@@ -1,0 +1,36 @@
+nw
+--
+remove old dependencies in nw (i thought they were gone already)
+run those tests
+get smarter with automation
+
+
+
+add all dependencies and test
+-----------------------------
+nw
+http
+single.[ch]
+duktape.[ch]
+	I will always control this build
+sqlite.[ch]
+	I CAN control this build, but it's best if I don't...
+	A flag should allow me to specify the build path when building "sqrooge"
+	
+
+
+
+why?
+----
+after months I'm still having dumb problems with cf...
+no one likes it, for not totally bad reasons...
+
+
+
+lua
+---
+test a LOCAL build of lua with 5.2.4 and 5.3.x
+keep it in vendor
+
+
+
