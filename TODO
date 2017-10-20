@@ -1,36 +1,122 @@
-nw
---
-remove old dependencies in nw (i thought they were gone already)
-run those tests
-get smarter with automation
-
-
-
-add all dependencies and test
------------------------------
-nw
-http
-single.[ch]
-duktape.[ch]
-	I will always control this build
-sqlite.[ch]
-	I CAN control this build, but it's best if I don't...
-	A flag should allow me to specify the build path when building "sqrooge"
-	
-
-
-
 why?
 ----
 after months I'm still having dumb problems with cf...
 no one likes it, for not totally bad reasons...
 
+theoretically, it's not super hard...
+- open a socket
+- parse the message
+- process it via any means
+- send it back
+- call it a day
 
 
 lua
 ---
-test a LOCAL build of lua with 5.2.4 and 5.3.x
-keep it in vendor
+- built fine on osx... :|  hmm
+- table load utilities easier with some stuff (no two steps w/o single)
+- error function that always works reliably
+- dir and read file functions
+- some way to run from a config file 
 
+
+a decent framework shouldn't do a whole lot, but the following are required:
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+<utilities are hard to make stable, and JS does a lot of things that I would
+need... including shipping with a package manager...>
+
+string.
+socket.
+db.
+file
+
+
+keep me handy
+=============
+	- handle a socket
+		-s, -k = start, kill a server via hypno
+		open it 
+		receive data from it
+		see what came parsed
+		send data through it
+		close it
+
+	- database drivers:
+		-t [ mysql, sqlite3, postgresql, etc ] = test database drivers via hypno-test
+		sqlite3
+		mysql
+		postgresql
+		maybe one of the nosqls depending on need
+
+	- routing
+		-u <file> = test a router setup via hypno (no json)
+		interpret the routes in a file as they relate to code
+
+	- templating
+		-f <file> = test templates with data and files, 
+		-d {} or "select * from etc;" =  you'll need some sort of lua data 
+		be able to do raw replacements
+		be able to do scripting in the language (use the language)
+		
+	- tooling
+		this can be done from c too... no reason not to, but it can always be removed
+		-c <dir> ...
+		or
+		--create-from <file> 
+		shell script for now... is fine....
+		can't move quickly w/o it
+		create new directories and route structures
+		remove directories
+		possibly view what's in those directories
+
+	- handle the request / response chain
+		obvs, there's nothing here...
+		give the user some variables to choose from
+		be able to set things that the user should be able to set
+		after parsing, basic routes are always needed:
+		/dump
+		/debug
+		/etc...
+
+	- run unit tests
+		-t = run unit tests via hypno...	
+
+
+
+now write a battle plan
+=======================
+
+x modify abws-server.c to be less full featured so it can handle this easy job...
+
+write a server that:
+
+x opens a socket:
+
+x recvs ALL data:
+
+	after parse, I should know where the site is:
+	after finding it, I can then send it somewhere...
+
+	EITHER
+		send the whole message to Lua, let it do parsing
+		create a header table (there should always be one)
+		create a body table if there is one
+	x OR
+		the http library does this already,
+		so convert that table to Lua via a table convert function laying around somewhere
+
+	(I LEFT OFF HERE)
+	*interpret a data file that should describe routing 
+
+	EITHER in Lua
+		try to run whatever lua code is there
+		then run whatever views are there
+	OR in C 
+		load all the files referenced as models, catching exceptions, data can automatically be wrapped in the file name 
+		then interpret the views
+
+	all of this data should be written to a buffer and be done
+
+	then close and start again
 
 
