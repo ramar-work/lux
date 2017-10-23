@@ -17,7 +17,13 @@ main: $(OBJ)
 	@echo $(CC) $(CFLAGS) $(OBJ) -o $(NAME) -llua
 	@$(CC) $(CFLAGS) $(OBJ) -o $(NAME) -llua
 
+testit: 
+	@echo $(CC) -c -DSQROOGE_H $(CFLAGS) vendor/single.c vendor/nw.c vendor/http.c bridge.c tests.c 
+	@$(CC) -c -DSQROOGE_H $(CFLAGS) vendor/single.c vendor/nw.c vendor/http.c bridge.c tests.c 
+	@echo $(CC) $(CFLAGS) single.o nw.o http.o bridge.o tests.o -o ho -llua
+	@$(CC) $(CFLAGS) single.o nw.o http.o bridge.o tests.o -o ho -llua
 
+	
 # A not-so-main target, that will probably result in a few object files...
 objs: $(OBJ)
 	@printf "Finished building objects\n"
@@ -33,6 +39,5 @@ pkg:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
+	-@rm $(NAME) 
 	-@find . | egrep '\.o$$' | xargs rm
-#		sed '/sqlite3.o/d' #| xargs rm 
-#	-@rm $(BINS) vendor/sqlite3.o 2>/dev/null

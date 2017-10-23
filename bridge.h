@@ -12,3 +12,6 @@
 int table_to_lua (lua_State *, int, Table *);
 int lua_to_table (lua_State *, int, Table *);
 void lua_loop ( lua_State *L );
+int lua_load_file( lua_State *, const char *filename, char *err );
+int lua_load_file2( lua_State *, Table *, const char *, char * );
+void lua_tdump (lua_State *L);

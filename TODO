@@ -120,3 +120,89 @@ x recvs ALL data:
 	then close and start again
 
 
+
+
+
+ideas
+=====
+- lua comes with a package manager
+	because it can be configured on a per-user basis, it may
+	be a great idea to configure some kind of script in setup/ to 
+	introduce packages on a local level
+
+- handling a large multi inundated request server may be easier in Lua than
+	in C.  mostly because it supports a lot of things you need to make it happen	
+
+- docs can be self generating sort of
+
+
+
+haha
+====
+- initializing this router is the fucking poops
+- however, once its done, I think thats it...
+
+
+so uh... 
+x	take httptest.c 
+x	load lua
+x	dump the table 
+	dump what Lua sees
+	then it should be easier to write the router against it...
+	really, I don't think I needed that...
+	all I needed were the URLs
+
+	when testing: 
+		test the status of the page, (200, 400 or 500 -- 500s can be thrown when args don't match, but will probably NOT work that way in prod)
+		test that the right datatype is coming through
+		utilities work well, so maybe use a "mirrored" Table?	
+
+	battle plan:
+		you have a goal:
+			$5 * 50000 = $250,000
+			If you made a small business that charged customer from $1 - $5 a month, you would see anywhere from $50000 to $250000 a month in revenue with 50000 customers.  Stick with $5 a month.  That is FAR cheaper than all competitors	
+		
+		knock out c/c debt, only $3.0K  ( i should hit that last $800, but come up w/ another way.  it's not useful either to knock this out )
+
+		try to find a niche as a consultant for rough times... (so talk to agencies)
+
+		bi-monthly visits might be the most sound way to do good things
+
+		live somewhere you like
+		
+		have 6 mos of expenses SAVED (not coming, not on the way, just saved)
+
+		find a business partner?	
+
+
+.
+
+if you finish this, do something fun with it...
+	think about front end too...
+	and marketing...
+
+
+
+	break url,
+	check each portion for a match in the table
+		*use strcmbd to append new url poritions to the buffer ( x, x.y, x.y.z, etc... )
+	if match found
+		check type:
+			table =
+				if the url still has parameters, check for any other values 
+					the problem is here, is that /check/:id could happen, where ID is required...  
+					 but even then, expects can handle this... tell it that the parameter received should be something...
+					continue
+				if not, 
+					check for 'expects' to validate values supplied
+					check for 'model' and 'view' tables or values to evaluate
+			string =
+				return it
+				would be incredibly useful to return the same named items... in model and app
+			number = 
+				return it
+			funct  = 
+				execute and return its result
+			sql?   = 
+				should reutrn formatted data, maybe specify the datatype... 
+				just thinking crazy

@@ -30,6 +30,9 @@ _Bool http_run (Recvr *r, void *p, char *e);
 //Specify a pidfile
 const char pidfile[] = "hypno.pid";
 
+//Error buffer
+char err[ 4096 ] = { 0 };
+
 //This is nw's data structure for handling protocols 
 Executor runners[] = 
 {
@@ -160,26 +163,22 @@ _Bool http_run (Recvr *r, void *p, char *e)
 		set_lua_functions( L, rg );
 	}
 
-	#if 0 //C or Lua?
-	#if 1
+	#if 0
 	//This block exists to test out a local example
 	char *md = "example/app";
 	char *vd = "example/views";
 	char *ff = "example/data.lua";
 	#endif
 
+	#if 1 //C or Lua?
 	//Convert HTTP structure to something Lua can read
 	table_to_lua( L, 1, &h->request.table );
-
-	//This path assumes that I use C to just call Lua at the right places.
-
-	//This lua_load_file function is in charge of kind of a lot... 
-	//It will load and check for errors, create a table and entry with the right scope name and rules,
-	//and something else...
+	int routeType = 0;
+	const char *file = "example/data.lua";
 
 	//Because of the amount of data coming from that data.lua file, loading here is easier
-	if ( lua_load_file( L, data.lua.file )	 == bla ) 
-		{ ... handle whatever status here after loading the data.lua file } 
+	if ( lua_load_file( L, file, err ) == 0 ) 
+		;
 	else 
 	{
 		//I have to negotiate the route here
@@ -188,20 +187,34 @@ _Bool http_run (Recvr *r, void *p, char *e)
 		//  /abasdf      => each route can be named, so this is just a matter or lt_get( tt, $routename )
 		//  /asdfasf/asdfsd  => same thing here
 		//  This starts going wrong when I thrown in wildcards and regex...
+		//
+		// Some tests:
+		//	/abc          - A regular route
+		//	/abc/:id/def  - A route dependent on a user id
+		//  /abc/*        - A route that accepts wildcards
+		//
+		// lt_* functions:
+		// 	Countdown from the top:
+		//	
 
+		lt_dump( &h->request.table );
+		//buffer to put the parts together	
+		//lt_get( &h->request.table, "/x/y/z" )
+
+#if 0
 		//Making an endpoint to stress test this routing engine would work wonders
 
 		//At this point, the route could be just about anything... so like before...
-		if ( routeType == string )
-			//Serve a text string with no nothing needed.  Templating will probably be supported.
-		else if ( routeType == function )
-			//Execute a function.  Always assume that the environment is available. 
-		else if ( routeType == path )
-			//Serve the contents of a file (like a static image or something that should always respond to a route name)
-		else if ( routeType == table )		
+		if ( routeType == 0 )
+			;//Serve a text string with no nothing needed.  Templating will probably be supported.
+		else if ( routeType == 1 )
+			;//Execute a function.  Always assume that the environment is available. 
+		else if ( routeType == 2 )
+			;//Serve the contents of a file (like a static image or something that should always respond to a route name)
+		else if ( routeType == 3 )		
 		{
 			//Loop through all models
-			for ( int i=0; i < limit; i ++ )
+			for ( int i=0; i < 0 ; i ++ )
 			{
 				if ( lua_load_file( L, file ) )
 					//handle error or status
@@ -209,7 +222,7 @@ _Bool http_run (Recvr *r, void *p, char *e)
 			}
 
 			//Loop through all views 
-			for ( int i=0; i < limit; i ++ )
+			for ( int i=0; i < 0 ; i ++ )
 			{
 				//Always render via the stuff I've got (for now anyway)
 				if ( lua_render_file( L, file ) )
@@ -217,6 +230,7 @@ _Bool http_run (Recvr *r, void *p, char *e)
 				}
 			}
 		}
+#endif
 	}
 	#else
 	//Really, it would be simpler to just hand off the process here.
@@ -514,6 +528,7 @@ Option opts[] =
 	//Debugging and whatnot
 	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
 	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },
+	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
 
 	//Server stuff
 	{ "-s", "--start"    , "Start a server."                                },
@@ -538,6 +553,25 @@ int main (int argc, char *argv[])
 	//Catch kill option first
 	if ( opt_set(opts, "--kill") )
 		killServer();
+
+	//
+	if ( opt_set(opts, "--file") )
+	{
+		lua_State *L = NULL;  
+		char *f = opt_get( opts, "--file" ).s;
+		Table t;
+
+		if (!( L = luaL_newstate() ))
+		{
+			fprintf( stderr, "L is not initialized...\n" );
+			return 0;
+		}
+		
+		lt_init( &t, NULL, 127 );
+		lua_load_file( L, f, err  );	
+		lua_to_table( L, 1, &t );
+		lt_dump( &t );
+	}	
 
 	//Start a server (and possibly fork it)
 	if ( opt_set(opts, "--start") ) 
