@@ -8,7 +8,7 @@ CC = gcc
 
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
-
+LLVMS=/usr/local/Cellar/llvm/5.0.0/bin/llvm-symbolizer
 CFLAGS = $(CLANGFLAGS)
 
 
