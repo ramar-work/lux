@@ -3,13 +3,14 @@ NAME = hypno
 SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c bridge.c main.c
 OBJ = ${SRC:.c=.o}
 
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -ansi -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H
-CC = gcc
-
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 LLVMS=/usr/local/Cellar/llvm/5.0.0/bin/llvm-symbolizer
 CFLAGS = $(CLANGFLAGS)
+
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -ansi -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H
+CC = gcc
+CFLAGS = $(GCCFLAGS)
 
 
 # A main target, that will most likely result in a binary
