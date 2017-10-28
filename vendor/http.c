@@ -717,7 +717,7 @@ _Bool http_read (Recvr *r, void *p, char *e)
 					case ENOSPC:
 					case EPIPE:
 					case ERANGE:
-						http_err( h, 500, strerror( errno ) );
+						http_err( h, 500, "%s\n", strerror( errno ) );
 						break;
 					default:
 						http_err( h, 500, "unknown error occurred at read" );

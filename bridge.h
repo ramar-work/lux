@@ -1,7 +1,7 @@
+#include "vendor/single.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#include "vendor/single.h"
 
 #ifdef DEBUG_H
  #define obprintf( f, ... ) fprintf( f, __VA_ARGS__ )

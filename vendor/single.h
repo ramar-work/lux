@@ -170,6 +170,9 @@
 #endif
 
 #ifndef TAB_H
+ #ifndef DEBUG_H
+  #define LT_DUMPFULL
+ #endif
  #define LT_POLYMORPH_BUFLEN 2048
  #define LT_MAX_HASH 7 
  #define lt_blob_at( t, i ) \
