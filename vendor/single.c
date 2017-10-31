@@ -1268,7 +1268,7 @@ Buffer *render_rendered (Render *r)
  #else
   static const int lt_max_slots     = 7;
  #endif
- #ifdef DEBUG_H
+ #ifndef DEBUG_H
   static const char *fmt = "%-4s\t%-10s\t%-5s\t%-10s\t%-30s\t%-6s\t%-20s\n";
  #endif
 static const LiteRecord nul = { 0 };
@@ -1514,46 +1514,34 @@ LiteType lt_add ( Table *t, int side, LiteType lt, int vi, float vf,
 	if ( lt == LITE_INT )
 	{
 		r->vint = vi;
-	#ifdef DEBUG_H
 		SHOWDATA( "Adding int %s %d to table at %p", ( !side ) ? "key" : "value", r->vint, ( void * )t );
-	#endif
 	}
 	else if ( lt == LITE_FLT )
 	{
 		r->vfloat = vf;
-	#ifdef DEBUG_H
 		SHOWDATA( "Adding float %s %f to table at %p", ( !side ) ? "key" : "value", r->vfloat, ( void * )t );
-	#endif
 	}
 #ifdef LITE_NUL
 	else if ( lt == LITE_NUL )
 	{
 		r->vnull = NULL;
-	#ifdef DEBUG_H
 		SHOWDATA( "Adding null %s to table at %p", ( !side ) ? "key" : "value", ( void * )t );
-	#endif
 	}
 #endif
 	else if ( lt == LITE_USR )
 	{
 		r->vusrdata = vn;
-	#ifdef DEBUG_H
 		SHOWDATA( "Adding userdata %p to table at %p", ( void * )r->vusrdata, ( void * )t );
-	#endif
 	}
 	else if ( lt == LITE_TBL )
 	{
-	#ifdef DEBUG_H
 		SHOWDATA( "Adding invalid value table!" );
-	#endif
 		return ( t->error = ERR_LT_INVALID_VALUE ) ? -1 : -1;
 	}
 	else if ( lt == LITE_BLB )
 	{
 		r->vblob.blob = vb, r->vblob.size = vblen;
-	#ifdef DEBUG_H
 		SHOWDATA( "Adding blob %s of length %d to table at %p", (!side) ? "key" : "value", r->vblob.size, ( void * )t );
-	#endif
 	}
 	else if ( lt == LITE_TXT )
 	{
@@ -1567,16 +1555,12 @@ LiteType lt_add ( Table *t, int side, LiteType lt, int vi, float vf,
 			memset( r->vchar, 0, vblen + 1 );
 			memcpy( r->vchar, vb, vblen );
 			r->vchar[ vblen ] = '\0';
-		#ifdef DEBUG_H
 			SHOWDATA( "Adding text %s '%s' to table at %p", ( !side ) ? "key" : "value", r->vchar, ( void * )t );
-		#endif
 		}
 	}
 	else 
 	{
-	#ifdef DEBUG_H
 		SHOWDATA( "Attempted to add unknown %s type to table at %p", ( !side ) ? "key" : "value", ( void * )t );
-	#endif
 		return 0;
 	}
 	return lt;
@@ -1633,9 +1617,7 @@ int lt_move (Table *t, int dir)
 	//Left or right?	
 	if ( !dir )
 	{
-	#ifdef DEBUG_H
 		SHOWDATA( "Descending into table value to table at %p", ( void * )t );
-	#endif
 		//Set count of elements in this new table to actual count
 		LiteTable *T = &value->v.vtable;
 		value->type  = LITE_TBL;
@@ -1654,9 +1636,7 @@ int lt_move (Table *t, int dir)
 		key->type      = LITE_TRM;
 		value->type    = LITE_NUL;
 		LiteRecord *r  = &key->v;	
-	#ifdef DEBUG_H
 		SHOWDATA( "Ascending from inner table within at %p", ( void * )t );
-	#endif
 
 		//
 		if ( !t->current->parent )
@@ -2102,8 +2082,13 @@ void lt_free (Table *t)
 	for ( int ii=0; ii < t->index; ii++ )
 	{
 		LiteKv *k = t->head + ii;
+		SHOWDATA( "Checking for and freeing key at index [%d] -> %p", ii, k->key.v.vchar );
 		( k->key.type == LITE_TXT ) ? free( k->key.v.vchar ), k->key.v.vchar = NULL : 0;
+		SHOWDATA( "Key at index is now                   [%d] -> %p", ii, k->key.v.vchar );
+
+		SHOWDATA( "Checking for & freeing value at index [%d] -> %p", ii, k->value.v.vchar );
 		( k->value.type == LITE_TXT ) ? free( k->value.v.vchar ), k->value.v.vchar = NULL : 0;
+		SHOWDATA( "Value at index is now                 [%d] -> %p", ii, k->value.v.vchar );
 	}
 
 	if ( t->mallocd )
@@ -2176,10 +2161,10 @@ static void lt_printindex (LiteKv *tt, int ind)
 			/*LITE_NODE is handled in printall*/
 			if (t == LITE_NON)
 				w += snprintf( &b[w], lt_buflen - w, "%s", "is uninitialized" );
-#ifdef LITE_NUL
+		#ifdef LITE_NUL
 			else if (t == LITE_NUL)
 				w += snprintf( &b[w], lt_buflen - w, "is terminator" );
-#endif
+		#endif
 			else if (t == LITE_USR)
 				w += snprintf( &b[w], lt_buflen - w, "userdata [address: %p]", r->vusrdata );
 			else if (t == LITE_TBL) 
@@ -2189,6 +2174,47 @@ static void lt_printindex (LiteKv *tt, int ind)
 					"table [address: %p, ptr: %ld, elements: %d]", (void *)rt, rt->ptr, rt->count );
 			}
 		}
+
+	#ifdef LT_DUMPFULL
+		//Print the parent key in full
+		if ( !i && ind )
+		{
+			int i = ind;
+			LiteKv *parent = tt->parent;
+			LiteKv *ptr[ 10 ] = { NULL };
+
+			//Build the full "hash path" so that it reads from left to right
+			while ( parent ) {
+				ptr[ --i ] = parent; 
+				parent = parent->parent;
+			}
+
+			//Then assemble a string
+			for ( int i=0; i<ind; i++ )	
+			{
+				int t = ptr[ i ]->key.type;
+				LiteRecord tv = ptr[ i ]->key.v;
+				if ( t == LITE_INT || t == LITE_FLT )
+					w += snprintf( &b[w], (lt_buflen - w) - 1, "%d.", tv.vint );
+				else if ( t == LITE_TXT )
+					w += snprintf( &b[w], (lt_buflen - w) - 1 , "%s.", tv.vchar );
+				else if ( t == LITE_BLB )
+				{
+					LiteBlob *bb = &r->vblob;
+					if ( bb->size < 0 )
+						return;	
+					if ( bb->size > lt_maxbuf )
+						w += snprintf( &b[w], lt_buflen - w-1, "is blob (%d bytes)", bb->size);
+					else {
+						memcpy( &b[w], bb->blob, bb->size ); 
+						memcpy( &b[w], (unsigned char *)".", 1 ); 
+						w += bb->size + 1;
+					}
+				}
+			}
+		}
+	#endif
+
 		if (t == LITE_FLT || t == LITE_INT)
 			w += snprintf( &b[w], lt_buflen - w, "%d", r->vint );
 		else if (t == LITE_FLT)
@@ -2217,14 +2243,12 @@ static void lt_printindex (LiteKv *tt, int ind)
 
 
 
-#ifdef DEBUG_H 
+#ifndef DEBUG_H 
 //Get a key or value somewhere
 void lt_printall ( Table *t ) 
 {
-#ifdef DEBUG_H
 	//Header
 	fprintf( stderr, fmt, "Index", "KType", "VType", "Value", "CombinedValue", "HashOf", "Hashes" );
-#endif
 
 	for ( int ii=0; ii < t->index; ii++ )
 	{
@@ -3307,28 +3331,28 @@ static _Bool sq_add_sqlite3_blob (sqlite3_stmt *stmt, int i, const SQWrite *w) {
 
 
 static _Bool pr_add_sqlite3_int (sqlite3_stmt *stmt, int i, const SQWrite *w) {
-	fprintf(stderr, "Adding int at column %d\n", i);
+	SHOWDATA( "Adding int at column %d\n", i);
 	fprintf(stderr, "%d\n", w->v.n); 
 	return 1;
 }
 
 
 static _Bool pr_add_sqlite3_double (sqlite3_stmt *stmt, int i, const SQWrite *w) {
-	fprintf(stderr, "Adding float at column %d\n", i);
+	SHOWDATA( "Adding float at column %d\n", i);
 	fprintf(stderr, "%f\n", w->v.f); 
 	return 1;
 }
 
 
 static _Bool pr_add_sqlite3_text (sqlite3_stmt *stmt, int i, const SQWrite *w) {
-	fprintf(stderr, "Adding text at column %d\n", i);
+	SHOWDATA( "Adding text at column %d\n", i);
 	write(2, w->v.c, w->len);
 	return 1;
 }
 
 
 static _Bool pr_add_sqlite3_blob (sqlite3_stmt *stmt, int i, const SQWrite *w) {
-	fprintf(stderr, "Adding blob at column %d\n", i);
+	SHOWDATA( "Adding blob at column %d\n", i );
 	write(2, w->v.d, w->len);
 	return 1;
 }
@@ -3336,13 +3360,13 @@ static _Bool pr_add_sqlite3_blob (sqlite3_stmt *stmt, int i, const SQWrite *w) {
 
 /*Handles serializing everything*/
 static int sq_sqlite3_column_int (sqlite3_stmt *stmt, int col, uint8_t *msg) {
-	fprintf(stderr, "%s\n", sqlite3_column_text(stmt, col)); 
+	SHOWDATA ("Adding %s to SQL database.\n", sqlite3_column_text(stmt, col) ); 
 	return 1;
 }
 
 
 static int sq_sqlite3_column_double (sqlite3_stmt *stmt, int col, uint8_t *msg) {
-	fprintf(stderr, "%s\n", sqlite3_column_text(stmt, col)); 
+	SHOWDATA ( "Adding %s to SQL database \n", sqlite3_column_text(stmt, col)); 
 	return 1;
 }
 

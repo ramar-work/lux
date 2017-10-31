@@ -1,43 +1,85 @@
-/*
+/* ---------------------------------- * 
 tests.c
 -------------
 
-There are a lot of tests that will ship with hypno.
-Right now, all I really need to do is beat on the URLs.
-There will be more later...
+There are a lot of tests that will ship 
+with hypno.  Right now, all I really need 
+to do is beat on the URLs.  There will be
+more later...
 
 - router
 - maybe filename scopes 
-
-
-
-*/
+------------------------------------- */
 #include "bridge.h"
 
-typedef struct Test {
-	const char *method  ,
-						 *url     ;
-} Test; 
+
+//Types of items
+typedef enum 
+{
+	CC_NONE, 
+	CC_MODEL, 
+	CC_VIEW, 
+	CC_FUNCT,
+	CC_STR
+} CCtype;
+
+
+typedef struct 
+{
+	int   type;      //model or view or something else...	
+	char *content;   //Most of the time it's a file, but it really should execute...
+	void *funct;     //This can be used for userdata (which are just Lua functions here)
+} Loader;
+
+
+typedef struct
+{
+	const 
+	char   *method  ,
+			   *url     ;
+	int    estatus ;
+	Loader result[10];
+} Test;
 
 
 
-Test routes[] = {
-	{ "GET"    , "/falafel/cd/effeg" },    // NO 
+/*
+Below is a list of tests organized using the Test 
+structure above.  Each test specifies: 
+	- a method (for testing the 'expects' key)
+	- a URL (to simulate receiving a URL from the user)
+	- a status (the expected status according to what I've received)
+	- a result table (when the router is done, a data structure is 
+		returned to describe how the payload is assembled)
+ */
+Test routes[] = 
+{
+	//TEST 1
+	{ "GET"    , "/falafel" , 400, {
+		{ CC_MODEL, "falafel", NULL },
+	}
+	},    // NO 
+
+	//TEST 2
+	{ "GET"    , "/spaghetti/sauce" , 200, {
+		{ CC_MODEL, "spaghetti", NULL },
+		{ CC_STR  , "sauce is too sweet!", NULL },
+	}
+	},    // NO 
+
+#if 0
+	{ "GET"    , "/spaghetti/sauce"  , 200  },    // NO 
 	{ "POST"   , "/spaghetti/cd/effeg" },    // NO 
 	{ "PUT"    , "/ab/cd/effeg" },    // NO 
 	{ "OPTIONS", "/ab/cd/effeg" },    // NO 
 	{ "TRACE"  , "/ab/cd/effeg" },    // NO 
 	{ "HEAD"   , "/ab/cd/effeg" },    // NO 
+#endif
 	{ NULL     , NULL           },    // END
 };
 
-//sigh... this is so silly...
-typedef enum {
-	CC_NONE, 
-	CC_MODEL, 
-	CC_VIEW, 
-	CC_FUNCT
-} CCtype ;
+
+
 
 //this is pretty fucking silly too
 struct Run {
@@ -46,14 +88,20 @@ struct Run {
 } Run[] = {
 	{ "model",  CC_MODEL }, 
 	{ "view" ,  CC_VIEW  }, 
+	{ "string" ,  CC_STR }, 
+	{ "function" ,  CC_FUNCT }, 
 };
 
+
+//...
 char *CCtypes[] = {
 	[CC_NONE]  = "None",
-	[CC_MODEL] = "Model",
-	[CC_VIEW]  = "View",
-	[CC_FUNCT] = "Function",
+	[CC_MODEL] = "Model",     //Models are usually executed, and added to env 
+	[CC_VIEW]  = "View",      //Views will be loaded, parsed, and sent to buffer
+	[CC_FUNCT] = "Function",  //Functions are executed, payload sent to buffer
+	[CC_STR]   = "String",    //Strings are just referenced and loaded to buffer
 };
+
 
 //...
 char *printCCtype ( CCtype cc )
@@ -61,12 +109,10 @@ char *printCCtype ( CCtype cc )
 	switch (cc)
 	{
 		case CC_NONE:
-			return CCtypes[ cc ];
 		case CC_MODEL: 
-			return CCtypes[ cc ];
 		case CC_VIEW: 
-			return CCtypes[ cc ];
 		case CC_FUNCT:
+		case CC_STR:
 			return CCtypes[ cc ];
 		default:
 			return NULL;
@@ -76,7 +122,6 @@ char *printCCtype ( CCtype cc )
 
 //ERR_TABLE_IS_EMPTY - A route has a table as a value, but no nothing (this could be an implied rule)
 //Could also just put nothing on the other side... although a blank table makes more sense... 
-
 int main ( int argc, char *argv[] )
 {
 	Table t;
@@ -91,11 +136,11 @@ int main ( int argc, char *argv[] )
 		lua_newtable( L );
 	}
 
-	//Load the file
+	//Load the file with Lua and convert results to Table
 	if ( !lua_load_file( L, "a.lua", err ) )
 		return err( 1, "everything is not working...\n" );
 
-	if ( !lt_init( &t, NULL, 127 ) )
+	if ( !lt_init( &t, NULL, 666 ) )
 		return err( 2, "table did not initialize...\n" );
 			
 	if ( !lua_to_table( L, 2, &t ) )
@@ -106,17 +151,6 @@ int main ( int argc, char *argv[] )
 
 	//Loop through each Test
 	Test *tt = routes;
-
-	//
-	struct loader {
-		int   type;      //model or view or something else...	
-		char *filename;  //Most of the time it's a file, but it really should execute...
-		void *funct;     //This can be used for userdata (which are just Lua functions here)
-	} Loader[ 10 ];
-
-	//Watch this for obvious reasons...
-	memset( Loader, 0, sizeof( Loader ));
-
 	while ( tt->method ) 
 	{
 		//Define a bunch of crap and print stuff to get the URL breakdown ready
@@ -127,25 +161,41 @@ int main ( int argc, char *argv[] )
 		char us[ 512 ];
 		memset( us, 0, sizeof(us) );
 		printf( "%s\n=========================\n", tt->url ); 
-		struct loader *LL = Loader;
+
+		//Initialize the loader structure that the router should return 
+		Loader loader[ 10 ];
+		memset( loader, 0, sizeof( Loader ) * 10 );
+		Loader *LL = loader;
+
+	#if 1
+		//Check for ? and & (query string stuff) and adjust string length 
+		int len = strlen( tt->url );
+		if ( memchrat(tt->url, '?', strlen(tt->url)) || memchrat(tt->url, '&', strlen(tt->url)) )
+		{
+			int ma = memchrat(tt->url, '?', strlen(tt->url));
+			int na = memchrat(tt->url, '&', strlen(tt->url));
+			len -= ( na != -1 ) ? na : 0;
+			len -= ( ma != -1 ) ? ma : 0;
+		}
+	#endif
 
 		//Break the url down by searching forwards for '/'
-		while ( memwalk( &a, (uint8_t *)tt->url, (uint8_t *)"/", strlen( tt->url ), 1 )  )
+		while ( memwalk( &a, (uint8_t *)tt->url, (uint8_t *)"/", len, 1 ) )
 		{
 			//Skip no matches
-			if ( !a.size )
-				continue;
+			if ( !a.size ) continue;
 
-			//Check for ? and & (query string stuff) (won't be in the real thing)
 			//Recycle the same buffer for each "merge" of the URL
 			memcpy( &us[ b ], &tt->url[ a.pos ], a.size );
 			b += a.size;
 			us[ b ] = '\0';
 			b += 1;
-			printf( "new user url: %s\n", us );
+			//printf( "new user url: %s\n", us );
+
+			//Check the hash and tell me what it is...
+			int yh = lt_get_long_i( &t, (uint8_t *)us, strlen( us ) ); 
 
 			//Check each URL to see if it's a route match
-			int yh = lt_get_long_i( &t, (uint8_t *)us, strlen( us ) ); 
 			if ( yh == -1 ) 
 				printf( "val not found '%s'...\n", us );
 			else 
@@ -156,45 +206,68 @@ int main ( int argc, char *argv[] )
 				if ( type == LITE_NON || type == LITE_TRM || type == LITE_INT || type == LITE_FLT || type == LITE_NUL )
 					err( 0, "type not accepted...\n" );
 				else if ( type == LITE_USR )
-					err( 0, "type not accepted...\n" );//A Lua function most likely...not ready yet
-				else if ( type == LITE_TXT || type == LITE_BLB ) 
-					;//LL->type = Run[ii].type, LL++;	
-				else if ( type == LITE_TBL ) {
-					//Check for 'expects', 'model(s)' and 'view(s)'
-					for ( int ii=0; ii<sizeof(Run)/sizeof(struct Run); ii++ ) {
-						char *filetype = Run[ ii ].filetype;
-						char *locate   = strcmbd( ".", us, filetype );
-						int m    = lt_get_long_i( &t, (uint8_t *)locate, strlen( locate ));
-						LL->type = Run[ii].type;	
-						//printf( "filetype: %s\n", filetype );printf( "Hash of '%s' is %d\n", locate, m );
+				{
+					//A Lua function most likely...not ready yet
+					err( 0, "function type not accepted (yet)...\n" );
+				}
+				else if ( type == LITE_BLB ) 
+				{
+					//Binary data..., unsure how this will work now
+					err( 0, "binary type not accepted (yet)...\n" );
+				}
+				else if ( type == LITE_TXT ) 
+				{
+					LL->type = CC_STR; 
+					LL->content = lt_text_at( &t, yh ); 
+					LL++;	
+				}
+				else if ( type == LITE_TBL ) 
+				{
+					//Check for 'expects'
+					//{...}
 
-						//Error out if hashes aren't there (for now)
-						if ( m == -1 )
-							printf( "Key not found: %s\n", locate );
-						else {
+					//Check for 'model(s)' and 'view(s)'
+					char *fname[2] = { "model", "view" };
+					int ctype[2] = { CC_MODEL, CC_VIEW };
+					int m = -1;
+	
+					for ( int ii=0; ii < 2; ii++ ) 
+					{
+						char *locate = strcmbd( ".", us, fname[ ii ] );
+						if ((m = lt_get_long_i( &t, (uint8_t *)locate, strlen( locate ))) > -1 )
+						{
 							int mtype = lt_rettype( &t, 1, m  );
 							//Then check the type and do something
 							if ( mtype != LITE_TXT && mtype != LITE_TBL /* && mtype != LITE_USR */ )
+							{
 								//LL->funct = lt_userdata_at( &t, m ); 
  								printf( "stupid wrong type...\n" ); //Throw an error if this is the case
-							else if ( mtype == LITE_TXT )
-								LL->filename = lt_text_at( &t, m ), LL++;
-							else if ( mtype == LITE_TBL ) {
-int dh=1;
-								//There is no looping feature yet, increase m by 1 until you hit a terminator
-								while ( lt_rettype( &t, 0, ++m ) != LITE_TRM ) {
+							}
+							else if ( mtype == LITE_TXT ) 
+							{
+								LL->content = lt_text_at( &t, m ); 
+								LL->type = ctype[ ii ];
+								LL++;	
+							}
+							else if ( mtype == LITE_TBL ) 
+							{
+								//Increment current table index until you hit a terminator
+								while ( lt_rettype( &t, 0, ++m ) != LITE_TRM ) 
+								{
 									//lt_rettype( &t, 0, m ) should NEVER be anything but a number, stop if not
 									int kt = lt_rettype( &t, 0, m ), vt = lt_rettype( &t, 1, m );
 									if ( vt != LITE_TXT )
-										printf( "%s\n", "Value is not a string, fuck you and die :)" );
-									else {
-										printf( "match %d?\n", dh++ );
-										LL->filename = lt_text_at( &t, m );	
+										printf( "%s\n", "Value not yet supported..." );
+									else 
+									{
+										LL->content = lt_text_at( &t, m );	
+										LL->type = ctype[ ii ];
 										LL++;
 									}
 								} // while ( lt_rettype( ... ) != LITE_TRM )
 							} // ( mtype == LITE_TBL )
 						} // ( m == -1 )
+						free( locate );
 					} // for ( ;; )
 				}	// else ( type ==	LITE_NON )
 			} // else if ( yh == -1 )
@@ -202,23 +275,23 @@ int dh=1;
 			//Add to the string for the next iteration
 			us[ b - 1 ] = '.';	
 			us[ b ] = '\0';
-			printf( "url: '%s'\n", us );
+			printf( "next iteration of URL: '%s'\n", us );
 		}
 
-#if 1
 		//This test is done.  I want to see the structure before moving on.
-		//struct loader *FU = &LL[0];
-		struct loader *FU = &Loader[0];
-		while ( FU->type ) {
-			printf( "%s -> %s\n", printCCtype( FU->type ), FU->filename );
-			FU++;
+		printf( "Execution path for route: %s\n", tt->url ); 
+		Loader *Ld = &loader[0];
+		while ( Ld->type ) {
+			printf( "%s -> %s\n", printCCtype( Ld->type ), Ld->content );
+			Ld++;
 		}
-#endif
 
 		//Move to the next test		
-		getchar();
-		fprintf( stderr, "%s\n\n", tt->method );	
+		//fprintf( stderr, "%s\n\n", tt->method );	
 		tt++;
 	} // end while( tt->method )
+
+	lt_free( &t );
 	return 0;
 }
+// vim: tabstop=2 number
