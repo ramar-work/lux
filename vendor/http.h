@@ -162,6 +162,7 @@ _Bool http_set_header (HTTP *h, const char *key, const char *value);
 _Bool http_set_version (HTTP *h, float version); 
 _Bool http_set_content_length (HTTP *, int ); 
 _Bool http_set_content (HTTP *, const char * /*mimetype*/, uint8_t *, int); 
+
 #define http_set_content_str( h, mime, str ) \
 	http_set_content (h, mime, (uint8_t *)str, strlen( str )); 
 

@@ -563,17 +563,17 @@ int http_pack_response (HTTP *h)
 	snprintf(ff, 4, (res->version < 2) ? "%1.1f" : "%1.0f", res->version);
 
 	//Copy the status line
-	res->mlen += sprintf( (char *)&statline[res->mlen], fmt, 
+	res->mlen += snprintf( (char *)&statline[res->mlen], 1024, fmt, 
 		ff, res->status, res->sttext);
 
 	//All other headers get res->mlen here
 	//....?
 
 	//Always have at least a content length line
-	res->mlen += sprintf( (char *)&statline[res->mlen], cfmt, res->clen);
+	res->mlen += snprintf( (char *)&statline[res->mlen], 1024, cfmt, res->clen);
 
 	//Finally, set a content-type
-	res->mlen += sprintf( (char *)&statline[res->mlen], ctfmt, res->ctype);
+	res->mlen += snprintf( (char *)&statline[res->mlen], 1024, ctfmt, res->ctype);
 
 	//Stop now if this is a zero length message.
 	if (!res->clen) {

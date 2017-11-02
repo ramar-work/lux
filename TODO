@@ -1,7 +1,10 @@
 sigh...
 =======
-remember: BIG hashes (until I get a chance to rewrite this)
+x loader seems to work with 'falafel'
+
+x remember: BIG hashes (until I get a chance to rewrite this)
 now, using the Loader structure, it should be pretty easy to write the rest of this...
+goes in the http func
 	while ( loader ) {
 		if ( loader->type == FUNCT )
 			a = loader->content( ... )

@@ -144,14 +144,12 @@ _Bool http_run (Recvr *r, void *p, char *e)
 	http_print_response( h );
  #else
 	//This is what I'll usually use and the majority of work should happen here.
-	LiteBlob  *b  = NULL;
+	const char *file = "b.lua"; // or "example/data.lua";
 	lua_State *L  = luaL_newstate(); 
 	luaCF     *rg = lua_functions;
-	Buffer    *rr = NULL;
+	Buffer    *rr = h->resb;
 	Table      t;     
 	Render     R; 
-	char      *mf = NULL, 
-            *vf = NULL;
 
 	//Check that Lua initialized here
 	if ( !L )
@@ -161,101 +159,106 @@ _Bool http_run (Recvr *r, void *p, char *e)
 		lua_newtable( L );
 		lua_loop( L );
 		set_lua_functions( L, rg );
+		//Convert HTTP structure to something Lua can read
+		table_to_lua( L, 1, &h->request.table );
 	}
 
-	#if 0
-	//This block exists to test out a local example
-	char *md = "example/app";
-	char *vd = "example/views";
-	char *ff = "example/data.lua";
-	#endif
-
-	#if 1 //C or Lua?
-	//Convert HTTP structure to something Lua can read
-	table_to_lua( L, 1, &h->request.table );
-	int routeType = 0;
-	//const char *file = "example/data.lua";
-	const char *file = "a.lua";
-
-	//Because of the amount of data coming from that data.lua file, loading here is easier
-	if ( lua_load_file( L, file, err ) == 0 ) 
-		;
+	//Load the first data.lua here
+	if ( !lua_load_file( L, file, err ) ) 
+		return http_err( h, 500, "Loading routes failed at file '%s': %s", file, err );
 	else 
 	{
-		//Turn on table
-		if ( !lt_init( &t, NULL, 666 ) )
-			return err( 2, "table did not initialize...\n" );
-
-		//Convert the Lua table to a C table
-		if ( !lua_to_table( L, 2, &t ) )
-			return err( 3, "could not convert Lua table ...\n" );
-
 		//Negotiate the route here.
 		Loader ld[ 10 ];
 		memset( ld, 0, sizeof( Loader ) * 10 );
+		Loader *l = ld;
+		char *ptr = NULL;
+
+		//Turn on table
+		if ( !lt_init( &t, NULL, 666 ) )
+			return http_err( h, 500, "table did not initialize...\n" );
+
+		//Convert the Lua table to a C table
+		if ( !lua_to_table( L, 2, &t ) )
+			return http_err( h, 500, "could not convert Lua table ...\n" );
+
+		//Return an error here and tell what happened (if it comes to that)
 		if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), &h->request.table, &t ) )
+			return http_err( h, 500, "Parsing routes failed." );
+
+		//Cycle through all of the elements comprising the route
+		while ( l->type ) 
 		{
-			//Return an error here...
-			//return err( 0, "You are megadeth..." );
-		}
-
-#if 0
-		//Making an endpoint to stress test this routing engine would work wonders
-
-		//At this point, the route could be just about anything... so like before...
-		if ( routeType == 0 )
-			;//Serve a text string with no nothing needed.  Templating will probably be supported.
-		else if ( routeType == 1 )
-			;//Execute a function.  Always assume that the environment is available. 
-		else if ( routeType == 2 )
-			;//Serve the contents of a file (like a static image or something that should always respond to a route name)
-		else if ( routeType == 3 )		
-		{
-			//Loop through all models
-			for ( int i=0; i < 0 ; i ++ )
+  	 #if 0
+			else if ( l->type == CC_QUERY )
+				return http_err( h, 500, "Lua query payloads don't work yet." );
+			else if ( l->type == CC_FUNCT )
+				return http_err( h, 500, "Lua function payloads don't work yet." );
+		 #endif
+			if ( l->type == CC_STR ) 
+				bf_append( rr, (uint8_t *)l->content, strlen( l->content ) );	
+			else if ( l->type == CC_MODEL || l->type == CC_VIEW ) 
 			{
-				if ( lua_load_file( L, file ) )
-					//handle error or status
+				//Check that the file exists and permissions are correct
+				const char *dir = "example1";
+				struct stat sb;
+				memset( &sb, 0, sizeof( struct stat ) );
+				char *file = NULL;
+				char *type = (l->type == CC_MODEL ) ? "lua" : "html";
+				char *sdir = (l->type == CC_MODEL ) ? "app" : "views";
+
+				file = strcmbd( "/", dir, sdir, l->content, type );
+				file[ (strlen( file ) - strlen( type )) - 1 ] = '.';
+				fprintf( stderr, "Loading %s file: %s\n", sdir, file );
+
+				if ( stat( file, &sb ) == -1 ) {
+					free( file );
+					return http_err( h, 500, "%s", strerror( errno ) );
 				}
-			}
 
-			//Loop through all views 
-			for ( int i=0; i < 0 ; i ++ )
-			{
-				//Always render via the stuff I've got (for now anyway)
-				if ( lua_render_file( L, file ) )
-					//handle error or status
+				//Execute referenced file name
+				if ( l->type == CC_MODEL )
+				{
+					//When model is successfully loaded, a key made of the FILENAME 
+					//will contain a table with the rendering data
+					if ( !lua_load_file( L, file, err ) )
+					{
+						free( file );
+						return http_err( h, 500, "%s", err );
+					}
 				}
+				else if ( l->type == CC_VIEW )
+				{
+					//Open and display it for now...	
+					char buf[ 8000 ] = {0};
+					int fd = open( file, O_RDONLY, S_IRUSR | S_IRGRP );
+					int r = read( fd, buf, sizeof(buf));
+					bf_append( rr, (uint8_t *)buf, r );	
+				}
+
+				free( file );
 			}
-		}
-#endif
-	}
-	#else
-	//Really, it would be simpler to just hand off the process here.
-	if ( luaL_dofile( L, "example/index.lua" ) != 0 )
-	{
-		fprintf( stderr, "Error occurred!\n" );
-		if ( lua_gettop( L ) > 0 ) {
-			fprintf( stderr, "%s\n", lua_tostring( L, 1 ) );
+			else {
+				return http_err( h, 500, "Some unknown payload was received." );
+			}
+			l++;
 		}
 	}
-	#endif
 
-	#if 1
-	//This is here, because I'm always going to be within a server.
-	const char resp[] = 
-		"HTTP/2.0 200 OK\r\n"
-		"Content-Type: text/html\r\n"
-		"Content-Length: 23\r\n\r\n"
-		"<h2>Hello, world!</h2>\n";
-
+	//bypassing should make the headers work right...
+	//fprintf( stderr, "Written so far %d...", bf_written( rr ));
 	http_set_status( h, 200 );
-	http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
-	#endif
-	http_print_response( h );
+	http_set_version( h, 1.0 );
+	//http_set_content( h, "text/html", bf_data( &rb ), bf_written( &rb ) );
+	http_set_content_type( h, "text/html" );
+	http_set_content_length( h, bf_written( rr ) );
+	http_pack_response( h );
+	lt_free( &t );
+	//destroy Lua environment?
  #endif	
 
 	//This has to be set if you don't fail...
+	http_print_response( h );
 	r->stage = NW_AT_WRITE;
 	return 1;
 }

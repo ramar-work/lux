@@ -50,11 +50,8 @@ int lua_load_file( lua_State *L, const char *file, char *err  )
 	{
 		fprintf( stderr, "Error occurred!\n" );
 		//The entire stack needs to be cleared...
-		if ( lua_gettop( L ) > 0 ) {
-			fprintf( stderr, "%s\n", lua_tostring( L, 1 ) );
-			snprintf( err, 1023, "%s\n", lua_tostring( L, 1 ) );	
-			return 0;	
-		}
+		if ( lua_gettop( L ) > 0 ) 
+			return ( snprintf( err, 1023, "%s\n", lua_tostring( L, 2 ) ) ? 0 : 0 );
 	}
 	return 1;	
 }
@@ -230,7 +227,7 @@ void lua_tdump (lua_State *L)
 
 
 //Parse the current route according to what was in the table.
-Loader *parse_route ( Loader *l, int lsize, Table *t, Table *rt )
+Loader *parse_route ( Loader *l, int lsize, Table *httpTable, Table *routeTable )
 {
 	//Define and declare
 	Loader *LL = l;
@@ -238,15 +235,15 @@ Loader *parse_route ( Loader *l, int lsize, Table *t, Table *rt )
 	int szof_us = sizeof( us );
 	int b     = 0;
 	int count = 0; 
-	int ind   = lt_get_long_i( t, (uint8_t *)"URL", 3 );
+	int ind   = lt_get_long_i( httpTable, (uint8_t *)"URL", 3 );
 
 	//This should be checked out of this function
-	while ( lt_rettype( t, 0, ind++ ) != LITE_TRM )
+	while ( lt_rettype( httpTable, 0, ind++ ) != LITE_TRM )
 		count++;
 
 	//Fail if this happens, b/c the URL wasn't done right
 	if ( count < 2 )
-		return 0;
+		return err( NULL, "URL doesn't exist." );
 
 	//Reset count and set index to the top of the URL chain
 	ind -= count;	
@@ -258,31 +255,33 @@ Loader *parse_route ( Loader *l, int lsize, Table *t, Table *rt )
 
 #if 1
 	//Now this loops through HTTP structure
-	lt_dump( t );
-	lt_dump( rt );
+	lt_dump( httpTable );
+	lt_dump( routeTable );
 #endif
 
 	//Recycle the same buffer for each "merge" of the URL
 	for ( int i = ++ind; i < count; i++ ) 
 	{
-		//Get the value at the index and combine it into string buffer 'us'... 
-		//Something about something
+		//Get the value from URL table and combine it into string buffer 'us'... 
 		int yh = 0;
-		LiteBlob *bb = &lt_blob_at( t, i );
+		LiteBlob *bb = &lt_blob_at( httpTable, i );
 		memcpy( &us[ b ], &bb->blob[ 1 ], bb->size - 1 );
 		b += bb->size - 1;
-	#if 0
-		write( 2, us, b );
-		write( 2, "\n", 1 );
-	#endif
 
 		//Check the hash in the routing table and tell me what it is...
-		if ( (yh = lt_get_long_i( rt, (uint8_t *)us, b )) == -1 )
+		if ( (yh = lt_get_long_i( routeTable, (uint8_t *)us, b )) == -1 )
 			return err( NULL, "val not found '%s'...\n", us );
 		else
 		{
 			//Get the type of the element that's there
-			int type = lt_rettype( t, 1, yh );
+			int type = lt_rettype( routeTable, 1, yh );
+		#if 1
+			fprintf( stderr, "hash and type of " ); 
+			write( 2, "'", 1 );
+			write( 2, us, b );
+			write( 2, "'", 1 );
+			fprintf( stderr, " - %d, %s\n", yh, lt_typename( type ) );
+		#endif
 
 		#if 0
 			//Depending on type, the router action will change
@@ -296,10 +295,10 @@ Loader *parse_route ( Loader *l, int lsize, Table *t, Table *rt )
 				err( 0, "binary type not accepted (yet)...\n" );
 		#else
 			if ( type != LITE_TXT && type != LITE_TBL )
-				return err( NULL, "type '%s' not accepted...\n", lt_typename( type ) );
+				return err( NULL, "Type '%s' not accepted...\n", lt_typename( type ) );
 		#endif
 			else if ( type == LITE_TXT )
-				LL->type = CC_STR, LL->content = lt_text_at( t, yh ), LL++ ;
+				LL->type = CC_STR, LL->content = lt_text_at( routeTable, yh ), LL++ ;
 			else if ( type == LITE_TBL )
 			{
 				//Define what models and views look like
@@ -311,26 +310,26 @@ Loader *parse_route ( Loader *l, int lsize, Table *t, Table *rt )
 				{
 					char *locate = strcmbd( ".", us, ab[ ii ].fn );
 					int m = -1;
-					if ((m = lt_get_long_i( rt, (uint8_t *)locate, strlen( locate ))) > -1 )
+					if ((m = lt_get_long_i( routeTable, (uint8_t *)locate, strlen( locate ))) > -1 )
 					{
-						int mtype = lt_rettype( t, 1, m  );
+						int mtype = lt_rettype( routeTable, 1, m  );
 						//Then check the type and do something
 						if ( mtype != LITE_TXT && mtype != LITE_TBL /* && mtype != LITE_USR */ )
-							return err( NULL, "type '%s' not accepted for table...\n", lt_typename( type ) );
-						else if ( mtype == LITE_TXT ) 
-							LL->content = lt_text_at( t, m ), LL->type = ab[ ii ].cn, LL++;
+							return err( NULL, "type '%s' not accepted for table...\n", lt_typename( mtype ) );
+						else if ( mtype == LITE_TXT )
+							LL->content = lt_text_at( routeTable, m ), LL->type = ab[ ii ].cn, LL++;
 						else if ( mtype == LITE_TBL ) 
 						{
 							//Increment current table index until you hit a terminator
-							while ( lt_rettype( t, 0, ++m ) != LITE_TRM ) 
+							while ( lt_rettype( routeTable, 0, ++m ) != LITE_TRM ) 
 							{
-								int kt = lt_rettype( t, 0, m ), vt = lt_rettype( t, 1, m );
+								int kt = lt_rettype( routeTable, 0, m ), vt = lt_rettype( routeTable, 1, m );
 								//return err( NULL, "type '%s' not accepted for table...\n", lt_typename( type ) );
 								if ( vt != LITE_TXT )
-									printf( "%s\n", "Value not yet supported..." );
+									printf( "Value type '%s' not yet supported...", lt_typename( mtype ) );
 								else 
 								{
-									LL->content = lt_text_at( t, m );	
+									LL->content = lt_text_at( routeTable, m );	
 									LL->type = ab[ii].cn; //ctype[ ii ];
 									LL++;
 								}
@@ -341,17 +340,30 @@ Loader *parse_route ( Loader *l, int lsize, Table *t, Table *rt )
 				} // for ( ;; )
 			}	// else ( type ==	LITE_NON )
 		}
+	
+	#if 1
+		while ( LL->type ) {
+			printf( "%s -> %s\n", printCCtype( LL->type ), LL->content );
+			LL++;
+		}
+	#endif
 
 		//Add to the string for the next iteration
-		us[ b - 1 ] = '.';	
-		us[ b ] = '\0';
-		printf( "next iteration of URL: '%s'\n", us );
+		fprintf( stderr, "length of early bar: %d\n", b );
+		b += 1;
+		us[ b ] = '.';	
+
+		//uh....
+		fprintf( stderr, "length of appended bar: %d\n", b );
+		fprintf( stderr, "%s", "next iteration of URL: '" );
+		//write( 2, us, b + 1 );
+		fprintf( stderr, "%s", "'\n" );
 	}
 
 #if 0
 	//This test is done.  I want to see the structure before moving on.
 	//printf( "Execution path for route: %s\n", tt->url );
-	Loader *Ld = &loader[0];
+	Loader *Ld = &l[0];
 	while ( Ld->type ) {
 		printf( "%s -> %s\n", printCCtype( Ld->type ), Ld->content );
 		Ld++;
