@@ -8,16 +8,16 @@ LLVMS=/usr/local/Cellar/llvm/5.0.0/bin/llvm-symbolizer
 INCLUDE_DIR=-I/usr/include/lua5.3
 LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -ansi -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H
-CC = gcc
-CFLAGS = $(GCCFLAGS)
-
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
 
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -ansi -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H
+CC = gcc
+CFLAGS = $(GCCFLAGS)
+
 # (just get rid of this target when the tests are done)
-first: osx
+first: main 
 	printf '' >/dev/null
 	
 # A main target, that will most likely result in a binary

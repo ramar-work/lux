@@ -14,6 +14,34 @@ void lua_loop ( lua_State *L )
 }
 
 
+char *CCtypes[] = {
+	[CC_NONE]  = "None",
+	[CC_MODEL] = "Model",     //Models are usually executed, and added to env 
+	[CC_VIEW]  = "View",      //Views will be loaded, parsed, and sent to buffer
+	[CC_FUNCT] = "Function",  //Functions are executed, payload sent to buffer
+	[CC_STR]   = "String",    //Strings are just referenced and loaded to buffer
+	[CC_MAX]   = NULL,        //A nul terminator
+};
+
+
+
+//Print CC type
+char *printCCtype ( CCtype cc )
+{
+	switch (cc)
+	{
+		case CC_NONE:
+		case CC_MODEL: 
+		case CC_VIEW: 
+		case CC_FUNCT:
+		case CC_STR:
+			return CCtypes[ cc ];
+		default:
+			return NULL;
+	}
+}
+
+
 
 //
 int lua_load_file( lua_State *L, const char *file, char *err  )
@@ -162,7 +190,6 @@ int lua_to_table (lua_State *L, int index, Table *t )
 			sd--;
 		}
 
-
 		obprintf( stderr, "popping last two values...\n" );
 		if ( vt == LUA_TNUMBER || vt == LUA_TSTRING )
 		lt_finalize( t );
@@ -174,6 +201,7 @@ int lua_to_table (lua_State *L, int index, Table *t )
 }
 
 
+//Lua dump....
 void lua_tdump (lua_State *L) 
 {
 	int level = 0;	
@@ -201,73 +229,133 @@ void lua_tdump (lua_State *L)
 
 
 
-#if 0
-//Print a set of values at a particular index
-static void lua_tprintindex (LiteKv *tt, int ind)
+//Parse the current route according to what was in the table.
+Loader *parse_route ( Loader *l, int lsize, Table *t, Table *rt )
 {
-	int         w = 0;
-  char b[lt_buflen]; 
-	memset(b, 0, lt_buflen);
-	struct { int t; LiteRecord *r; } items[2] = {
-		{ tt->key.type  , &tt->key.v    },
-		{ tt->value.type, &tt->value.v  } 
-	};
+	//Define and declare
+	Loader *LL = l;
+	char us[ 1024 ] = { 0 };
+	int szof_us = sizeof( us );
+	int b     = 0;
+	int count = 0; 
+	int ind   = lt_get_long_i( t, (uint8_t *)"URL", 3 );
 
-	for ( int i=0; i<2; i++ ) 
-	{
-		LiteRecord *r = items[i].r; 
-		int t = items[i].t;
-		if ( i ) 
-		{
-			memcpy( &b[w], " -> ", 4 );
-			w += 4;
-			/*LITE_NODE is handled in printall*/
-			if (t == LITE_NON)
-				w += snprintf( &b[w], lt_buflen - w, "%s", "is uninitialized" );
-#ifdef LITE_NUL
-			else if (t == LITE_NUL)
-				w += snprintf( &b[w], lt_buflen - w, "is terminator" );
+	//This should be checked out of this function
+	while ( lt_rettype( t, 0, ind++ ) != LITE_TRM )
+		count++;
+
+	//Fail if this happens, b/c the URL wasn't done right
+	if ( count < 2 )
+		return 0;
+
+	//Reset count and set index to the top of the URL chain
+	ind -= count;	
+#if 0
+	fprintf( stderr, "indexof lt_get_long_i is at %d\n", ind );	
+	fprintf( stderr, "element count is %d\n", count );	
+	fprintf( stderr, "ind is %d\n", ind );
 #endif
-			else if (t == LITE_USR)
-				w += snprintf( &b[w], lt_buflen - w, "userdata [address: %p]", r->vusrdata );
-			else if (t == LITE_TBL) 
-			{
-				LiteTable *rt = &r->vtable;
-				w += snprintf( &b[w], lt_buflen - w, 
-					"table [address: %p, ptr: %ld, elements: %d]", (void *)rt, rt->ptr, rt->count );
-			}
-		}
-		if (t == LITE_FLT || t == LITE_INT)
-			w += snprintf( &b[w], lt_buflen - w, "%d", r->vint );
-		else if (t == LITE_FLT)
-			w += snprintf( &b[w], lt_buflen - w, "%f", r->vfloat );
-		else if (t == LITE_TXT)
-			w += snprintf( &b[w], lt_buflen - w, "%s", r->vchar );
-		else if (t == LITE_TRM)
-			w += snprintf( &b[w], lt_buflen - w, "%ld", r->vptr );
-		else if (t == LITE_BLB) 
+
+#if 1
+	//Now this loops through HTTP structure
+	lt_dump( t );
+	lt_dump( rt );
+#endif
+
+	//Recycle the same buffer for each "merge" of the URL
+	for ( int i = ++ind; i < count; i++ ) 
+	{
+		//Get the value at the index and combine it into string buffer 'us'... 
+		//Something about something
+		int yh = 0;
+		LiteBlob *bb = &lt_blob_at( t, i );
+		memcpy( &us[ b ], &bb->blob[ 1 ], bb->size - 1 );
+		b += bb->size - 1;
+	#if 0
+		write( 2, us, b );
+		write( 2, "\n", 1 );
+	#endif
+
+		//Check the hash in the routing table and tell me what it is...
+		if ( (yh = lt_get_long_i( rt, (uint8_t *)us, b )) == -1 )
+			return err( NULL, "val not found '%s'...\n", us );
+		else
 		{
-			LiteBlob *bb = &r->vblob;
-			if ( bb->size < 0 )
-				return;	
-			if ( bb->size > lt_maxbuf )
-				w += snprintf( &b[w], lt_buflen - w, "is blob (%d bytes)", bb->size);
-			else {
-				memcpy( &b[w], bb->blob, bb->size ); 
-				w += bb->size;
-			}
+			//Get the type of the element that's there
+			int type = lt_rettype( t, 1, yh );
+
+		#if 0
+			//Depending on type, the router action will change
+			if ( type != LITE_USR && type != LITE_BLB && type != LITE_TXT && type != LITE_TBL ) 
+				err( 0, "type '%s' not accepted...\n", lt_typename( type ) );
+			//A Lua function most likely...not ready yet
+			else if ( type == LITE_USR )
+				err( 0, "function type not accepted (yet)...\n" );
+			//Binary data..., unsure how this will work now
+			else if ( type == LITE_BLB ) 
+				err( 0, "binary type not accepted (yet)...\n" );
+		#else
+			if ( type != LITE_TXT && type != LITE_TBL )
+				return err( NULL, "type '%s' not accepted...\n", lt_typename( type ) );
+		#endif
+			else if ( type == LITE_TXT )
+				LL->type = CC_STR, LL->content = lt_text_at( t, yh ), LL++ ;
+			else if ( type == LITE_TBL )
+			{
+				//Define what models and views look like
+				struct { char *fn; int cn; } ab[] =
+					{ { "model", CC_MODEL }, { "view", CC_VIEW } };
+
+				//Check for 'model(s)' and 'view(s)'
+				for ( int ii=0; ii < 2; ii++ )
+				{
+					char *locate = strcmbd( ".", us, ab[ ii ].fn );
+					int m = -1;
+					if ((m = lt_get_long_i( rt, (uint8_t *)locate, strlen( locate ))) > -1 )
+					{
+						int mtype = lt_rettype( t, 1, m  );
+						//Then check the type and do something
+						if ( mtype != LITE_TXT && mtype != LITE_TBL /* && mtype != LITE_USR */ )
+							return err( NULL, "type '%s' not accepted for table...\n", lt_typename( type ) );
+						else if ( mtype == LITE_TXT ) 
+							LL->content = lt_text_at( t, m ), LL->type = ab[ ii ].cn, LL++;
+						else if ( mtype == LITE_TBL ) 
+						{
+							//Increment current table index until you hit a terminator
+							while ( lt_rettype( t, 0, ++m ) != LITE_TRM ) 
+							{
+								int kt = lt_rettype( t, 0, m ), vt = lt_rettype( t, 1, m );
+								//return err( NULL, "type '%s' not accepted for table...\n", lt_typename( type ) );
+								if ( vt != LITE_TXT )
+									printf( "%s\n", "Value not yet supported..." );
+								else 
+								{
+									LL->content = lt_text_at( t, m );	
+									LL->type = ab[ii].cn; //ctype[ ii ];
+									LL++;
+								}
+							} // while ( lt_rettype( ... ) != LITE_TRM )
+						} // ( mtype == LITE_TBL )
+					} // ( m == -1 )
+					free( locate );
+				} // for ( ;; )
+			}	// else ( type ==	LITE_NON )
 		}
+
+		//Add to the string for the next iteration
+		us[ b - 1 ] = '.';	
+		us[ b ] = '\0';
+		printf( "next iteration of URL: '%s'\n", us );
 	}
 
-	write(2, b, w);
-	write(2, "\n", 1);
-}
-#endif	
-
-
-//Move through a list of these 
-int route_controller ( const char **url )
-{
-
-	return 1;
+#if 0
+	//This test is done.  I want to see the structure before moving on.
+	//printf( "Execution path for route: %s\n", tt->url );
+	Loader *Ld = &loader[0];
+	while ( Ld->type ) {
+		printf( "%s -> %s\n", printCCtype( Ld->type ), Ld->content );
+		Ld++;
+	}
+#endif
+	return l;
 }

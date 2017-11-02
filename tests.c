@@ -14,24 +14,6 @@ more later...
 
 
 //Types of items
-typedef enum 
-{
-	CC_NONE, 
-	CC_MODEL, 
-	CC_VIEW, 
-	CC_FUNCT,
-	CC_STR
-} CCtype;
-
-
-typedef struct 
-{
-	int   type;      //model or view or something else...	
-	char *content;   //Most of the time it's a file, but it really should execute...
-	void *funct;     //This can be used for userdata (which are just Lua functions here)
-} Loader;
-
-
 typedef struct
 {
 	const 
@@ -40,7 +22,6 @@ typedef struct
 	int    estatus ;
 	Loader result[10];
 } Test;
-
 
 
 /*
@@ -81,43 +62,12 @@ Test routes[] =
 
 
 
-//this is pretty fucking silly too
-struct Run {
-	char  *filetype;
-	CCtype type;
-} Run[] = {
-	{ "model",  CC_MODEL }, 
-	{ "view" ,  CC_VIEW  }, 
-	{ "string" ,  CC_STR }, 
-	{ "function" ,  CC_FUNCT }, 
-};
 
 
 //...
-char *CCtypes[] = {
-	[CC_NONE]  = "None",
-	[CC_MODEL] = "Model",     //Models are usually executed, and added to env 
-	[CC_VIEW]  = "View",      //Views will be loaded, parsed, and sent to buffer
-	[CC_FUNCT] = "Function",  //Functions are executed, payload sent to buffer
-	[CC_STR]   = "String",    //Strings are just referenced and loaded to buffer
-};
 
 
 //...
-char *printCCtype ( CCtype cc )
-{
-	switch (cc)
-	{
-		case CC_NONE:
-		case CC_MODEL: 
-		case CC_VIEW: 
-		case CC_FUNCT:
-		case CC_STR:
-			return CCtypes[ cc ];
-		default:
-			return NULL;
-	}
-}
 
 
 //ERR_TABLE_IS_EMPTY - A route has a table as a value, but no nothing (this could be an implied rule)
@@ -148,6 +98,17 @@ int main ( int argc, char *argv[] )
 
 	//Dump the file	
 	lt_dump( &t );
+
+	//This is here.
+	static struct Run {
+		char  *filetype;
+		CCtype type;
+	} Run[] = {
+		{ "model",  CC_MODEL }, 
+		{ "view" ,  CC_VIEW  }, 
+		{ "string" ,  CC_STR }, 
+		{ "function" ,  CC_FUNCT }, 
+	};
 
 	//Loop through each Test
 	Test *tt = routes;

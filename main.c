@@ -174,32 +174,30 @@ _Bool http_run (Recvr *r, void *p, char *e)
 	//Convert HTTP structure to something Lua can read
 	table_to_lua( L, 1, &h->request.table );
 	int routeType = 0;
-	const char *file = "example/data.lua";
+	//const char *file = "example/data.lua";
+	const char *file = "a.lua";
 
 	//Because of the amount of data coming from that data.lua file, loading here is easier
 	if ( lua_load_file( L, file, err ) == 0 ) 
 		;
 	else 
 	{
-		//I have to negotiate the route here
-		// assuming:
-		//  /        => get default or whatever name is default  ( file->default? or lt_get( tt, "file.default" )) 
-		//  /abasdf      => each route can be named, so this is just a matter or lt_get( tt, $routename )
-		//  /asdfasf/asdfsd  => same thing here
-		//  This starts going wrong when I thrown in wildcards and regex...
-		//
-		// Some tests:
-		//	/abc          - A regular route
-		//	/abc/:id/def  - A route dependent on a user id
-		//  /abc/*        - A route that accepts wildcards
-		//
-		// lt_* functions:
-		// 	Countdown from the top:
-		//	
+		//Turn on table
+		if ( !lt_init( &t, NULL, 666 ) )
+			return err( 2, "table did not initialize...\n" );
 
-		lt_dump( &h->request.table );
-		//buffer to put the parts together	
-		//lt_get( &h->request.table, "/x/y/z" )
+		//Convert the Lua table to a C table
+		if ( !lua_to_table( L, 2, &t ) )
+			return err( 3, "could not convert Lua table ...\n" );
+
+		//Negotiate the route here.
+		Loader ld[ 10 ];
+		memset( ld, 0, sizeof( Loader ) * 10 );
+		if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), &h->request.table, &t ) )
+		{
+			//Return an error here...
+			//return err( 0, "You are megadeth..." );
+		}
 
 #if 0
 		//Making an endpoint to stress test this routing engine would work wonders
@@ -474,7 +472,10 @@ int startServer ( int port, int connLimit, int daemonize )
 }
 
 
-
+#ifdef INCLUDE_KILL 
+#ifdef WIN32
+ #error "Kill is not gonna work here, son... Sorry to burst yer bublet."
+#endif
 //Kills a currently running server
 int killServer () 
 {
@@ -518,7 +519,7 @@ int killServer ()
 	fprintf( stderr, "server dead...\n");
 	return 0;
 }
-
+#endif
 
 
 
@@ -533,8 +534,9 @@ Option opts[] =
 	//Server stuff
 	{ "-s", "--start"    , "Start a server."                                },
 	{ "-n", "--no-daemon", "Choose port to start server on."                },
+#ifdef INCLUDE_KILL 
 	{ "-k", "--kill",      "Kill a running server."                },
-
+#endif
 	//Parameters
 	{ NULL, "--max-conn",  "How many connections to enable at a time.", 'n' },
 	{ "-p", "--port"    ,  "Choose port to start server on."          , 'n' },
@@ -550,9 +552,11 @@ int main (int argc, char *argv[])
 	//Values
 	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
 
+#ifdef INCLUDE_KILL 
 	//Catch kill option first
 	if ( opt_set(opts, "--kill") )
 		killServer();
+#endif
 
 	//
 	if ( opt_set(opts, "--file") )
