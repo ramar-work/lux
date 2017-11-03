@@ -24,6 +24,16 @@
  #define lua_seti( a, b, c ) 
 #endif
 
+//This should be an enum
+#define ERR_SRVFORK 20
+#define ERR_PIDFAIL 21
+#define ERR_PIDWRFL 22 
+#define ERR_SSOCKET 23 
+#define ERR_INITCON 24 
+#define ERR_SKLOOPS 25 
+#define SUC_PARENT  27
+#define SUC_CHILD   28
+
 //Define some headers here
 _Bool http_run (Recvr *r, void *p, char *e);
 
@@ -245,20 +255,18 @@ _Bool http_run (Recvr *r, void *p, char *e)
 		}
 	}
 
-	//bypassing should make the headers work right...
+	//Bypassing should make the headers work right...
 	//fprintf( stderr, "Written so far %d...", bf_written( rr ));
 	http_set_status( h, 200 );
 	http_set_version( h, 1.0 );
-	//http_set_content( h, "text/html", bf_data( &rb ), bf_written( &rb ) );
 	http_set_content_type( h, "text/html" );
 	http_set_content_length( h, bf_written( rr ) );
 	http_pack_response( h );
 	lt_free( &t );
-	//destroy Lua environment?
  #endif	
 
 	//This has to be set if you don't fail...
-	http_print_response( h );
+	//http_print_response( h );
 	r->stage = NW_AT_WRITE;
 	return 1;
 }
@@ -403,14 +411,6 @@ ERR_PIDWRFL - Failed to write to PID file, fatal b/c a zombie would exist
 SUC_PARENT  - Parent successfully started a daemon
 SUC_CHILD   - Child successfully exited the function 
  */
-#define ERR_SRVFORK 20
-#define ERR_PIDFAIL 21
-#define ERR_PIDWRFL 22 
-#define ERR_SSOCKET 23 
-#define ERR_INITCON 24 
-#define ERR_SKLOOPS 25 
-#define SUC_PARENT  27
-#define SUC_CHILD   28
 int startServer ( int port, int connLimit, int daemonize )
 {
 	//Define stuff
@@ -555,11 +555,11 @@ int main (int argc, char *argv[])
 	//Values
 	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
 
-#ifdef INCLUDE_KILL 
+ #ifdef INCLUDE_KILL 
 	//Catch kill option first
 	if ( opt_set(opts, "--kill") )
 		killServer();
-#endif
+ #endif
 
 	//
 	if ( opt_set(opts, "--file") )
@@ -584,13 +584,10 @@ int main (int argc, char *argv[])
 	if ( opt_set(opts, "--start") ) 
 	{
 		int stat, conn, port, daemonize;
-		!(conn    = opt_get(opts, "--max-conn").n) ? conn = 1000 : 0;
-		!(port    = opt_get(opts, "--port").n) ? port = 2000 : 0; 
 		daemonize = !opt_set(opts, "--no-daemon");
-
-		//Different statuses do different things
-		stat = startServer( port, conn, daemonize ); 
-
+		!(conn = opt_get(opts, "--max-conn").n) ? conn = 1000 : 0;
+		!(port = opt_get(opts, "--port").n) ? port = 2000 : 0; 
+		stat   = startServer( port, conn, daemonize ); 
 	}
 	return 0;
 }

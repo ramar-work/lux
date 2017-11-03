@@ -1,0 +1,80 @@
+<!---
+Here's a real webpage. 
+Don't get discouraged now.
+Finish this first, then figure it out...
+  --->
+
+<html>
+
+
+<pre>
+server and whatnot
+	tests
+	crashes
+		should never crash
+	speed
+		how fast is this compared to Apache or nGinx		
+	ease of Apache or nGinx
+		Apache can have its own modules - https://httpd.apache.org/docs/2.4/developer/modguide.html
+		
+
+SSL	
+	ssl package for Lua: either write your own or use someone else's
+		https://github.com/brunoos/luasec/wiki
+	how long would that SSL book take to digest?
+		has to be debugged and run and whatnot	
+	how to generate certificates
+		&lt;type the command line here...&gt;
+
+
+SMTP
+	smtp package for Lua: either write your own or use someone else's
+	roll your own since it's easy to parse it (but it's long)
+	email newsletters that render right in different clients
+
+
+responsive website packages
+
+make middleware
+
+how does front end package management work?
+
+database drivers
+
+session management that works everywhere
+
+build a store with paypal or something else
+
+oauth
+
+why not wordpress?
+</pre>
+
+
+<ul>
+
+<li><a href="#server">server</a></li>
+
+<li>
+<a href="#ssl">ssl</a>
+	<ul>
+		<li><a href="#certificates">How to Generate Certificates</a></li>
+	</ul>
+</li>
+
+<li><a href="#email">email</a>
+	<ul>
+		<li><a href="#smtp">smtp</a></li>
+	</ul>
+</li>
+
+<li><a href="#responsive">responsive</a></li>
+<li><a href="#middleware">middleware</a></li>
+<li><a href="#frontend">frontend</a></li>
+<li><a href="#s">s</a></li>
+<li><a href="#s">s</a></li>
+<li><a href="#s">s</a></li>
+<li><a href="#s">s</a></li>
+<li><a href="#s">s</a></li>
+<li><a href="#s">s</a></li>
+</ul>

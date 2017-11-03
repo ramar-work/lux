@@ -1,29 +1,35 @@
+bye!!!
+======
+- pack response still fails
+x		but it doesn't seem to be failing now
+
+-	write the rest of the loader functions
+x		string
+x		model evaluation
+		function - where does everything go
+		view - skip this, useless without working rendering
+		query - skip this too, useless without db drivers
+
+- rendering
+		I may have to add new hashes and use fpointers
+		basic find and replace works (but needs more testing)
+		script execution should also work but will take some modification
+			fail/throw exception when something doesn't work
+	
+- database drivers 
+		SQlite first
+		Postgres and MySQL second
+
+- this should be it... after this, it's just writing code...
+
+
 sigh...
 =======
 x loader seems to work with 'falafel'
 
 x remember: BIG hashes (until I get a chance to rewrite this)
 now, using the Loader structure, it should be pretty easy to write the rest of this...
-goes in the http func
-	while ( loader ) {
-		if ( loader->type == FUNCT )
-			a = loader->content( ... )
-		else if ( loader->type == STR )
-			a = loader->content
-		else if ( loader->type == MODEL )
-			a = lua_exec( loader->content )
-		else if ( loader->type == VIEW )
-			a = parse( loader->content )
-		else if ( loader->type == QUERY )
-			a = sql_do( loader->content )
-		else {
-			die... with 500 or 401 or whatever...
-		}
-	}
-	bf_add( a, ... )
-
-
-
+-	goes in the http func
 - after writing the top sequence
 - try running this thing for real
 - does it work?  does it crash?
