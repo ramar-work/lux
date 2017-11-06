@@ -1,22 +1,9 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <math.h>
-#include <dirent.h>
-#include <libgen.h>
-#include "bridge.h"
-
 #include "vendor/single.h"
 #include "vendor/nw.h"
 #include "vendor/http.h"
+#include "bridge.h"
 
 #define PROG "luas"
-
-#if 1
- //I did this because there will eventually be defines that control backends
- #include "vendor/sqlite3.h"
-#endif
 
 #ifndef LUA_53
  #define lua_rotate( a, b, c ) 

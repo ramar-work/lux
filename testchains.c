@@ -25,16 +25,43 @@ HOWEVER,
 
 
 Loader l[] = {
-	{ CC_MODEL, "a" },
-	{ CC_MODEL, "b" },
+	//The entire path should be resolved.  I don't see a reason to do it twice.
+	//Additional, you can check it seperately and make sure that all files are available
+
+	//Sadly though, this is slightly more complicated than it should be...
+	{ CC_MODEL, "example/non/app/cycle-a.lua" },
+	{ CC_MODEL, "example/non/app/cycle-b.lua" },
 	{ 0, NULL }
 };
 
 
-
-int main (int argc, char *argv[])
+// Resolving directories can happen first
+int resolve_chain ( )
 {
-	Loader *ll = l;
+	return 0;
+}
+
+
+// Prepare the chain
+Loader *prepare_chain ( Loader *ld, char *reldir )
+{
+	//Loop through, create a full path and check if those files exist
+	
+	//The engine would return NULL and probably throw a 404 if the file didn't exist
+	//This could also be a server error, since technically the symbolic file exists, but
+	//the workings underneath do not.
+	return NULL;
+}
+
+
+// void *data is a possible data structure that may keep track of a bunch of data
+// like relative directories or something...
+Buffer *run_chain ( Loader *ld, Buffer *dest )
+{
+	Loader *ll = ld;
+	//printf( "addr of buffer: %p\n", b );
+
+	//The end result here returns a buffer.
 	while ( ll->type ) 
 	{
 		//Header
@@ -42,11 +69,49 @@ int main (int argc, char *argv[])
 			printCCtype( ll->type ), "===================" );
 
 		//Do based on ll->type 
+		//If anything fails, return NULL and throw a 500. 
+		if ( ll->type == CC_MODEL )
+		{
+			fprintf( stderr, "%s\n", ll->content );	
+		}
+		else if ( ll->type == CC_VIEW )
+		{
+			fprintf( stderr, "%s\n", ll->content );	
+		}
 
 		//Add to buffer depending on choice
 		
 		//Next one
 		ll++;
 	}
+
+	return dest;
+}
+
+
+Option opts[] = 
+{
+	//Debugging and whatnot
+	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
+	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
+	{ .sentinel = 1 }
+};
+
+
+int main (int argc, char *argv[])
+{
+#if 0
+	//Values
+	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
+#endif
+
+	//A buffer would typically be initialized here.
+	Buffer bc;
+	if ( !bf_init( &bc, NULL, 1 ) )
+		return err( 2, "Buffer failed to initialize." );
+
+	//Then run the chain.
+	if ( !run_chain( l, &bc ) )
+		return err( 1, "Chain running failed on whatever block." );
 	return 0;
 }
