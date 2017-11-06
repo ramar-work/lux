@@ -26,7 +26,7 @@ main: $(OBJ)
 	@$(CC) $(CFLAGS) $(OBJ) -o $(NAME) -llua
 
 # Router test program
-router: RICKROSS=testparser
+router: RICKROSS=testrouter
 router: test-build
 router: 	
 	printf ''>/dev/null
@@ -73,5 +73,5 @@ pkg:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) 
+	-@rm $(NAME) testrouter testchains
 	-@find . | egrep '\.o$$' | xargs rm

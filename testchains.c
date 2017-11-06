@@ -34,5 +34,19 @@ Loader l[] = {
 
 int main (int argc, char *argv[])
 {
+	Loader *ll = l;
+	while ( ll->type ) 
+	{
+		//Header
+		fprintf( stderr, "Evaluating %s:\n%s\n", 
+			printCCtype( ll->type ), "===================" );
+
+		//Do based on ll->type 
+
+		//Add to buffer depending on choice
+		
+		//Next one
+		ll++;
+	}
 	return 0;
 }
