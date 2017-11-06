@@ -37,14 +37,14 @@ Test routes[] =
 {
 	//TEST 1
 	{ "GET"    , "/falafel" , 400, {
-		{ CC_MODEL, "falafel", NULL },
+		{ CC_MODEL, "falafel", 0 },
 	}
 	},    // NO 
 
 	//TEST 2
 	{ "GET"    , "/spaghetti/sauce" , 200, {
-		{ CC_MODEL, "spaghetti", NULL },
-		{ CC_STR  , "sauce is too sweet!", NULL },
+		{ CC_MODEL, "spaghetti", 0 },
+		{ CC_STR  , "sauce is too sweet!", 0 },
 	}
 	},    // NO 
 

@@ -14,7 +14,13 @@ typedef struct
 {
 	int   type;      //model or view or something else...	
 	char *content;   //Most of the time it's a file, but it really should execute...
+#if 0
 	void *funct;     //This can be used for userdata (which are just Lua functions here)
+#else
+	int index;       //This is an alternate method that 
+       						 //does not use C to call Lua functions
+			
+#endif
 } Loader;
 
 

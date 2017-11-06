@@ -12,7 +12,7 @@ CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize
 CC = clang
 CFLAGS = $(CLANGFLAGS)
 
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -ansi -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H #-ansi
 CC = gcc
 CFLAGS = $(GCCFLAGS)
 
@@ -24,6 +24,26 @@ first: main
 main: $(OBJ)
 	@echo $(CC) $(CFLAGS) $(OBJ) -o $(NAME) -llua
 	@$(CC) $(CFLAGS) $(OBJ) -o $(NAME) -llua
+
+# Router test program
+router: RICKROSS=testparser
+router: test-build
+router: 	
+	printf ''>/dev/null
+
+# Chain test program
+chains: RICKROSS=testchains
+chains: test-build
+chains: 
+	printf ''>/dev/null
+
+# All test build programs use this recipe
+test-build:
+	@echo $(CC) -c $(CFLAGS) vendor/single.c vendor/nw.c vendor/http.c bridge.c $(RICKROSS).c vendor/sqlite3.c
+	@$(CC) -c -DSQROOGE_H $(CFLAGS) vendor/single.c vendor/nw.c vendor/http.c bridge.c $(RICKROSS).c vendor/sqlite3.c
+	@echo $(CC) $(CFLAGS) single.o nw.o http.o bridge.o $(RICKROSS).o sqlite3.o -o $(RICKROSS) -llua
+	@$(CC) $(CFLAGS) single.o nw.o http.o bridge.o $(RICKROSS).o sqlite3.o -o $(RICKROSS) -llua
+
 
 osx: 
 	@echo $(CC) -c -DSQROOGE_H $(CFLAGS) vendor/single.c vendor/nw.c vendor/http.c bridge.c tests.c 

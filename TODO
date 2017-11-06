@@ -1,5 +1,25 @@
-bye!!!
-======
+set a goal
+==========
+
+
+the good news:
+	a Loader structure exists now and can be mocked to test what you want
+	{ <file>, CC_MODEL }
+
+to make returns work the right way?
+	write some Lua code and return it (do not handle functions yet)
+	check that conversions work	
+
+
+
+HTML
+	GET (write dump to screen)
+	POST (write dump to screen)
+	crashes are incredibly important to check for...
+
+
+shit to do
+==========
 - pack response still fails
 x		but it doesn't seem to be failing now
 
@@ -9,6 +29,33 @@ x		model evaluation
 		function - where does everything go
 		view - skip this, useless without working rendering
 		query - skip this too, useless without db drivers
+
+
+- write the rest of the router functionality
+		if the route is not found:
+			/ =>
+				if '*' or '/regex/' is available
+					call it
+				else if 'default' or some function named default
+					call it	
+				else
+					throw 404
+
+			/abc => 
+				if '*' or '/regex/' is available
+					call it
+				else
+					throw 404
+
+			/abc/def =>
+				if '*' or '/regex' is available
+					call it
+				else if 'levels before (abc in this case)' contains 'expects', '*', or '/regex/'
+					call it
+				else
+					throw 404
+
+
 
 - rendering
 		I may have to add new hashes and use fpointers
@@ -25,6 +72,9 @@ x		model evaluation
 
 sigh...
 =======
+- people want to work with decent people...
+		just choose...
+
 x loader seems to work with 'falafel'
 
 x remember: BIG hashes (until I get a chance to rewrite this)

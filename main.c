@@ -212,11 +212,11 @@ _Bool http_run (Recvr *r, void *p, char *e)
 				//Check that the file exists and permissions are correct
 				const char *dir = "example1";
 				struct stat sb;
-				memset( &sb, 0, sizeof( struct stat ) );
 				char *file = NULL;
 				char *type = (l->type == CC_MODEL ) ? "lua" : "html";
 				char *sdir = (l->type == CC_MODEL ) ? "app" : "views";
 
+				memset( &sb, 0, sizeof( struct stat ) );
 				file = strcmbd( "/", dir, sdir, l->content, type );
 				file[ (strlen( file ) - strlen( type )) - 1 ] = '.';
 				fprintf( stderr, "Loading %s file: %s\n", sdir, file );
@@ -256,7 +256,7 @@ _Bool http_run (Recvr *r, void *p, char *e)
 	}
 
 	//Bypassing should make the headers work right...
-	//fprintf( stderr, "Written so far %d...", bf_written( rr ));
+	//fprintf( stderr, "Written so far %d...", bf_written( rr ) );
 	http_set_status( h, 200 );
 	http_set_version( h, 1.0 );
 	http_set_content_type( h, "text/html" );
