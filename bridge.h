@@ -43,6 +43,7 @@ void lua_loop ( lua_State *L );
 int lua_load_file( lua_State *, const char *filename, char *err );
 int lua_load_file2( lua_State *, Table *, const char *, char * );
 void lua_tdump (lua_State *L);
+void lua_stackdump ( lua_State *L, int *p, int *sd );
 
 Loader *parse_route( Loader *, int, Table *src, Table *route );
 char *printCCtype ( CCtype cc );

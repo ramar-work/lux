@@ -1,2 +1,2 @@
 -- cycle-a.lua
-return "cycle-a"
+return  1 / 2

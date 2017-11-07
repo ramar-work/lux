@@ -54,9 +54,10 @@ Loader *prepare_chain ( Loader *ld, char *reldir )
 }
 
 
+
 // void *data is a possible data structure that may keep track of a bunch of data
 // like relative directories or something...
-Buffer *run_chain ( Loader *ld, Buffer *dest )
+Buffer *run_chain ( Loader *ld, Buffer *dest, lua_State *L, char *err )
 {
 	Loader *ll = ld;
 	//printf( "addr of buffer: %p\n", b );
@@ -73,9 +74,22 @@ Buffer *run_chain ( Loader *ld, Buffer *dest )
 		if ( ll->type == CC_MODEL )
 		{
 			fprintf( stderr, "%s\n", ll->content );	
+
+			//Successful calls will put results on the stack. 
+			if ( !lua_load_file( L, ll->content, err ) ) 
+			{
+				//Unsuccessful will return NULL, but the stack has the error
+				//The lua_load_file function SHOULD modify the error message
+				return NULL;
+			}
 		}
 		else if ( ll->type == CC_VIEW )
 		{
+			//Dump Lua stack for debugging
+			
+			//Convert Lua to table
+			
+			//Then render, which should work in one pass...
 			fprintf( stderr, "%s\n", ll->content );	
 		}
 
@@ -105,13 +119,26 @@ int main (int argc, char *argv[])
 	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
 #endif
 
-	//A buffer would typically be initialized here.
+	//...
 	Buffer bc;
+	char err[ 2048 ] = { 0 };
+	lua_State *L = luaL_newstate();
+
+#if 1
+	//An extremely fast dump for the purposes of
+	int in = 0;
+	int sd = 0;
+	lua_load_file( L, "c.lua", 0 );
+	lua_stackdump( L, &in, &sd );
+#endif
+
+	//A buffer would typically be initialized here.
 	if ( !bf_init( &bc, NULL, 1 ) )
 		return err( 2, "Buffer failed to initialize." );
 
 	//Then run the chain.
-	if ( !run_chain( l, &bc ) )
-		return err( 1, "Chain running failed on whatever block." );
+	if ( !run_chain( l, &bc, L, err ) )
+		return err( 1, "Chain running failed on block: %s", err );
+
 	return 0;
 }

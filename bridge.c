@@ -51,7 +51,7 @@ int lua_load_file( lua_State *L, const char *file, char *err  )
 		fprintf( stderr, "Error occurred!\n" );
 		//The entire stack needs to be cleared...
 		if ( lua_gettop( L ) > 0 ) 
-			return ( snprintf( err, 1023, "%s\n", lua_tostring( L, 2 ) ) ? 0 : 0 );
+			return ( snprintf( err, 1023, "%s\n", lua_tostring( L, 1 ) ) ? 0 : 0 );
 	}
 	return 1;	
 }
@@ -196,6 +196,75 @@ int lua_to_table (lua_State *L, int index, Table *t )
 	lt_lock( t );
 	return 1;
 }
+
+
+
+#define LUA_DUMPSTACK( str ) \
+	if ( strlen( str ) ) fprintf( stderr, "%s\n------------------------\n", str ); \
+	for ( int y=0; y < lua_gettop(L); y++ ) fprintf( stderr, "[%d] => %s\n", y, lua_typename( L, y ) );
+		
+
+void lua_stackdump ( lua_State *L, int *p, int *sd )
+{
+	//static int sd;
+	lua_pushnil( L );
+	//obprintf( stderr, "Current stack depth: %d\n", sd );
+	//sd++;
+	(*sd)++;
+	fprintf( stderr, "Current stack depth: %d\n", *sd );
+	
+
+	//
+	while ( lua_next( L, *sd ) != 0 ) 
+	{
+		//Fancy printing
+		fprintf( stderr, &"\t\t\t\t\t\t\t\t\t "[ 10 - *sd ] );
+		fprintf( stderr, "[%3d:%2d] => ", *p, *sd );
+
+		//Print both left and right side
+		for ( int i = -2; i < 0; i++ )
+		{
+			int t = lua_type( L, i );
+			const char *type = lua_typename( L, t );
+			if ( t == LUA_TSTRING )
+				fprintf( stderr, "(%s) %s", type, lua_tostring( L, i ));
+			else if ( t == LUA_TFUNCTION )
+				fprintf( stderr, "(%s) %p", type, (void *)lua_tocfunction( L, i ) );
+			else if ( t == LUA_TNUMBER )
+				fprintf( stderr, "(%s) %lld", type, (long long)lua_tointeger( L, i ));
+			else if ( t == LUA_TBOOLEAN)
+				fprintf( stderr, "%s: %s", type, lua_toboolean( L, i ) ? "true" : "false" );
+			else if ( t == LUA_TTHREAD )
+				fprintf( stderr, "%s: %p", type, lua_tothread( L, i ) );
+			else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
+				fprintf( stderr, "%s: %p", type, lua_touserdata( L, i ) );
+			else if ( t == LUA_TNIL ||  t == LUA_TNONE )
+				fprintf( stderr, "%s: %p", type, lua_topointer( L, i ) );
+			else if ( t == LUA_TTABLE ) 
+			{
+				//recursion may not work here....
+				fprintf( stderr, "%s: %s", type, "" );
+				(*sd) ++;
+				LUA_DUMPSTACK( "descent" );
+				lua_stackdump( L, p, sd );
+				LUA_DUMPSTACK( "ascent" );
+				lua_pop( L, 1 );
+				(*sd) --;
+			}
+			fprintf( stderr, "%s", ( i == -2 ) ? " -> " : "\n" );
+		}
+		LUA_DUMPSTACK( "before pop" );
+		lua_pop( L, 1 );
+		LUA_DUMPSTACK( "after pop" );
+	}
+
+	*sd--;
+	//Should always resolve back to zero... at the last run anyway
+	//fprintf( stderr, &"\t\t\t\t\t\t\t\t\t "[ 10 - *sd ] );
+	return;
+}
+
+
 
 
 //Lua dump....

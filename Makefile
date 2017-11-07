@@ -1,6 +1,6 @@
 # This project...
 NAME = hypno
-OS = $(shell uname)
+OS = $(shell uname | sed 's/[_ ].*//')
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
@@ -45,6 +45,10 @@ test-build-Darwin:
 	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
 	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
 
+test-build-CYGWIN: $(OBJ)
+test-build-CYGWIN:
+	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
+	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
 
 # Linux
 # These systems may need these additional commands: 
