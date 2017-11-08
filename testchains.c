@@ -1,5 +1,6 @@
-/*
-//hypno-chain.c 
+/* ---------------------------------------------------
+hypno-chain.c 
+
 Hypno's power is based off of a chain of data, this 
 just runs the chain/evaluator part. 
 
@@ -18,7 +19,7 @@ HOWEVER,
 - BIG ASS TABLES need to be tested.
 (You may have up 1000 keys., Also test this)
 
-*/
+ * --------------------------------------------------- */
 #include "vendor/single.h"
 #include "vendor/http.h"
 #include "bridge.h"
@@ -106,21 +107,20 @@ Buffer *run_chain ( Loader *ld, Buffer *dest, lua_State *L, char *err )
 Option opts[] = 
 {
 	//Debugging and whatnot
-	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
-	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
+	{ "-f", "--file",      "Run this Lua file.",'s' },
 	{ .sentinel = 1 }
 };
 
 
 int main (int argc, char *argv[])
 {
-#if 0
 	//Values
-	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
-#endif
+	if (argc > 2) 
+		opt_eval(opts, argc, argv);
 
 	//...
 	Buffer bc;
+	char *file = ( opt_set( opts, "--file" ) ) ? opt_get( opts, "--file" ).s : "a.lua";
 	char err[ 2048 ] = { 0 };
 	lua_State *L = luaL_newstate();
 
@@ -128,8 +128,9 @@ int main (int argc, char *argv[])
 	//An extremely fast dump for the purposes of
 	int in = 0;
 	int sd = 0;
-	lua_load_file( L, "c.lua", 0 );
+	lua_load_file( L, file, 0 );
 	lua_stackdump( L, &in, &sd );
+	exit( 0 );
 #endif
 
 	//A buffer would typically be initialized here.

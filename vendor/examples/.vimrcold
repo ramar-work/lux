@@ -1,0 +1,259 @@
+"----------------------------------"
+"simple setup
+"----------------------------------"
+set number
+set nocompatible
+set noerrorbells
+set novisualbell
+syntax on
+set mouse=nv
+set tabstop=3
+set shiftwidth=3
+set backup 					"make backup files
+set backupdir=/home/zaiah/tmp "put backup files here
+set dir=/home/zaiah/tmp
+set swapfile
+colors koehler 
+highlight Folded ctermbg=black
+highlight StatusLine term=bold cterm=bold
+highlight StatusLineNC term=bold cterm=bold
+set hlsearch
+
+"----------------------------------"
+"edit mode
+"----------------------------------"
+map <F2> <Esc>:w<CR>
+map <F3> <Esc>:e .<CR>
+map <F4> <Esc>:q<CR>
+map <F5> <Esc>:sp <CR>
+map <F6> <Esc>:vsp <CR>
+map <F7> <Esc>:susp<CR>
+map <F8> <Esc>:so ~/.vimrc<CR>
+"map <F9>
+
+"----------------------------------"
+" annoyances and folds
+"----------------------------------"
+"Fix syntax highlighting when files get huge...
+map <F12> <Esc>:syntax sync fromstart<CR>
+"map <C-S> :syntax sync fromstart<CR>
+
+"Activate folds when necessary
+map <C-F> :set foldmethod=marker foldmarker=//--,--//<CR> 
+map <C-H> :set foldmethod=marker foldmarker=--++,----<CR> 
+map <C-D> :set foldmethod=marker foldmarker={,}<CR> 
+
+"----------------------------------"
+" binary files
+" 	vim -b : edit binary using xxd-format!
+"----------------------------------"
+augroup Binary
+  au!
+  au BufReadPre  *.bin,*.exe let &bin=1
+  au BufReadPost *.bin,*.exe if &bin | %!xxd
+  au BufReadPost *.bin,*.exe set ft=xxd | endif
+  au BufWritePre *.bin,*.exe if .bin,.exe | %!xxd -r
+  au BufWritePre *.bin,*.exe endif
+  au BufWritePost *.bin,*.exe if .bin,.exe | %!xxd
+  au BufWritePost *.bin,*.exe set nomod | endif
+augroup END
+
+"----------------------------------"
+"trickery
+"----------------------------------"
+let $PAGER=''
+
+"----------------------------------"
+"bash 
+"----------------------------------"
+filetype plugin on
+let g:BASH_AuthorName	= 'Ramar Collins'
+let g:BASH_Email			= 'ramar.collins@gmail.com'
+let g:BASH_Company		= 'TMSV'
+
+" Execute
+:autocmd FileType sh noremap <C-L> :w!<CR>:!/bin/bash %<CR>
+
+" Make Executable? 
+:autocmd FileType sh noremap <C-E> :w!<CR>:% >> `pwd`/%<CR>
+
+" Comments
+":autocmd FileType sh noremap <C-O> :w!<CR> :i<CR>#!/bin/bash 
+
+" Short Options (deprecated)
+:autocmd FileType sh noremap <C-p> :w!<CR> :i<CR>while getopts x: opt<CR>do<CR><TAB>case "$opt" in<CR><TAB>x) x=true;;<CR><TAB>*) echo "$0 - not an option."; exit;;<CR><TAB>esac<CR>done<CR>shift $((OPTIND - 1))<CR><C-C>
+
+" Case Statement (probably also deprecated)
+:autocmd FileType sh noremap <C-u> :w!<CR> :i<CR>IFS=' <CR>'<CR><CR>usage()<CR>{<CR><TAB>STATUS=${1-0}<CR><TAB>echo "<CR><CR>"<CR><TAB>exit $STATUS<CR>}<CR><CR>while [ $# -gt 0 ]<CR>do<CR><TAB>case "$1" in<CR><TAB><TAB>?) something=something;;<CR><TAB><TAB>-h) usage 0;;<CR><TAB><TAB>-*) echo "Not an option!"<CR><TAB><TAB>usage 1<CR><TAB><TAB>;;<CR><TAB><TAB>*) break;;<CR><TAB>esac<CR>done<CR><C-C>
+
+"----------------------------------"
+" .css
+"----------------------------------"
+:autocmd Filetype css noremap <C-O> :i<CR>/******************************************************<CR>* desc<CR>* <CR>*<CR>******************************************************/<CR><C-C>
+"----------------------------------"
+" .vim
+"----------------------------------"
+" Needs a little help, can't handle functions.
+:autocmd Filetype vim noremap <C-L> :w!<CR>:source %<CR>  
+:autocmd Filetype vim noremap <C-P> :w!<CR>:source %<CR>  
+:nmap <C-P> :source %<CR>
+"----------------------------------"
+" Copy / Paste Crutches"
+"----------------------------------"
+map <C-Z> :w!<CR>:!/usr/bin/gedit %<CR>
+
+"----------------------------------"
+:autocmd Filetype vim noremap <C-P> :w!<CR>:source %<CR>  
+:nmap <C-P> :source %<CR>
+"----------------------------------"
+" Copy / Paste Crutches"
+"----------------------------------"
+map <C-Z> :w!<CR>:!/usr/bin/gedit %<CR>
+
+"----------------------------------"
+" Project (the best damn vim plugin
+" 	on earth!)
+"----------------------------------"
+"map <C-a> :bwipe<CR>:Project `pwd`/*.vim<CR>
+map <C-a> :Project `pwd`/*.vim<CR>
+map <C-n> :Project $name.vim<CR> \C<CR> 
+map <A-o> :Project<CR>:redraw<CR>/
+nmap <silent> <F3> <Plug>ToggleProject
+let g:proj_window_width = 40
+let g:proj_window_increment = 50
+
+"----------------------------------"
+"c lang
+"
+" Must change to current directory
+" when using in conjunction with 
+" project plugin.
+"----------------------------------"
+"valgrind death
+":autocmd Filetype c noremap <C-L> :w!<CR>:!/usr/bin/valgrind `printf % \| sed -e 's/\.c/.out/'`<CR>
+":autocmd Filetype c noremap <C-K> :w!<CR>:!/usr/bin/valgrind -v ./`printf % \| sed -e 's/\.c/.out/'`<CR>
+:autocmd Filetype c noremap <C-L> :w!<CR>:!/usr/bin/valgrind ./`printf % \| sed -e 's/\.c/.out/'`<CR>
+:autocmd Filetype c noremap <C-K> :w!<CR>:!/usr/bin/valgrind -v ./`printf % \| sed -e 's/\.c/.out/'`<CR>
+
+"gcc 
+":autocmd Filetype c noremap <C-M> :w!<CR>:!/usr/bin/gcc -o `echo % \| sed -e 's/\.c/.out/'` % && `printf % \| sed -e 's/\.c/\.out/'`<CR>
+:autocmd Filetype c noremap <C-M> :w!<CR>:!/usr/bin/gcc -o `printf % \| sed -e 's/\.c/\.out/'` % && ./`printf % \| sed -e 's/\.c/\.out/'`<CR>
+
+"commenting
+":autocmd Filetype c noremap <C-O> :i<CR>/******************************************************<CR> * desc<CR> * <CR> *<CR> ******************************************************/<CR><C-C>
+:autocmd Filetype c noremap <C-O> :i<CR>/******************************************************<CR>* <3re4GhuLLKh> <CR>* <CR>*<CR>******************************************************/<CR><C-C>:w!<CR>:!sed -i "s/<3re4GhuLLKh>/$(basename %)/" %<CR>:e!<CR><C-C>
+
+"----------------------------------"
+"c++
+"----------------------------------"
+"g++
+:autocmd Filetype cpp noremap <C-M> :w!<CR>:!/usr/bin/g++ -o `printf % \| sed -e 's/\.cpp/\.out/'` % && ./`printf % \| sed -e 's/\.cpp/\.out/'`<CR>
+
+"make hell
+":autocmd Filetype c noremap <C-M> :w!<CR>:!/usr/bin/make %<CR>
+
+
+"----------------------------------"
+"php / ming
+"----------------------------------"
+" run file with PHP CLI (CTRL-M)
+:autocmd FileType php noremap <C-M> :w!<CR>:!/usr/bin/php %<CR>
+
+" add a header to PHP files
+:autocmd FileType php noremap <C-E> :w!<CR>:!$HOME/.vim/syntax.sh -p % >> `pwd`/%; vim `pwd`/%<CR>
+
+" PHP parser check (CTRL-L)
+:autocmd FileType php noremap <C-L> :!/usr/bin/php -l %<CR>
+
+" test sites in development browser
+:autocmd FileType php noremap <C-M> :w!<CR>:!/usr/bin/firefox http://localhost/$(basename `pwd`)/%<CR>
+
+" If init.php is in the same folder, run that.
+:autocmd FileType php noremap <C-P> :w!<CR>:!/usr/bin/curl http://localhost/$(basename `pwd`)/%<CR>
+
+"----------------------------------"
+" ruby :)
+"----------------------------------"
+:autocmd Filetype rb noremap <C-L> :!/usr/bin/ruby -c %<CR>
+
+"----------------------------------"
+" Makefiles 
+"----------------------------------"
+:autocmd Filetype Makefile noremap <C-O> :i<CR>#------------------------------------------------------<CR># <3re4GhuLLKh> <CR>#<CR>#<CR>#-----------------------------------------------------#<CR><C-C>:w!<CR>:!sed -i "s/<3re4GhuLLKh>/$(basename %)/" %<CR>:e!<CR><C-C>
+:autocmd Filetype mk noremap <C-O> :i<CR>#------------------------------------------------------<CR># <3re4GhuLLKh> <CR>#<CR>#<CR>#-----------------------------------------------------#<CR><C-C>:w!<CR>:!sed -i "s/<3re4GhuLLKh>/$(basename %)/" %<CR>:e!<CR><C-C>
+
+"----------------------------------"
+" lua :) :)
+"----------------------------------"
+" Test for proper syntax
+:autocmd Filetype lua noremap <C-L> :!/usr/bin/lua %<CR>
+
+:autocmd Filetype lua noremap <C-O> :i<CR>------------------------------------------------------<CR>-- <3re4GhuLLKh> <CR>-- <CR>-- <CR>------------------------------------------------------<CR><C-C>:w!<CR>:!sed -i "s/<3re4GhuLLKh>/$(basename %)/" %<CR>:e!<CR><C-C>
+" augroup END
+
+" What this whole thing should really be:
+" -need access to the file name that I'm working on
+" -need to use loops when display comments (double dashes '--' and asterisks '*'
+" -not sure how to write function names
+"
+" Common Blocks
+" -not sure how to write function names
+"
+" Common Blocks
+"
+" Improve this to use external text blocks.
+" Extra points if you can switch between your common filetypes.
+	
+	" Function
+"	:autocmd Filetype lua noremap <C-O> :i<CR><TAB>local function x()<TAB><TAB><TAB><TAB><TAB><TAB><TAB><TAB><TAB>--++<CR><TAB><CR><TAB>end<TAB><TAB><TAB><TAB><TAB><TAB><TAB><TAB><TAB>----<CR><C-C>
+	
+	" Define as package.
+	":autocmd Filetype lua noremap <C-P> :i<CR><TAB><TAB>local x = {}<CR><CR><TAB><TAB>x = {<CR><TAB><TAB><TAB>["x"] = function () x() end,<CR><TAB><TAB>}<CR><C-C>
+	":autocmd Filetype lua noremap <C-]> :i<CR><TAB><TAB>x = {<CR><TAB><TAB><TAB>["x"] = function () x() end,<CR><TAB><TAB>}<CR><C-C>
+	:autocmd Filetype lua noremap <C-J> :i<CR><TAB><TAB>x = {<CR><TAB><TAB><TAB>["x"] = "x",<CR><TAB><TAB>}<CR><C-C>
+
+	" for (shift is ipairs) / pairs & ipairs
+	:autocmd FileType lua noremap <C-U> :i<CR><TAB>for x,y in pairs(x) do<CR><TAB><CR><TAB>end<CR><C-C>
+	:autocmd FileType lua noremap <C-Y> :i<CR><TAB>for _,x in ipairs(x) do<CR><TAB><CR><TAB>end<CR><C-C>
+"	:autocmd FileType lua noremap <C-\> :i<CR><TAB>for x=0,y,1 do<CR><TAB><CR><TAB>end<CR><C-C>
+
+	" common conditionals
+	:autocmd Filetype lua noremap <C-K> :i<CR><TAB>if x then<CR><TAB><CR><TAB>else<CR><TAB><CR><TAB>end<CR><C-C>
+	:autocmd Filetype lua noremap <C-\> :i<CR><TAB>case = {<CR><TAB>["x"] = function () x() end,<CR><TAB><TAB>["y"] = function () y() end,<CR><TAB><TAB>["z"] = function () z() end,<CR><TAB>}<CR><C-C>
+
+"----------------------------------"
+"javascript
+"----------------------------------"
+:autocmd Filetype javascript noremap <C-O> :i<CR>/******************************************************<CR>* desc<CR>* <CR>*<CR>******************************************************/<CR><C-C>
+
+"----------------------------------"
+"html
+"----------------------------------"
+"function PreviewHTML_External()
+"  exe "silent !mozilla -remote \"openurl(file://"; . expand( "%:p" ) . ")\""
+"endfunction
+"map <Leader>pp :call PreviewHTML_External()<CR>
+:autocmd Filetype html noremap <C-O> :i<CR><!-- <CR>desc<CR><CR>--><CR><C-C>
+
+"----------------------------------"
+"scheme
+"----------------------------------"
+
+"----------------------------------"
+"sql
+"----------------------------------"
+":autocmd Filetype sql noremap <C-M> :w!<CR>:!/usr/bin/sqlite3 %<CR>
+:autocmd FileType r noremap <C-L> :w!<CR>:!/usr/bin/R --file=%<CR>
+
+"----------------------------------"
+"sql
+"----------------------------------"
+":autocmd Filetype sql noremap <C-M> :w!<CR>:!/usr/bin/sqlite3 %<CR>
+:autocmd FileType sql set omnifunc=empty
+:autocmd FileType sql noremap <C-L> :w!<CR>:!/usr/bin/psql -U postgres -f `pwd`/% &<CR>
+
+"----------------------------------"
+"easy documentation
+"----------------------------------"
+"let g:netrw_http_cmd = elinks-for-vim
+

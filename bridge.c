@@ -206,20 +206,14 @@ int lua_to_table (lua_State *L, int index, Table *t )
 
 void lua_stackdump ( lua_State *L, int *p, int *sd )
 {
-	//static int sd;
 	lua_pushnil( L );
-	//obprintf( stderr, "Current stack depth: %d\n", sd );
-	//sd++;
 	(*sd)++;
-	fprintf( stderr, "Current stack depth: %d\n", *sd );
-	
-
-	//
+	//fprintf( stderr, "Current stack depth: %d\n", *sd );
 	while ( lua_next( L, *sd ) != 0 ) 
 	{
 		//Fancy printing
-		fprintf( stderr, &"\t\t\t\t\t\t\t\t\t "[ 10 - *sd ] );
-		fprintf( stderr, "[%3d:%2d] => ", *p, *sd );
+		fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t "[ 10 - *sd ] );
+		fprintf( stderr, "[%3d:%2d] => ", *p, *sd / 2 );
 
 		//Print both left and right side
 		for ( int i = -2; i < 0; i++ )
@@ -243,19 +237,20 @@ void lua_stackdump ( lua_State *L, int *p, int *sd )
 			else if ( t == LUA_TTABLE ) 
 			{
 				//recursion may not work here....
-				fprintf( stderr, "%s: %s", type, "" );
+				fprintf( stderr, "%s\n", type );
 				(*sd) ++;
-				LUA_DUMPSTACK( "descent" );
+				//LUA_DUMPSTACK( "descent" );
 				lua_stackdump( L, p, sd );
-				LUA_DUMPSTACK( "ascent" );
-				lua_pop( L, 1 );
-				(*sd) --;
+				//fprintf( stderr, "End recursive dumping...\n" );
+				//lua_pop( L, 1 );
+				(*sd) -= 2; //reset table back to state before processing table
 			}
 			fprintf( stderr, "%s", ( i == -2 ) ? " -> " : "\n" );
 		}
-		LUA_DUMPSTACK( "before pop" );
+		//getchar();
+		//LUA_DUMPSTACK( "before pop" );
 		lua_pop( L, 1 );
-		LUA_DUMPSTACK( "after pop" );
+		//LUA_DUMPSTACK( "after pop" );
 	}
 
 	*sd--;
