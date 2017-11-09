@@ -131,10 +131,20 @@ int main (int argc, char *argv[])
 	printf( "lua_gettop: %d\n", lua_gettop( L ) );
 	lua_stackdump( L );
 #endif
-	char *e[4] = { "e.lua", "f.lua", "g.lua", "h.lua" };
-	for ( int i=0; i < 4; i++ )
-		if ( !lua_load_file( L, e[ i ], err ) )
+	char *e[] = { 
+	#if 0
+		"f.lua", "g.lua", "h.lua", "d.lua" 
+	#else
+		"f.lua", "d.lua", "g.lua", "e.lua", "i.lua"
+	#endif
+	};	
+
+	for ( int i=0; i < sizeof(e)/sizeof(char *); i++ ) {
+		char *f = strcmbd( "/", "tests", e[ i ]);
+		if ( !lua_load_file( L, f, err ) )
 			return err( 1, "Failed to load file %s\n%s", file, err );
+		free( f );
+	}
 
 	printf( "lua_gettop: %d\n", lua_gettop( L ) );
 	lua_stackdump( L );

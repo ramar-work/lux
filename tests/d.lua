@@ -3,7 +3,10 @@ bacon = "cheeseburger"
 reg = {
 	a = "b",
 	c = "e",
-	b = "f",
+	b = {
+		washed = "f",
+		[234] = "out"
+	}
 }
 return reg
 

@@ -1,5 +1,18 @@
 #include "bridge.h"
 
+
+
+char *CCtypes[] = {
+	[CC_NONE]  = "None",
+	[CC_MODEL] = "Model",     //Models are usually executed, and added to env 
+	[CC_VIEW]  = "View",      //Views will be loaded, parsed, and sent to buffer
+	[CC_FUNCT] = "Function",  //Functions are executed, payload sent to buffer
+	[CC_STR]   = "String",    //Strings are just referenced and loaded to buffer
+	[CC_MAX]   = NULL,        //A nul terminator
+};
+
+
+
 //Loop through a table in memory
 void lua_loop ( lua_State *L )
 {
@@ -13,15 +26,6 @@ void lua_loop ( lua_State *L )
 	}
 }
 
-
-char *CCtypes[] = {
-	[CC_NONE]  = "None",
-	[CC_MODEL] = "Model",     //Models are usually executed, and added to env 
-	[CC_VIEW]  = "View",      //Views will be loaded, parsed, and sent to buffer
-	[CC_FUNCT] = "Function",  //Functions are executed, payload sent to buffer
-	[CC_STR]   = "String",    //Strings are just referenced and loaded to buffer
-	[CC_MAX]   = NULL,        //A nul terminator
-};
 
 
 
@@ -206,14 +210,19 @@ void lua_stackclear ( lua_State *L )
 
 
 
-void lua_dumptable ( lua_State *L, int *sd )
+void lua_dumptable ( lua_State *L, int *pos, int *sd )
 {
 	lua_pushnil( L );
-	while ( lua_next( L, *sd ) != 0 ) 
+	LUA_DUMPSTK( L );
+	//fprintf( stderr, "*pos = %d\n", *pos );
+
+	while ( lua_next( L, *pos ) != 0 ) 
 	{
 		//Fancy printing
-		fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t "[ 10 - *sd ] );
-		fprintf( stderr, "[%3d:%2d] => ", *p, *sd / 2 );
+		//fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - *sd ] );
+		PRETTY_TABS( *sd );
+		LUA_DUMPSTK( L );
+		fprintf( stderr, "[%3d:%2d] => ", *pos, *sd );
 
 		//Print both left and right side
 		for ( int i = -2; i < 0; i++ )
@@ -221,69 +230,83 @@ void lua_dumptable ( lua_State *L, int *sd )
 			int t = lua_type( L, i );
 			const char *type = lua_typename( L, t );
 			if ( t == LUA_TSTRING )
-				fprintf( stderr, "(%s) %s", type, lua_tostring( L, i ));
+				fprintf( stderr, "(%8s) %s", type, lua_tostring( L, i ));
 			else if ( t == LUA_TFUNCTION )
-				fprintf( stderr, "(%s) %p", type, (void *)lua_tocfunction( L, i ) );
+				fprintf( stderr, "(%8s) %p", type, (void *)lua_tocfunction( L, i ) );
 			else if ( t == LUA_TNUMBER )
-				fprintf( stderr, "(%s) %lld", type, (long long)lua_tointeger( L, i ));
+				fprintf( stderr, "(%8s) %lld", type, (long long)lua_tointeger( L, i ));
 			else if ( t == LUA_TBOOLEAN)
-				fprintf( stderr, "%s: %s", type, lua_toboolean( L, i ) ? "true" : "false" );
+				fprintf( stderr, "(%8s) %s", type, lua_toboolean( L, i ) ? "true" : "false" );
 			else if ( t == LUA_TTHREAD )
-				fprintf( stderr, "%s: %p", type, lua_tothread( L, i ) );
+				fprintf( stderr, "(%8s) %p", type, lua_tothread( L, i ) );
 			else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
-				fprintf( stderr, "%s: %p", type, lua_touserdata( L, i ) );
+				fprintf( stderr, "(%8s) %p", type, lua_touserdata( L, i ) );
 			else if ( t == LUA_TNIL ||  t == LUA_TNONE )
-				fprintf( stderr, "%s: %p", type, lua_topointer( L, i ) );
+				fprintf( stderr, "(%8s) %p", type, lua_topointer( L, i ) );
 			else if ( t == LUA_TTABLE ) 
 			{
-				//recursion may not work here....
-				fprintf( stderr, "%s\n", type );
-				(*sd) ++;
-				lua_dumptable( L, sd );
-				(*sd) -= 2; //rewind stack depth to state before processing table
+				fprintf( stderr, "(%8s) %p\n", type, lua_topointer( L, i ) );
+				(*sd) ++, (*pos) += 2;
+				lua_dumptable( L, pos, sd );
+				(*sd) --, (*pos) -= 2;
+				PRETTY_TABS( *sd );
+				fprintf( stderr, "}" );
 			}
 			fprintf( stderr, "%s", ( i == -2 ) ? " -> " : "\n" );
 		}
+
 		lua_pop( L, 1 );
+		LUA_DUMPSTK( L );
 	}
 	return;
 }
 
-void lua__stackdump ( lua_State *L, int *p, int *sd )
+
+
+
+void lua_stackdump ( lua_State *L )
 {
 	//No top
 	if ( lua_gettop( L ) == 0 )
 		return;
 
 	//Loop through all of the values that are on the stack
-	for ( int i=0; i<lua_gettop(L); i++ )
-		printf( "[%d] %s\n", i, lua_typename( L, lua_type( L, i ) ) );
+	LUA_DUMPSTK( L );
 
 	//Loop again, but show the value of each key on the stack
-	for ( int ii = 0; ii < lua_gettop( L ); ii++ ) 
+	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) 
 	{
-		int t = lua_type( L, ii );
+		int t = lua_type( L, pos );
 		const char *type = lua_typename( L, t );
+		fprintf( stderr, "[%3d] => ", pos );
+
 		if ( t == LUA_TSTRING )
-			fprintf( stderr, "(%s) %s", type, lua_tostring( L, ii ));
+			fprintf( stderr, "(%8s) %s", type, lua_tostring( L, pos ));
 		else if ( t == LUA_TFUNCTION )
-			fprintf( stderr, "(%s) %p", type, (void *)lua_tocfunction( L, ii ) );
+			fprintf( stderr, "(%8s) %p", type, (void *)lua_tocfunction( L, pos ) );
 		else if ( t == LUA_TNUMBER )
-			fprintf( stderr, "(%s) %lld", type, (long long)lua_tointeger( L, ii ));
+			fprintf( stderr, "(%8s) %lld", type, (long long)lua_tointeger( L, pos ));
 		else if ( t == LUA_TBOOLEAN)
-			fprintf( stderr, "%s: %s", type, lua_toboolean( L, ii ) ? "true" : "false" );
+			fprintf( stderr, "(%8s) %s", type, lua_toboolean( L, pos ) ? "true" : "false" );
 		else if ( t == LUA_TTHREAD )
-			fprintf( stderr, "%s: %p", type, lua_tothread( L, ii ) );
+			fprintf( stderr, "(%8s) %p", type, lua_tothread( L, pos ) );
 		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
-			fprintf( stderr, "%s: %p", type, lua_touserdata( L, ii ) );
+			fprintf( stderr, "(%8s) %p", type, lua_touserdata( L, pos ) );
 		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
-			fprintf( stderr, "%s: %p", type, lua_topointer( L, ii ) );
+			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, pos ) );
 		else if ( t == LUA_TTABLE ) 
 		{
-			(*sd)++;
-			lua_dumptable( L, 0, sd );
-			*sd--;
-		}
+		#if 0
+			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, pos ) );
+		#else
+			fprintf( stderr, "(%8s) %p {\n", type, lua_topointer( L, pos ) );
+			int sd = 1;
+			LUA_DUMPSTK( L );
+			lua_dumptable( L, &pos, &sd );
+			fprintf( stderr, "}" );
+		#endif
+		}	
+		fprintf( stderr, "\n" );
 	}
 	return;
 }

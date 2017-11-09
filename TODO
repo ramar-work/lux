@@ -1,8 +1,27 @@
 today
 =====
 - node works better and doesn't require this...
-- dumping still needs to work
 
+- dumping works
+
+- now, to get everything in the model:
+	all of it must be put under one table,
+	and the other elements, like cookie, http, etc, need to be introduced to the Lua environment...
+	
+- checklist of all elements
+		model.(*) - the "sum" of all the model files
+		http.(*)
+			cookie.(*) - All cookie info
+			session.(*) - Dunno where this goes yet
+			request.(*) - All request data
+			response.(*) - All response data
+			header.(*) - All header data	
+
+- when that's done, rendering needs to work
+		as long as tables are working, there should be little issue here
+
+- then when that's done, you MIGHT be able to do work...
+		...
 
 
 
