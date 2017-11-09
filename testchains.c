@@ -120,18 +120,26 @@ int main (int argc, char *argv[])
 
 	//...
 	Buffer bc;
-	char *file = ( opt_set( opts, "--file" ) ) ? opt_get( opts, "--file" ).s : "a.lua";
+	char *file = ( opt_set( opts, "--file" ) ) ? opt_get( opts, "--file" ).s : "d.lua";
 	char err[ 2048 ] = { 0 };
 	lua_State *L = luaL_newstate();
 
-#if 1
 	//An extremely fast dump for the purposes of
-	int in = 0;
-	int sd = 0;
-	lua_load_file( L, file, 0 );
-	lua_stackdump( L, &in, &sd );
-	exit( 0 );
+#if 0
+	if ( !lua_load_file( L, "d.lua", err ) )
+		return err( 1, "Failed to load file %s\n%s", file, err );
+	printf( "lua_gettop: %d\n", lua_gettop( L ) );
+	lua_stackdump( L );
 #endif
+	char *e[4] = { "e.lua", "f.lua", "g.lua", "h.lua" };
+	for ( int i=0; i < 4; i++ )
+		if ( !lua_load_file( L, e[ i ], err ) )
+			return err( 1, "Failed to load file %s\n%s", file, err );
+
+	printf( "lua_gettop: %d\n", lua_gettop( L ) );
+	lua_stackdump( L );
+return 0;	
+	lua_stackclear( L );
 
 	//A buffer would typically be initialized here.
 	if ( !bf_init( &bc, NULL, 1 ) )

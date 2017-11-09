@@ -198,17 +198,17 @@ int lua_to_table (lua_State *L, int index, Table *t )
 }
 
 
+void lua_stackclear ( lua_State *L )
+{
+	int top = lua_gettop( L );
+	lua_pop( L, top );
+}
 
-#define LUA_DUMPSTACK( str ) \
-	if ( strlen( str ) ) fprintf( stderr, "%s\n------------------------\n", str ); \
-	for ( int y=0; y < lua_gettop(L); y++ ) fprintf( stderr, "[%d] => %s\n", y, lua_typename( L, y ) );
-		
 
-void lua_stackdump ( lua_State *L, int *p, int *sd )
+
+void lua_dumptable ( lua_State *L, int *sd )
 {
 	lua_pushnil( L );
-	(*sd)++;
-	//fprintf( stderr, "Current stack depth: %d\n", *sd );
 	while ( lua_next( L, *sd ) != 0 ) 
 	{
 		//Fancy printing
@@ -239,23 +239,52 @@ void lua_stackdump ( lua_State *L, int *p, int *sd )
 				//recursion may not work here....
 				fprintf( stderr, "%s\n", type );
 				(*sd) ++;
-				//LUA_DUMPSTACK( "descent" );
-				lua_stackdump( L, p, sd );
-				//fprintf( stderr, "End recursive dumping...\n" );
-				//lua_pop( L, 1 );
-				(*sd) -= 2; //reset table back to state before processing table
+				lua_dumptable( L, sd );
+				(*sd) -= 2; //rewind stack depth to state before processing table
 			}
 			fprintf( stderr, "%s", ( i == -2 ) ? " -> " : "\n" );
 		}
-		//getchar();
-		//LUA_DUMPSTACK( "before pop" );
 		lua_pop( L, 1 );
-		//LUA_DUMPSTACK( "after pop" );
 	}
+	return;
+}
 
-	*sd--;
-	//Should always resolve back to zero... at the last run anyway
-	//fprintf( stderr, &"\t\t\t\t\t\t\t\t\t "[ 10 - *sd ] );
+void lua__stackdump ( lua_State *L, int *p, int *sd )
+{
+	//No top
+	if ( lua_gettop( L ) == 0 )
+		return;
+
+	//Loop through all of the values that are on the stack
+	for ( int i=0; i<lua_gettop(L); i++ )
+		printf( "[%d] %s\n", i, lua_typename( L, lua_type( L, i ) ) );
+
+	//Loop again, but show the value of each key on the stack
+	for ( int ii = 0; ii < lua_gettop( L ); ii++ ) 
+	{
+		int t = lua_type( L, ii );
+		const char *type = lua_typename( L, t );
+		if ( t == LUA_TSTRING )
+			fprintf( stderr, "(%s) %s", type, lua_tostring( L, ii ));
+		else if ( t == LUA_TFUNCTION )
+			fprintf( stderr, "(%s) %p", type, (void *)lua_tocfunction( L, ii ) );
+		else if ( t == LUA_TNUMBER )
+			fprintf( stderr, "(%s) %lld", type, (long long)lua_tointeger( L, ii ));
+		else if ( t == LUA_TBOOLEAN)
+			fprintf( stderr, "%s: %s", type, lua_toboolean( L, ii ) ? "true" : "false" );
+		else if ( t == LUA_TTHREAD )
+			fprintf( stderr, "%s: %p", type, lua_tothread( L, ii ) );
+		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
+			fprintf( stderr, "%s: %p", type, lua_touserdata( L, ii ) );
+		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
+			fprintf( stderr, "%s: %p", type, lua_topointer( L, ii ) );
+		else if ( t == LUA_TTABLE ) 
+		{
+			(*sd)++;
+			lua_dumptable( L, 0, sd );
+			*sd--;
+		}
+	}
 	return;
 }
 
