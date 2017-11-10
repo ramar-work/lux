@@ -30,28 +30,55 @@ Loader l[] = {
 	//Additional, you can check it seperately and make sure that all files are available
 
 	//Sadly though, this is slightly more complicated than it should be...
+#if 0
 	{ CC_MODEL, "example/non/app/cycle-a.lua" },
 	{ CC_MODEL, "example/non/app/cycle-b.lua" },
+#else
+	{ CC_MODEL, "cycle-a" },
+	{ CC_MODEL, "cycle-b" },
+#endif
 	{ 0, NULL }
 };
 
 
 // Resolving directories can happen first
-int resolve_chain ( )
+void show_chain ( Loader *ld )
 {
-	return 0;
+	Loader *ll = ld;	
+	while ( ll->type ) 
+	{
+		fprintf( stderr, "%s: %s\n", printCCtype( ll->type ), ll->content );
+		ll++;	
+	}
 }
 
 
 // Prepare the chain
-Loader *prepare_chain ( Loader *ld, char *reldir )
+Loader *prepare_chain ( Loader *ld, const char *reldir )
 {
 	//Loop through, create a full path and check if those files exist
 	
 	//The engine would return NULL and probably throw a 404 if the file didn't exist
 	//This could also be a server error, since technically the symbolic file exists, but
 	//the workings underneath do not.
-	return NULL;
+
+	const char *exts[] = { "lua", "tpl" };
+	const char *dirs[] = { "app", "views" };
+	Loader *ll = ld;	
+
+	while ( ll->type ) 
+	{
+		int in = ( ll->type == CC_MODEL ) ? 0 : 1;
+		char *tmp = strcmbd( "/", reldir, dirs[ in ], ll->content, exts[ in ]);
+		tmp[ strlen( tmp ) - 4 ] = '.';
+		fprintf( stderr, "dir: %s\n", tmp );
+
+		//free( ll->content );
+		ll->content = tmp;
+		ll++;
+	}
+
+	return ll;
 }
 
 
@@ -124,13 +151,14 @@ int main (int argc, char *argv[])
 	char err[ 2048 ] = { 0 };
 	lua_State *L = luaL_newstate();
 
-	//An extremely fast dump for the purposes of
-#if 0
-	if ( !lua_load_file( L, "d.lua", err ) )
-		return err( 1, "Failed to load file %s\n%s", file, err );
-	printf( "lua_gettop: %d\n", lua_gettop( L ) );
-	lua_stackdump( L );
-#endif
+	//
+	if ( !prepare_chain( l, "example/non" ) )
+		return err( 2, "Failed to prepare chain..." );	
+
+	if ( 1 )
+		show_chain( l );
+
+#if 1
 	char *e[] = { 
 	#if 0
 		"f.lua", "g.lua", "h.lua", "d.lua" 
@@ -139,18 +167,118 @@ int main (int argc, char *argv[])
 	#endif
 	};	
 
-	for ( int i=0; i < sizeof(e)/sizeof(char *); i++ ) {
+	//Load all models here for now...
+	for ( int i=0; i < sizeof(e)/sizeof(char *); i++ ) 
+	{
 		char *f = strcmbd( "/", "tests", e[ i ]);
 		if ( !lua_load_file( L, f, err ) )
 			return err( 1, "Failed to load file %s\n%s", file, err );
 		free( f );
 	}
 
-	printf( "lua_gettop: %d\n", lua_gettop( L ) );
+	//Dump stack just for my knowledge
 	lua_stackdump( L );
-return 0;	
-	lua_stackclear( L );
+	//lua_stackclear( L );
 
+	//Aggregate...
+	//lua_aggregate( L ) 
+	//lua_to_table( L, 0, &t );
+#else
+
+	//Run each model ( run_models )
+	while ( lt->type )
+	{
+		if ( lt->type == CC_MODEL )
+		{
+			fprintf( stderr, "%s\n", lt->content );	
+
+			//Successful calls will put results on the stack. 
+			if ( !lua_load_file( L, lt->content, err ) ) 
+			{
+				//Unsuccessful will return NULL, but the stack has the error
+				//The lua_load_file function SHOULD modify the error message
+				return NULL;
+			}
+		}
+		lt++; //next file
+	}
+
+	//Aggregate what's on the stack
+	rewind( lt );
+	lua_aggregate( L, "name-of-table" );
+	lua_to_table( L, 0, &t );
+
+	//Render each view ( run_views )
+	while ( lt->type ) 
+	{
+		if ( lt->type == CC_VIEW ) 
+		{
+			Render R;
+			Table t; 
+			int fd = 0, br = 0;
+			char *ren = NULL;
+			struct stat sb;
+		
+			//Message
+			fprintf( stderr, "Rendering view file %s\n", lt->content );
+
+			//Check for the file and get its size.
+			if ( stat( lt->content, &sb ) == -1 )
+				return err( 1, "Failed to get file and all..." );
+
+			//Make some space for the file's contents
+			if ( !(ren = malloc( sb.st_size + 1 )) )
+				return err( 1, "Failed to allocate size for file dump..." );
+
+			//Then open up the file 
+			if (( fd = open( lt->content, O_RDONLY ) ) == -1 )
+				return err( 1, "Failed to open file to render, are your permissions OK?" );
+				
+			//And load it for the rendering engine	
+			if (( br = read( fd, ren, sizeof( ren ) - 1 )) == -1 )
+				{ fprintf( stderr, "loading file '%s' failed...\n", v); goto cleanit ; }
+
+			//Prepare the rendering engine
+			if ( !render_init( &R, &t ) )
+				{ fprintf( stderr, "render_init failed...\n"); goto cleanit ; }
+
+		#if 0
+			//Dump the block (for testing)
+			if ( 1 )
+				write( 2, ren, br );
+		#endif
+			
+			//"Score" the block to render
+			if ( !render_map( &R, (uint8_t *)ren, br ) )
+				{ fprintf( stderr, "render mapping failed...\n"); goto cleanit ; }
+
+			//Start rendering
+			if ( !render_render( &R ) )
+				{ fprintf( stderr, "render_init failed...\n"); goto cleanit ; }
+			
+		#if 0
+			//Send results to stdout or somewhere else...
+			if ( 1 )
+				write( 2, bf_data( render_rendered( &R ) ), bf_written( render_rendered( &R )) );
+			else 
+		#endif
+			{
+				bf_append( HTTP_BUF, bf_data( render_rendered( &R ) ), bf_written( render_rendered( &R )) );
+			}
+
+			//Clean up
+cleanUp:
+			render_free( &R );
+			lt_free( &t );
+			free( vf );
+			close(fd); 
+			fd = 0; 
+		}
+
+		lt++; //next file
+	}
+
+ #if 0	
 	//A buffer would typically be initialized here.
 	if ( !bf_init( &bc, NULL, 1 ) )
 		return err( 2, "Buffer failed to initialize." );
@@ -158,6 +286,8 @@ return 0;
 	//Then run the chain.
 	if ( !run_chain( l, &bc, L, err ) )
 		return err( 1, "Chain running failed on block: %s", err );
+ #endif
+#endif
 
 	return 0;
 }

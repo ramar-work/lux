@@ -114,7 +114,7 @@
  #endif
 #endif
 
-#ifndef DEBUG_H
+#ifdef DEBUG_H
  #if 1
 	#define SUSP(...) \
 		fprintf( stderr, "%s, %d: ", __FILE__, __LINE__ ); fprintf( stderr, __VA_ARGS__ ); getchar() 

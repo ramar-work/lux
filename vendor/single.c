@@ -1183,11 +1183,12 @@ int render_render ( Render *r )
 			memcpy( &search[ p ], ct->blob, ct->size );
 			p += ct->size;
 		
-#if 1
+		#ifdef DEBUG_H
+			fprintf( stderr, "Searching for hash: " );
 			write( 2, search, p );
 			write( 2, "\n", 1 );
 			//getchar();
-#endif
+		#endif
 		
 			if ( (i = lt_get_long_i( r->srctable, search, p )) == -1 )
 				{ ct++; continue; }//fprintf( stderr, "Looks like there's nothing here..." );		

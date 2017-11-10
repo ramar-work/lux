@@ -2,11 +2,14 @@ today
 =====
 - node works better and doesn't require this...
 
-- dumping works
+x dumping works
+
+x rendering works (but may have little issues here and there)
 
 - now, to get everything in the model:
-	all of it must be put under one table,
-	and the other elements, like cookie, http, etc, need to be introduced to the Lua environment...
+	each element on the stack needs to be in a table, don't care what the table is called
+	tables named after files are pretty and should work ok in theory, let's see though...
+	all of the HTTP elements need to also be accessible, see the following:
 	
 - checklist of all elements
 		model.(*) - the "sum" of all the model files

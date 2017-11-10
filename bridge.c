@@ -1,7 +1,5 @@
 #include "bridge.h"
 
-
-
 char *CCtypes[] = {
 	[CC_NONE]  = "None",
 	[CC_MODEL] = "Model",     //Models are usually executed, and added to env 
@@ -139,6 +137,9 @@ int table_to_lua (lua_State *L, int index, Table *tt)
 	obprintf( stderr, "Done!\n" );
 	return 1;
 }
+
+
+//Convert Lua stack to a Table
 
 
 

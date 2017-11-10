@@ -4,7 +4,7 @@ OS = $(shell uname | sed 's/[_ ].*//')
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H #-ansi
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 #-DDEBUG_H #-ansi
 CC = gcc
 CFLAGS = $(GCCFLAGS)
 
@@ -36,6 +36,11 @@ chains: test-build-$(OS)
 chains: 
 	@printf ''>/dev/null
 
+# Render test program
+render: RICKROSS=testrender
+render: test-build-$(OS)
+render: 
+	@printf ''>/dev/null
 
 # All test build programs use this recipe
 # But notice that a version exists for different operating systems. 
@@ -56,8 +61,8 @@ test-build-CYGWIN:
 # $(shell pkg-config --cflags lua5.3)
 test-build-Linux: $(OBJ) 
 test-build-Linux:
-	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread
-	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread
+	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
+	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
 
 	
 # A not-so-main target, that will probably result in a few object files...
