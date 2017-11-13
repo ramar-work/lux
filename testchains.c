@@ -131,6 +131,14 @@ Buffer *run_chain ( Loader *ld, Buffer *dest, lua_State *L, char *err )
 }
 
 
+
+void lua_aggregate ( lua_State *L, const char *tableName )
+{
+	//The ENTIRE stack goes here...
+
+}
+
+
 Option opts[] = 
 {
 	//Debugging and whatnot
@@ -141,6 +149,9 @@ Option opts[] =
 
 int main (int argc, char *argv[])
 {
+	//Get the start time
+	//...
+
 	//Values
 	if (argc > 2) 
 		opt_eval(opts, argc, argv);
@@ -289,5 +300,7 @@ cleanUp:
  #endif
 #endif
 
+	//Get the start time
+	//...
 	return 0;
 }

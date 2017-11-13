@@ -16,6 +16,7 @@ LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c bridge.c
 OBJ = ${SRC:.c=.o}
 
+
 # A main target, that will most likely result in a binary
 main: RICKROSS=main
 main: test-build-$(OS)

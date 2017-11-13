@@ -1183,12 +1183,11 @@ int render_render ( Render *r )
 			memcpy( &search[ p ], ct->blob, ct->size );
 			p += ct->size;
 		
-		#ifdef DEBUG_H
-			fprintf( stderr, "Searching for hash: " );
+#if 1
 			write( 2, search, p );
 			write( 2, "\n", 1 );
 			//getchar();
-		#endif
+#endif
 		
 			if ( (i = lt_get_long_i( r->srctable, search, p )) == -1 )
 				{ ct++; continue; }//fprintf( stderr, "Looks like there's nothing here..." );		
@@ -2162,10 +2161,10 @@ static void lt_printindex (LiteKv *tt, int ind)
 			/*LITE_NODE is handled in printall*/
 			if (t == LITE_NON)
 				w += snprintf( &b[w], lt_buflen - w, "%s", "is uninitialized" );
-		#ifdef LITE_NUL
+#ifdef LITE_NUL
 			else if (t == LITE_NUL)
 				w += snprintf( &b[w], lt_buflen - w, "is terminator" );
-		#endif
+#endif
 			else if (t == LITE_USR)
 				w += snprintf( &b[w], lt_buflen - w, "userdata [address: %p]", r->vusrdata );
 			else if (t == LITE_TBL) 
@@ -2175,47 +2174,6 @@ static void lt_printindex (LiteKv *tt, int ind)
 					"table [address: %p, ptr: %ld, elements: %d]", (void *)rt, rt->ptr, rt->count );
 			}
 		}
-
-	#ifdef LT_DUMPFULL
-		//Print the parent key in full
-		if ( !i && ind )
-		{
-			int i = ind;
-			LiteKv *parent = tt->parent;
-			LiteKv *ptr[ 10 ] = { NULL };
-
-			//Build the full "hash path" so that it reads from left to right
-			while ( parent ) {
-				ptr[ --i ] = parent; 
-				parent = parent->parent;
-			}
-
-			//Then assemble a string
-			for ( int i=0; i<ind; i++ )	
-			{
-				int t = ptr[ i ]->key.type;
-				LiteRecord tv = ptr[ i ]->key.v;
-				if ( t == LITE_INT || t == LITE_FLT )
-					w += snprintf( &b[w], (lt_buflen - w) - 1, "%d.", tv.vint );
-				else if ( t == LITE_TXT )
-					w += snprintf( &b[w], (lt_buflen - w) - 1 , "%s.", tv.vchar );
-				else if ( t == LITE_BLB )
-				{
-					LiteBlob *bb = &r->vblob;
-					if ( bb->size < 0 )
-						return;	
-					if ( bb->size > lt_maxbuf )
-						w += snprintf( &b[w], lt_buflen - w-1, "is blob (%d bytes)", bb->size);
-					else {
-						memcpy( &b[w], bb->blob, bb->size ); 
-						memcpy( &b[w], (unsigned char *)".", 1 ); 
-						w += bb->size + 1;
-					}
-				}
-			}
-		}
-	#endif
-
 		if (t == LITE_FLT || t == LITE_INT)
 			w += snprintf( &b[w], lt_buflen - w, "%d", r->vint );
 		else if (t == LITE_FLT)
