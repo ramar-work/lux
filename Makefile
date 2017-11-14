@@ -16,6 +16,13 @@ LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c bridge.c
 OBJ = ${SRC:.c=.o}
 
+# A top-level target that builds everything
+top:
+	make router; \
+	make chains; \
+	make render; \
+	make sql; \
+	make main
 
 # A main target, that will most likely result in a binary
 main: RICKROSS=main
@@ -37,11 +44,18 @@ chains: test-build-$(OS)
 chains: 
 	@printf ''>/dev/null
 
+# SQL test program
+sql: RICKROSS=testsql
+sql: test-build-$(OS)
+sql: 
+	@printf ''>/dev/null
+
 # Render test program
 render: RICKROSS=testrender
 render: test-build-$(OS)
 render: 
 	@printf ''>/dev/null
+
 
 # All test build programs use this recipe
 # But notice that a version exists for different operating systems. 

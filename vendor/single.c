@@ -3506,6 +3506,9 @@ _Bool sq_exec_complex (Database *gb, const char *sql, const SQWrite *w)
 
 	return 1;
 }
+
+
+
 /*Close a database and finalize any prepared statement*/
 _Bool sq_close (Database *gb) 
 {

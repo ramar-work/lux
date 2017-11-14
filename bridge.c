@@ -488,3 +488,96 @@ Loader *parse_route ( Loader *l, int lsize, Table *httpTable, Table *routeTable 
 #endif
 	return l;
 }
+
+
+int counter=0;
+
+
+//Callback
+int lua_callback(void *nu, int argc, char **argv, char **cn) 
+{
+	lua_State *L = (lua_State *)nu;
+	int i;
+	lua_pushnumber(L, counter); // 4
+	lua_newtable(L); // 5
+	for (i=0;i<argc;i++) {
+	#ifdef VERBOSE
+		printf("Retrieving column '%s' => %s\n", cn[i], argv[i] ? argv[i] : "NULL");
+	#endif
+		lua_pushstring(L, cn[i]); 
+		lua_pushstring(L, argv[i] ? argv[i] : "NULL");
+		lua_settable(L, 5);
+	}
+	lua_settable(L, 3);
+	counter++;
+	return 0; 
+}
+
+
+//This is a Lua function
+int lua_db ( lua_State *L )
+{
+	//...
+	int rc;
+	int len = 0;
+	sqlite3 *db = NULL;
+	sqlite3_stmt *stmt = NULL;
+	char *errmsg = NULL;
+	char errbuf[ 2048 ] = { 0 };
+	const char *filename = luaL_checkstring( L, 1 );
+	const char *query = luaL_checkstring( L, 2 );
+	char *final_query = NULL;
+
+
+	//Trim the query
+	final_query = (char *)trim((uint8_t *)query, " \t\n\r", strlen(query), &len ); 
+	fprintf( stderr, "SQL file for query: %s\n", filename );
+	fprintf( stderr, "query: '%s'\n", final_query );
+
+	//Don't use Tables here, becuase it makes it harder...
+	if (sqlite3_open(filename, &db) != SQLITE_OK) 
+	{
+		//return berr(0, ERR_DB_OPEN );
+		//snprintf(errbuf, 1023, "Can't open database: %s.", sqlite3_errmsg(db));
+		fprintf(stderr, "Can't open database: %s.", sqlite3_errmsg(db));
+		sqlite3_close(db);
+		//push a string to Lua
+		return 0;
+		//return err(0, "failed to open db: %s\n", sqlite3_errmsg( db ));
+	}
+
+	//If there are multiple queries, run all of them
+	//while ((a = memtok(&sql[t], (uint8_t *)";\0", strlen(sql) - t, 2)) > -1) 
+	while ( 1 ) 
+	{
+		//Execute whatever query
+		if ((rc = sqlite3_exec(db, query, lua_callback, (void *)L, &errmsg)) != SQLITE_OK) 
+		{
+			//snprintf(errbuf, 1023, "Failed to execute SQL query: %s.", errmsg);
+			fprintf(stderr, "Failed to execute SQL query: %s.", errmsg);
+			sqlite3_free(errmsg);
+			return 0;
+		}
+
+		//Do this the long way...
+
+		//If the result is zero, then you just push status=true and results={} or nil
+		//If it's not, push status=true and results={...}
+		if ( sqlite3_close( db ) != SQLITE_OK )
+		{
+			return 0;
+		}
+
+		break;
+	}
+
+	//There should always be one table returned	
+	return 1;
+}
+
+
+
+
+//All the Lua functions will PROBABLY sit here...
+
+//Stole this from Tyler Neylon's channel on YouTube

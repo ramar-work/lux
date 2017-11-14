@@ -13,6 +13,12 @@
 #define PRETTY_TABS( ct ) \
 	fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - ct ] );
 
+
+#define GLOBAL_FN( fn, fn_name ) \
+	lua_pushcfunction(L, fn ); \
+	lua_setglobal( L, fn_name );
+
+
 #if 1
 #define LUA_DUMPSTK( L )
 #else
@@ -65,3 +71,4 @@ void lua_stackdump ( lua_State *L, int *p, int *sd );
 #endif
 Loader *parse_route( Loader *, int, Table *src, Table *route );
 char *printCCtype ( CCtype cc );
+int lua_db ( lua_State *L );
