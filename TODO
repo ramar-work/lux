@@ -10,6 +10,13 @@ x rendering works (but may have little issues here and there)
 	each element on the stack needs to be in a table, don't care what the table is called
 	tables named after files are pretty and should work ok in theory, let's see though...
 	all of the HTTP elements need to also be accessible, see the following:
+
+- there is a healthy bug in single:sq_save
+	zero results crash 
+		(b/c the code keeps going and trying to make a table even though there is nothing there...)
+
+- also single:sq_save needs to use the result count for initializing lt_init
+		1024 is never going to be the answer in all cases...
 	
 - checklist of all elements
 		model.(*) - the "sum" of all the model files
@@ -19,13 +26,19 @@ x rendering works (but may have little issues here and there)
 			request.(*) - All request data
 			response.(*) - All response data
 			header.(*) - All header data	
+		db.(*)   - DB access crap
+
 
 - when that's done, rendering needs to work
 		as long as tables are working, there should be little issue here
 
+
 - then when that's done, you MIGHT be able to do work...
 		...
 
+
+- if I had to get a test run of this done, how would I do it?
+	do I still care about this?
 
 
 

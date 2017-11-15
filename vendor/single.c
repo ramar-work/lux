@@ -3694,6 +3694,9 @@ int sq_reader_find (Database *gb, const char *colname) {
 }
 
 
+#define SQ_GO( fmt, ... ) \
+	fprintf( stderr, "%s: %d -> ", __FILE__, __LINE__ ); fprintf( stderr, fmt, __VA_ARGS__ ); getchar();
+
 //Save database results to table
 int sq_save (Database *db, const char *query, const char *name, const SQWrite *w )
 {
@@ -3713,8 +3716,6 @@ int sq_save (Database *db, const char *query, const char *name, const SQWrite *w
 		fprintf( stderr, "No open database was detected...\n" );
 		return 0;
 	}
-
-
 
 	//Trim the received query
 	pq = (char *)trim((uint8_t *)query, " \t\n\r", strlen(query), &len ); 
@@ -3836,6 +3837,9 @@ int sq_save (Database *db, const char *query, const char *name, const SQWrite *w
 		bf_append( &db->results, (uint8_t *)"\0", 1 );
 		src = bf_data( &db->results );
 		bfw = bf_written( &db->results );
+
+		//All of the data is in this big ass block...
+		//write( 2, src, bfw );
 		memset( &src[ bfw - ( sqlite3_L + 1 ) ], '3', sqlite3_L );
 
 		//Set everything needed for parsing
@@ -3885,7 +3889,6 @@ int sq_save (Database *db, const char *query, const char *name, const SQWrite *w
 	}
 
 	lt_lock( &db->kvt );
-	//lt_printall ( &db->kvt );
 	return 1;	
 }
 #endif

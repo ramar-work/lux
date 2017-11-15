@@ -78,11 +78,9 @@ int lua_load_file2( lua_State *L, Table *t, const char *file, char *err  )
 //Convert Table to Lua table
 int table_to_lua (lua_State *L, int index, Table *tt)
 {
-	int a = 1;
+	int a = index;
 	LiteKv *kv = NULL;
 	lt_reset( tt );
-
-	obprintf( stderr, "Converting HTTP data into Lua...\n" );
 
 	while ( (kv = lt_next( tt )) )
 	{
@@ -92,7 +90,7 @@ int table_to_lua (lua_State *L, int index, Table *tt)
 		};
 
 		int t=0;
-		for ( int i=0; i<2; i++ ) 
+		for ( int i=0; i<2; i++ )
 		{
 			LiteRecord *r = items[i].r; 
 			t = items[i].t;
@@ -111,7 +109,7 @@ int table_to_lua (lua_State *L, int index, Table *tt)
 				}
 			}
 			if (t == LITE_NON)
-				break;	
+				break;
 			else if (t == LITE_FLT || t == LITE_INT)
 				lua_pushnumber( L, r->vint );				
 			else if (t == LITE_FLT)
@@ -138,8 +136,6 @@ int table_to_lua (lua_State *L, int index, Table *tt)
 	return 1;
 }
 
-
-//Convert Lua stack to a Table
 
 
 
@@ -514,6 +510,14 @@ int lua_callback(void *nu, int argc, char **argv, char **cn)
 }
 
 
+
+//A Lua db insert function with binding...
+int lua_db_insert ( lua_State *L )
+{ 
+	return 0;
+}
+
+
 //This is a Lua function
 int lua_db ( lua_State *L )
 {
@@ -527,14 +531,58 @@ int lua_db ( lua_State *L )
 	const char *filename = luaL_checkstring( L, 1 );
 	const char *query = luaL_checkstring( L, 2 );
 	char *final_query = NULL;
+	Database b; 
+	memset( &b, 0, sizeof(Database));
 
 
 	//Trim the query
 	final_query = (char *)trim((uint8_t *)query, " \t\n\r", strlen(query), &len ); 
+
+#if 1
+	//More details
 	fprintf( stderr, "SQL file for query: %s\n", filename );
 	fprintf( stderr, "query: '%s'\n", final_query );
+#endif
 
-	//Don't use Tables here, becuase it makes it harder...
+#if 1
+	//Using tables (and extra memory)
+	if ( !sq_init( &b ) || !sq_open( &b, filename ) ) 
+	{
+		fprintf( stderr, "Error was: %d, %s\n", __LINE__, "unknown as of yet..." );
+		return 0; /*return an error to Lua*/
+	}
+
+	//Save the results to table
+	if ( !sq_save( &b, final_query, "db", NULL ) )
+	{
+		fprintf( stderr, "Error was: %d, %s\n", __LINE__, "unknown as of yet..." );
+		return 0; /*return an error to Lua*/
+	}
+
+ #if 1
+	//Dump them
+	lt_dump( &b.kvt );
+ #endif
+
+	//Clear the stack and add a table
+	lua_settop( L, 0 );
+	lua_newtable( L );
+ #if 0
+	//lua_stackdump( L );
+ #endif
+
+	//Put results in Lua
+	if ( !table_to_lua( L, 1, &b.kvt ) )
+	{
+		fprintf( stderr, "Failed to put table on stack...\n" );
+		return 0;
+	}
+
+	//Does this free?
+	sq_close( &b );	
+	lua_stackdump( L );
+#else
+	//Traditional way
 	if (sqlite3_open(filename, &db) != SQLITE_OK) 
 	{
 		//return berr(0, ERR_DB_OPEN );
@@ -546,32 +594,20 @@ int lua_db ( lua_State *L )
 		//return err(0, "failed to open db: %s\n", sqlite3_errmsg( db ));
 	}
 
-	//If there are multiple queries, run all of them
-	//while ((a = memtok(&sql[t], (uint8_t *)";\0", strlen(sql) - t, 2)) > -1) 
-	while ( 1 ) 
+	//There is a lot of code here...
+	//Timing tests will tell a lot.
+	//I'm also thinking that while Lua is not endless, it MAY handle 
+	//really large record sets better than my Table implementation out of the box...
+
+	//Close the connection
+	if ( sqlite3_close( db ) != SQLITE_OK )
 	{
-		//Execute whatever query
-		if ((rc = sqlite3_exec(db, query, lua_callback, (void *)L, &errmsg)) != SQLITE_OK) 
-		{
-			//snprintf(errbuf, 1023, "Failed to execute SQL query: %s.", errmsg);
-			fprintf(stderr, "Failed to execute SQL query: %s.", errmsg);
-			sqlite3_free(errmsg);
-			return 0;
-		}
-
-		//Do this the long way...
-
-		//If the result is zero, then you just push status=true and results={} or nil
-		//If it's not, push status=true and results={...}
-		if ( sqlite3_close( db ) != SQLITE_OK )
-		{
-			return 0;
-		}
-
-		break;
+		return 0;
 	}
+#endif
 
-	//There should always be one table returned	
+
+	//Put things on the stack and return
 	return 1;
 }
 
