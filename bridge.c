@@ -10,17 +10,6 @@ char *CCtypes[] = {
 };
 
 
-int lua_aggregate (lua_State *L)
-{
-	//Add a table
-	lua_newtable( L );
-	lua_stackdump( L );
-	//the index at the top is the main table, so that's where the function will add indices 
-
-	//Cycle through the stack
-	//Always return one table...
-	return 1;
-}
 
 
 //Loop through a table in memory
@@ -626,6 +615,152 @@ int lua_db ( lua_State *L )
 
 
 
-//All the Lua functions will PROBABLY sit here...
+int lua_writetable( lua_State *L, int *pos, int ti )
+{
+	lua_pushnil( L );
+	while ( lua_next( L, *pos ) != 0 ) 
+	{
+		//Set the current index
+		int t = lua_type( L, -2 );
 
-//Stole this from Tyler Neylon's channel on YouTube
+	#if 1
+		//Copy the index and rotate the top and bottom
+		lua_pushnil( L );
+		lua_copy( L, -3, lua_gettop( L ) );
+		lua_rotate( L, -2, -1 );
+	#else
+		//There must be a way to do this that will run on older Luas
+	#endif
+
+		//Now, setting the table works about the same as popping
+		lua_settable( L, ti );	
+		lua_stackdump( L );
+	}
+	return 1;
+}
+
+
+
+int lua_aggregate (lua_State *L)
+{
+	//Check that the stack has something on it
+	if ( lua_gettop( L ) == 0 )
+		return 0;
+
+#if 1
+	//Let's try a simple stack test.  
+	//Add a bunch of random garbage that's not a table and see how it works...
+	lua_settop( L, 0 );
+	fprintf( stderr, "Adding test rows...\n" );
+	lua_pushstring( L, "weedeating" );
+	lua_pushnumber( L, 1321231 );
+	lua_pushstring( L, "michael jackson" );
+	lua_pushstring( L, "roblox and come" );
+	lua_pushnumber( L, 12213 );
+
+	//New table
+	lua_newtable( L ); //6
+	lua_pushstring( L, "singer" );
+	lua_pushstring( L, "bon jovi" );
+	lua_settable( L, 6 );	
+	lua_pushstring( L, "orange" );
+	lua_pushstring( L, "kim westbrook" );
+	lua_settable( L, 6 );	
+	lua_pushinteger( L, 77 );
+	lua_pushstring( L, "randomly high index" );
+	lua_settable( L, 6 );	
+
+	//Nested table
+	lua_pushstring( L, "jazz" );
+	lua_newtable( L ); //8
+	lua_pushstring( L, "singer" );
+	lua_pushstring( L, "bon jovi" );
+	lua_settable( L, 8 );	
+	lua_pushstring( L, "orange" );
+	lua_pushstring( L, "kim westbrook" );
+	lua_settable( L, 8 );	
+	lua_pushinteger( L, 77 );
+	lua_pushstring( L, "randomly high index" );
+	lua_settable( L, 8 );	
+	lua_stackdump( L );
+	lua_settable( L, 6 );	
+
+	//A regular string to round things off
+	lua_pushstring( L, "You workin' again, John?" );
+	lua_stackdump( L );
+	getchar();
+#endif
+
+	//Add a table
+	lua_newtable( L );
+	lua_stackdump( L );
+	const int tp = lua_gettop( L ); //The top
+	int pos = tp - 1; //The index on the stack I'm at
+	int ti  = 1; //Where the table is on the stack
+	fprintf( stderr, "table position is %d\n", ti );
+	fprintf( stderr, "top (const table) is at %d\n", tp );
+	fprintf( stderr, "currently at %d\n", pos );
+
+	//Loop again, but show the value of each key on the stack
+	for ( int pos = tp - 1 ; pos > 0 ; )
+	{
+		//
+		int t = lua_type( L, pos );
+		const char *type = lua_typename( L, t );
+		fprintf( stderr, "Adding key [%3d] => ", pos );
+
+	#if 1
+		//Push a numeric index, since all of this should be in one table.
+		lua_pushnumber( L, ti++ );
+	#endif
+
+		//Write the value into table...
+		if ( t == LUA_TSTRING )
+			lua_pushstring( L, lua_tostring( L, pos ) );	
+		else if ( t == LUA_TFUNCTION )
+			lua_pushcfunction( L, (void *)lua_tocfunction( L, pos ) );
+		else if ( t == LUA_TNUMBER )
+			lua_pushnumber( L, lua_tonumber( L, pos ) );
+		else if ( t == LUA_TBOOLEAN)
+			lua_pushboolean( L, lua_toboolean( L, pos ) );
+		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
+		{
+			void *p = lua_touserdata( L, pos );
+			lua_pushlightuserdata( L, p );
+		}
+	#if 0
+		else if ( t == LUA_TTHREAD )
+			lua_pushthread( L, lua_tothread( L, pos ) );
+		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
+			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, pos ) );
+	#endif
+		else if ( t == LUA_TTABLE )
+		{
+			int np = tp + 2;
+			lua_newtable( L );
+			lua_writetable( L, &pos, tp + 2 );
+		}
+
+		fprintf( stderr, "Setting table at index %d\n", tp );
+		//getchar();
+		lua_settable( L, tp );	
+		lua_stackdump( L );
+		fprintf( stderr, "\n" );
+		pos--;
+	}
+
+	//Remove all previous elements?
+	for ( int pos = tp - 1 ; pos > 0 ; pos-- )
+		lua_remove( L, pos );
+
+	//Always return one table...
+	fprintf( stderr, "Aggregated table looks like:\n" );
+	lua_stackdump( L );
+	return 1;
+}
+
+/*
+
+[1] { }
+
+*/

@@ -1,23 +1,5 @@
 today
 =====
-- node works better and doesn't require this...
-
-x dumping works
-
-x rendering works (but may have little issues here and there)
-
-- now, to get everything in the model:
-	each element on the stack needs to be in a table, don't care what the table is called
-	tables named after files are pretty and should work ok in theory, let's see though...
-	all of the HTTP elements need to also be accessible, see the following:
-
-- there is a healthy bug in single:sq_save
-	zero results crash 
-		(b/c the code keeps going and trying to make a table even though there is nothing there...)
-
-- also single:sq_save needs to use the result count for initializing lt_init
-		1024 is never going to be the answer in all cases...
-	
 - checklist of all elements
 		model.(*) - the "sum" of all the model files
 		http.(*)
@@ -28,10 +10,27 @@ x rendering works (but may have little issues here and there)
 			header.(*) - All header data	
 		db.(*)   - DB access crap
 
+- node works better and doesn't require this...
+
+x dumping works
+
+x rendering works (but may have little issues here and there)
+
+- there is a healthy bug in single:sq_save
+	zero results crash 
+		(b/c the code keeps going and trying to make a table even though there is nothing there...)
+
+- also single:sq_save needs to use the result count for initializing lt_init
+		1024 is never going to be the answer in all cases...
+
+? write a function to put all the stack stuff in one table
+		multiple nested tables does not work without crashing... 
+		the bug is in the same place more than likely...
+
+- write another function putting model eval and rendering in one place
 
 - when that's done, rendering needs to work
 		as long as tables are working, there should be little issue here
-
 
 - then when that's done, you MIGHT be able to do work...
 		...

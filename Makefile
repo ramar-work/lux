@@ -93,5 +93,5 @@ update:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) testrouter testchains
+	-@rm $(NAME) testrouter testchains testsql
 	-@find . | egrep '\.o$$' | xargs rm

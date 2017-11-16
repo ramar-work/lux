@@ -185,7 +185,9 @@ int main (int argc, char *argv[])
 	//lua_stackclear( L );
 
 	//Aggregate...
-	lua_aggregate( L );
+	if ( !lua_aggregate( L ) )
+		return err( 1, "Aggregation failed." );
+
 	//lua_to_table( L, 0, &t );
 #else
 
