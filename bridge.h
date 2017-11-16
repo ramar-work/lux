@@ -72,3 +72,4 @@ void lua_stackdump ( lua_State *L, int *p, int *sd );
 Loader *parse_route( Loader *, int, Table *src, Table *route );
 char *printCCtype ( CCtype cc );
 int lua_db ( lua_State *L );
+int lua_aggregate (lua_State *L);

@@ -10,6 +10,18 @@ char *CCtypes[] = {
 };
 
 
+int lua_aggregate (lua_State *L)
+{
+	//Add a table
+	lua_newtable( L );
+	lua_stackdump( L );
+	//the index at the top is the main table, so that's where the function will add indices 
+
+	//Cycle through the stack
+	//Always return one table...
+	return 1;
+}
+
 
 //Loop through a table in memory
 void lua_loop ( lua_State *L )

@@ -132,13 +132,6 @@ Buffer *run_chain ( Loader *ld, Buffer *dest, lua_State *L, char *err )
 
 
 
-void lua_aggregate ( lua_State *L, const char *tableName )
-{
-	//The ENTIRE stack goes here...
-
-}
-
-
 Option opts[] = 
 {
 	//Debugging and whatnot
@@ -192,7 +185,7 @@ int main (int argc, char *argv[])
 	//lua_stackclear( L );
 
 	//Aggregate...
-	//lua_aggregate( L ) 
+	lua_aggregate( L );
 	//lua_to_table( L, 0, &t );
 #else
 
