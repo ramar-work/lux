@@ -53,14 +53,24 @@ void show_chain ( Loader *ld )
 }
 
 
-// Prepare the chain
+/*
+Loader *prepare_chain ( Loader *ld, const char *reldir )
+
+Loop through the Loader structure and for each member in ld->content: 
+	- check if the file exists relative to the directory pointed to by *reldir
+	- create a full path
+	- replace ld->content with this new path
+
+Errors:
+Files in *ld may not exist, so the returned Loader structure in these cases will be NULL 
+Allocation errors can also occur in unusual situations
+
+TODO:
+*ld is expected to have some kind of values, but the strucutre should be preinitialized
+with some kind of zero value and checked here regardless.
+*/
 Loader *prepare_chain ( Loader *ld, const char *reldir )
 {
-	//Loop through, create a full path and check if those files exist
-	
-	//The engine would return NULL and probably throw a 404 if the file didn't exist
-	//This could also be a server error, since technically the symbolic file exists, but
-	//the workings underneath do not.
 
 	const char *exts[] = { "lua", "tpl" };
 	const char *dirs[] = { "app", "views" };
@@ -155,14 +165,17 @@ int main (int argc, char *argv[])
 	char err[ 2048 ] = { 0 };
 	lua_State *L = luaL_newstate();
 
-	//
+	//See prepare_chain above for what is going on here
 	if ( !prepare_chain( l, "example/non" ) )
 		return err( 2, "Failed to prepare chain..." );	
 
+	//Dump data for your own good
 	if ( 1 )
 		show_chain( l );
 
 #if 1
+ #if 0 
+	//Below is a list of Lua "model" files to run.  
 	char *e[] = { 
 	#if 0
 		"f.lua", "g.lua", "h.lua", "d.lua" 
@@ -175,16 +188,27 @@ int main (int argc, char *argv[])
 	for ( int i=0; i < sizeof(e)/sizeof(char *); i++ ) 
 	{
 		char *f = strcmbd( "/", "tests", e[ i ]);
+		fprintf( stderr, "Attempting to load file %s...\n", f );
+
 		if ( !lua_load_file( L, f, err ) )
 			return err( 1, "Failed to load file %s\n%s", file, err );
+
+		fprintf( stderr, "File loaded successfully!\n" );
+
+		
+		fprintf( stderr, "Lua stack after loading of file %s\n", f );
+		lua_stackdump( L );
+		getchar();
+
 		free( f );
 	}
 
-	//Dump stack just for my knowledge
+	//Dump stack containing the data from these models just for my knowledge
+	fprintf( stderr, "Lua stack after loading of all files...\n" );
 	lua_stackdump( L );
-	//lua_stackclear( L );
+ #endif
 
-	//Aggregate...
+	//Now aggregate all the values into one table.
 	if ( !lua_aggregate( L ) )
 		return err( 1, "Aggregation failed." );
 

@@ -16,6 +16,11 @@ LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c bridge.c
 OBJ = ${SRC:.c=.o}
 
+
+# Change the top-level target for convience
+a:
+	make chains && ./testchains
+
 # A top-level target that builds everything
 top:
 	make router; \
@@ -93,5 +98,5 @@ update:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) testrouter testchains testsql
+	-@rm $(NAME) testrouter testchains testsql testrender
 	-@find . | egrep '\.o$$' | xargs rm
