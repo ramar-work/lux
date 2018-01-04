@@ -24,31 +24,47 @@ main:
 
 
 # Router test program
-router: RICKROSS=testrouter
+router: RICKROSS=tests/router
 router: test-build-$(OS)
 router: 	
 	@printf ''>/dev/null
 
 
 # Chain test program
-chains: RICKROSS=testchains
+chains: RICKROSS=tests/chains
 chains: test-build-$(OS)
 chains: 
 	@printf ''>/dev/null
 
+# SQL test program and routines to populate the test's required database
+sql: RICKROSS=tests/sql
+sql: test-build-$(OS)
+sql: 
+	@sed -n 2,14p tests/sql-data/ges.txt > tests/sql-data/ges.create.sql
+	@sqlite3 tests/sql-data/ges.db < tests/sql-data/ges.create.sql
+	@sed -n 20,118p tests/sql-data/ges.txt > tests/sql-data/ges.import.sql
+	@sqlite3 -separator ',' tests/sql-data/ges.db ".import tests/sql-data/ges.import.sql general_election"
+	@sqlite3 tests/sql-data/ges.db 'select * from general_election limit 10' 
+	@-rm tests/sql-data/ges.create.sql tests/sql-data/ges.import.sql
+
+# Render test program
+render: RICKROSS=tests/render
+render: test-build-$(OS)
+render: 
+	@printf ''>/dev/null
 
 # All test build programs use this recipe
 # But notice that a version exists for different operating systems. 
 # OSX
 test-build-Darwin: $(OBJ)
 test-build-Darwin:
-	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
-	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
+	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
+	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
 
 test-build-CYGWIN: $(OBJ)
 test-build-CYGWIN:
-	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
-	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
+	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
+	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
 
 # Linux
 # These systems may need these additional commands: 
@@ -73,5 +89,5 @@ update:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) testrouter testchains
+	-@rm $(NAME) router chains sql render
 	-@find . | egrep '\.o$$' | xargs rm

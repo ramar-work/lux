@@ -1,16 +1,95 @@
 /* ---------------------------------- * 
-tests.c
--------------
-
-There are a lot of tests that will ship 
-with hypno.  Right now, all I really need 
-to do is beat on the URLs.  There will be
-more later...
-
-- router
-- maybe filename scopes 
-------------------------------------- */
-#include "bridge.h"
+* router.c
+* -------------
+* 
+* hypno's router should work like this:
+*
+*		if the route is not found:
+*			/ =>
+*				if '*' or '/regex/' is available
+*					call it
+*				else if 'default' or some function named default
+*					call it	
+*				else
+*					throw 404
+*
+*			/abc => 
+*				if '*' or '/regex/' is available
+*					call it
+*				else
+*					throw 404
+*
+*			/abc/def =>
+*				if '*' or '/regex' is available
+*					call it
+*				else if 'levels before (abc in this case)' contains 'expects', '*', or '/regex/'
+*					call it
+*				else
+*					throw 404
+*
+*
+*	In English:
+*
+*	if match found
+*			now there's another data structure, use that...
+*		check type:
+*			table =
+*				if the url still has parameters, check for any other values 
+*					the problem is here, is that /check/:id could happen, where ID is required...  
+*					 but even then, expects can handle this... tell it that the parameter received should be something...
+*					continue
+*				if not, 
+*					check for 'expects' to validate values supplied
+*					check for 'model' and 'view' tables or values to evaluate
+*			string =
+*				return it
+*				would be incredibly useful to return the same named items... in model and app
+*			number = 
+*				return it
+*			funct  = 
+*				execute and return its result
+*			sql?   = 
+*				should reutrn formatted data, maybe specify the datatype... 
+*				just thinking crazy
+*
+*
+* Here's what Lua should expect:
+*
+* return {
+* 	routeName = [ <function>, <string>, <table> ],
+* 
+* 	if routeName points to a <table> 
+* 	then
+* 		any of the following are keys that have meaning:
+* 			*          = wildcard that accepts anything
+* 			/.../      = a regular expression that accepts anything
+* 			model      = <string>, <function> or <table> that defines a model
+* 			view       = <string>, <function> or <table> that defines a view 
+* 			expects    = <table> that defines what is allowed should the url STOP here
+* 								   (notice this means that any level deeper with a match will throw
+* 								    these rules out)
+* 			*file      = <string> that points to a binary file that should be served
+* 			[*301/302] = <string> that directs where a user should be redirected
+* 			*query     = <string> that points to a query
+* 			*queryfile = <string> that points to a file containing a query
+* 			
+* 			**NOTE: query and query file could use arguments and checking
+* 
+* 		other rules:
+* 			any name not matching a regex (like 'sally' for instance) will pull up 
+* 			the associated value if the URL contains a match.  So if:
+* 			<value>   = <string> 
+* 				The engine will return a string (or binary content, since the
+* 				engine deals with this particular string field as uint8_t)
+* 			<value>   = <function> 
+* 				The engine will execute the function and return the payload 
+* 			<value>   = <table>
+* 				The engine will search for other matches according to the above rules
+* 				at the next part of the URL.
+* 	fi			
+* }
+* ------------------------------------- */
+#include "../bridge.h"
 
 
 //Types of items

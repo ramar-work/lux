@@ -8,26 +8,7 @@
  #define obprintf( f, ... ) fprintf( f, __VA_ARGS__ )
 #else
  #define obprintf( f, ... )
-#endif
-
-#define PRETTY_TABS( ct ) \
-	fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - ct ] );
-
-
-#define GLOBAL_FN( fn, fn_name ) \
-	lua_pushcfunction(L, fn ); \
-	lua_setglobal( L, fn_name );
-
-
-#if 1
-#define LUA_DUMPSTK( L )
-#else
-#define LUA_DUMPSTK( L ) \
-	fprintf( stderr, "Line %d:\n", __LINE__ ); \
-	for ( int i=1; i <= lua_gettop(L); i++ ) \
-		printf("[%d] %s\n", i, lua_typename(L, lua_type(L, i))); \
-	getchar();
-#endif
+#endif 
 
 typedef struct 
 {
@@ -62,14 +43,7 @@ void lua_loop ( lua_State *L );
 int lua_load_file( lua_State *, const char *filename, char *err );
 int lua_load_file2( lua_State *, Table *, const char *, char * );
 void lua_tdump (lua_State *L);
-void lua_stackclear ( lua_State *L );
-void lua_stackdump ( lua_State *L );
-#if 0
 void lua_stackdump ( lua_State *L, int *p, int *sd );
-#define lua_stackdump(L) \
-	do { int in=0, sd=0; lua__stackdump( L, &in, &sd ); } while ( 0 ) 
-#endif
+
 Loader *parse_route( Loader *, int, Table *src, Table *route );
 char *printCCtype ( CCtype cc );
-int lua_db ( lua_State *L );
-int lua_aggregate (lua_State *L);

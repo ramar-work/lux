@@ -1,9 +1,0 @@
-- lua comes with a package manager
-	because it can be configured on a per-user basis, it may
-	be a great idea to configure some kind of script in setup/ to 
-	introduce packages on a local level
-
-- handling a large multi inundated request server may be easier in Lua than
-	in C.  mostly because it supports a lot of things you need to make it happen	
-
-- docs can be self generating sort of
