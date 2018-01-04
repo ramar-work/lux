@@ -116,15 +116,23 @@ A checklist for all of this is below:
 	https://gist.github.com/Jon-Schneider/8b7c53d27a7a13346a643dac9c19d34f
 	http://www.topherlee.com/software/pcm-tut-wavformat.html
 	http://www-mmsp.ece.mcgill.ca/Documents/AudioFormats/WAVE/WAVE.html
+	https://sites.google.com/site/musicgapi/technical-documents/wav-file-format
 
 	And common compression schemes (zip, lzma, gzip, etc)
-
+	ZIP
+	https://github.com/kuba--/zip
+	https://code.google.com/archive/p/miniz/downloads
+	https://zlib.net/ (hard to use possibly, hence why the two above exist, but its on most systems)
+	http://7-zip.org/download.html (and here's another, which deals with .xz as well)
 
 - Write encoding primitives ( base64, sha1sum, md5, etc )
 	base64 is a search away
 
 	the other two are probably covered in that big crypto book
 
+- Write curl/wget/socket.get things and test APIs
+	Paypal offers credit card numbers...
+	https://www.paypalobjects.com/en_AU/vhelp/paypalmanager_help/credit_card_numbers.htm
 
 ## Proposed CLI (Usage)
 
