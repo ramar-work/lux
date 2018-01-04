@@ -56,8 +56,8 @@ test-build-CYGWIN:
 # $(shell pkg-config --cflags lua5.3)
 test-build-Linux: $(OBJ) 
 test-build-Linux:
-	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread
-	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread
+	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
+	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
 
 	
 # A not-so-main target, that will probably result in a few object files...
