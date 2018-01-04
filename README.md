@@ -102,7 +102,28 @@ A checklist for all of this is below:
 - Write table extensions
 
 - Write email primitives
+	Hopefully a strong library already exists for this
 
+- Write binary data generation routines (for testing, but instrumental because of how things should work)
+	Writing against ImageMagick is the least resistance path for dynamic image generation
+	GIF
+	http://www.onicos.com/staff/iz/formats/gif.html
+	http://giflib.sourceforge.net/whatsinagif/lzw_image_data.html
+
+	However, I forgot that I'll probably want to write audio data (WAV, MP3 and FLAC)
+
+	WAV
+	https://gist.github.com/Jon-Schneider/8b7c53d27a7a13346a643dac9c19d34f
+	http://www.topherlee.com/software/pcm-tut-wavformat.html
+	http://www-mmsp.ece.mcgill.ca/Documents/AudioFormats/WAVE/WAVE.html
+
+	And common compression schemes (zip, lzma, gzip, etc)
+
+
+- Write encoding primitives ( base64, sha1sum, md5, etc )
+	base64 is a search away
+
+	the other two are probably covered in that big crypto book
 
 
 ## Proposed CLI (Usage)
