@@ -1,12 +1,15 @@
 # This project...
 NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
-CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
-CC = clang
-CFLAGS = $(CLANGFLAGS)
 GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H #-ansi
 CC = gcc
 CFLAGS = $(GCCFLAGS)
+CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
+CC = clang
+CFLAGS = $(CLANGFLAGS)
+
+# Use this flag before invoking programs, leave it blank on some systems
+INVOKE = ASAN_SYMBOLIZER_PATH=$$(locate llvm-symbolizer | grep "llvm-symbolizer$$")
 
 # Some Linux systems need these, but pkg-config should handle it
 INCLUDE_DIR=-I/usr/include/lua5.3
@@ -15,6 +18,11 @@ LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 # Not sure why these don't always work...
 SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c bridge.c
 OBJ = ${SRC:.c=.o}
+
+
+# ...
+will:
+	make agg && $(INVOKE) ./agg
 
 # A main target, that will most likely result in a binary
 main: RICKROSS=main
@@ -67,6 +75,7 @@ test-build-Darwin:
 	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
 	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
 
+# Cygwin
 test-build-CYGWIN: $(OBJ)
 test-build-CYGWIN:
 	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
@@ -78,8 +87,8 @@ test-build-CYGWIN:
 # $(shell pkg-config --cflags lua5.3)
 test-build-Linux: $(OBJ) 
 test-build-Linux:
-	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
-	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
+	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua -ldl -lpthread -lm
+	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua -ldl -lpthread -lm
 
 	
 # A not-so-main target, that will probably result in a few object files...
