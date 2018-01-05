@@ -1,10 +1,12 @@
 #include "bridge.h"
 
+
 #ifdef LUA_53
  #define lua_rotate( ... ) lua_rotate( __VA_ARGS__ )
 #else
  #define lua_rotate( ... )
 #endif
+
 
 char *CCtypes[] = {
 	[CC_NONE]  = "None",
@@ -14,8 +16,6 @@ char *CCtypes[] = {
 	[CC_STR]   = "String",    //Strings are just referenced and loaded to buffer
 	[CC_MAX]   = NULL,        //A nul terminator
 };
-
-
 
 
 //Loop through a table in memory
@@ -30,8 +30,6 @@ void lua_loop ( lua_State *L )
 		//lua_getindex(L, i );
 	}
 }
-
-
 
 
 //Print CC type
@@ -649,76 +647,6 @@ int lua_writetable( lua_State *L, int *pos, int ti )
 
 int lua_aggregate (lua_State *L)
 {
-#if 1
-	//Stack Test
-	//==========
-	//Check that the lua_stackdump function works like it should.  Most of the
-	//implementations that are easily found online don't really show as much
-	//information as I would like.
-	#define MIST(a) lua_stackdump(a); getchar();
-
-	//Clear the stack
-	fprintf( stderr, "Clearing the stack...\n" );
-	lua_settop( L, 0 );
-	MIST( L );
-
-	//Add a bunch of random garbage that's not a table and see how it works...
-	fprintf( stderr, "Adding test rows...\n" );
-	lua_pushstring( L, "weedeating" );
-	lua_pushnumber( L, 1321231 );
-	lua_pushstring( L, "michael jackson" );
-	lua_pushstring( L, "roblox and come" );
-	lua_pushnumber( L, 12213 );
-	MIST( L );
-
-	//Add a new table and add three key-value pairs to it
-	fprintf( stderr, "Adding new table containing three key-value pairs.\n" );
-	lua_newtable( L ); 
-	lua_pushstring( L, "singer" );
-	lua_pushstring( L, "bon jovi" );
-	lua_settable( L, 6 );	
-	lua_pushstring( L, "color" );
-	lua_pushstring( L, "blue" );
-	lua_settable( L, 6 );	
-	lua_pushinteger( L, 77 );
-	lua_pushstring( L, "randomly high index" );
-	lua_settable( L, 6 );	
-	MIST( L );
-
-	//Nested table
-	fprintf( stderr, "Adding new table containing two key-value pairs and one numeric key-value pair.\n" );
-	lua_pushstring( L, "jazz" ); //The new table will have this as a key name
-	lua_newtable( L ); //8
-	lua_pushstring( L, "singer" );
-	lua_pushstring( L, "bruce springsteen" );
-	lua_settable( L, 8 );	
-	lua_pushstring( L, "color" );
-	lua_pushstring( L, "orange" );
-	lua_settable( L, 8 );	
-	lua_pushinteger( L, 999 );
-	lua_pushstring( L, "randomly high index" );
-	lua_settable( L, 8 );	
-	MIST( L );
-
-	//again
-	fprintf( stderr, "Moving newly created table to table at index 6.\n" );
-	lua_settable( L, 6 );	
-	MIST( L );
-	MIST( L );
-	MIST( L );
-	MIST( L );
-	MIST( L );
-
-	//A regular string to round things off
-	fprintf( stderr, "Adding a regular string to table to test switching value types.\n" );
-	lua_pushstring( L, "You workin' again, John?" );
-	MIST( L );
-
-	//
-	fprintf( stderr, "Test is completed." );
-	exit( 0 );
-#endif
-
 	//Check that the stack has something on it
 	if ( lua_gettop( L ) == 0 )
 		return 0;

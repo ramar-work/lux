@@ -140,21 +140,26 @@ Test routes[] =
 
 
 
-
-
-
-//...
-
-
-//...
+//Deifne global stuff that I'll always use
+static char errmsg[2048] = { 0 };
+static const char filename[] = "tests/chains-data/a.lua";
+static Table t;
+static struct Run {
+	char  *filetype;
+	CCtype type;
+} Run[] = {
+	{ "model",  CC_MODEL }, 
+	{ "view" ,  CC_VIEW  }, 
+	{ "string" ,  CC_STR }, 
+	{ "function" ,  CC_FUNCT }, 
+};
 
 
 //ERR_TABLE_IS_EMPTY - A route has a table as a value, but no nothing (this could be an implied rule)
 //Could also just put nothing on the other side... although a blank table makes more sense... 
 int main ( int argc, char *argv[] )
 {
-	Table t;
-	char err[ 2048 ];
+	//Create a new state via Lua
 	lua_State *L = luaL_newstate(); 
 
 	//Check that Lua initialized here
@@ -166,28 +171,17 @@ int main ( int argc, char *argv[] )
 	}
 
 	//Load the file with Lua and convert results to Table
-	if ( !lua_load_file( L, "a.lua", err ) )
-		return err( 1, "everything is not working...\n" );
+	if ( !lua_load_file( L, filename, errmsg ) )
+		return err( 1, "Couldn't find filename: %s...\n", filename );
 
 	if ( !lt_init( &t, NULL, 666 ) )
-		return err( 2, "table did not initialize...\n" );
+		return err( 2, "Table did not initialize...\n" );
 			
 	if ( !lua_to_table( L, 2, &t ) )
-		return err( 3, "could not convert Lua table ...\n" );
+		return err( 3, "Could not convert data from %s Lua table.\n", filename );
 
 	//Dump the file	
 	lt_dump( &t );
-
-	//This is here.
-	static struct Run {
-		char  *filetype;
-		CCtype type;
-	} Run[] = {
-		{ "model",  CC_MODEL }, 
-		{ "view" ,  CC_VIEW  }, 
-		{ "string" ,  CC_STR }, 
-		{ "function" ,  CC_FUNCT }, 
-	};
 
 	//Loop through each Test
 	Test *tt = routes;

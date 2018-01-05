@@ -53,6 +53,12 @@ render: test-build-$(OS)
 render: 
 	@printf ''>/dev/null
 
+# Aggregation test program
+agg: RICKROSS=tests/agg
+agg: test-build-$(OS)
+agg: 
+	@printf ''>/dev/null
+
 # All test build programs use this recipe
 # But notice that a version exists for different operating systems. 
 # OSX
@@ -89,5 +95,5 @@ update:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) router chains sql render
-	-@find . | egrep '\.o$$' | xargs rm
+	-@rm $(NAME) agg router chains sql render
+	-@find . | egrep '\.o$$' | grep -v 'sqlite3.o' | xargs rm

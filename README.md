@@ -189,3 +189,9 @@ A checklist for all of this is below:
 ## Tests
 
 Right now all tests have to be run from the top-level directory.  There are two programs shipped that test certain parts of hypno.  `router` tests the router evaluation.  `chains` tests the MVC execution chain. `agg` tests table aggregation.  After compilation, each new program will show up in the top-level directory.
+
+
+## Results
+Thu, Jan  4, 2018  9:27:58 PM
+
+spent about 2.5 hours getting back up to speed on hypno's codebase and working with a better test for aggregation.  working on a test program now that will randomly generate stack values.  The next step will be putting all of these values into one table. 
