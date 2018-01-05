@@ -1,12 +1,12 @@
 # This project...
 NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
-CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
-CC = clang
-CFLAGS = $(CLANGFLAGS)
 GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H #-ansi
 CC = gcc
 CFLAGS = $(GCCFLAGS)
+CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
+CC = clang
+CFLAGS = $(CLANGFLAGS)
 
 # Some Linux systems need these, but pkg-config should handle it
 INCLUDE_DIR=-I/usr/include/lua5.3
@@ -15,6 +15,11 @@ LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 # Not sure why these don't always work...
 SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c bridge.c
 OBJ = ${SRC:.c=.o}
+
+
+# ...
+will:
+	make agg && ./agg
 
 # A main target, that will most likely result in a binary
 main: RICKROSS=main

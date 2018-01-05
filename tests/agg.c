@@ -28,6 +28,7 @@ static int depth = 0;
 static int currentIndex = 1;
 static const char *ltype[] = { "table", "number", "string" };
 const char table_is_full[] = "Table is full.";
+const char wouldHave[] = "Would have added a table here.";
 
 int _int ( lua_State *L )
 {
@@ -46,22 +47,32 @@ char *_char ( lua_State *L )
 }
 
 
+#define SD(...) \
+	fprintf( stderr, "%s:%d ", __FILE__, __LINE__ ); \
+	fprintf( stderr, __VA_ARGS__ ); \
+	lua_stackdump( L ); \
+	getchar()
+
+
 int _table ( lua_State *L, char **tc, int *tcIndex )
 {
 	//Only populate if the current depth is less than 5
-	if ( depth > 4 )
+	if ( depth > 4 ) {
+SD( "Stack too high: adding nothing...\n" );
 		return 0;
+	}
 	else
 	{
 		//Generate some random number as the index (these won't be bigger than 10)
-		int tmax = atoi( rand_numbers( 1 ) );
-		tmax *= 2;
+		int tmax = atoi( rand_numbers( 1 ) ) * 2;
+		int ttype = 0;
+
+		//Get index of newest table on stack
 		lua_newtable( L );
 		int ind = lua_gettop( L );
 
-lua_stackdump( L );
-fprintf( stderr, "table at: %d, depth at: %d\n", ind, depth );
-getchar();
+SD( "Stack after adding new empty table via _table( ... )...\n"
+		"This new table will have %d values.\n", tmax / 2 );
 #if 1	
 		//Now I'm one level deeper	
 		depth++;
@@ -69,37 +80,38 @@ getchar();
 		//Should probably double tmax so that a symmetrical amount of things are on the table
 		while ( tmax-- ) 
 		{
-			int ttype = atoi( rand_numbers( 2 ) ) % 3;
-		
-			if ( ttype == 0 ) 
+			fprintf( stderr, "Current value of tmax: %d\n", tmax );
+			if (( ttype = atoi( rand_numbers( 2 ) ) % 3 ) == 0 && tmax % 2 == 0 )
 			{
-			#if 0
-				lua_pushnumber( L, atoi( rand_numbers( 4 ) ) );
-			#else
-lua_stackdump( L );
-fprintf( stderr, "ready to add to nested table.\n" );
-fprintf( stderr, "tmax %% 2 = %d\n", tmax % 2 );
-getchar();
-				if ( tmax % 2 == 0 && _table( L, tc, tcIndex ) == 0 )
-				{
-					lua_pushnumber( L, atoi( rand_numbers( 4 ) ) );
-					lua_pushstring( L, table_is_full ); 
-					lua_settable( L, ind );
-					break;	
-				}
-			#endif
+SD( "Adding level %d table to stack.\n", depth );
+				lua_newtable(L); 
+SD( "Done with level %d table.\n", depth );
 			}
 			else if ( ttype == 1 ) 
 			{
-				lua_pushnumber( L, atoi( rand_numbers( 4 ) ) );
+				int a = atoi( rand_numbers( 4 ) );
+				lua_pushnumber( L, a );
+SD( "Added number %d to stack.\n", a );
 			}
 			else if ( ttype == 2 ) {
 				char *freeMe = rand_chars( 64 );
 				lua_pushstring( L, freeMe );
+SD( "Added string %s to stack.\n", freeMe );
+			}
+			else {
+				if (atoi(rand_numbers( 1 )) % 2) 
+					lua_pushnumber( L, atoi( rand_numbers( 3 )) );
+				else {
+					char *freeMe = rand_chars( 64 );
+					lua_pushstring( L, freeMe );
+				}
+SD( "Couldn't add table as key, so added another random value.\n" );
 			}
 			
 			if ( tmax % 2 == 0 ) {
+SD( "Adding last two values to table at %d.\n", ind );
 				lua_settable( L, ind );
+SD( "Inspect that values were added to table correctly..." );
 			}
 		}
 	
