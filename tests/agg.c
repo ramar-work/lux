@@ -127,6 +127,10 @@ SD( "Inspect that values were added to table correctly..." );
 
 int main (int argc, char *argv[])
 {
+	//Create a stack last and make sure it has enough space for some intense testing
+	lua_State *L = luaL_newstate();
+
+#if 0
 	for ( int n=0; n<10; n++ )
 	{
 		//Define values that the test can reuse later.
@@ -147,9 +151,6 @@ int main (int argc, char *argv[])
 			n--;
 			continue;
 		}
-
-		//Create a stack last and make sure it has enough space for some intense testing
-		lua_State *L = luaL_newstate();
 
 		//Looping
 		while ( rootTableCount-- ) 
@@ -180,7 +181,6 @@ int main (int argc, char *argv[])
 		}
 	}
 
-#if 1
 #else
 	//Clear the stack
 	fprintf( stderr, "Clearing the stack...\n" );
@@ -239,8 +239,20 @@ int main (int argc, char *argv[])
 	lua_pushstring( L, "You workin' again, John?" );
 	MIST( L );
 
-	//
-	fprintf( stderr, "Test is completed." );
+	//...
+	fprintf( stderr, "Population is completed." );
 #endif
+
+#if 0
+	//Add some other stuff
+	char err[2048] = {0};
+	const char *ff[] = { "tests/agg-data/ad1.test", "tests/agg-data/ad2.test", "tests/agg-data/ad3.test", "tests/agg-data/ad4.test", NULL };
+
+	for ( int f=0; f < sizeof( ff ) / sizeof ( char * ); f++ )	
+		if ( !lua_load_file( L, *ff, err ) ) err( 3, "Could not load file %s\n", *ff );
+
+	//Should add a table and tell Lua where I want the values explicitly.	
+#endif
+	lua_aggregate( L );
 	return 0;
 }
