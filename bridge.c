@@ -215,7 +215,7 @@ void lua_stackclear ( lua_State *L )
 void lua_dumptable ( lua_State *L, int *pos, int *sd )
 {
 	lua_pushnil( L );
-	LUA_DUMPSTK( L );
+	//LUA_DUMPSTK( L );
 	//fprintf( stderr, "*pos = %d\n", *pos );
 
 	while ( lua_next( L, *pos ) != 0 ) 

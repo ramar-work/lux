@@ -1,3 +1,4 @@
 *.o
 *.exe
 *.db
+*.test

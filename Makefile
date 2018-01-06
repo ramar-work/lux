@@ -1,12 +1,12 @@
 # This project...
 NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H #-ansi
-CC = gcc
-CFLAGS = $(GCCFLAGS)
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H #-ansi
+CC = gcc
+CFLAGS = $(GCCFLAGS)
 
 # Use this flag before invoking programs, leave it blank on some systems
 INVOKE = ASAN_SYMBOLIZER_PATH=$$(locate llvm-symbolizer | grep "llvm-symbolizer$$")
@@ -67,6 +67,12 @@ agg: test-build-$(OS)
 agg: 
 	@printf ''>/dev/null
 
+# Depth and stackdump test program
+depth: RICKROSS=tests/depth
+depth: test-build-$(OS)
+depth: 
+	@for NUM in `seq 1 5`; do scripts/dd.sh > tests/depth-data/dd-$${NUM}.test && lua tests/depth-data/dd-$${NUM}.test; done
+
 # All test build programs use this recipe
 # But notice that a version exists for different operating systems. 
 # OSX
@@ -104,5 +110,5 @@ update:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) agg router chains sql render
+	-@rm $(NAME) agg router chains sql render depth
 	-@find . | egrep '\.o$$' | grep -v 'sqlite3.o' | xargs rm
