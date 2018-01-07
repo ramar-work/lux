@@ -114,45 +114,36 @@
  #endif
 #endif
 
-#ifndef DEBUG_H
- #if 1
-	#define SUSP(...) \
-		fprintf( stderr, "%s, %d: ", __FILE__, __LINE__ ); fprintf( stderr, __VA_ARGS__ ); getchar() 
+#ifdef DEBUG_H
+ #define SUSP(...) \
+  fprintf( stderr, "%s, %d: ", __FILE__, __LINE__ ); fprintf( stderr, __VA_ARGS__ ); getchar() 
 
-  #define STEP(...) do { \
-   fprintf( stderr, "%20s [ %s: %d ]", __func__, __FILE__, __LINE__ ); \
-   getchar(); } while (0)
- #else
-  #define STEP(...) do { \
-   fprintf( stderr, __VA_ARGS__ ); getchar(); } while (0)
- #endif
+ #define STEP(...) do { \
+  fprintf( stderr, "%20s [ %s: %d ]", __func__, __FILE__, __LINE__ ); \
+  getchar(); } while (0)
 
- //A define to help dump data
  #define SHOWDATA(...) do { \
   fprintf(stderr, "%-30s [ %s %d ] -> ", __func__, __FILE__, __LINE__); \
   fprintf( stderr, __VA_ARGS__ ); \
   fprintf( stderr, "\n"); } while (0)
 
- //Dump binary data
  #define SHOWBDATA(a,b, ...) do { \
   fprintf(stderr, "%-30s [ %s %d ] -> ", __func__, __FILE__, __LINE__); \
   fprintf( stderr, __VA_ARGS__ ); \
-	write( 2, a, b ); \
+  write( 2, a, b ); \
   fprintf( stderr, "\n"); } while (0)
 
-
- //Encapsulate for testing
  #define ENCAPS( d, len ) \
   write( 2, "'", 1 ); \
   write( 2, d, len ); \
   write( 2, "'", 1 ); \
   write( 2, "\n", 1 )
 #else
-	#define SUSP(...)
-  #define STEP(...) 
-  #define SHOWDATA(...)
-	#define SHOWBDATA(a,b, ...) 
-	#define ENCAPS( d, len )
+ #define SUSP(...)
+ #define STEP(...) 
+ #define SHOWDATA(...)
+ #define SHOWBDATA(a,b, ...) 
+ #define ENCAPS( d, len )
 #endif
 
 
@@ -170,7 +161,7 @@
 #endif
 
 #ifndef TAB_H
- #ifndef DEBUG_H
+ #ifdef DEBUG_H
   #define LT_DUMPFULL
  #endif
  #define LT_POLYMORPH_BUFLEN 2048

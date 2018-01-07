@@ -19,10 +19,16 @@
 #include "../bridge.h"
 
 #if 0
-#define MIST(a) lua_stackdump(a); getchar()
+#define MIST(a)
 #else
-#define MIST(a) lua_stackdump(a)
+#define MIST(a) fprintf( stderr, "%s:%d => ", __FILE__, __LINE__ ); lua_stackdump(a)
 #endif
+
+#define SD(...) \
+	fprintf( stderr, "%s:%d ", __FILE__, __LINE__ ); \
+	fprintf( stderr, __VA_ARGS__ ); \
+	lua_stackdump( L ); \
+	getchar()
 
 static int depth = 0;
 static int currentIndex = 1;
@@ -45,13 +51,6 @@ char *_char ( lua_State *L )
 	lua_pushstring( L, mal );
 	return mal;
 }
-
-
-#define SD(...) \
-	fprintf( stderr, "%s:%d ", __FILE__, __LINE__ ); \
-	fprintf( stderr, __VA_ARGS__ ); \
-	lua_stackdump( L ); \
-	getchar()
 
 
 int _table ( lua_State *L, char **tc, int *tcIndex )
@@ -129,7 +128,7 @@ int main (int argc, char *argv[])
 {
 	//Create a stack last and make sure it has enough space for some intense testing
 	lua_State *L = luaL_newstate();
-
+	
 #if 0
 	for ( int n=0; n<10; n++ )
 	{
@@ -207,13 +206,15 @@ int main (int argc, char *argv[])
 	lua_settable( L, 6 );	
 	lua_pushinteger( L, 77 );
 	lua_pushstring( L, "randomly high index" );
-	lua_settable( L, 6 );	
+	lua_settable( L, 6 );
 	MIST( L );
 
 	//Nested table
 	fprintf( stderr, "Adding new table containing two key-value pairs and one numeric key-value pair.\n" );
-	lua_pushstring( L, "jazz" ); //The new table will have this as a key name
-	lua_newtable( L ); //8
+	lua_pushstring( L, "jazzy" ); //The new table will have this as a key name
+	lua_newtable( L ); // 8
+	MIST( L );
+	
 	lua_pushstring( L, "singer" );
 	lua_pushstring( L, "bruce springsteen" );
 	lua_settable( L, 8 );	
@@ -236,7 +237,11 @@ int main (int argc, char *argv[])
 
 	//A regular string to round things off
 	fprintf( stderr, "Adding a regular string to table to test switching value types.\n" );
+
 	lua_pushstring( L, "You workin' again, John?" );
+	MIST( L );
+
+	lua_pushstring( L, "Possibly..." );
 	MIST( L );
 
 	//...

@@ -212,25 +212,42 @@ void lua_stackclear ( lua_State *L )
 
 
 
+void lua_loopstack( lua_State *L )
+{
+	fprintf ( stderr, "====> CURRENT STACK LOOKS LIKE: <=====\n" );
+	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) 
+	{
+		int t = lua_type( L, pos );
+		const char *type = lua_typename( L, t );
+		fprintf( stderr, "[%3d] => ", pos );
+		fprintf( stderr, " %s\n", type );
+	}
+	fprintf( stderr, "\n" );
+}
+
+
+
 void lua_dumptable ( lua_State *L, int *pos, int *sd )
 {
 	lua_pushnil( L );
-	//LUA_DUMPSTK( L );
-	//fprintf( stderr, "*pos = %d\n", *pos );
+	int lnStat = 0;
 
-	while ( lua_next( L, *pos ) != 0 ) 
+	while ((lnStat = lua_next( L, *pos )) != 0 ) 
 	{
 		//Fancy printing
-		//fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - *sd ] );
 		PRETTY_TABS( *sd );
-		LUA_DUMPSTK( L );
+		//LUA_DUMPSTK( L );
 		fprintf( stderr, "[%3d:%2d] => ", *pos, *sd );
+		char *tt[2] = { 0 };
 
 		//Print both left and right side
 		for ( int i = -2; i < 0; i++ )
 		{
 			int t = lua_type( L, i );
 			const char *type = lua_typename( L, t );
+			tt[ (i==-2) ? 0 : 1 ] = (char *)type;
+
+#if 1
 			if ( t == LUA_TSTRING )
 				fprintf( stderr, "(%8s) %s", type, lua_tostring( L, i ));
 			else if ( t == LUA_TFUNCTION )
@@ -248,20 +265,28 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 			else if ( t == LUA_TTABLE ) 
 			{
 				fprintf( stderr, "(%8s) %p\n", type, lua_topointer( L, i ) );
-				(*sd) ++, (*pos) += 2;
+				int diff = lua_gettop( L ) - *pos;
+
+				(*sd) ++, (*pos) += diff;
 				lua_dumptable( L, pos, sd );
-				(*sd) --, (*pos) -= 2;
+				(*sd) --, (*pos) -= diff;
 				PRETTY_TABS( *sd );
 				fprintf( stderr, "}" );
 			}
+#endif
 			fprintf( stderr, "%s", ( i == -2 ) ? " -> " : "\n" );
+			PRETTY_TABS( *sd );
 		}
 
+		PRETTY_TABS( *sd );
+		//fprintf( stderr, "%s, %s\n", tt[0], tt[1] );
 		lua_pop( L, 1 );
-		LUA_DUMPSTK( L );
+		//LUA_DUMPSTK( L );
 	}
 	return;
 }
+
+
 
 
 
@@ -271,9 +296,6 @@ void lua_stackdump ( lua_State *L )
 	//No top
 	if ( lua_gettop( L ) == 0 )
 		return;
-
-	//Loop through all of the values that are on the stack
-	LUA_DUMPSTK( L );
 
 	//Loop again, but show the value of each key on the stack
 	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) 
@@ -311,35 +333,6 @@ void lua_stackdump ( lua_State *L )
 		fprintf( stderr, "\n" );
 	}
 	return;
-}
-
-
-
-
-//Lua dump....
-void lua_tdump (lua_State *L) 
-{
-	int level = 0;	
-	int ct = lua_gettop( L );
-
-	//get the count
-	//loop until you die... :D
-
-	//Loop through each index
-	for (int i=0; i <= ct; i++) 
-	{
-	// { a, b, c, d }
-	// { 0, 2342, { }, 332 }
-	// { a=b, b=c, c=f, d=e }
-		printf( "%d\n", i );
-		printf( "%s\n", lua_typename( L, lua_type( L, i )) );
-#if 0
-		LiteType vt = (t->head + i)->value.type;
-		fprintf ( stderr, "[%-5d] %s", i, &"\t\t\t\t\t\t\t\t\t\t"[ 10 - level ]);
-		lt_printindex( t->head + i, level );
-		level += ( vt == LITE_NUL ) ? -1 : (vt == LITE_TBL) ? 1 : 0;
-#endif
-	}
 }
 
 
@@ -653,10 +646,14 @@ int lua_aggregate (lua_State *L)
 
 	//Add a table
 	lua_newtable( L );
-	lua_stackdump( L );
-	const int tp = lua_gettop( L ); //The top
+
+	//Get the index of the new table
+	int tp = lua_gettop( L ); //The top
 	int pos = tp - 1; //The index on the stack I'm at
 	int ti  = 1; //Where the table is on the stack
+
+#if 0
+	//
 	fprintf( stderr, "table position is %d\n", ti );
 	fprintf( stderr, "top (const table) is at %d\n", tp );
 	fprintf( stderr, "currently at %d\n", pos );
@@ -716,11 +713,7 @@ int lua_aggregate (lua_State *L)
 	//Always return one table...
 	fprintf( stderr, "Aggregated table looks like:\n" );
 	lua_stackdump( L );
+#endif
 	return 1;
 }
 
-/*
-
-[1] { }
-
-*/
