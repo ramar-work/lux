@@ -4,7 +4,7 @@ OS = $(shell uname | sed 's/[_ ].*//')
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O2 -DDEBUG_H #-ansi
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 -DDEBUG_H #-ansi
 CC = gcc
 CFLAGS = $(GCCFLAGS)
 
@@ -72,7 +72,7 @@ agg:
 depth: RICKROSS=tests/depth
 depth: test-build-$(OS)
 depth: 
-	@for NUM in `seq 1 5`; do scripts/dd.sh > tests/depth-data/dd-$${NUM}.test && lua tests/depth-data/dd-$${NUM}.test; done
+	@for NUM in `seq 1 5`; do tests/scripts/dd.sh > tests/depth-data/dd$${NUM}.test && lua tests/depth-data/dd$${NUM}.test; done
 
 # All test build programs use this recipe
 # But notice that a version exists for different operating systems. 
@@ -125,3 +125,5 @@ echo:
 	@printf "%-10s => %s\n" "OBJ" "$(OBJ)" 
 	@printf "%-10s => %s\n" "IGNCLEAN" $(IGNCLEAN) 
 	@printf "%-10s => %s\n" "LUA_V" $(LUA_V) 
+	@printf "Available tests are:\n"
+	@printf "agg, chains, depth, render, router & sql\n"

@@ -23,7 +23,7 @@ function table_value
 	#String, number or table
 	case $(( $RANDOM % 3 )) in
 		0)
-			sed -n ${RANDOM}p $WF | sed 's/$/,/'
+			sed -n ${RANDOM}p $WF | sed 's/\(.*\)/"\1",/'
 			;;
 		1)
 			printf "%d," $RANDOM	
@@ -31,7 +31,7 @@ function table_value
 		2)
 			#Generate either a string or number as index
 			[ $(( $RANDOM % 2 )) -eq 0 ] && \
-				sed -n ${RANDOM}p $WF | sed 's/$/ = {/' || printf "[%d] = {" $RANDOM	
+				sed -n ${RANDOM}p $WF | sed 's/\(.*\)/["\1"] = {/' || printf "[%d] = {" $RANDOM	
 
 			#If depth is greater than 9, back up and close the current table.
 			if [ $DEPTH -gt $MAX_DEPTH ]

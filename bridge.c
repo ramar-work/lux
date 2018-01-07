@@ -236,16 +236,13 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 	{
 		//Fancy printing
 		PRETTY_TABS( *sd );
-		//LUA_DUMPSTK( L );
 		fprintf( stderr, "[%3d:%2d] => ", *pos, *sd );
-		char *tt[2] = { 0 };
 
 		//Print both left and right side
 		for ( int i = -2; i < 0; i++ )
 		{
 			int t = lua_type( L, i );
 			const char *type = lua_typename( L, t );
-			tt[ (i==-2) ? 0 : 1 ] = (char *)type;
 
 #if 1
 			if ( t == LUA_TSTRING )
@@ -264,7 +261,7 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 				fprintf( stderr, "(%8s) %p", type, lua_topointer( L, i ) );
 			else if ( t == LUA_TTABLE ) 
 			{
-				fprintf( stderr, "(%8s) %p\n", type, lua_topointer( L, i ) );
+				fprintf( stderr, "(%8s) %p {\n", type, lua_topointer( L, i ) );
 				int diff = lua_gettop( L ) - *pos;
 
 				(*sd) ++, (*pos) += diff;
@@ -278,10 +275,8 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 			PRETTY_TABS( *sd );
 		}
 
-		PRETTY_TABS( *sd );
 		//fprintf( stderr, "%s, %s\n", tt[0], tt[1] );
 		lua_pop( L, 1 );
-		//LUA_DUMPSTK( L );
 	}
 	return;
 }
@@ -651,12 +646,48 @@ int lua_aggregate (lua_State *L)
 	int tp = lua_gettop( L ); //The top
 	int pos = tp - 1; //The index on the stack I'm at
 	int ti  = 1; //Where the table is on the stack
+lua_loopstack(L);
 
+	//Loop again, but show the value of each key on the stack
+	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) 
+	{
+		int t = lua_type( L, pos );
+		const char *type = lua_typename( L, t );
+		//fprintf( stderr, "[%3d] => ", pos );
+		lua_pushnumber( L, ti++ );
+
+		if ( t == LUA_TSTRING )
+			lua_pushstring( L, lua_tostring( L, pos ) );	
+		else if ( t == LUA_TFUNCTION )
+			lua_pushcfunction( L, (void *)lua_tocfunction( L, pos ) );
+		else if ( t == LUA_TNUMBER )
+			lua_pushnumber( L, lua_tonumber( L, pos ) );
+		else if ( t == LUA_TBOOLEAN)
+			lua_pushboolean( L, lua_toboolean( L, pos ) );
+		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
+			lua_pushnil( L );
+		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
+		{
+			void *p = lua_touserdata( L, pos );
+			lua_pushlightuserdata( L, p );
+		}
+		else if ( t == LUA_TTABLE ) 
+		{
+			lua_newtable( L );
+			//lua_writetable( L, &pos, tp + 2 );
+		}
+
+		//set the new table
+		lua_settable( L, tp );	
+		lua_stackdump( L );
+		getchar();
+	}
 #if 0
-	//
+	#if 0
 	fprintf( stderr, "table position is %d\n", ti );
 	fprintf( stderr, "top (const table) is at %d\n", tp );
 	fprintf( stderr, "currently at %d\n", pos );
+	#endif
 
 	//Loop again, but show the value of each key on the stack
 	for ( int pos = tp - 1 ; pos > 0 ; )

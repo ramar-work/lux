@@ -11,7 +11,8 @@
 #endif
 
 #define PRETTY_TABS( ct ) \
-	fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - ct ] );
+	fprintf( stderr, "%s", &"                   "[ 20 - ct ] );
+	//fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - ct ] );
 
 
 #define GLOBAL_FN( fn, fn_name ) \
