@@ -123,141 +123,167 @@ SD( "Inspect that values were added to table correctly..." );
 
 
 
+#define AGG_RANDOM_TABLES 0
+#define AGG_PREGENERATED_VALUES 1
+#define AGG_SIMPLE_VALUES 0
+#define AGG_VALUES_FROM_FILE 0
+
+
 
 int main (int argc, char *argv[])
 {
 	//Create a stack last and make sure it has enough space for some intense testing
 	lua_State *L = luaL_newstate();
 	
-#if 0
-	for ( int n=0; n<10; n++ )
+	if ( AGG_RANDOM_TABLES )
 	{
-		//Define values that the test can reuse later.
-		int testInt = 0;
-		char *testChars[100] = {0};
-		int testCharIndex = 0;
-		Table testTable = {0};
-
-		//Define how many entries should be in the "root" table
-		int rootTableCount = atoi( rand_numbers( 2 ) ); 
-		rootTableCount >>= 2;
-
-		//Repeat if the value is 0
-		if ( rootTableCount > 0 )
-			fprintf( stderr, "Generating a table with %d entries.\n", rootTableCount );
-		else
+		for ( int n=0; n<10; n++ )
 		{
-			n--;
-			continue;
-		}
+			//Define values that the test can reuse later.
+			int testInt = 0;
+			char *testChars[100] = {0};
+			int testCharIndex = 0;
+			Table testTable = {0};
 
-		//Looping
-		while ( rootTableCount-- ) 
-		{
 			//Define how many entries should be in the "root" table
-			int ltypeInt = atoi( rand_numbers( 2 ) ) % 3;
-			//fprintf( stderr, "Will generate index %d with value %s.\n", rootTableCount, ltype[ ltypeInt % 3 ] );
+			int rootTableCount = atoi( rand_numbers( 2 ) ); 
+			rootTableCount >>= 2;
 
-			//Add the appropriate type
-			if ( ltypeInt == 0 )
-				_table( L, testChars, &testCharIndex );
-			else if ( ltypeInt == 1 )
-				_int  ( L );
-			else if ( ltypeInt == 2 ) 
+			//Repeat if the value is 0
+			if ( rootTableCount > 0 )
+				fprintf( stderr, "Generating a table with %d entries.\n", rootTableCount );
+			else
 			{
-				testChars[ testCharIndex++ ] = _char ( L );//, &testChars[ testCharIndex ] );
+				n--;
+				continue;
 			}
-		}
 
-		//There is an absolutely massive table sitting on the stack now.  Dump it.
-		lua_stackdump( L );
+			//Looping
+			while ( rootTableCount-- ) 
+			{
+				//Define how many entries should be in the "root" table
+				int ltypeInt = atoi( rand_numbers( 2 ) ) % 3;
+				//fprintf( stderr, "Will generate index %d with value %s.\n", rootTableCount, ltype[ ltypeInt % 3 ] );
 
-		//Then put everything in one via lua_agg.
-		
-		//Clean up
-		while ( testCharIndex-- ) {
-			free( testChars[ testCharIndex ] );
+				//Add the appropriate type
+				if ( ltypeInt == 0 )
+					_table( L, testChars, &testCharIndex );
+				else if ( ltypeInt == 1 )
+					_int  ( L );
+				else if ( ltypeInt == 2 ) 
+				{
+					testChars[ testCharIndex++ ] = _char ( L );//, &testChars[ testCharIndex ] );
+				}
+			}
+
+			//There is an absolutely massive table sitting on the stack now.  Dump it.
+			lua_stackdump( L );
+
+			//Then put everything in one via lua_agg.
+			
+			//Clean up
+			while ( testCharIndex-- ) {
+				free( testChars[ testCharIndex ] );
+			}
 		}
 	}
 
-#else
-	//Clear the stack
-	fprintf( stderr, "Clearing the stack...\n" );
-	lua_settop( L, 0 );
-	MIST( L );
 
-	//Add a bunch of random garbage that's not a table and see how it works...
-	fprintf( stderr, "Adding test rows...\n" );
-	lua_pushstring( L, "weedeating" );
-	lua_pushnumber( L, 1321231 );
-	lua_pushstring( L, "michael jackson" );
-	lua_pushstring( L, "roblox and come" );
-	lua_pushnumber( L, 12213 );
-	MIST( L );
+	if ( AGG_PREGENERATED_VALUES )
+	{
+		//Clear the stack
+		fprintf( stderr, "Clearing the stack...\n" );
+		lua_settop( L, 0 );
+		MIST( L );
 
-	//Add a new table and add three key-value pairs to it
-	fprintf( stderr, "Adding new table containing three key-value pairs.\n" );
-	lua_newtable( L ); 
-	lua_pushstring( L, "singer" );
-	lua_pushstring( L, "bon jovi" );
-	lua_settable( L, 6 );	
-	lua_pushstring( L, "color" );
-	lua_pushstring( L, "blue" );
-	lua_settable( L, 6 );	
-	lua_pushinteger( L, 77 );
-	lua_pushstring( L, "randomly high index" );
-	lua_settable( L, 6 );
-	MIST( L );
+		//Add a bunch of random garbage that's not a table and see how it works...
+		fprintf( stderr, "Adding test rows...\n" );
+		lua_pushstring( L, "weedeating" );
+		lua_pushnumber( L, 1321231 );
+		lua_pushstring( L, "michael jackson" );
+		lua_pushstring( L, "roblox and come" );
+		lua_pushnumber( L, 12213 );
+		MIST( L );
 
-	//Nested table
-	fprintf( stderr, "Adding new table containing two key-value pairs and one numeric key-value pair.\n" );
-	lua_pushstring( L, "jazzy" ); //The new table will have this as a key name
-	lua_newtable( L ); // 8
-	MIST( L );
-	
-	lua_pushstring( L, "singer" );
-	lua_pushstring( L, "bruce springsteen" );
-	lua_settable( L, 8 );	
-	lua_pushstring( L, "color" );
-	lua_pushstring( L, "orange" );
-	lua_settable( L, 8 );	
-	lua_pushinteger( L, 999 );
-	lua_pushstring( L, "randomly high index" );
-	lua_settable( L, 8 );	
-	MIST( L );
+		//Add a new table and add three key-value pairs to it
+		fprintf( stderr, "Adding new table containing three key-value pairs.\n" );
+		lua_newtable( L ); 
+		lua_pushstring( L, "singer" );
+		lua_pushstring( L, "bon jovi" );
+		lua_settable( L, 6 );	
+		lua_pushstring( L, "color" );
+		lua_pushstring( L, "blue" );
+		lua_settable( L, 6 );	
+		lua_pushinteger( L, 77 );
+		lua_pushstring( L, "randomly high index" );
+		lua_settable( L, 6 );
+		MIST( L );
 
-	//again
-	fprintf( stderr, "Moving newly created table to table at index 6.\n" );
-	lua_settable( L, 6 );	
-	MIST( L );
-	MIST( L );
-	MIST( L );
-	MIST( L );
-	MIST( L );
+		//Nested table
+		fprintf( stderr, "Adding new table containing two key-value pairs and one numeric key-value pair.\n" );
+		lua_pushstring( L, "jazzy" ); //The new table will have this as a key name
+		lua_newtable( L ); // 8
+		MIST( L );
+		
+		lua_pushstring( L, "singer" );
+		lua_pushstring( L, "bruce springsteen" );
+		lua_settable( L, 8 );	
+		lua_pushstring( L, "color" );
+		lua_pushstring( L, "orange" );
+		lua_settable( L, 8 );	
+		lua_pushinteger( L, 999 );
+		lua_pushstring( L, "randomly high index" );
+		lua_settable( L, 8 );	
+		MIST( L );
 
-	//A regular string to round things off
-	fprintf( stderr, "Adding a regular string to table to test switching value types.\n" );
+		//again
+		fprintf( stderr, "Moving newly created table to table at index 6.\n" );
+		lua_settable( L, 6 );	
+		MIST( L );
+		MIST( L );
+		MIST( L );
+		MIST( L );
+		MIST( L );
 
-	lua_pushstring( L, "You workin' again, John?" );
-	MIST( L );
+		//A regular string to round things off
+		fprintf( stderr, "Adding a regular string to table to test switching value types.\n" );
 
-	lua_pushstring( L, "Possibly..." );
-	MIST( L );
+		lua_pushstring( L, "You workin' again, John?" );
+		MIST( L );
 
-	//...
-	fprintf( stderr, "Population is completed." );
-#endif
+		lua_pushstring( L, "Possibly..." );
+		MIST( L );
 
-#if 0
-	//Add some other stuff
-	char err[2048] = {0};
-	const char *ff[] = { "tests/agg-data/ad1.test", "tests/agg-data/ad2.test", "tests/agg-data/ad3.test", "tests/agg-data/ad4.test", NULL };
+		//...
+		fprintf( stderr, "Population is completed.\n" );
+	}
 
-	for ( int f=0; f < sizeof( ff ) / sizeof ( char * ); f++ )	
-		if ( !lua_load_file( L, *ff, err ) ) err( 3, "Could not load file %s\n", *ff );
 
-	//Should add a table and tell Lua where I want the values explicitly.	
-#endif
+	if ( AGG_SIMPLE_VALUES )
+	{
+		fprintf( stderr, "Adding simple test values to stack...\n" );
+		lua_pushstring( L, "weedeating" );
+		lua_pushnumber( L, 1321231 );
+		lua_pushstring( L, "michael jackson" );
+		lua_pushstring( L, "roblox and come" );
+		lua_pushnumber( L, 12213 );
+		MIST( L );
+	}
+
+
+	if ( AGG_VALUES_FROM_FILE )
+	{
+		//Add some other stuff
+		char err[2048] = {0};
+		const char *ff[] = { "tests/agg-data/ad1.test", "tests/agg-data/ad2.test", "tests/agg-data/ad3.test", "tests/agg-data/ad4.test", NULL };
+
+		for ( int f=0; f < sizeof( ff ) / sizeof ( char * ); f++ )	
+			if ( !lua_load_file( L, *ff, err ) ) err( 3, "Could not load file %s\n", *ff );
+
+		//Should add a table and tell Lua where I want the values explicitly.	
+	}
+
 	lua_aggregate( L );
+	lua_stackdump( L );
 	return 0;
 }

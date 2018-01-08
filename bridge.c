@@ -8,6 +8,10 @@
 #endif
 
 
+#define lua_loopstack( L ) \
+	fprintf ( stderr, "====> CURRENT STACK (AT %s:%d) LOOKS LIKE: <=====\n", __FILE__, __LINE__ ); \
+	lua_loopstackvals( L )
+
 char *CCtypes[] = {
 	[CC_NONE]  = "None",
 	[CC_MODEL] = "Model",     //Models are usually executed, and added to env 
@@ -212,9 +216,9 @@ void lua_stackclear ( lua_State *L )
 
 
 
-void lua_loopstack( lua_State *L )
+void lua_loopstackvals( lua_State *L )
 {
-	fprintf ( stderr, "====> CURRENT STACK LOOKS LIKE: <=====\n" );
+
 	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) 
 	{
 		int t = lua_type( L, pos );
@@ -609,12 +613,19 @@ int lua_db ( lua_State *L )
 
 int lua_writetable( lua_State *L, int *pos, int ti )
 {
+	//
 	lua_pushnil( L );
-	while ( lua_next( L, *pos ) != 0 ) 
+lua_loopstack(L);
+fprintf( stderr, "Will look at table here: %d\n", ti );
+getchar();
+
+	//
+	while ( lua_next( L, ti ) != 0 ) 
 	{
 		//Set the current index
 		int t = lua_type( L, -2 );
-
+lua_loopstack(L);
+getchar();
 	#if 1
 		//Copy the index and rotate the top and bottom
 		lua_pushnil( L );
@@ -643,18 +654,14 @@ int lua_aggregate (lua_State *L)
 	lua_newtable( L );
 
 	//Get the index of the new table
-	int tp = lua_gettop( L ); //The top
-	int pos = tp - 1; //The index on the stack I'm at
-	int ti  = 1; //Where the table is on the stack
-lua_loopstack(L);
-getchar();
+	int tp = lua_gettop( L );
+	int ti  = 1;
 
 	//Loop again, but show the value of each key on the stack
-	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) 
+	for ( int pos = 1; pos < tp; tp-- /*pos++*/ ) 
 	{
 		int t = lua_type( L, pos );
 		const char *type = lua_typename( L, t );
-		//fprintf( stderr, "[%3d] => ", pos );
 		lua_pushnumber( L, ti++ );
 
 		if ( t == LUA_TSTRING )
@@ -674,78 +681,16 @@ getchar();
 		}
 		else if ( t == LUA_TTABLE ) 
 		{
+			lua_loopstack( L ); getchar();
 			lua_newtable( L );
-			//lua_writetable( L, &pos, tp + 2 );
+			//TODO: Rename lua_writetable to lua_transfertable and change interface...
+			lua_writetable( L, &pos, tp );
 		}
 
 		//set the new table
 		lua_settable( L, tp );	
-		lua_stackdump( L );
-		getchar();
-	}
-#if 0
-	#if 0
-	fprintf( stderr, "table position is %d\n", ti );
-	fprintf( stderr, "top (const table) is at %d\n", tp );
-	fprintf( stderr, "currently at %d\n", pos );
-	#endif
-
-	//Loop again, but show the value of each key on the stack
-	for ( int pos = tp - 1 ; pos > 0 ; )
-	{
-		//
-		int t = lua_type( L, pos );
-		const char *type = lua_typename( L, t );
-		fprintf( stderr, "Adding key [%3d] => ", pos );
-
-	#if 1
-		//Push a numeric index, since all of this should be in one table.
-		lua_pushnumber( L, ti++ );
-	#endif
-
-		//Write the value into table...
-		if ( t == LUA_TSTRING )
-			lua_pushstring( L, lua_tostring( L, pos ) );	
-		else if ( t == LUA_TFUNCTION )
-			lua_pushcfunction( L, (void *)lua_tocfunction( L, pos ) );
-		else if ( t == LUA_TNUMBER )
-			lua_pushnumber( L, lua_tonumber( L, pos ) );
-		else if ( t == LUA_TBOOLEAN)
-			lua_pushboolean( L, lua_toboolean( L, pos ) );
-		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
-		{
-			void *p = lua_touserdata( L, pos );
-			lua_pushlightuserdata( L, p );
-		}
-	#if 0
-		else if ( t == LUA_TTHREAD )
-			lua_pushthread( L, lua_tothread( L, pos ) );
-		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
-			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, pos ) );
-	#endif
-		else if ( t == LUA_TTABLE )
-		{
-			int np = tp + 2;
-			lua_newtable( L );
-			lua_writetable( L, &pos, tp + 2 );
-		}
-
-		fprintf( stderr, "Setting table at index %d\n", tp );
-		//getchar();
-		lua_settable( L, tp );	
-		lua_stackdump( L );
-		fprintf( stderr, "\n" );
-		pos--;
-	}
-
-	//Remove all previous elements?
-	for ( int pos = tp - 1 ; pos > 0 ; pos-- )
 		lua_remove( L, pos );
-
-	//Always return one table...
-	fprintf( stderr, "Aggregated table looks like:\n" );
-	lua_stackdump( L );
-#endif
+	}
 	return 1;
 }
 
