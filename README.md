@@ -68,20 +68,7 @@ Routing and site organization all happen from this file.  Here is an example:
 
 ## TODO
 
-Choosing Lua has been with many plusses and many negatives.  Some of the negatives mean:
-
-- writing sort routines
-- writing string manipulation functions
-- writing some heavily needed table utilities
-- write email primitives
-
-To get this done, also requires:
-- easy to build SSL
-- JSON/XML parser 
-- JS parser (maybe)
-
-
-A checklist for all of this is below:
+### Checklist
 
 - Write, debug and test table aggregation
 
@@ -134,7 +121,34 @@ A checklist for all of this is below:
 	Paypal offers credit card numbers...
 	https://www.paypalobjects.com/en_AU/vhelp/paypalmanager_help/credit_card_numbers.htm
 
-## Proposed CLI (Usage)
+### Aggregation
+
+Debugged this, and now am ready to implement a solution.
+
+
+### Test Suite
+
+Most of these work fine, but:
+tests/sql.c and tests/depth.c rely on shell scripts and installed user programs to generate test data.
+Generating the data for these tests with C will solve speed and consistency problems.
+
+
+### Stuff that's Leftover
+
+Choosing Lua has been with many plusses and many negatives.  Some of the negatives mean:
+
+- writing sort routines
+- writing string manipulation functions
+- writing some heavily needed table utilities
+- write email primitives
+
+To get this done, also requires:
+- easy to build SSL
+- JSON/XML parser 
+- JS parser (maybe)
+
+
+### Proposed CLI (Usage)
 
 - handle a socket
 	-s, -k = start, kill a server via hypno

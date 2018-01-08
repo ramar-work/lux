@@ -131,7 +131,7 @@ int main (int argc, char *argv[])
 	int in = 0;
 	int sd = 0;
 	lua_load_file( L, "tests/c.lua", 0 );
-	lua_stackdump( L, &in, &sd );
+	//lua_stackdump( L, &in, &sd );
 #endif
 
 	//A buffer would typically be initialized here.

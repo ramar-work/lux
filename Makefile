@@ -20,10 +20,9 @@ LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c #bridge.c
 OBJ = ${SRC:.c=.o}
 
-
-# ...
-will:
-	make agg && $(INVOKE) ./agg
+# Test target
+w:
+	$(MAKE) agg && $(INVOKE) ./agg
 
 # A main target, that will most likely result in a binary
 main: RICKROSS=main
@@ -31,6 +30,15 @@ main: test-build-$(OS)
 main: 
 	mv $(RICKROSS) hypno
 
+# Build all tests and the server + scripting backend
+all:
+	$(MAKE)
+	$(MAKE) agg
+	$(MAKE) chains 
+	$(MAKE) depth
+	$(MAKE) render
+	$(MAKE) router 
+	$(MAKE) sql 
 
 # Router test program
 router: RICKROSS=tests/router
@@ -49,12 +57,14 @@ chains:
 sql: RICKROSS=tests/sql
 sql: test-build-$(OS)
 sql: 
+	@echo "Generating test data for SQL parse tests (WARNING: This could take a while....)"
 	@sed -n 2,14p tests/sql-data/ges.txt > tests/sql-data/ges.create.sql
 	@sqlite3 tests/sql-data/ges.db < tests/sql-data/ges.create.sql
 	@sed -n 20,118p tests/sql-data/ges.txt > tests/sql-data/ges.import.sql
 	@sqlite3 -separator ',' tests/sql-data/ges.db ".import tests/sql-data/ges.import.sql general_election"
 	@sqlite3 tests/sql-data/ges.db 'select * from general_election limit 10' 
 	@-rm tests/sql-data/ges.create.sql tests/sql-data/ges.import.sql
+	@echo "DONE!"
 
 # Render test program
 render: RICKROSS=tests/render
@@ -72,7 +82,9 @@ agg:
 depth: RICKROSS=tests/depth
 depth: test-build-$(OS)
 depth: 
+	@echo "Generating test data for depth tests (WARNING: This could take a while....)"
 	@for NUM in `seq 1 5`; do tests/scripts/dd.sh > tests/depth-data/dd$${NUM}.test && lua tests/depth-data/dd$${NUM}.test; done
+	@echo "DONE!"
 
 # All test build programs use this recipe
 # But notice that a version exists for different operating systems. 
@@ -80,15 +92,15 @@ depth:
 test-build-Darwin: $(OBJ)
 test-build-Darwin: bridge.o 
 test-build-Darwin:
-	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
-	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
+	@echo $(CC) $(CFLAGS) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
+	@$(CC) $(CFLAGS) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
 
 # Cygwin
 test-build-CYGWIN: $(OBJ)
 test-build-CYGWIN: bridge.o
 test-build-CYGWIN:
-	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
-	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
+	@echo $(CC) $(CFLAGS) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
+	@$(CC) $(CFLAGS) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
 
 # Linux
 test-build-Linux: $(OBJ) 

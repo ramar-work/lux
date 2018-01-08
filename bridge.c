@@ -647,6 +647,7 @@ int lua_aggregate (lua_State *L)
 	int pos = tp - 1; //The index on the stack I'm at
 	int ti  = 1; //Where the table is on the stack
 lua_loopstack(L);
+getchar();
 
 	//Loop again, but show the value of each key on the stack
 	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) 
