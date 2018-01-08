@@ -89,15 +89,13 @@ depth:
 # All test build programs use this recipe
 # But notice that a version exists for different operating systems. 
 # OSX
-test-build-Darwin: $(OBJ)
-test-build-Darwin: bridge.o 
+test-build-Darwin: $(OBJ) bridge.o 
 test-build-Darwin:
 	@echo $(CC) $(CFLAGS) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
 	@$(CC) $(CFLAGS) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
 
 # Cygwin
-test-build-CYGWIN: $(OBJ)
-test-build-CYGWIN: bridge.o
+test-build-CYGWIN: $(OBJ) bridge.o
 test-build-CYGWIN:
 	@echo $(CC) $(CFLAGS) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
 	@$(CC) $(CFLAGS) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua
@@ -111,11 +109,25 @@ test-build-Linux:
 	@echo $(CC) $(CFLAGS) $(shell pkg-config --cflags lua$(LUA_V)) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) $(shell pkg-config --libs lua$(LUA_V)) -ldl -lpthread -lm
 	@$(CC) $(CFLAGS) $(shell pkg-config --cflags lua$(LUA_V)) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) $(shell pkg-config --libs lua$(LUA_V)) -ldl -lpthread -lm
 
+
+# Linux is problematic, so I'm using this as a test for certain systems
+linux: $(OBJ)
+linux: RICKROSS=main
+linux:
+	@echo $(CC) $(CFLAGS) -c bridge.c
+	@$(CC) $(CFLAGS) -c bridge.c && echo "DONE!" || echo "Failed to compile bridge.c..."
+	@echo $(CC) $(CFLAGS) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua -ldl -lpthread -lm
+	@$(CC) $(CFLAGS) $(OBJ) bridge.o $(RICKROSS).c -o $(shell basename $(RICKROSS)) -llua -ldl -lpthread -lm
+
 	
 # A not-so-main target, that will probably result in a few object files...
 objs: $(OBJ)
 	@printf "Finished building objects\n"
 
+vendor/sqlite3.o: CFLAGS = -g -Wall -Wno-unused -std=c99 -Wno-deprecated-declarations -O2
+vendor/sqlite3.o:
+	@echo $(CC) $(CFLAGS) -c vendor/sqlite3.c -o vendor/sqlite3.o
+	@$(CC) $(CFLAGS) -c vendor/sqlite3.c -o vendor/sqlite3.o
 
 # An update target?  (checks for new versions of all your vendor dependencies...)	
 update:

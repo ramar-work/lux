@@ -133,6 +133,12 @@ tests/sql.c and tests/depth.c rely on shell scripts and installed user programs 
 Generating the data for these tests with C will solve speed and consistency problems.
 
 
+### Packaging, Shipping and Maintenance
+
+Linux is a mess.  So shipping Lua with the program might work best.   Single filing Lua is not going to be simple or plain.
+That will need some kind of script.
+
+
 ### Stuff that's Leftover
 
 Choosing Lua has been with many plusses and many negatives.  Some of the negatives mean:

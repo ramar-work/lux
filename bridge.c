@@ -9,10 +9,12 @@
 
 
 #define lua_loopstack( L ) \
-	fprintf ( stderr, "====> CURRENT STACK (AT %s:%d) LOOKS LIKE: <=====\n", __FILE__, __LINE__ ); \
-	lua_loopstackvals( L )
+	fprintf ( stderr, "====> CURRENT STACK (AT %s:%s:%d) LOOKS LIKE: <=====\n", __FILE__, __func__, __LINE__ ); \
+	lua_loopstackvals( L ); getchar()
 
-char *CCtypes[] = {
+
+char *CCtypes[] = 
+{
 	[CC_NONE]  = "None",
 	[CC_MODEL] = "Model",     //Models are usually executed, and added to env 
 	[CC_VIEW]  = "View",      //Views will be loaded, parsed, and sent to buffer
@@ -206,6 +208,7 @@ int lua_to_table (lua_State *L, int index, Table *t )
 	lt_lock( t );
 	return 1;
 }
+
 
 
 void lua_stackclear ( lua_State *L )
@@ -613,30 +616,52 @@ int lua_db ( lua_State *L )
 
 int lua_writetable( lua_State *L, int *pos, int ti )
 {
-	//
+	//...
 	lua_pushnil( L );
+fprintf( stderr, "pos:             %d\n", *pos );
+fprintf( stderr, "tp:              %d\n", ti  );
+fprintf( stderr, "lua_gettop( L ): %d\n", lua_gettop( L ) );
+lua_stackdump(L);
 lua_loopstack(L);
-fprintf( stderr, "Will look at table here: %d\n", ti );
-getchar();
-
-	//
+ 
 	while ( lua_next( L, ti ) != 0 ) 
 	{
-		//Set the current index
-		int t = lua_type( L, -2 );
-lua_loopstack(L);
-getchar();
-	#if 1
-		//Copy the index and rotate the top and bottom
-		lua_pushnil( L );
-		lua_copy( L, -3, lua_gettop( L ) );
-		lua_rotate( L, -2, -1 );
-	#else
-		//There must be a way to do this that will run on older Luas
-	#endif
+		//If the table is properly formed, then this should always work...
+		fprintf( stderr, "%s, %s\n", 
+			lua_typename( L, lua_type(L, -2) ), lua_typename( L, lua_type(L, -1) ) );
+
+		//Duplicate the key on the stack before the end
+		for ( int i = -2; i < 0; i++ )
+		{
+			int t = lua_type( L, -2 );
+			if ( t == LUA_TSTRING )
+				lua_pushstring( L, lua_tostring( L, -2 ) );	
+			else if ( t == LUA_TFUNCTION )
+				lua_pushcfunction( L, (void *)lua_tocfunction( L, -2 ) );
+			else if ( t == LUA_TNUMBER )
+				lua_pushnumber( L, lua_tonumber( L, -2 ) );
+			else if ( t == LUA_TBOOLEAN)
+				lua_pushboolean( L, lua_toboolean( L, -2 ) );
+			else if ( t == LUA_TNIL ||  t == LUA_TNONE )
+				lua_pushnil( L );
+			else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
+			{
+				void *p = lua_touserdata( L, -2 );
+				lua_pushlightuserdata( L, p );
+			}
+			else if ( t == LUA_TTABLE ) 
+			{
+				lua_pushnil( L );
+				lua_copy( L, -3, lua_gettop( L )); 
+			}
+		}
 
 		//Now, setting the table works about the same as popping
+		fprintf( stderr, "setting key and value of inner table...\n" );
 		lua_settable( L, ti );	
+
+		//Delete one and leave the other for the next iteration
+		lua_remove( L, lua_gettop( L ));
 		lua_stackdump( L );
 	}
 	return 1;
@@ -646,6 +671,8 @@ getchar();
 
 int lua_aggregate (lua_State *L)
 {
+	lua_loopstack(L);
+
 	//Check that the stack has something on it
 	if ( lua_gettop( L ) == 0 )
 		return 0;
@@ -681,10 +708,11 @@ int lua_aggregate (lua_State *L)
 		}
 		else if ( t == LUA_TTABLE ) 
 		{
-			lua_loopstack( L ); getchar();
+			lua_stackdump( L );
+			lua_loopstack( L );
 			lua_newtable( L );
 			//TODO: Rename lua_writetable to lua_transfertable and change interface...
-			lua_writetable( L, &pos, tp );
+			lua_writetable( L, &pos, 1 );//lua_gettop( L ) );
 		}
 
 		//set the new table
