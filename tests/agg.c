@@ -124,9 +124,9 @@ SD( "Inspect that values were added to table correctly..." );
 
 
 #define AGG_RANDOM_TABLES 0
-#define AGG_PREGENERATED_VALUES 1
+#define AGG_PREGENERATED_VALUES 0
 #define AGG_SIMPLE_VALUES 0
-#define AGG_VALUES_FROM_FILE 0
+#define AGG_VALUES_FROM_FILE 1
 
 
 
@@ -256,6 +256,10 @@ int main (int argc, char *argv[])
 
 		//...
 		fprintf( stderr, "Population is completed.\n" );
+			
+		fprintf( stderr, "Test #2 complete...\n" );
+		lua_aggregate( L );
+		lua_stackdump( L );
 	}
 
 
@@ -268,6 +272,10 @@ int main (int argc, char *argv[])
 		lua_pushstring( L, "roblox and come" );
 		lua_pushnumber( L, 12213 );
 		MIST( L );
+
+		fprintf( stderr, "Test #3 complete...\n" );
+		lua_aggregate( L );
+		lua_stackdump( L );
 	}
 
 
@@ -275,15 +283,16 @@ int main (int argc, char *argv[])
 	{
 		//Add some other stuff
 		char err[2048] = {0};
-		const char *ff[] = { "tests/agg-data/ad1.test", "tests/agg-data/ad2.test", "tests/agg-data/ad3.test", "tests/agg-data/ad4.test", NULL };
+		const char *ff[] = { "tests/agg-data/ad1.test" };//, "tests/agg-data/ad2.test", "tests/agg-data/ad3.test", "tests/agg-data/ad4.test", NULL };
 
 		for ( int f=0; f < sizeof( ff ) / sizeof ( char * ); f++ )	
 			if ( !lua_load_file( L, *ff, err ) ) err( 3, "Could not load file %s\n", *ff );
 
 		//Should add a table and tell Lua where I want the values explicitly.	
+		fprintf( stderr, "Test #4 complete...\n" );
+		lua_aggregate( L );
+		lua_stackdump( L );
 	}
 
-	lua_aggregate( L );
-	lua_stackdump( L );
 	return 0;
 }

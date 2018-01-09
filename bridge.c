@@ -157,7 +157,6 @@ int lua_to_table (lua_State *L, int index, Table *t )
 	lua_pushnil( L );
 	obprintf( stderr, "Current stack depth: %d\n", sd++ );
 
-	//
 	while ( lua_next( L, index ) != 0 ) 
 	{
 		int kt, vt;
@@ -200,8 +199,9 @@ int lua_to_table (lua_State *L, int index, Table *t )
 		}
 
 		obprintf( stderr, "popping last two values...\n" );
-		if ( vt == LUA_TNUMBER || vt == LUA_TSTRING )
-		lt_finalize( t );
+		if ( vt == LUA_TNUMBER || vt == LUA_TSTRING ) {
+			lt_finalize( t );
+		}
 		lua_pop(L, 1);
 	}
 
@@ -251,7 +251,6 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 			int t = lua_type( L, i );
 			const char *type = lua_typename( L, t );
 
-#if 1
 			if ( t == LUA_TSTRING )
 				fprintf( stderr, "(%8s) %s", type, lua_tostring( L, i ));
 			else if ( t == LUA_TFUNCTION )
@@ -277,12 +276,11 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 				PRETTY_TABS( *sd );
 				fprintf( stderr, "}" );
 			}
-#endif
+
 			fprintf( stderr, "%s", ( i == -2 ) ? " -> " : "\n" );
 			PRETTY_TABS( *sd );
 		}
 
-		//fprintf( stderr, "%s, %s\n", tt[0], tt[1] );
 		lua_pop( L, 1 );
 	}
 	return;
@@ -322,15 +320,10 @@ void lua_stackdump ( lua_State *L )
 			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, pos ) );
 		else if ( t == LUA_TTABLE ) 
 		{
-		#if 0
-			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, pos ) );
-		#else
 			fprintf( stderr, "(%8s) %p {\n", type, lua_topointer( L, pos ) );
 			int sd = 1;
-			LUA_DUMPSTK( L );
 			lua_dumptable( L, &pos, &sd );
 			fprintf( stderr, "}" );
-		#endif
 		}	
 		fprintf( stderr, "\n" );
 	}
@@ -613,66 +606,8 @@ int lua_db ( lua_State *L )
 
 
 
-
-int lua_writetable( lua_State *L, int *pos, int ti )
-{
-	//...
-	lua_pushnil( L );
-fprintf( stderr, "pos:             %d\n", *pos );
-fprintf( stderr, "tp:              %d\n", ti  );
-fprintf( stderr, "lua_gettop( L ): %d\n", lua_gettop( L ) );
-lua_stackdump(L);
-lua_loopstack(L);
- 
-	while ( lua_next( L, ti ) != 0 ) 
-	{
-		//If the table is properly formed, then this should always work...
-		fprintf( stderr, "%s, %s\n", 
-			lua_typename( L, lua_type(L, -2) ), lua_typename( L, lua_type(L, -1) ) );
-
-		//Duplicate the key on the stack before the end
-		for ( int i = -2; i < 0; i++ )
-		{
-			int t = lua_type( L, -2 );
-			if ( t == LUA_TSTRING )
-				lua_pushstring( L, lua_tostring( L, -2 ) );	
-			else if ( t == LUA_TFUNCTION )
-				lua_pushcfunction( L, (void *)lua_tocfunction( L, -2 ) );
-			else if ( t == LUA_TNUMBER )
-				lua_pushnumber( L, lua_tonumber( L, -2 ) );
-			else if ( t == LUA_TBOOLEAN)
-				lua_pushboolean( L, lua_toboolean( L, -2 ) );
-			else if ( t == LUA_TNIL ||  t == LUA_TNONE )
-				lua_pushnil( L );
-			else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
-			{
-				void *p = lua_touserdata( L, -2 );
-				lua_pushlightuserdata( L, p );
-			}
-			else if ( t == LUA_TTABLE ) 
-			{
-				lua_pushnil( L );
-				lua_copy( L, -3, lua_gettop( L )); 
-			}
-		}
-
-		//Now, setting the table works about the same as popping
-		fprintf( stderr, "setting key and value of inner table...\n" );
-		lua_settable( L, ti );	
-
-		//Delete one and leave the other for the next iteration
-		lua_remove( L, lua_gettop( L ));
-		lua_stackdump( L );
-	}
-	return 1;
-}
-
-
-
 int lua_aggregate (lua_State *L)
 {
-	lua_loopstack(L);
-
 	//Check that the stack has something on it
 	if ( lua_gettop( L ) == 0 )
 		return 0;
@@ -702,17 +637,11 @@ int lua_aggregate (lua_State *L)
 		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
 			lua_pushnil( L );
 		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
-		{
-			void *p = lua_touserdata( L, pos );
-			lua_pushlightuserdata( L, p );
-		}
+			lua_pushlightuserdata( L, lua_touserdata( L, pos ));
 		else if ( t == LUA_TTABLE ) 
 		{
-			lua_stackdump( L );
-			lua_loopstack( L );
-			lua_newtable( L );
-			//TODO: Rename lua_writetable to lua_transfertable and change interface...
-			lua_writetable( L, &pos, 1 );//lua_gettop( L ) );
+			lua_pushnil( L );
+			lua_copy( L, pos, lua_gettop( L ) ); 
 		}
 
 		//set the new table
@@ -721,4 +650,3 @@ int lua_aggregate (lua_State *L)
 	}
 	return 1;
 }
-
