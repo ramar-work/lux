@@ -1,12 +1,12 @@
 # This project...
 NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
-CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
-CC = clang
-CFLAGS = $(CLANGFLAGS)
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 -DDEBUG_H #-ansi
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 #-DDEBUG_H #-ansi
 CC = gcc
 CFLAGS = $(GCCFLAGS)
+CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize-undefined-trap-on-error -Wno-format-security #-DDEBUG_H
+CC = clang
+CFLAGS = $(CLANGFLAGS)
 
 # Use this flag before invoking programs, leave it blank on some systems
 #INVOKE = ASAN_SYMBOLIZER_PATH=$$(locate llvm-symbolizer | grep "llvm-symbolizer$$")
@@ -20,10 +20,6 @@ LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c #bridge.c
 OBJ = ${SRC:.c=.o}
 
-# Test target
-w:
-	$(MAKE) agg && $(INVOKE) ./agg
-
 # A main target, that will most likely result in a binary
 main: RICKROSS=main
 main: test-build-$(OS)
@@ -35,7 +31,6 @@ all:
 	$(MAKE)
 	$(MAKE) agg
 	$(MAKE) chains 
-	$(MAKE) depth
 	$(MAKE) render
 	$(MAKE) router 
 	$(MAKE) sql 
@@ -103,6 +98,7 @@ test-build-CYGWIN:
 # Linux
 test-build-Linux: $(OBJ) 
 test-build-Linux: LUA_V=5.2
+test-build-Linux: CLANGFLAGS += -fsanitize=address 
 test-build-Linux:
 	@echo $(CC) $(CFLAGS) $(shell pkg-config --cflags lua$(LUA_V)) -c bridge.c
 	@$(CC) $(CFLAGS) $(shell pkg-config --cflags lua$(LUA_V)) -c bridge.c && echo "DONE!" || echo "Failed to compile bridge.c..."
@@ -137,7 +133,7 @@ update:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) agg router chains sql render depth
+	-@rm $(NAME) agg router chains sql render
 	-@find . | egrep '\.o$$' | grep -v 'sqlite3.o' | xargs rm
 
 
@@ -150,4 +146,4 @@ echo:
 	@printf "%-10s => %s\n" "IGNCLEAN" $(IGNCLEAN) 
 	@printf "%-10s => %s\n" "LUA_V" $(LUA_V) 
 	@printf "Available tests are:\n"
-	@printf "agg, chains, depth, render, router & sql\n"
+	@printf "agg, chains, render, router & sql\n"

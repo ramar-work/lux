@@ -2,3 +2,6 @@
 *.exe
 *.db
 *.test
+.*.swp
+.*.swo
+.*.swf

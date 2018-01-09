@@ -62,7 +62,7 @@ int main ( int argc, char *argv[] )
 		return err( 1, "There is no function...\n" );
 
 	//Load a query via Lua's functionality
-	if ( luaL_dostring( L, "a = exec( 'tests/ges.db', 'SELECT * FROM general_election LIMIT 10' )" ) != LUA_OK )
+	if ( luaL_dostring( L, "a = exec( 'tests/sql-data/ges.db', 'SELECT * FROM general_election LIMIT 10' )" ) != LUA_OK )
 		return err( 1, "Failed to run query...\n" );
 
 	//Rendering is still handled in C world, so output the data here.

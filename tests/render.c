@@ -31,8 +31,8 @@ int main (int argc, char *argv[])
 		int fd = 0;
 		int br = 0;
 		char ren[ 10000 ] = { 0 };
-		char *m = strcmbd( "/", "tests/render", files[i], files[i], "lua" );
-		char *v = strcmbd( "/", "tests/render", files[i], files[i], "tpl" );
+		char *m = strcmbd( "/", "tests/render-data", files[i], files[i], "lua" );
+		char *v = strcmbd( "/", "tests/render-data", files[i], files[i], "tpl" );
 		m[ strlen( m ) - 4 ] = '.';
 		v[ strlen( v ) - 4 ] = '.';
 
