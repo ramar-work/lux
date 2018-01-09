@@ -22,9 +22,9 @@ Loader ld[] = {
 	//Sadly though, this is slightly more complicated than it should be...
 	{ CC_MODEL, TEST_DIR "model1.lua" },
 	{ CC_MODEL, TEST_DIR "model2.lua" },
-	{ CC_MODEL, TEST_DIR "model2.lua" },
-	{ CC_VIEW , TEST_DIR "view1.lua" },
-	{ CC_VIEW , TEST_DIR "view2.lua" },
+	{ CC_MODEL, TEST_DIR "model3.lua" },
+	{ CC_VIEW , TEST_DIR "view1.tpl" },
+	{ CC_VIEW , TEST_DIR "view2.tpl" },
 	{ 0, NULL }
 };
 
@@ -33,67 +33,6 @@ Loader ld[] = {
 int resolve_chain ( )
 {
 	return 0;
-}
-
-
-// Prepare the chain
-Loader *prepare_chain ( Loader *ld, char *reldir )
-{
-	//Loop through, create a full path and check if those files exist
-	
-	//The engine would return NULL and probably throw a 404 if the file didn't exist
-	//This could also be a server error, since technically the symbolic file exists, but
-	//the workings underneath do not.
-	return NULL;
-}
-
-
-
-// void *data is a possible data structure that may keep track of a bunch of data
-// like relative directories or something...
-Buffer *run_chain ( Loader *ld, Buffer *dest, lua_State *L, char *err )
-{
-	Loader *ll = ld;
-	//printf( "addr of buffer: %p\n", b );
-
-	//The end result here returns a buffer.
-	while ( ll->type ) 
-	{
-		//Header
-		fprintf( stderr, "Evaluating %s:\n%s\n", 
-			printCCtype( ll->type ), "===================" );
-
-		//Do based on ll->type 
-		//If anything fails, return NULL and throw a 500. 
-		if ( ll->type == CC_MODEL )
-		{
-			fprintf( stderr, "%s\n", ll->content );	
-
-			//Successful calls will put results on the stack. 
-			if ( !lua_load_file( L, ll->content, err ) ) 
-			{
-				//Unsuccessful will return NULL, but the stack has the error
-				//The lua_load_file function SHOULD modify the error message
-				return NULL;
-			}
-		}
-		else if ( ll->type == CC_VIEW )
-		{
-			//Dump Lua stack for debugging
-			
-			//Convert Lua to table
-			
-			//Then render, which should work in one pass...
-			fprintf( stderr, "%s\n", ll->content );	
-		}
-
-		//Add to buffer depending on choice
-		
-		//Next one
-		ll++;
-	}
-
-	return dest;
 }
 
 
@@ -124,26 +63,51 @@ int main (int argc, char *argv[])
 	if ( !bf_init( &bc, NULL, 1 ) )
 		return err( 2, "Buffer failed to initialize." );
 
-#if 0
-	//Then run the chain.
-	if ( !run_chain( l, &bc, L, err ) )
-		return err( 1, "Chain running failed on block: %s", err );
-#else
 	//Set a pointer to the test data.
 	Loader *ll = ld;
+	fprintf( stdout, "Evaluating all models...\n" );
 
+	/*
+	To get rendering to work properly there are two ways to approach it.
+	A) take all the agg values and put them in one table...
+		( assuming that lua_aggregate( L ) is the last function called, add
+		a new table, a string to the stack and either move or copy the table
+		that's at the beginning to the end.  the stack would look like:
+		[0] => { ... },
+		[1] => "model",
+		[2] => { } 
+
+		set it via lua_settable()
+		[0] => { "model" = { ... } }
+
+	B) each file name can be a "scope"
+		so before aggregation, add a string, then hit lua_load_file
+		do lua_settable before moving to the next file:
+
+		[0] = { ... }
+		[1] = <filename>
+		[2] = { <results of evaluated file> }
+	
+		at aggregate, you'll have one table with all "scopes":
+		[0] = {
+			file1 = {
+				{ ... }	
+			},
+			file2 = {
+				{ ... }	
+			}
+		}
+
+	*/
+
+#if 0
 	//The end result here returns a buffer.
 	while ( ll->type ) 
 	{
-		//Header
-		fprintf( stderr, "Evaluating %s:\n%s\n", 
-			printCCtype( ll->type ), "===================" );
-
-		//Do based on ll->type 
 		//If anything fails, return NULL and throw a 500. 
 		if ( ll->type == CC_MODEL )
 		{
-			fprintf( stderr, "%s\n", ll->content );	
+			fprintf( stdout, "%s\n", ll->content );	
 
 			//Successful calls will put results on the stack. 
 			if ( !lua_load_file( L, ll->content, err ) ) 
@@ -156,13 +120,18 @@ int main (int argc, char *argv[])
 	}
 
 	//Aggregate all values on the stack.
-	lua_stackdump( L ); getchar();
 	lua_aggregate( L );
-	lua_stackdump( L );
+lua_stackdump(L);
+#else
+	char *ff = "tests/chains-data/ezmodel.lua";
+	if ( !lua_load_file( L, ff, err ) )
+		return err( 134, "Failed to load file: %s\n", ff ); 
+#endif
+
+	//Initialize the table structure
+	lt_init( &t, NULL, 1024 );
 
 	//Convert Lua to Table
-	lt_init( &t, NULL, 1024 );
-	lua_stackdump( L );
 	if ( !lua_to_table( L, 1, &t ) )
 		err( 5, "Failed to convert lua_stack values to table...\n" );
 
@@ -171,9 +140,10 @@ int main (int argc, char *argv[])
 
 	//Rewind pointer
 	ll = ld;
+	fprintf( stdout, "Evaluating all views...\n" );
 
 	//Then render all the views
-	while ( ll->type ) 
+	while ( ll->type )
 	{
 		if ( ll->type == CC_VIEW )
 		{
@@ -192,8 +162,10 @@ int main (int argc, char *argv[])
 			//Can use malloc or something else...
 			if ( !( ren = malloc( sb.st_size ) ) )
 				err( 6, "Failed to allocate needed file size.\n" ); 
+	
+			memset( ren, 0, sb.st_size );
 				
-			if (( br = read( fd, ren, sizeof( ren ) - 1 )) == -1 )
+			if (( br = read( fd, ren, sb.st_size - 1 )) == -1 )
 				err( 4, "Failed to read file %s: %s\n", ll->content, strerror( errno ) );
 				
 			//Allocate space for rendering
@@ -224,8 +196,8 @@ int main (int argc, char *argv[])
 	}
 
 	//Dump the final version of the content.
-	write( 2, bf_data( &bc ), bf_written( &bc ) );
-#endif
+	write( 1, bf_data( &bc ), bf_written( &bc ) );
+	fflush( stdout );
 
 	return 0;
 }

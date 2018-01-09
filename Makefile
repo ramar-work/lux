@@ -1,12 +1,12 @@
 # This project...
 NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 #-DDEBUG_H #-ansi
-CC = gcc
-CFLAGS = $(GCCFLAGS)
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize-undefined-trap-on-error -Wno-format-security #-DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 #-DDEBUG_H #-ansi
+CC = gcc
+CFLAGS = $(GCCFLAGS)
 
 # Use this flag before invoking programs, leave it blank on some systems
 #INVOKE = ASAN_SYMBOLIZER_PATH=$$(locate llvm-symbolizer | grep "llvm-symbolizer$$")
@@ -19,6 +19,13 @@ LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 # Not sure why these don't always work...
 SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c #bridge.c
 OBJ = ${SRC:.c=.o}
+
+# ...
+aaa: ldump
+	printf ''>/dev/null	
+
+vvv:
+	./ldump -m tests/chains-data/ezmodel.lua -v "tests/chains-data/view2.tpl"
 
 # A main target, that will most likely result in a binary
 main: RICKROSS=main
@@ -35,12 +42,17 @@ all:
 	$(MAKE) router 
 	$(MAKE) sql 
 
+# Table dump test program
+ldump: RICKROSS=ldump
+ldump: test-build-$(OS)
+ldump: 	
+	@printf ''>/dev/null
+
 # Router test program
 router: RICKROSS=tests/router
 router: test-build-$(OS)
 router: 	
 	@printf ''>/dev/null
-
 
 # Chain test program
 chains: RICKROSS=tests/chains

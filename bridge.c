@@ -70,6 +70,7 @@ int lua_load_file( lua_State *L, const char *file, char *err  )
 }
 
 
+//
 int lua_load_file2( lua_State *L, Table *t, const char *file, char *err  )
 {
 	if ( luaL_dofile( L, file ) != 0 )
@@ -278,7 +279,7 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 			}
 
 			fprintf( stderr, "%s", ( i == -2 ) ? " -> " : "\n" );
-			PRETTY_TABS( *sd );
+			//PRETTY_TABS( *sd );
 		}
 
 		lua_pop( L, 1 );
@@ -650,3 +651,8 @@ int lua_aggregate (lua_State *L)
 	}
 	return 1;
 }
+
+
+
+//Views
+

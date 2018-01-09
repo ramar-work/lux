@@ -70,13 +70,15 @@ Routing and site organization all happen from this file.  Here is an example:
 
 ### Checklist
 
-- Write, debug and test table aggregation
+x Write, debug and test table aggregation
 
 - Write, debug and test MVC execution chain
+		Some problems here:
+			rendering multiple levels deep does not work
+			seeing the same issue that I saw months ago when looping, start index seems to be off
+			also don't completely finish the render
 
 - Write, debug and test data.lua evaluation
-
-- Write, debug and test rendering
 
 - Write, debug and test database drivers (SQLite should be built-in)
 
