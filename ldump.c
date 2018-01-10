@@ -5,7 +5,6 @@ Quick utility for testing dumps...
 
 This should be in some other form...
 
-
 */
 #include "bridge.h"
 
@@ -17,17 +16,6 @@ const char usage[] =
 ;
 
 
-//
-Option opts[] = 
-{
-	{ "-m", "--models",       "Choose this directory for serving web apps.",'s' },
-	{ "-v", "--views" ,       "Choose this directory for serving web apps.",'s' },
-
-	{ .sentinel = 1 }
-};
-
-
-//
 int main (int argc, char *argv[])
 {
 	lua_State *L = luaL_newstate();
@@ -142,6 +130,5 @@ int main (int argc, char *argv[])
 
 	fprintf( stderr, "written: %d\n", bf_written( &bc )); 
 	write(1, bf_data( &bc ), bf_written( &bc )); 
-	//lua_stackdump( L );
 	return 0;
 }
