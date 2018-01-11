@@ -1,0 +1,11 @@
+...
+
+- render needs fixing (pretty hard and I'm low on brain power today...)
+
+	debug the write error (it's so far a bit random)	
+	add $ syntax (for pulling $key and $value)
+	add ! syntax (for executing code)
+	
+
+-
+ 

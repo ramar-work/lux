@@ -15,6 +15,8 @@ const char usage[] =
 	"-v, --views <template files>\n"
 ;
 
+#define MUNK( ... ) \
+	( fprintf( stderr, "%s:%d %s\n", __FILE__, __LINE__, #__VA_ARGS__	) ? 1 : 1 ) && __VA_ARGS__
 
 int main (int argc, char *argv[])
 {
@@ -85,39 +87,42 @@ int main (int argc, char *argv[])
 			struct stat sb;
 	
 			//Check that the opened file doesn't just fail...
-			if ( fd == -1 )
+			if ( MUNK( fd == -1 ) )
 				return err( 4, "Failed to open file %s: %s\n", ly->content, strerror( errno ) );
 		
 			//Check something and do something
-			if ( stat( ly->content, &sb ) == -1 )
+			if ( MUNK( stat( ly->content, &sb ) == -1 ) )
 				return err( 5, "Failed to stat file %s: %s\n", ly->content, strerror( errno ) );
 
 			//Can use malloc or something else...
-			if ( !( ren = malloc( sb.st_size ) ) )
+			if ( MUNK( !( ren = malloc( sb.st_size ) ) ) )
 				return err( 6, "Failed to allocate needed file size.\n" ); 
 	
-			if ( !memset( ren, 0, sb.st_size ) )
+			if ( MUNK( !memset( ren, 0, sb.st_size ) ) )
 				return err( 6, "memset( ... ) failed, because your computer and possibly your life suck...\n" ); 
 				
 			//Read a template file in	
-			if (( br = read( fd, ren, sb.st_size - 1 )) == -1 )
+			if (( MUNK(( br = read( fd, ren, sb.st_size - 1 )) == -1 )) )
 				return err( 4, "Failed to read file %s: %s\n", ly->content, strerror( errno ) );
 				
 			//Allocate space for rendering
-			if ( !render_init( &R, &t ) )
+			if ( MUNK( !render_init( &R, &t ) ) )
 				return err( 32, "render_init failed...\n" );
 
 			//"Score" the block to render
-			if ( !render_map( &R, (uint8_t *)ren, br ) )
+			if ( MUNK( !render_map( &R, (uint8_t *)ren, br ) ) )
 				return err( 33, "render_mapping failed...\n" );
 
+			//Dump block? (should show where everything is)
+			render_dump_mark( &R );getchar(); 
+
 			//Start rendering
-			if ( !render_render( &R ) )
+			if ( MUNK( !render_render( &R ) ) )
 				return err( 34, "render_render failed...\n" );
 
 			//Write to some buffer, and just keep adding
 			Buffer *bd = render_rendered( &R ); 
-			if ( !bf_append( &bc, bf_data(bd), bf_written(bd)) )
+			if ( MUNK( !bf_append( &bc, bf_data(bd), bf_written(bd)) ) )
 				return err( 35, "Failed to append to buffer...\n" );
 	
 			//...

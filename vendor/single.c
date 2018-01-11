@@ -928,7 +928,8 @@ void print_body ( Bod *b )
 #endif
 
 
-static void render_dump_mark ( Render *r )
+#ifdef DEBUG_H
+void render_dump_mark ( Render *r )
 {
 	Mark *ct = &r->markers[0];
 	while ( ct->blob )
@@ -945,6 +946,7 @@ static void render_dump_mark ( Render *r )
 		ct++;
 	}
 }
+#endif
 
 
 //render_init - Initializes a render block
@@ -1063,7 +1065,6 @@ int render_map ( Render *r, uint8_t *src, int srclen )
 		}
 	}
 
-	//render_dump_mark( r );
 	return 1;
 }
 

@@ -220,6 +220,11 @@ x sql
 C chains
 
 
+render sucks... need to fix this...
+
+debug what the hell is going on with pointer loop?
+
+
 ## Results
 
 Thu, Jan  4, 2018  9:27:58 PM

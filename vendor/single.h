@@ -1238,6 +1238,9 @@ void render_set_srcdata (Render *r, uint8_t *src);
 void render_set_srctable (Render *r, Table *t);
 int render_map ( Render *r, uint8_t *src, int srclen );
 Buffer *render_rendered (Render *r);
+ #ifdef DEBUG_H
+void render_dump_mark ( Render *r );
+ #endif
 #endif
 
 

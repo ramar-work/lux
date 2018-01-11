@@ -4,7 +4,7 @@ OS = $(shell uname | sed 's/[_ ].*//')
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize-undefined-trap-on-error -Wno-format-security #-DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 #-DDEBUG_H #-ansi
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 -DDEBUG_H #-ansi
 CC = gcc
 CFLAGS = $(GCCFLAGS)
 
@@ -23,6 +23,17 @@ OBJ = ${SRC:.c=.o}
 # ...
 aaa: ldump
 	printf ''>/dev/null	
+
+# ...
+bbb: LUA_V=5.2
+bbb:
+	@echo cpp $(shell pkg-config --cflags lua$(LUA_V)) ldump.c	
+	@cpp $(shell pkg-config --cflags lua$(LUA_V)) ldump.c	
+
+# Writing each test here may help my somewhat left back ass...
+rtest: TESTDIR=tests/ldump-data
+rtest:
+	./ldump -m $(TESTDIR)/all-single-values.lua -v $(TESTDIR)/all-single-values.tpl
 
 vvv:
 	./ldump -m tests/chains-data/ezmodel.lua -v "tests/chains-data/view2.tpl"
@@ -145,7 +156,7 @@ update:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) agg router chains sql render
+	-@rm $(NAME) agg router chains sql render ldump
 	-@find . | egrep '\.o$$' | grep -v 'sqlite3.o' | xargs rm
 
 
