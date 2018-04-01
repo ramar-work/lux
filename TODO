@@ -1,3 +1,16 @@
+???
+---
+
+- put main.c's MVC eval in one function (eval_route or something - it's the last test in Makefile) 
+
+- write some basic dump functions to test HTTP run at different parts in the process (what does that mean?  stop at table_to_lua and examine results, stop at parse_route and examine results, etc.)
+
+- how do pictures and other binary data get served?  do they crash?
+
+
+
+
+
 today
 =====
 - checklist of all elements

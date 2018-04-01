@@ -4,7 +4,7 @@ OS = $(shell uname | sed 's/[_ ].*//')
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 #-DDEBUG_H #-ansi
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H #-ansi
 CC = gcc
 CFLAGS = $(GCCFLAGS)
 
@@ -17,9 +17,17 @@ SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c bridge.c
 OBJ = ${SRC:.c=.o}
 
 
+# A main target, that will most likely result in a binary
+main: RICKROSS=main
+main: test-build-$(OS)
+main: 
+	mv $(RICKROSS) hypno
+
+
 # Change the top-level target for convience
-a:
+lasttest:
 	make chains && ./testchains
+
 
 # A top-level target that builds everything
 top:
@@ -28,12 +36,6 @@ top:
 	make render; \
 	make sql; \
 	make main
-
-# A main target, that will most likely result in a binary
-main: RICKROSS=main
-main: test-build-$(OS)
-main: 
-	mv $(RICKROSS) hypno
 
 
 # Router test program

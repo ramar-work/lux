@@ -3,6 +3,7 @@
 #include "vendor/http.h"
 #include "bridge.h"
 
+
 #define PROG "luas"
 
 #ifndef LUA_53
@@ -10,6 +11,9 @@
  #define lua_geti( a, b, c ) 
  #define lua_seti( a, b, c ) 
 #endif
+
+//For testing purposes, I'm going to include an EXAMPLE define that uses the 'example' folder.
+#define EXAMPLE_H
 
 //This should be an enum
 #define ERR_SRVFORK 20
@@ -116,12 +120,12 @@ int set_lua_functions ( lua_State *L, luaCF *rg )
 
 
 //This is the single-threaded HTTP run function
-_Bool http_run (Recvr *r, void *p, char *e) 
+_Bool http_run ( Recvr *r, void *p, char *err ) 
 {
+	char buf[ 1024 ]   = { 0 };
 	HTTP *h            = (HTTP *)r->userdata;
 	HTTP_Request *req  = &h->request;
 	req->mlen          = r->recvd;
-	char buf[ 1024 ]   = { 0 };
 
 	//This should receive the entire request
 	SHOWDATA( "streaming request" );
@@ -139,107 +143,125 @@ _Bool http_run (Recvr *r, void *p, char *e)
 	http_set_status( h, 200 );
 	http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
 	http_print_response( h );
- #else
-	//This is what I'll usually use and the majority of work should happen here.
-	const char *file = "b.lua"; // or "example/data.lua";
-	lua_State *L  = luaL_newstate(); 
+ #endif
+
+ #if 0
+	//Read the data.lua file.  I'm not going to choose a folder here b/c this is an example.
+	
+ #endif
+
+ #if 1
+	//Define
+	Table  t;     
+	Render R; 
+	Loader ld[ 10 ];
+	memset( ld, 0, sizeof( Loader ) * 10 );
+	Loader *l = ld;
+	lua_State *L  = NULL; 
 	luaCF     *rg = lua_functions;
 	Buffer    *rr = h->resb;
-	Table      t;     
-	Render     R; 
+	char *ptr = NULL;
+
+
+	#ifdef EXAMPLE_H
+	 const char *file = "example/data.lua";
+	#else
+	 const char *file = NULL;
+	 #error "Data file selection does not work yet."
+	#endif
 
 	//Check that Lua initialized here
-	if ( !L )
-		return 0;
-	else {
-		luaL_openlibs( L );
-		lua_newtable( L );
-		lua_loop( L );
-		set_lua_functions( L, rg );
-		//Convert HTTP structure to something Lua can read
-		table_to_lua( L, 1, &h->request.table );
+	if ( !(L = luaL_newstate()) ) {
+		//snprintf( err, 4095, "%s\n", "Failed to create new Lua state?" );
+		//return 0;
+		return http_err( h, 500, "Failed to create new Lua state?" );
 	}
 
-	//Load the first data.lua here
+	//Open Lua libraries.
+	luaL_openlibs( L );
+	lua_newtable( L );
+	lua_loop( L );
+	set_lua_functions( L, rg );
+
+	//Convert HTTP request structure to something Lua can read
+	if ( !table_to_lua( L, 1, &h->request.table ) ) {
+		//snprintf( err, 4095, "%s\n", "Failed to create Lua table from native C structure." );
+		//return 0;
+		return http_err( h, 500, "Failed to create Lua table from native C structure." );
+	}
+
+	//Turn on table
+	if ( !lt_init( &t, NULL, 666 ) )
+		return http_err( h, 500, "Lua routing table failed to initialize...\n" );
+
+	//Load the site's data.lua here
 	if ( !lua_load_file( L, file, err ) ) 
 		return http_err( h, 500, "Loading routes failed at file '%s': %s", file, err );
-	else 
+
+	//Convert the Lua route table to a C table
+	if ( !lua_to_table( L, 2, &t ) )
+		return http_err( h, 500, "could not convert Lua table ...\n" );
+
+	//Return an error here and tell what happened (if it comes to that)
+	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), &h->request.table, &t ) )
+		return http_err( h, 500, "Parsing routes failed." );
+
+	//Cycle through all of the elements comprising the route
+	while ( l->type ) 
 	{
-		//Negotiate the route here.
-		Loader ld[ 10 ];
-		memset( ld, 0, sizeof( Loader ) * 10 );
-		Loader *l = ld;
-		char *ptr = NULL;
-
-		//Turn on table
-		if ( !lt_init( &t, NULL, 666 ) )
-			return http_err( h, 500, "table did not initialize...\n" );
-
-		//Convert the Lua table to a C table
-		if ( !lua_to_table( L, 2, &t ) )
-			return http_err( h, 500, "could not convert Lua table ...\n" );
-
-		//Return an error here and tell what happened (if it comes to that)
-		if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), &h->request.table, &t ) )
-			return http_err( h, 500, "Parsing routes failed." );
-
-		//Cycle through all of the elements comprising the route
-		while ( l->type ) 
+	 #if 0
+		else if ( l->type == CC_QUERY )
+			return http_err( h, 500, "Lua query payloads don't work yet." );
+		else if ( l->type == CC_FUNCT )
+			return http_err( h, 500, "Lua function payloads don't work yet." );
+	 #endif
+		if ( l->type == CC_STR ) 
+			bf_append( rr, (uint8_t *)l->content, strlen( l->content ) );	
+		else if ( l->type == CC_MODEL || l->type == CC_VIEW ) 
 		{
-  	 #if 0
-			else if ( l->type == CC_QUERY )
-				return http_err( h, 500, "Lua query payloads don't work yet." );
-			else if ( l->type == CC_FUNCT )
-				return http_err( h, 500, "Lua function payloads don't work yet." );
-		 #endif
-			if ( l->type == CC_STR ) 
-				bf_append( rr, (uint8_t *)l->content, strlen( l->content ) );	
-			else if ( l->type == CC_MODEL || l->type == CC_VIEW ) 
-			{
-				//Check that the file exists and permissions are correct
-				const char *dir = "example1";
-				struct stat sb;
-				char *file = NULL;
-				char *type = (l->type == CC_MODEL ) ? "lua" : "html";
-				char *sdir = (l->type == CC_MODEL ) ? "app" : "views";
+			//Check that the file exists and permissions are correct
+			const char *dir = "example1";
+			struct stat sb;
+			char *file = NULL;
+			char *type = (l->type == CC_MODEL ) ? "lua" : "html";
+			char *sdir = (l->type == CC_MODEL ) ? "app" : "views";
 
-				memset( &sb, 0, sizeof( struct stat ) );
-				file = strcmbd( "/", dir, sdir, l->content, type );
-				file[ (strlen( file ) - strlen( type )) - 1 ] = '.';
-				fprintf( stderr, "Loading %s file: %s\n", sdir, file );
+			memset( &sb, 0, sizeof( struct stat ) );
+			file = strcmbd( "/", dir, sdir, l->content, type );
+			file[ (strlen( file ) - strlen( type )) - 1 ] = '.';
+			fprintf( stderr, "Loading %s file: %s\n", sdir, file );
 
-				if ( stat( file, &sb ) == -1 ) {
-					free( file );
-					return http_err( h, 500, "%s", strerror( errno ) );
-				}
-
-				//Execute referenced file name
-				if ( l->type == CC_MODEL )
-				{
-					//When model is successfully loaded, a key made of the FILENAME 
-					//will contain a table with the rendering data
-					if ( !lua_load_file( L, file, err ) )
-					{
-						free( file );
-						return http_err( h, 500, "%s", err );
-					}
-				}
-				else if ( l->type == CC_VIEW )
-				{
-					//Open and display it for now...	
-					char buf[ 8000 ] = {0};
-					int fd = open( file, O_RDONLY, S_IRUSR | S_IRGRP );
-					int r = read( fd, buf, sizeof(buf));
-					bf_append( rr, (uint8_t *)buf, r );	
-				}
-
+			if ( stat( file, &sb ) == -1 ) {
 				free( file );
+				return http_err( h, 500, "%s", strerror( errno ) );
 			}
-			else {
-				return http_err( h, 500, "Some unknown payload was received." );
+
+			//Execute referenced file name
+			if ( l->type == CC_MODEL )
+			{
+				//When model is successfully loaded, a key made of the FILENAME 
+				//will contain a table with the rendering data
+				if ( !lua_load_file( L, file, err ) )
+				{
+					free( file );
+					return http_err( h, 500, "%s", err );
+				}
 			}
-			l++;
+			else if ( l->type == CC_VIEW )
+			{
+				//Open and display it for now...	
+				char buf[ 8000 ] = {0};
+				int fd = open( file, O_RDONLY, S_IRUSR | S_IRGRP );
+				int r = read( fd, buf, sizeof(buf));
+				bf_append( rr, (uint8_t *)buf, r );	
+			}
+
+			free( file );
 		}
+		else {
+			return http_err( h, 500, "Some unknown payload was received." );
+		}
+		l++;
 	}
 
 	//Bypassing should make the headers work right...
@@ -441,18 +463,18 @@ int startServer ( int port, int connLimit, int daemonize )
 	}
 
 	//Open the socket
-	if (!socket_open(&sock) || !socket_bind(&sock) || !socket_listen(&sock))
+	if ( !socket_open(&sock) || !socket_bind(&sock) || !socket_listen(&sock) )
 		return ERR_SSOCKET;//(fprintf(stderr, "Socket init error.\n") ? 1 : 1);
 
 	//Initialize details for a non-blocking server loop
-	if (!initialize_selector(&sel, &sock)) //&l, local_index))
+	if ( !initialize_selector(&sel, &sock) ) //&l, local_index))
 		return ERR_INITCON;//nw_err(0, "Selector init error.\n"); 
 
 	//Dump some data
 	obprintf(stderr, "Listening at %s:%d\n", sock.hostname, sock.port);
 
 	//Start the non-blocking server loop
-	if (!activate_selector(&sel))
+	if ( !activate_selector(&sel) )
 		return ERR_SKLOOPS;//(fprintf(stderr, "Something went wrong inside the select loop.\n") ? 1 : 1);
 	
 	//Clean up and tear down.
@@ -462,13 +484,12 @@ int startServer ( int port, int connLimit, int daemonize )
 }
 
 
-#ifdef INCLUDE_KILL 
-#ifdef WIN32
- #error "Kill is not gonna work here, son... Sorry to burst yer bublet."
-#endif
 //Kills a currently running server
 int killServer () 
 {
+#ifdef WIN32
+ #error "Kill is not gonna work here, son... Sorry to burst yer bublet."
+#endif
 	pid_t pid;
 	int fd, len;
 	struct stat sb;
@@ -509,31 +530,81 @@ int killServer ()
 	fprintf( stderr, "server dead...\n");
 	return 0;
 }
-#endif
-
 
 
 //Options
 Option opts[] = 
 {
-	//Debugging and whatnot
-	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
-	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },
-	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
-
-	//Server stuff
 	{ "-s", "--start"    , "Start a server."                                },
-	{ "-n", "--no-daemon", "Choose port to start server on."                },
-#ifdef INCLUDE_KILL 
 	{ "-k", "--kill",      "Kill a running server."                },
-#endif
-	//Parameters
-	{ NULL, "--max-conn",  "How many connections to enable at a time.", 'n' },
+
+	{ NULL, "--chroot-dir","Choose a directory to change root to.",     's' },
+	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },
+	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
+	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
+	{ "-m", "--max-conn",  "How many connections to enable at a time.", 'n' },
+	{ "-n", "--no-daemon", "Do not daemonize the server when starting."  },
 	{ "-p", "--port"    ,  "Choose port to start server on."          , 'n' },
-	{ "-c", "--chroot-dir","Choose a directory to change root to.",     's' },
+
 	{ .sentinel = 1 }
 };
 
+
+//Run killServer() from main()
+int kill_cmd( Option *opts, char *err ) 
+{
+	killServer();
+	return 1;
+}
+
+
+//Load a different data.lua file from main()
+int file_cmd( Option *opts, char *err ) 
+{
+	lua_State *L = NULL;  
+	char *f = opt_get( opts, "--file" ).s;
+	Table t;
+
+	if (!( L = luaL_newstate() ))
+	{
+		fprintf( stderr, "L is not initialized...\n" );
+		return 0;
+	}
+	
+	lt_init( &t, NULL, 127 );
+	lua_load_file( L, f, err  );	
+	lua_to_table( L, 1, &t );
+	lt_dump( &t );
+	return 1;
+}
+
+
+//Start the server from main()
+int start_cmd( Option *opts, char *err ) 
+{
+	int stat, conn, port, daemonize;
+	daemonize = !opt_set(opts, "--no-daemon");
+	!(conn = opt_get(opts, "--max-conn").n) ? conn = 1000 : 0;
+	!(port = opt_get(opts, "--port").n) ? port = 2000 : 0; 
+	fprintf( stderr, "starting server on %d\n", port );
+	stat   = startServer( port, conn, daemonize ); 
+
+	//I start a loop above, so... how to handle that when I need to jump out of it?
+	return 1;
+}
+
+
+//Command loop
+struct Cmd
+{ 
+	const char *cmd;
+	int (*exec)( Option *, char *);
+} Cmds[] = {
+	{ "--kill"     , kill_cmd  }
+ ,{ "--file"     , file_cmd  }
+ ,{ "--start"    , start_cmd }
+ ,{ NULL         , NULL      }
+};
 
 
 //Server loop
@@ -542,12 +613,20 @@ int main (int argc, char *argv[])
 	//Values
 	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
 
- #ifdef INCLUDE_KILL 
-	//Catch kill option first
-	if ( opt_set(opts, "--kill") )
-		killServer();
- #endif
+	//Evaluate all main stuff by looping through the above structure.
+	struct Cmd *cmd = Cmds;	
+	while ( cmd->cmd ) {
+		fprintf( stderr, "Got option: %s\n", cmd->cmd );
+		if ( opt_set( opts, cmd->cmd ) ) {
+			if ( !cmd->exec( opts, err ) ) {
+				fprintf( stderr, "hypno: %s\n", err );
+				return 1;
+			}
+		}
+		cmd++;
+	}
 
+#if 0
 	//
 	if ( opt_set(opts, "--file") )
 	{
@@ -576,5 +655,7 @@ int main (int argc, char *argv[])
 		!(port = opt_get(opts, "--port").n) ? port = 2000 : 0; 
 		stat   = startServer( port, conn, daemonize ); 
 	}
+#endif
 	return 0;
 }
+
