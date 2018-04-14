@@ -1268,7 +1268,7 @@ Buffer *render_rendered (Render *r)
  #else
   static const int lt_max_slots     = 7;
  #endif
- #ifndef DEBUG_H
+ #ifdef DEBUG_H
   static const char *fmt = "%-4s\t%-10s\t%-5s\t%-10s\t%-30s\t%-6s\t%-20s\n";
  #endif
 static const LiteRecord nul = { 0 };
@@ -1338,10 +1338,6 @@ static int build_backwards (LiteKv *t, unsigned char *buf, int bs)
 	return size;
 }
 
-
-
-#ifdef DEBUG_H 
-#endif
 
 //Trim things
 unsigned char *lt_trim (uint8_t *msg, char *trim, int len, int *nlen) 
@@ -2202,7 +2198,7 @@ static void lt_printindex (LiteKv *tt, int ind)
 
 
 
-#ifndef DEBUG_H 
+#ifdef DEBUG_H 
 //Get a key or value somewhere
 void lt_printall ( Table *t ) 
 {

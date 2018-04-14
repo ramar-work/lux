@@ -44,6 +44,9 @@ Executor runners[] =
 };
 
 
+#define XX() \
+	fprintf( stderr, "%s: %d\n", __FILE__, __LINE__ ); getchar()
+
 //Table of Lua functions
 typedef struct 
 {
@@ -122,13 +125,33 @@ int set_lua_functions ( lua_State *L, luaCF *rg )
 //This is the single-threaded HTTP run function
 _Bool http_run ( Recvr *r, void *p, char *err ) 
 {
-	char buf[ 1024 ]   = { 0 };
-	HTTP *h            = (HTTP *)r->userdata;
-	HTTP_Request *req  = &h->request;
-	req->mlen          = r->recvd;
+	//This is a hell of a lot of data.
+	Table  routes
+				,request
+				,unknown;     
+	Render R; 
+	Loader ld[ 10 ];
+	char *ptr = NULL;
+	char buf[ 1024 ] = { 0 };
+	HTTP *h = (HTTP *)r->userdata;
+	HTTP_Request *req = &h->request;
+	lua_State *L  = luaL_newstate(); 
+	luaCF     *rg = lua_functions;
+	Buffer    *rr = h->resb;
+
+	//Check that Lua initialized here
+	if ( !L )
+		return http_err( h, 500, "Failed to create new Lua state?" );
+
+	//Set up the "loader" structure
+	memset( ld, 0, sizeof( Loader ) * 10 );
+	Loader *l = ld;
+
+	//Set the message length
+	req->mlen = r->recvd;
 
 	//This should receive the entire request
-	SHOWDATA( "streaming request" );
+	obprintf( stderr, "streaming request" );
 	if ( !http_get_remaining( h, r->request, r->recvd ) )
 		return http_err( h, 500, "Error processing request." );
 
@@ -143,68 +166,60 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	http_set_status( h, 200 );
 	http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
 	http_print_response( h );
- #endif
 
- #if 0
-	//Read the data.lua file.  I'm not going to choose a folder here b/c this is an example.
-	
- #endif
-
- #if 1
-	//Define
-	Table  t;     
-	Render R; 
-	Loader ld[ 10 ];
-	memset( ld, 0, sizeof( Loader ) * 10 );
-	Loader *l = ld;
-	lua_State *L  = NULL; 
-	luaCF     *rg = lua_functions;
-	Buffer    *rr = h->resb;
-	char *ptr = NULL;
-
-
-	#ifdef EXAMPLE_H
-	 const char *file = "example/data.lua";
-	#else
-	 const char *file = NULL;
-	 #error "Data file selection does not work yet."
-	#endif
-
-	//Check that Lua initialized here
-	if ( !(L = luaL_newstate()) ) {
-		//snprintf( err, 4095, "%s\n", "Failed to create new Lua state?" );
-		//return 0;
-		return http_err( h, 500, "Failed to create new Lua state?" );
-	}
-
+ #else
 	//Open Lua libraries.
 	luaL_openlibs( L );
 	lua_newtable( L );
-	lua_loop( L );
-	set_lua_functions( L, rg );
+	//set_lua_functions( L, rg );
 
-	//Convert HTTP request structure to something Lua can read
-	if ( !table_to_lua( L, 1, &h->request.table ) ) {
-		//snprintf( err, 4095, "%s\n", "Failed to create Lua table from native C structure." );
-		//return 0;
-		return http_err( h, 500, "Failed to create Lua table from native C structure." );
-	}
+	//Read the data file for whatever "site" is gonna be run.
+	char *file = "example/data.lua";
 
-	//Turn on table
-	if ( !lt_init( &t, NULL, 666 ) )
-		return http_err( h, 500, "Lua routing table failed to initialize...\n" );
-
-	//Load the site's data.lua here
+	//Load the route file.
 	if ( !lua_load_file( L, file, err ) ) 
 		return http_err( h, 500, "Loading routes failed at file '%s': %s", file, err );
 
-	//Convert the Lua route table to a C table
-	if ( !lua_to_table( L, 2, &t ) )
-		return http_err( h, 500, "could not convert Lua table ...\n" );
+	//Convert this to an actual table so C can work with it...
+	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) )
+		return http_err( h, 500, "Converting routes from file '%s' failed.", file );
 
+	//I wish there was a way to pass in a function that could control the look of this
+	//lt_dump( &routes );
+	//lt_dump( &h->request.table );
+
+	//For right now, let's just hardcode these "debugging" backends.
+	// '/routes' (or 'debug/routes')
+	// '/request'
+	// '/luaf'
+	// anything else...
+	// after this function runs, I should have a structure that I cn loop through that will let me load each seperate thing.
+	//if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), &h->request.table, &routes ) )
+	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), h, &routes ) )
+		return http_err( h, 500, "Finding the model and view for the current route failed." );
+
+	for ( int i=0; i<sizeof(ld)/sizeof(Loader); i++ ) {
+		fprintf( stderr, "[ %s ,"  , ( ld[ i ].type == 1 ) ? "model" : "view (or something else)"  );	
+		fprintf( stderr,   "%s ,"  , ld[ i ].content );	
+		fprintf( stderr,   "%d ]\n", ld[ i ].index );	
+	}
+
+	//Here's a response just because.	
+	const char resp[] = 
+		"HTTP/2.0 200 OK\r\n"
+		"Content-Type: text/html\r\n"
+		"Content-Length: 23\r\n\r\n"
+		"<h2>Hello, world!</h2>\n";
+	http_set_status( h, 200 );http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
+ #endif
+
+ #if 0
 	//Return an error here and tell what happened (if it comes to that)
 	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), &h->request.table, &t ) )
 		return http_err( h, 500, "Parsing routes failed." );
+XX();
+
+	//I need to loop through this and print what came back.  Let's do that first...
 
 	//Cycle through all of the elements comprising the route
 	while ( l->type ) 

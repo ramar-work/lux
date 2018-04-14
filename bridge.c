@@ -341,18 +341,23 @@ void lua_tdump (lua_State *L)
 
 
 //Parse the current route according to what was in the table.
-Loader *parse_route ( Loader *l, int lsize, Table *httpTable, Table *routeTable )
+//Loader *parse_route ( Loader *l, int lsize, Table *httpTable, Table *routeTable )
+Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
 {
 	//Define and declare
-	Loader *LL = l;
+	Loader **LL = &l;
+	Table *http_r = &http->request.table;
 	char us[ 1024 ] = { 0 };
 	int szof_us = sizeof( us );
 	int b     = 0;
 	int count = 0; 
-	int ind   = lt_get_long_i( httpTable, (uint8_t *)"URL", 3 );
+
+	//Find the index of the URL key in HTTP 
+	int ind   = lt_get_long_i( http_r, (uint8_t *)"URL", 3 );
+	fprintf( stderr, "URL at: %d\n", ind );
 
 	//This should be checked out of this function
-	while ( lt_rettype( httpTable, 0, ind++ ) != LITE_TRM )
+	while ( lt_rettype( http_r, 0, ind++ ) != LITE_TRM )
 		count++;
 
 	//Fail if this happens, b/c the URL wasn't done right
@@ -369,18 +374,125 @@ Loader *parse_route ( Loader *l, int lsize, Table *httpTable, Table *routeTable 
 
 #if 1
 	//Now this loops through HTTP structure
-	lt_dump( httpTable );
-	lt_dump( routeTable );
+	lt_dump( http_r );
+	http_print_request( http );
+	//lt_dump( routeTable );
 #endif
 
+
+	//Guess this was written at some other time...
+	//Each one of these things is just a route... pretty easy for the most part...
+
+	// TODO:
+	// '/' always resolves to default, just makes sense...
+	// '/[a-zA-Z*]' always resolves to the domain
+	// combining once and just changing '/' to '.' should resolve much faster...
+	// no support for regexp yet...
+
+	// TODO some more:
+	// Combine the URL
+	
+	char *fullRoute = NULL;
+	fprintf (stderr, "Path: %s\n", http->request.path );
+	fprintf (stderr, "Path: %d\n", (int)strlen( http->request.path ));
+
+	//Root domain check...
+	if ( (int)strlen( http->request.path ) == 1 && strcmp( http->request.path, "/" ) == 0 ) {
+		fprintf (stderr, "Path requested is root.\n" );
+		fullRoute = "routes.default";
+	}
+	//Do other domain-y things...
+	else {
+		fprintf (stderr, "Path requested is %s.\n", http->request.path );
+		fullRoute = strcmbd( "/", "routes", &http->request.path[1] );
+		for ( int i=0; i<strlen(fullRoute);i++ ) {
+			( fullRoute[i] == '/' ) ? fullRoute[i] = '.' : 0;
+		}
+	}
+
+
+	//Now check the hash against the thing and loop through shit...
+	char 
+		*modelTag = strcmbd( ".", fullRoute, "model" ),
+		*viewTag = strcmbd( ".", fullRoute, "view" );
+
+	int 
+		mh = lt_get_long_i( routeTable, (uint8_t *)modelTag, strlen(modelTag) ),
+		vh = lt_get_long_i( routeTable, (uint8_t *)viewTag, strlen(viewTag) );
+
+#if 0
+	fprintf( stderr, "%s\n", modelTag );
+	fprintf( stderr, "%s\n", viewTag );
+
+	fprintf( stderr, "mt hash: %d\n", mh );
+	fprintf( stderr, "vt hash: %d\n", vh );
+#endif
+
+	//Loop through until you get a terminator, means you're at the end...
+	for ( int i=mh + 1; ; i++ ) {
+		char *lt_char = NULL;
+		int lt_type =	lt_valuetypeat( routeTable, i );
+
+		// Stop at nul or term
+		if ( lt_type == LITE_NUL || lt_type == LITE_TRM ) {
+			break;
+		}
+
+		//TODO: If this manages to be null or zero-length, it's probably a bug...
+		if ( !(lt_char =	lt_text_at( routeTable, i )) ) {
+			break;
+		}
+
+char *a = strdup( lt_char );
+		fprintf( stderr, "thing: %s\n", a );
+
+	#if 1	
+		//LL is either accessed wrong or not init'd.
+		(*LL)->type = CC_STR
+	 ,(*LL)->content = a
+	 , LL++ ;
+	#endif
+	}
+
+
+	//Loop through until you get a terminator, means you're at the end...
+	for ( int i=vh + 1; ; i++ ) {
+		char *lt_char = NULL;
+		int lt_type =	lt_valuetypeat( routeTable, i );
+
+		// Stop at nul or term
+		if ( lt_type == LITE_NUL || lt_type == LITE_TRM ) {
+			break;
+		}
+		
+		if ( !(lt_char =	lt_text_at( routeTable, i )) ) {
+			break;
+		}
+
+#if 0
+		fprintf( stderr, "thing: %s\n", lt_char );
+		(*LL)->type = CC_STR
+	 ,(*LL)->content = strdup( lt_char )
+	 , LL++ ;
+#endif
+	}
+
+return NULL;
+		
 	//Recycle the same buffer for each "merge" of the URL
-	for ( int i = ++ind; i < count; i++ ) 
+	//TODO: This doesn't look like it handles "root" domains yet...
+	for ( int i = ++ind; i < count; i++ )
 	{
 		//Get the value from URL table and combine it into string buffer 'us'... 
 		int yh = 0;
-		LiteBlob *bb = &lt_blob_at( httpTable, i );
+		LiteBlob *bb = &lt_blob_at( http_r, i );
 		memcpy( &us[ b ], &bb->blob[ 1 ], bb->size - 1 );
 		b += bb->size - 1;
+
+fprintf( stderr, "combining routes ought to look like: %s\n", us );
+		continue; 
+		//END HERE :)
+
 
 		//Check the hash in the routing table and tell me what it is...
 		if ( (yh = lt_get_long_i( routeTable, (uint8_t *)us, b )) == -1 )
@@ -412,7 +524,7 @@ Loader *parse_route ( Loader *l, int lsize, Table *httpTable, Table *routeTable 
 				return err( NULL, "Type '%s' not accepted...\n", lt_typename( type ) );
 		#endif
 			else if ( type == LITE_TXT )
-				LL->type = CC_STR, LL->content = lt_text_at( routeTable, yh ), LL++ ;
+				(*LL)->type = CC_STR, (*LL)->content = lt_text_at( routeTable, yh ), LL++ ;
 			else if ( type == LITE_TBL )
 			{
 				//Define what models and views look like
@@ -430,21 +542,22 @@ Loader *parse_route ( Loader *l, int lsize, Table *httpTable, Table *routeTable 
 						//Then check the type and do something
 						if ( mtype != LITE_TXT && mtype != LITE_TBL /* && mtype != LITE_USR */ )
 							return err( NULL, "type '%s' not accepted for table...\n", lt_typename( mtype ) );
-						else if ( mtype == LITE_TXT )
-							LL->content = lt_text_at( routeTable, m ), LL->type = ab[ ii ].cn, LL++;
-						else if ( mtype == LITE_TBL ) 
-						{
+						else if ( mtype == LITE_TXT ) {
+							 (*LL)->content = lt_text_at( routeTable, m )
+							,(*LL)->type = ab[ ii ].cn
+							,LL++;
+						}
+						else if ( mtype == LITE_TBL ) {
 							//Increment current table index until you hit a terminator
-							while ( lt_rettype( routeTable, 0, ++m ) != LITE_TRM ) 
-							{
+							while ( lt_rettype( routeTable, 0, ++m ) != LITE_TRM ) {
 								int kt = lt_rettype( routeTable, 0, m ), vt = lt_rettype( routeTable, 1, m );
 								//return err( NULL, "type '%s' not accepted for table...\n", lt_typename( type ) );
 								if ( vt != LITE_TXT )
 									printf( "Value type '%s' not yet supported...", lt_typename( mtype ) );
 								else 
 								{
-									LL->content = lt_text_at( routeTable, m );	
-									LL->type = ab[ii].cn; //ctype[ ii ];
+									(*LL)->content = lt_text_at( routeTable, m );	
+									(*LL)->type = ab[ii].cn; //ctype[ ii ];
 									LL++;
 								}
 							} // while ( lt_rettype( ... ) != LITE_TRM )
@@ -456,8 +569,10 @@ Loader *parse_route ( Loader *l, int lsize, Table *httpTable, Table *routeTable 
 		}
 	
 	#if 1
-		while ( LL->type ) {
-			printf( "%s -> %s\n", printCCtype( LL->type ), LL->content );
+		fprintf( stderr, "This should show all routes.\n" );
+		fprintf( stderr, "============================\n" );
+		while ( (*LL)->type ) {
+			printf( "%s -> %s\n", printCCtype( (*LL)->type ), (*LL)->content );
 			LL++;
 		}
 	#endif
@@ -474,7 +589,7 @@ Loader *parse_route ( Loader *l, int lsize, Table *httpTable, Table *routeTable 
 		fprintf( stderr, "%s", "'\n" );
 	}
 
-#if 0
+#if 1
 	//This test is done.  I want to see the structure before moving on.
 	//printf( "Execution path for route: %s\n", tt->url );
 	Loader *Ld = &l[0];

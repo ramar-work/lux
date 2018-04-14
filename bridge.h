@@ -69,7 +69,8 @@ void lua_stackdump ( lua_State *L, int *p, int *sd );
 #define lua_stackdump(L) \
 	do { int in=0, sd=0; lua__stackdump( L, &in, &sd ); } while ( 0 ) 
 #endif
-Loader *parse_route( Loader *, int, Table *src, Table *route );
+//Loader *parse_route( Loader *, int, Table *src, Table *route );
+Loader *parse_route( Loader *, int, HTTP *http, Table *routeTable );
 char *printCCtype ( CCtype cc );
 int lua_db ( lua_State *L );
 int lua_aggregate (lua_State *L);

@@ -4,9 +4,10 @@ OS = $(shell uname | sed 's/[_ ].*//')
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H #-ansi
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 #-DDEBUG_H #-ansi
 CC = gcc
 CFLAGS = $(GCCFLAGS)
+PORT = 2200
 
 # Some Linux systems need these, but pkg-config should handle it
 INCLUDE_DIR=-I/usr/include/lua5.3
@@ -23,6 +24,21 @@ main: test-build-$(OS)
 main: 
 	mv $(RICKROSS) hypno
 
+# This tests how hypno starts with a certain set of criteria.
+goku:
+	./hypno --no-daemon --start --port $(PORT) 
+
+# This tests hypno and logs to a file named baby.log
+baby:
+	./hypno --no-daemon --start --port $(PORT) 2>baby.log
+
+# This is a test request to use with Curl or Wget	
+gohan:
+	wget -O /tmp/index.html http://localhost:$(PORT)/multi
+
+# This is a test request to use with Curl or Wget	
+gotenks:
+	wget -O /tmp/index.html http://localhost:$(PORT)
 
 # Change the top-level target for convience
 lasttest:
@@ -51,11 +67,13 @@ chains: test-build-$(OS)
 chains: 
 	@printf ''>/dev/null
 
+
 # SQL test program
 sql: RICKROSS=testsql
 sql: test-build-$(OS)
 sql: 
 	@printf ''>/dev/null
+
 
 # Render test program
 render: RICKROSS=testrender
@@ -101,4 +119,4 @@ update:
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
 	-@rm $(NAME) testrouter testchains testsql testrender
-	-@find . | egrep '\.o$$' | xargs rm
+	-@find . | egrep '\.o$$' | grep -v sqlite | xargs rm
