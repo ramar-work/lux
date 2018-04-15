@@ -145,7 +145,6 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 	//Set up the "loader" structure
 	memset( ld, 0, sizeof( Loader ) * 10 );
-	Loader *l = ld;
 
 	//Set the message length
 	req->mlen = r->recvd;
@@ -184,6 +183,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) )
 		return http_err( h, 500, "Converting routes from file '%s' failed.", file );
 
+
 	//I wish there was a way to pass in a function that could control the look of this
 	//lt_dump( &routes );
 	//lt_dump( &h->request.table );
@@ -194,15 +194,38 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	// '/luaf'
 	// anything else...
 	// after this function runs, I should have a structure that I cn loop through that will let me load each seperate thing.
-	//if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), &h->request.table, &routes ) )
 	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), h, &routes ) )
 		return http_err( h, 500, "Finding the model and view for the current route failed." );
 
-	for ( int i=0; i<sizeof(ld)/sizeof(Loader); i++ ) {
-		fprintf( stderr, "[ %s ,"  , ( ld[ i ].type == 1 ) ? "model" : "view (or something else)"  );	
-		fprintf( stderr,   "%s ,"  , ld[ i ].content );	
-		fprintf( stderr,   "%d ]\n", ld[ i ].index );	
+	//Now, the fun part... it's all one function.
+	Loader *l = ld;
+	while ( l->content ) {
+		//Leave this to print types of content
+	#if 0
+		fprintf( stderr, "%s\n", l->content );	
+		l++;
+	#endif
+	
+		//Load each model file (which is just running via Lua)
+		if ( l->type == CC_MODEL ) { 
+			if ( !lua_load_file( L, l->content, err ) ) {
+				return http_err( h, 500, "Could not load Lua document at %s\n", l->content );
+			}
+		}
 	}
+
+	lua_stackdump( L );
+	//A) Combine all the Lua keys and show me what's there
+	lua_aggregate( L );
+	//B) Rethink the previous loop and load each value into it's own table instead of waiting until this point in the code 
+	//...
+#if 0
+	l = &ld[0];
+	while ( l->content ) {
+		//Load each view into it's own buffer (can be malloc'd uint8 for now)
+		//Then render once... I think...
+	}
+#endif
 
 	//Here's a response just because.	
 	const char resp[] = 

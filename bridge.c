@@ -345,7 +345,7 @@ void lua_tdump (lua_State *L)
 Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
 {
 	//Define and declare
-	Loader **LL = &l;
+	Loader *LL = l;
 	Table *http_r = &http->request.table;
 	char us[ 1024 ] = { 0 };
 	int szof_us = sizeof( us );
@@ -391,7 +391,6 @@ Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
 
 	// TODO some more:
 	// Combine the URL
-	
 	char *fullRoute = NULL;
 	fprintf (stderr, "Path: %s\n", http->request.path );
 	fprintf (stderr, "Path: %d\n", (int)strlen( http->request.path ));
@@ -443,17 +442,11 @@ Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
 			break;
 		}
 
-char *a = strdup( lt_char );
-		fprintf( stderr, "thing: %s\n", a );
-
-	#if 1	
 		//LL is either accessed wrong or not init'd.
-		(*LL)->type = CC_STR
-	 ,(*LL)->content = a
-	 , LL++ ;
-	#endif
+		LL->type = CC_MODEL;
+	  LL->content = strdup( lt_char );
+	  LL++ ;
 	}
-
 
 	//Loop through until you get a terminator, means you're at the end...
 	for ( int i=vh + 1; ; i++ ) {
@@ -464,134 +457,21 @@ char *a = strdup( lt_char );
 		if ( lt_type == LITE_NUL || lt_type == LITE_TRM ) {
 			break;
 		}
-		
+
+		//TODO: If this manages to be null or zero-length, it's probably a bug...
 		if ( !(lt_char =	lt_text_at( routeTable, i )) ) {
 			break;
 		}
 
+		//LL is either accessed wrong or not init'd.
+		LL->type = CC_VIEW;
+	  LL->content = strdup( lt_char );
+	  LL++ ;
+	}
+
 #if 0
-		fprintf( stderr, "thing: %s\n", lt_char );
-		(*LL)->type = CC_STR
-	 ,(*LL)->content = strdup( lt_char )
-	 , LL++ ;
-#endif
-	}
-
-return NULL;
-		
-	//Recycle the same buffer for each "merge" of the URL
-	//TODO: This doesn't look like it handles "root" domains yet...
-	for ( int i = ++ind; i < count; i++ )
-	{
-		//Get the value from URL table and combine it into string buffer 'us'... 
-		int yh = 0;
-		LiteBlob *bb = &lt_blob_at( http_r, i );
-		memcpy( &us[ b ], &bb->blob[ 1 ], bb->size - 1 );
-		b += bb->size - 1;
-
-fprintf( stderr, "combining routes ought to look like: %s\n", us );
-		continue; 
-		//END HERE :)
-
-
-		//Check the hash in the routing table and tell me what it is...
-		if ( (yh = lt_get_long_i( routeTable, (uint8_t *)us, b )) == -1 )
-			return err( NULL, "val not found '%s'...\n", us );
-		else
-		{
-			//Get the type of the element that's there
-			int type = lt_rettype( routeTable, 1, yh );
-		#if 1
-			fprintf( stderr, "hash and type of " ); 
-			write( 2, "'", 1 );
-			write( 2, us, b );
-			write( 2, "'", 1 );
-			fprintf( stderr, " - %d, %s\n", yh, lt_typename( type ) );
-		#endif
-
-		#if 0
-			//Depending on type, the router action will change
-			if ( type != LITE_USR && type != LITE_BLB && type != LITE_TXT && type != LITE_TBL ) 
-				err( 0, "type '%s' not accepted...\n", lt_typename( type ) );
-			//A Lua function most likely...not ready yet
-			else if ( type == LITE_USR )
-				err( 0, "function type not accepted (yet)...\n" );
-			//Binary data..., unsure how this will work now
-			else if ( type == LITE_BLB ) 
-				err( 0, "binary type not accepted (yet)...\n" );
-		#else
-			if ( type != LITE_TXT && type != LITE_TBL )
-				return err( NULL, "Type '%s' not accepted...\n", lt_typename( type ) );
-		#endif
-			else if ( type == LITE_TXT )
-				(*LL)->type = CC_STR, (*LL)->content = lt_text_at( routeTable, yh ), LL++ ;
-			else if ( type == LITE_TBL )
-			{
-				//Define what models and views look like
-				struct { char *fn; int cn; } ab[] =
-					{ { "model", CC_MODEL }, { "view", CC_VIEW } };
-
-				//Check for 'model(s)' and 'view(s)'
-				for ( int ii=0; ii < 2; ii++ )
-				{
-					char *locate = strcmbd( ".", us, ab[ ii ].fn );
-					int m = -1;
-					if ((m = lt_get_long_i( routeTable, (uint8_t *)locate, strlen( locate ))) > -1 )
-					{
-						int mtype = lt_rettype( routeTable, 1, m  );
-						//Then check the type and do something
-						if ( mtype != LITE_TXT && mtype != LITE_TBL /* && mtype != LITE_USR */ )
-							return err( NULL, "type '%s' not accepted for table...\n", lt_typename( mtype ) );
-						else if ( mtype == LITE_TXT ) {
-							 (*LL)->content = lt_text_at( routeTable, m )
-							,(*LL)->type = ab[ ii ].cn
-							,LL++;
-						}
-						else if ( mtype == LITE_TBL ) {
-							//Increment current table index until you hit a terminator
-							while ( lt_rettype( routeTable, 0, ++m ) != LITE_TRM ) {
-								int kt = lt_rettype( routeTable, 0, m ), vt = lt_rettype( routeTable, 1, m );
-								//return err( NULL, "type '%s' not accepted for table...\n", lt_typename( type ) );
-								if ( vt != LITE_TXT )
-									printf( "Value type '%s' not yet supported...", lt_typename( mtype ) );
-								else 
-								{
-									(*LL)->content = lt_text_at( routeTable, m );	
-									(*LL)->type = ab[ii].cn; //ctype[ ii ];
-									LL++;
-								}
-							} // while ( lt_rettype( ... ) != LITE_TRM )
-						} // ( mtype == LITE_TBL )
-					} // ( m == -1 )
-					free( locate );
-				} // for ( ;; )
-			}	// else ( type ==	LITE_NON )
-		}
-	
-	#if 1
-		fprintf( stderr, "This should show all routes.\n" );
-		fprintf( stderr, "============================\n" );
-		while ( (*LL)->type ) {
-			printf( "%s -> %s\n", printCCtype( (*LL)->type ), (*LL)->content );
-			LL++;
-		}
-	#endif
-
-		//Add to the string for the next iteration
-		fprintf( stderr, "length of early bar: %d\n", b );
-		b += 1;
-		us[ b ] = '.';	
-
-		//uh....
-		fprintf( stderr, "length of appended bar: %d\n", b );
-		fprintf( stderr, "%s", "next iteration of URL: '" );
-		//write( 2, us, b + 1 );
-		fprintf( stderr, "%s", "'\n" );
-	}
-
-#if 1
-	//This test is done.  I want to see the structure before moving on.
-	//printf( "Execution path for route: %s\n", tt->url );
+	//Leave this, in case I want to see the structure before moving on.
+	printf( "Execution path for route: %s\n", http->url );
 	Loader *Ld = &l[0];
 	while ( Ld->type ) {
 		printf( "%s -> %s\n", printCCtype( Ld->type ), Ld->content );
@@ -601,6 +481,12 @@ fprintf( stderr, "combining routes ought to look like: %s\n", us );
 	return l;
 }
 
+
+
+int load_and_run_files ( Loader *l ) { 
+	
+	return 1;
+}
 
 int counter=0;
 
