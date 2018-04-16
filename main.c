@@ -129,6 +129,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	Table  routes
 				,request
 				,unknown;     
+	struct stat sb;
 	Render R; 
 	Loader ld[ 10 ];
 	char *ptr = NULL;
@@ -154,19 +155,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	if ( !http_get_remaining( h, r->request, r->recvd ) )
 		return http_err( h, 500, "Error processing request." );
 
- #if 0
-	//This is a quick test to check that things work as they should.
-	const char resp[] = 
-		"HTTP/2.0 200 OK\r\n"
-		"Content-Type: text/html\r\n"
-		"Content-Length: 23\r\n\r\n"
-		"<h2>Hello, world!</h2>\n";
-
-	http_set_status( h, 200 );
-	http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
-	http_print_response( h );
-
- #else
+ #if 1
 	//Open Lua libraries.
 	luaL_openlibs( L );
 	lua_newtable( L );
@@ -175,18 +164,22 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	//Read the data file for whatever "site" is gonna be run.
 	char *file = "example/data.lua";
 
+	//Always waste some time looking for the file
+	if ( stat( file, &sb ) == -1 )
+		return http_err( h, 500, "Couldn't find file containing site data: %s.", file );
+
 	//Load the route file.
-	if ( !lua_load_file( L, file, err ) ) 
+	if ( !lua_load_file( L, file, &err ) ) 
 		return http_err( h, 500, "Loading routes failed at file '%s': %s", file, err );
 
 	//Convert this to an actual table so C can work with it...
 	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) )
 		return http_err( h, 500, "Converting routes from file '%s' failed.", file );
 
-
 	//I wish there was a way to pass in a function that could control the look of this
-	//lt_dump( &routes );
-	//lt_dump( &h->request.table );
+	//if ( 0 ) 
+	//	lt_dump( &routes );
+	//	lt_dump( &h->request.table );
 
 	//For right now, let's just hardcode these "debugging" backends.
 	// '/routes' (or 'debug/routes')
@@ -200,21 +193,27 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	//Now, the fun part... it's all one function.
 	Loader *l = ld;
 	while ( l->content ) {
-		//Leave this to print types of content
-	#if 0
-		fprintf( stderr, "%s\n", l->content );	
-		l++;
-	#endif
-	
 		//Load each model file (which is just running via Lua)
 		if ( l->type == CC_MODEL ) { 
-			if ( !lua_load_file( L, l->content, err ) ) {
-				return http_err( h, 500, "Could not load Lua document at %s\n", l->content );
+			//Somehow have to get the root directory of the site in question...
+			char *mfile = strcmbd( "/", "example/system", "models", l->content, "lua" );
+			int mfilelen = strlen( mfile );
+			mfile[ mfilelen - 4 ] = '.';
+			fprintf( stderr, "%s\n", mfile );
+
+			if ( stat( mfile, &sb ) == -1 )
+				return http_err( h, 500, "Couldn't find model file: %s.", mfile );
+
+			if ( !lua_load_file( L, mfile, &err ) ) {
+				return http_err( h, 500, "Could not load Lua document at %s.  Error message: %s\n", mfile, err );
 			}
 		}
+
+		//Next
+		l++;
 	}
 
-	lua_stackdump( L );
+	//lua_stackdump( L );
 	//A) Combine all the Lua keys and show me what's there
 	lua_aggregate( L );
 	//B) Rethink the previous loop and load each value into it's own table instead of waiting until this point in the code 
@@ -279,7 +278,7 @@ XX();
 			{
 				//When model is successfully loaded, a key made of the FILENAME 
 				//will contain a table with the rendering data
-				if ( !lua_load_file( L, file, err ) )
+				if ( !lua_load_file( L, file, &err ) )
 				{
 					free( file );
 					return http_err( h, 500, "%s", err );
@@ -610,7 +609,7 @@ int file_cmd( Option *opts, char *err )
 	}
 	
 	lt_init( &t, NULL, 127 );
-	lua_load_file( L, f, err  );	
+	lua_load_file( L, f, &err );	
 	lua_to_table( L, 1, &t );
 	lt_dump( &t );
 	return 1;
@@ -679,7 +678,7 @@ int main (int argc, char *argv[])
 		}
 		
 		lt_init( &t, NULL, 127 );
-		lua_load_file( L, f, err  );	
+		lua_load_file( L, f, &err );	
 		lua_to_table( L, 1, &t );
 		lt_dump( &t );
 	}	

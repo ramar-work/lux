@@ -47,14 +47,16 @@ char *printCCtype ( CCtype cc )
 
 
 //
-int lua_load_file( lua_State *L, const char *file, char *err  )
+int lua_load_file( lua_State *L, const char *file, char **err  )
 {
 	if ( luaL_dofile( L, file ) != 0 )
 	{
 		fprintf( stderr, "Error occurred!\n" );
 		//The entire stack needs to be cleared...
-		if ( lua_gettop( L ) > 0 ) 
-			return ( snprintf( err, 1023, "%s\n", lua_tostring( L, 1 ) ) ? 0 : 0 );
+		if ( lua_gettop( L ) > 0 ) {
+			fprintf( stderr, "%s\n", lua_tostring(L, 1) );
+			return ( snprintf( *err, 1023, "%s\n", lua_tostring( L, 1 ) ) ? 0 : 0 );
+		}
 	}
 	return 1;	
 }
