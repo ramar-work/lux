@@ -130,7 +130,6 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 				,request
 				,unknown;     
 	struct stat sb;
-	Render R; 
 	Loader ld[ 10 ];
 	char *ptr = NULL;
 	char buf[ 1024 ] = { 0 };
@@ -155,7 +154,6 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	if ( !http_get_remaining( h, r->request, r->recvd ) )
 		return http_err( h, 500, "Error processing request." );
 
- #if 1
 	//Open Lua libraries.
 	luaL_openlibs( L );
 	lua_newtable( L );
@@ -176,17 +174,44 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) )
 		return http_err( h, 500, "Converting routes from file '%s' failed.", file );
 
+	lua_stackdump( L );
+	lt_dump( &routes );
+
+	//Clear the stack (TODO: come back and figure out why this is causing crashes)
+	lua_settop( L, 0 );
+
 	//I wish there was a way to pass in a function that could control the look of this
 	//if ( 0 ) 
 	//	lt_dump( &routes );
 	//	lt_dump( &h->request.table );
 
-	//For right now, let's just hardcode these "debugging" backends.
-	// '/routes' (or 'debug/routes')
-	// '/request'
-	// '/luaf'
-	// anything else...
-	// after this function runs, I should have a structure that I cn loop through that will let me load each seperate thing.
+	/* ------------------
+	 * TODO:
+	 * 
+	 *
+	 * For right now, let's just hardcode these "debugging" backends.
+	 * '/routes' (or 'debug/routes')
+	 * '/request'
+	 * '/luaf'
+	 * anything else...
+	 * after this function runs, I should have a structure that I cn loop through that will let me load each seperate thing.
+	 *
+	 * - Program 'default' route if not already done 
+	 *		(and if it's not defined, it's either an error or I'll have a default page hardcoded in)
+	 * - Move all the declarations back to the top (optionally, put them in a single structure to make life easy)
+	 * - Determine where the webroot of the current site is located
+	 *		(in order to get the paths of both models and views and etc)
+	 * - Add files as key names when including model files
+	 * - Consider execution of the entire process via a fork
+	 * - Write handlers for built-in endpoints (I always need this and it's something I can offer)
+	 *		(thinking of routes, log, execution (how do models work, which files are included)
+	 * - Don't forget to register custom Lua functions
+   * - Can the entire environment be transferred to Lua space?  ( I'm thinking of http/cgi )
+	 * - Do site lookup from hostname via headers 
+	 * ------------------ */
+	
+
+	//Parse the routes that come off of this file
 	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), h, &routes ) )
 		return http_err( h, 500, "Finding the model and view for the current route failed." );
 
@@ -213,103 +238,86 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 		l++;
 	}
 
+	//This is a working solution.  Still gotta figure out the reason for that crash...
 	//lua_stackdump( L );
-	//A) Combine all the Lua keys and show me what's there
-	lua_aggregate( L );
-	//B) Rethink the previous loop and load each value into it's own table instead of waiting until this point in the code 
-	//...
-#if 0
-	l = &ld[0];
-	while ( l->content ) {
-		//Load each view into it's own buffer (can be malloc'd uint8 for now)
-		//Then render once... I think...
+	lua_aggregate( L ); //1
+	lua_pushstring(L,"model"); //2
+	lua_pushvalue(L,1); //3
+	lua_newtable(L); //4
+	lua_replace(L,1); //3
+	lua_settable(L,1); //1
+	//lua_stackdump( L );	
+	
+	//There is a thing called model now.
+	Table ll;
+	lt_init( &ll, NULL, 127 );	
+	if ( !lua_to_table( L, 1, &ll ) ) {
+		return http_err( h, 500, "Couldn't turn aggregate table into a C table.\n" );
 	}
-#endif
+	lt_dump( &ll );
 
+	//Make a new "render buffer"
+	uint8_t *rb = malloc( 30000 );
+	if ( !rb || !memset( rb, 0, 30000 ) ) {
+		return http_err( h, 500, "Couldn't allocate enough space for a render buffer.\n" );
+	}	
+
+	//Rewind Loader ptr and load each view's raw text
+	l = &ld[0];
+	int buflen = 0;
+	while ( l->content ) {
+		//Load each view into a single buffer (can be malloc'd uint8 for now)
+		if ( l->type == CC_VIEW ) {
+			//Somehow have to get the root directory of the site in question...
+			char *vfile = strcmbd( "/", "example/system", "views", l->content, "html" );
+			int fd, bt, vfilelen = strlen( vfile );
+			vfile[ vfilelen - 5 ] = '.';
+			fprintf( stderr, "%s\n", vfile );
+
+			if ( stat( vfile, &sb ) == -1 )
+				return http_err( h, 500, "Couldn't find view file: %s. Error: %s", vfile, strerror( errno ) );
+			
+			if ( (fd = open( vfile, O_RDONLY )) == -1 )
+				return http_err( h, 500, "Couldn't open view file: %s. Error: %s", vfile, strerror( errno ) );
+			
+			if ( (bt += read(fd, &rb[buflen], sb.st_size )) == -1 )
+				return http_err( h, 500, "Couldn't read view file into buffer: %s.  Error: %s", vfile, strerror( errno ) );
+			
+			buflen += bt;
+		}
+		l++;
+	}
+
+	//Show the buffer for debugging purposes...
+	write( 2, rb, buflen );
+
+	//Render based on the last table that was converted
+	Render R;
+	if ( !render_init( &R, &ll ) )
+		return http_err( h, 500, "Couldn't initialize rendering engine." );
+	if ( !render_map( &R, (uint8_t *)rb, strlen( (char *)rb ) ) )
+		return http_err( h, 500, "Couldn't set up render mapping." );
+	if ( 1 )
+		0;//render_dump_mark( &R );
+	if ( !render_render( &R ) )	
+		return http_err( h, 500, "Failed to carry out templating on buffer." );
+	http_set_status( h, 200 );
+	http_set_content( h, "text/html", ( uint8_t * )
+		bf_data(render_rendered(&R)), bf_written(render_rendered(&R)) );
+
+	//Free the buffer
+	free( rb );
+
+ #if 0
 	//Here's a response just because.	
 	const char resp[] = 
 		"HTTP/2.0 200 OK\r\n"
 		"Content-Type: text/html\r\n"
 		"Content-Length: 23\r\n\r\n"
 		"<h2>Hello, world!</h2>\n";
-	http_set_status( h, 200 );http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
- #endif
-
- #if 0
-	//Return an error here and tell what happened (if it comes to that)
-	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), &h->request.table, &t ) )
-		return http_err( h, 500, "Parsing routes failed." );
-XX();
-
-	//I need to loop through this and print what came back.  Let's do that first...
-
-	//Cycle through all of the elements comprising the route
-	while ( l->type ) 
-	{
-	 #if 0
-		else if ( l->type == CC_QUERY )
-			return http_err( h, 500, "Lua query payloads don't work yet." );
-		else if ( l->type == CC_FUNCT )
-			return http_err( h, 500, "Lua function payloads don't work yet." );
-	 #endif
-		if ( l->type == CC_STR ) 
-			bf_append( rr, (uint8_t *)l->content, strlen( l->content ) );	
-		else if ( l->type == CC_MODEL || l->type == CC_VIEW ) 
-		{
-			//Check that the file exists and permissions are correct
-			const char *dir = "example1";
-			struct stat sb;
-			char *file = NULL;
-			char *type = (l->type == CC_MODEL ) ? "lua" : "html";
-			char *sdir = (l->type == CC_MODEL ) ? "app" : "views";
-
-			memset( &sb, 0, sizeof( struct stat ) );
-			file = strcmbd( "/", dir, sdir, l->content, type );
-			file[ (strlen( file ) - strlen( type )) - 1 ] = '.';
-			fprintf( stderr, "Loading %s file: %s\n", sdir, file );
-
-			if ( stat( file, &sb ) == -1 ) {
-				free( file );
-				return http_err( h, 500, "%s", strerror( errno ) );
-			}
-
-			//Execute referenced file name
-			if ( l->type == CC_MODEL )
-			{
-				//When model is successfully loaded, a key made of the FILENAME 
-				//will contain a table with the rendering data
-				if ( !lua_load_file( L, file, &err ) )
-				{
-					free( file );
-					return http_err( h, 500, "%s", err );
-				}
-			}
-			else if ( l->type == CC_VIEW )
-			{
-				//Open and display it for now...	
-				char buf[ 8000 ] = {0};
-				int fd = open( file, O_RDONLY, S_IRUSR | S_IRGRP );
-				int r = read( fd, buf, sizeof(buf));
-				bf_append( rr, (uint8_t *)buf, r );	
-			}
-
-			free( file );
-		}
-		else {
-			return http_err( h, 500, "Some unknown payload was received." );
-		}
-		l++;
-	}
-
-	//Bypassing should make the headers work right...
-	//fprintf( stderr, "Written so far %d...", bf_written( rr ) );
 	http_set_status( h, 200 );
-	http_set_version( h, 1.0 );
-	http_set_content_type( h, "text/html" );
-	http_set_content_length( h, bf_written( rr ) );
-	http_pack_response( h );
-	lt_free( &t );
- #endif	
+	http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
+ #endif
 
 	//This has to be set if you don't fail...
 	//http_print_response( h );

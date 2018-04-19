@@ -646,7 +646,7 @@ int lua_writetable( lua_State *L, int *pos, int ti )
 
 int lua_aggregate (lua_State *L)
 {
-#if 1
+#if 0
 	//Stack Test
 	//==========
 	//Check that the lua_stackdump function works like it should.  Most of the
@@ -721,8 +721,8 @@ int lua_aggregate (lua_State *L)
 		return 0;
 
 	//Add a table
-	lua_newtable( L );
-	lua_stackdump( L );
+	lua_newtable(L);
+	fprintf(stderr,"Stackdump:\n");
 	const int tp = lua_gettop( L ); //The top
 	int pos = tp - 1; //The index on the stack I'm at
 	int ti  = 1; //Where the table is on the stack
@@ -783,8 +783,8 @@ int lua_aggregate (lua_State *L)
 		lua_remove( L, pos );
 
 	//Always return one table...
-	fprintf( stderr, "Aggregated table looks like:\n" );
-	lua_stackdump( L );
+	//fprintf( stderr, "Aggregated table looks like:\n" );
+	//lua_stackdump( L );
 	return 1;
 }
 
