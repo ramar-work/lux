@@ -13,6 +13,13 @@
 #define PRETTY_TABS( ct ) \
 	fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - ct ] );
 
+#if ( LUA_VERSION_NUM >= 503 )
+	#error "Lua version is 5.3"
+	#define lrotate( l, i1, i2 ) lua_rotate( l, i1, i2 )
+#else
+	#define lrotate( l, i1, i2 )
+#endif
+
 
 #define GLOBAL_FN( fn, fn_name ) \
 	lua_pushcfunction(L, fn ); \
@@ -29,9 +36,20 @@
 	getchar();
 #endif
 
+typedef enum 
+{
+	CC_NONE, 
+	CC_MODEL, 
+	CC_VIEW, 
+	CC_FUNCT,
+	CC_STR,
+	CC_MAX,
+} CCtype;
+
+
 typedef struct 
 {
-	int   type;      //model or view or something else...	
+	CCtype type;      //model or view or something else...	
 	char *content;   //Most of the time it's a file, but it really should execute...
 #if 0
 	void *funct;     //This can be used for userdata (which are just Lua functions here)
@@ -44,15 +62,6 @@ typedef struct
 
 
 
-typedef enum 
-{
-	CC_NONE, 
-	CC_MODEL, 
-	CC_VIEW, 
-	CC_FUNCT,
-	CC_STR,
-	CC_MAX,
-} CCtype;
 
 
 
