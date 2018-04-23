@@ -5,22 +5,6 @@
 
 
 #define PROG "hypno"
-
-#ifndef LUA_53
- #define lua_rotate( a, b, c ) 
- #define lua_geti( a, b, c ) 
- #define lua_seti( a, b, c ) 
-#endif
-
-#define ERRL(...) snprintf( err, errlen, __VA_ARGS__ ) ? 0 : 0
-
-//Testing: I'm going to include an EXAMPLE define that uses the 'example' folder.
-#define EXAMPLE_H
-
-//Testing: Option module is not so wonderful yet, so use this to test out things having to do with it.
-#define TESTOPTS_H
-
-//This should be an enum
 #define ERR_SRVFORK 20
 #define ERR_PIDFAIL 21
 #define ERR_PIDWRFL 22 
@@ -29,6 +13,29 @@
 #define ERR_SKLOOPS 25 
 #define SUC_PARENT  27
 #define SUC_CHILD   28
+
+//Testing: See specifically where certain functions are crapping out.
+//#define ERR_SUPERV
+
+//Testing: I'm going to include an EXAMPLE define that uses the 'example' folder.
+#define EXAMPLE_H
+
+//Testing: Option module is not so wonderful yet, so use this to test out things having to do with it.
+#define TESTOPTS_H
+
+#ifndef LUA_53
+ #define lua_rotate( a, b, c ) 
+ #define lua_geti( a, b, c ) 
+ #define lua_seti( a, b, c ) 
+#endif
+
+//This define controls whether or not line numbers will also be included in the error message.
+#ifdef ERR_SUPERV
+ #define ERRL(...) ( snprintf( err, 24, "[ @%s(), %d ]                 ", __FUNCTION__, __LINE__ ) ? 1 : 1 && ( err += 24 ) && snprintf( err, errlen - 24, __VA_ARGS__ ) ) ? 0 : 0
+#else
+ #define ERRL(...) snprintf( err, errlen, __VA_ARGS__ ) ? 0 : 0
+#endif
+
 
 //Define some headers here
 _Bool http_run (Recvr *r, void *p, char *e);
@@ -49,9 +56,6 @@ Executor runners[] =
 	[NW_COMPLETED]      = { .exe = http_fin , NW_NOTHING }
 };
 
-
-#define XX() \
-	fprintf( stderr, "%s: %d\n", __FILE__, __LINE__ ); getchar()
 
 //Table of Lua functions
 typedef struct 
@@ -180,12 +184,45 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) )
 		return http_err( h, 500, "Converting routes from file '%s' failed.", file );
 
-	lua_stackdump( L );
-	lt_dump( &routes );
+	//lua_stackdump( L );
+	//lt_dump( &routes );
 
 	//Clear the stack (TODO: come back and figure out why this is causing crashes)
 	lua_settop( L, 0 );
+#if 0
+	//Register each of the Lua functions (TODO: every time... not good for perf)
+	lua_newtable( L ); //Do these go in the global scope or not
+	while ( rg->sentinel != -1 )
+	{
+		//Set the top table
+		if ( rg->sentinel == 1 ) 
+		{
+			lua_settable( L, 1 );
+			lua_loop( L );
+		}
 
+		else if ( !rg->name && rg->setname )
+		{
+			obprintf( stderr, "Registering new table: %s\n", rg->setname );
+			lua_pushstring( L, rg->setname );
+			lua_newtable( L );
+			lua_loop( L );
+		}
+
+		else if ( rg->name )
+		{	
+			obprintf( stderr, "Registering funct: %s\n", rg->name );
+			lua_pushstring( L, rg->name );
+			lua_pushcfunction( L, rg->func );
+	lua_stackdump( L ); getchar();
+			lua_settable( L, 3 );
+		}
+		rg++;
+	}
+
+	lua_stackdump( L );
+return http_err( h, 200, "nothing is wrong at all..." );
+#endif
 	//I wish there was a way to pass in a function that could control the look of this
 	//if ( 0 ) 
 	//	lt_dump( &routes );
@@ -276,7 +313,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 		if ( l->type == CC_VIEW ) {
 			//Somehow have to get the root directory of the site in question...
 			char *vfile = strcmbd( "/", "example/system", "views", l->content, "html" );
-			int fd, bt, vfilelen = strlen( vfile );
+			int fd, bt = 0, vfilelen = strlen( vfile );
 			vfile[ vfilelen - 5 ] = '.';
 			fprintf( stderr, "%s\n", vfile );
 
@@ -301,12 +338,16 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	Render R;
 	if ( !render_init( &R, &ll ) )
 		return http_err( h, 500, "Couldn't initialize rendering engine." );
+
 	if ( !render_map( &R, (uint8_t *)rb, strlen( (char *)rb ) ) )
 		return http_err( h, 500, "Couldn't set up render mapping." );
+
 	if ( 1 )
 		0;//render_dump_mark( &R );
+
 	if ( !render_render( &R ) )	
 		return http_err( h, 500, "Failed to carry out templating on buffer." );
+
 	http_set_status( h, 200 );
 	http_set_content( h, "text/html", ( uint8_t * )
 		bf_data(render_rendered(&R)), bf_written(render_rendered(&R)) );
@@ -465,9 +506,15 @@ Option opts[] =
 	{ "-s", "--start"    , "Start a server."                                },
 	{ "-k", "--kill",      "Kill a running server."                },
 
-	{ NULL, "--chroot-dir","Choose a directory to change root to.",     's' },
-	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },
+#if 0
 	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
+	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
+	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },	
+	//I'm just thinking out loud here.
+	{ "-u", "--user",      "Choose who to run as.",'s' },
+	{ "-m", "--mode",      "Choose how server should evaluate hostnames.",'s' },
+	{ NULL, "--chroot-dir","Choose a directory to change root to.",     's' },
+#endif
 	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
 	{ "-m", "--max-conn",  "How many connections to enable at a time.", 'n' },
 	{ "-n", "--no-daemon", "Do not daemonize the server when starting."  },
@@ -576,47 +623,46 @@ int start_cmd( Option *opts, char *err )
 	{
 		pid_t pid = fork();
 		if ( pid == -1 ) {
-			return ERRL( "Failed to daemonize server process." );
+			return ERRL( "Failed to daemonize server process: %s", strerror(errno) );
 		}
 		else if ( pid ) {
 			int len, fd = 0;
 			char buf[64] = { 0 };
 
 			if ( (fd = open( pidfile, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR )) == -1 )
-				return ERR_PIDFAIL;//(fprintf( stderr, "pid logging failed...\n" ) ? 1 : 1);
+				return ERRL( "Failed to access PID file: %s.", strerror(errno));
 
 			len = snprintf( buf, 63, "%d", pid );
 
 			//Write the pid down
 			if (write( fd, buf, len ) == -1)
-				return ERR_PIDWRFL;//(fprintf( stderr, "open of file failed miserably...\n" ) ? 1 : 1);
+				return ERRL( "Failed to log PID: %s.", strerror(errno));
 		
 			//The parent exited successfully.
-			close(fd);
+			if ( close(fd) == -1 )
+				return ERRL( "Could not close parent socket: %s", strerror(errno));
 			return SUC_PARENT;
 		}
 	}
 
 	//Open the socket
 	if ( !socket_open(&sock) || !socket_bind(&sock) || !socket_listen(&sock) )
-		return ERR_SSOCKET;//(fprintf(stderr, "Socket init error.\n") ? 1 : 1);
+		return ERRL("Failed to initialize a socket for port %d", port );
 
 	//Initialize details for a non-blocking server loop
 	if ( !initialize_selector(&sel, &sock) ) //&l, local_index))
-		return ERR_INITCON;//nw_err(0, "Selector init error.\n"); 
+		return ERRL("Failed to initialize server settings" );
 
 	//Dump some data
 	obprintf(stderr, "Listening at %s:%d\n", sock.hostname, sock.port);
 
 	//Start the non-blocking server loop
 	if ( !activate_selector(&sel) )
-		return ERR_SKLOOPS;//(fprintf(stderr, "Something went wrong inside the select loop.\n") ? 1 : 1);
+		return ERRL("Failure to properly initialize server select loop" );
 	
 	//Clean up and tear down.
 	free_selector(&sel);
-	obprintf(stderr, "HTTP server done...\n");
-	return SUC_CHILD;
-	//return 1;
+	return 1; //SUC_CHILD
 }
 
 
