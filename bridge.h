@@ -14,7 +14,7 @@
 	fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - ct ] );
 
 #if ( LUA_VERSION_NUM >= 503 )
-	#error "Lua version is 5.3"
+	//#error "Lua version is 5.3"
 	#define lrotate( l, i1, i2 ) lua_rotate( l, i1, i2 )
 #else
 	#define lrotate( l, i1, i2 )

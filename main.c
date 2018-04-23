@@ -316,10 +316,8 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 			mfile[ mfilelen - 4 ] = '.';
 			fprintf( stderr, "Attempting to load: %s\n", mfile );
 
-			if ( stat( mfile, &sb ) == -1 ) {
-				lua_settop( L, 0 );
+			if ( stat( mfile, &sb ) == -1 )
 				return ERRH("Couldn't find model file: %s.", mfile );
-			}
 
 		#if 0
 			if ( luaL_dofile( L, mfile ) )
