@@ -2,7 +2,7 @@
 #include "vendor/nw.h"
 #include "vendor/http.h"
 #include "bridge.h"
-
+#include <dirent.h>
 
 #define PROG "hypno"
 #define ERR_SRVFORK 20
@@ -66,7 +66,7 @@ typedef struct
 	int sentinel;
 } luaCF;
 
-int abc ( lua_State *L ) { return 0; } 
+int abc ( lua_State *L ) { fprintf( stderr, "chicken" ); return 0; } 
 
 luaCF lua_functions[] =
 {
@@ -132,6 +132,30 @@ int set_lua_functions ( lua_State *L, luaCF *rg )
 }
 
 
+//Serve a list of files
+void srvListOfFiles() {
+#if 0
+		if (S_ISREG((sb.st_mode))) 
+			fprintf( stderr, "%10s", "file:" );
+		else if (S_ISDIR((sb.st_mode)))
+			fprintf( stderr, "%10s", "dir:" );
+		else if (S_ISCHR((sb.st_mode))) 
+			fprintf( stderr, "%10s", "char:" );
+		else if (S_ISBLK((sb.st_mode))) 
+			fprintf( stderr, "%10s", "block:" );
+		else if (S_ISFIFO((sb.st_mode))) 
+			fprintf( stderr, "%10s", "felse ifo:" );
+		else if (S_ISLNK((sb.st_mode))) 
+			fprintf( stderr, "%10s", "link:" );
+		else if (S_ISSOCK((sb.st_mode))) {
+			fprintf( stderr, "%10s", "socket:" );
+		}
+#endif
+}
+
+//Serve binary files
+
+
 //This is the single-threaded HTTP run function
 _Bool http_run ( Recvr *r, void *p, char *err ) 
 {
@@ -160,17 +184,49 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	req->mlen = r->recvd;
 
 	//This should receive the entire request
-	obprintf( stderr, "streaming request" );
 	if ( !http_get_remaining( h, r->request, r->recvd ) )
 		return http_err( h, 500, "Error processing request." );
+
+	//kind of need subhandlers, but for right now, I do this...
+
+	//Simplest way is to check for a folder in the root of the webdirectory
+	//For now, I assume the root is at examples. (perhaps a server root file can exist there...)
+	char *activeDir = NULL;
+	DIR *ds = NULL;
+	struct dirent *de;
+	const char *dirname = "example";
+	if ( !( ds = opendir( dirname ) ) ) 
+		return http_err( h, 500, "Couldn't access web root: %s.", strerror(errno) );
+
+	//fprintf( stderr, "Directory '%s' contains:\n", dirname );
+	while ((de = readdir( ds ))) {
+		//just use lstat
+		char *fd = strcmbd( "/", dirname, de->d_name );
+		if ( lstat( fd, &sb ) == -1 ) {
+			return http_err( h, 500, "Can't access directory %s: %s.", fd, strerror(errno));
+		}
+
+		//Check the name of the folder and see if the hostname matches
+		if (S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode))) {
+			if ( strcmp( de->d_name, h->hostname ) == 0 ) {
+				activeDir = fd;
+				break;
+			}	
+		}
+		free(fd);
+	}
+
+	//Default responses get handled here 
+	if ( !activeDir ) {
+		return http_err(h, 500, "No site matching hostname '%s' found.", h->hostname );
+	}
 
 	//Open Lua libraries.
 	luaL_openlibs( L );
 	lua_newtable( L );
-	//set_lua_functions( L, rg );
 
 	//Read the data file for whatever "site" is gonna be run.
-	char *file = "example/data.lua";
+	char *file = strcmbd( "/", activeDir, "data.lua" );
 
 	//Always waste some time looking for the file
 	if ( stat( file, &sb ) == -1 )
@@ -186,43 +242,36 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 	//lua_stackdump( L );
 	//lt_dump( &routes );
+	//return http_err(h,200,"yay");
 
 	//Clear the stack (TODO: come back and figure out why this is causing crashes)
 	lua_settop( L, 0 );
-#if 0
+
 	//Register each of the Lua functions (TODO: every time... not good for perf)
-	lua_newtable( L ); //Do these go in the global scope or not
+	//lua_newtable( L ); //Do these go in the global scope or not
+	char *fSetName = NULL;
 	while ( rg->sentinel != -1 )
 	{
 		//Set the top table
-		if ( rg->sentinel == 1 ) 
-		{
-			lua_settable( L, 1 );
-			lua_loop( L );
+		if ( rg->sentinel == 1 ) {
+			lua_setglobal( L, fSetName );
 		}
-
-		else if ( !rg->name && rg->setname )
-		{
-			obprintf( stderr, "Registering new table: %s\n", rg->setname );
-			lua_pushstring( L, rg->setname );
+		else if ( !rg->name && rg->setname ) {
+			fSetName = rg->setname;
 			lua_newtable( L );
-			lua_loop( L );
 		}
-
-		else if ( rg->name )
-		{	
-			obprintf( stderr, "Registering funct: %s\n", rg->name );
+		else if ( rg->name ) {
 			lua_pushstring( L, rg->name );
 			lua_pushcfunction( L, rg->func );
-	lua_stackdump( L ); getchar();
-			lua_settable( L, 3 );
+			lua_settable( L, 1 );
 		}
 		rg++;
 	}
 
-	lua_stackdump( L );
-return http_err( h, 200, "nothing is wrong at all..." );
-#endif
+	//lua_stackdump( L );
+	//if ( !lua_load_file( L, "example/fsets.lua", &err ) )
+	//	return http_err( h, 500, "Error running file: %s", err );	
+
 	//I wish there was a way to pass in a function that could control the look of this
 	//if ( 0 ) 
 	//	lt_dump( &routes );
@@ -253,7 +302,6 @@ return http_err( h, 200, "nothing is wrong at all..." );
 	 * - Do site lookup from hostname via headers 
 	 * ------------------ */
 	
-
 	//Parse the routes that come off of this file
 	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), h, &routes ) )
 		return http_err( h, 500, "Finding the model and view for the current route failed." );
@@ -264,7 +312,7 @@ return http_err( h, 200, "nothing is wrong at all..." );
 		//Load each model file (which is just running via Lua)
 		if ( l->type == CC_MODEL ) { 
 			//Somehow have to get the root directory of the site in question...
-			char *mfile = strcmbd( "/", "example/system", "models", l->content, "lua" );
+			char *mfile = strcmbd( "/", activeDir, "models", l->content, "lua" );
 			int mfilelen = strlen( mfile );
 			mfile[ mfilelen - 4 ] = '.';
 			fprintf( stderr, "%s\n", mfile );
@@ -312,7 +360,7 @@ return http_err( h, 200, "nothing is wrong at all..." );
 		//Load each view into a single buffer (can be malloc'd uint8 for now)
 		if ( l->type == CC_VIEW ) {
 			//Somehow have to get the root directory of the site in question...
-			char *vfile = strcmbd( "/", "example/system", "views", l->content, "html" );
+			char *vfile = strcmbd( "/", activeDir, "views", l->content, "html" );
 			int fd, bt = 0, vfilelen = strlen( vfile );
 			vfile[ vfilelen - 5 ] = '.';
 			fprintf( stderr, "%s\n", vfile );
@@ -507,7 +555,9 @@ Option opts[] =
 	{ "-k", "--kill",      "Kill a running server."                },
 
 #if 0
-	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
+	{ "-c", "--create",    "Create a new directory for hypno site.",'s' },	
+	{ "-l", "--list",      "List all hypno sites on the system.",'s' },	
+	//...
 	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
 	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },	
 	//I'm just thinking out loud here.

@@ -34,7 +34,11 @@ baby:
 
 # This is a test request to use with Curl or Wget	
 gohan:
-	wget -O /tmp/index.html http://localhost:$(PORT)/multi
+	wget -qO /tmp/index.html http://localhost:$(PORT)/multi
+
+# This is a test request using a hostname to test hypno's virtual hosting capability
+khan:
+	@test `grep -c khan.org /etc/hosts` -gt 0 && wget -qO /tmp/index.html http://khan.org:$(PORT)/multi || echo "khan.org not found in /etc/hosts.  Run 'make hosts' to add it and others."
 
 # This is a test request to use with Curl or Wget	
 gotenks:
