@@ -1,14 +1,20 @@
 ???
 ---
 
-- put main.c's MVC eval in one function (eval_route or something - it's the last test in Makefile) 
+- negotiate the system path from the hostname
 
+- handle binary data and static files
+
+- load model subtables as filenames
+
+- what would a bunch of automated tests look like?
+	http_run - test routes
+	http_run - test Lua functions (which need their own tests)
+	
 - write some basic dump functions to test HTTP run at different parts in the process (what does that mean?  stop at table_to_lua and examine results, stop at parse_route and examine results, etc.)
 
-- how do pictures and other binary data get served?  do they crash?
-
-
-
+- write (either from scratch or not) new directories that hypno can read
+	database should be setup somewhere in there... 
 
 
 today

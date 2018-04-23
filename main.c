@@ -2,20 +2,9 @@
 #include "vendor/nw.h"
 #include "vendor/http.h"
 #include "bridge.h"
+#include <dirent.h>
 
-
-#define PROG "luas"
-
-#ifndef LUA_53
- #define lua_rotate( a, b, c ) 
- #define lua_geti( a, b, c ) 
- #define lua_seti( a, b, c ) 
-#endif
-
-//For testing purposes, I'm going to include an EXAMPLE define that uses the 'example' folder.
-#define EXAMPLE_H
-
-//This should be an enum
+#define PROG "hypno"
 #define ERR_SRVFORK 20
 #define ERR_PIDFAIL 21
 #define ERR_PIDWRFL 22 
@@ -25,6 +14,29 @@
 #define SUC_PARENT  27
 #define SUC_CHILD   28
 
+//Testing: See specifically where certain functions are crapping out.
+//#define ERR_SUPERV
+
+//Testing: I'm going to include an EXAMPLE define that uses the 'example' folder.
+#define EXAMPLE_H
+
+//Testing: Option module is not so wonderful yet, so use this to test out things having to do with it.
+#define TESTOPTS_H
+
+#ifndef LUA_53
+ #define lua_rotate( a, b, c ) 
+ #define lua_geti( a, b, c ) 
+ #define lua_seti( a, b, c ) 
+#endif
+
+//This define controls whether or not line numbers will also be included in the error message.
+#ifdef ERR_SUPERV
+ #define ERRL(...) ( snprintf( err, 24, "[ @%s(), %d ]                 ", __FUNCTION__, __LINE__ ) ? 1 : 1 && ( err += 24 ) && snprintf( err, errlen - 24, __VA_ARGS__ ) ) ? 0 : 0
+#else
+ #define ERRL(...) snprintf( err, errlen, __VA_ARGS__ ) ? 0 : 0
+#endif
+
+
 //Define some headers here
 _Bool http_run (Recvr *r, void *p, char *e);
 
@@ -33,6 +45,7 @@ const char pidfile[] = "hypno.pid";
 
 //Error buffer
 char err[ 4096 ] = { 0 };
+const int errlen = 4096; 
 
 //This is nw's data structure for handling protocols 
 Executor runners[] = 
@@ -44,9 +57,6 @@ Executor runners[] =
 };
 
 
-#define XX() \
-	fprintf( stderr, "%s: %d\n", __FILE__, __LINE__ ); getchar()
-
 //Table of Lua functions
 typedef struct 
 {
@@ -56,7 +66,7 @@ typedef struct
 	int sentinel;
 } luaCF;
 
-int abc ( lua_State *L ) { return 0; } 
+int abc ( lua_State *L ) { fprintf( stderr, "chicken" ); return 0; } 
 
 luaCF lua_functions[] =
 {
@@ -122,6 +132,30 @@ int set_lua_functions ( lua_State *L, luaCF *rg )
 }
 
 
+//Serve a list of files
+void srvListOfFiles() {
+#if 0
+		if (S_ISREG((sb.st_mode))) 
+			fprintf( stderr, "%10s", "file:" );
+		else if (S_ISDIR((sb.st_mode)))
+			fprintf( stderr, "%10s", "dir:" );
+		else if (S_ISCHR((sb.st_mode))) 
+			fprintf( stderr, "%10s", "char:" );
+		else if (S_ISBLK((sb.st_mode))) 
+			fprintf( stderr, "%10s", "block:" );
+		else if (S_ISFIFO((sb.st_mode))) 
+			fprintf( stderr, "%10s", "felse ifo:" );
+		else if (S_ISLNK((sb.st_mode))) 
+			fprintf( stderr, "%10s", "link:" );
+		else if (S_ISSOCK((sb.st_mode))) {
+			fprintf( stderr, "%10s", "socket:" );
+		}
+#endif
+}
+
+//Serve binary files
+
+
 //This is the single-threaded HTTP run function
 _Bool http_run ( Recvr *r, void *p, char *err ) 
 {
@@ -150,17 +184,49 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	req->mlen = r->recvd;
 
 	//This should receive the entire request
-	obprintf( stderr, "streaming request" );
 	if ( !http_get_remaining( h, r->request, r->recvd ) )
 		return http_err( h, 500, "Error processing request." );
+
+	//kind of need subhandlers, but for right now, I do this...
+
+	//Simplest way is to check for a folder in the root of the webdirectory
+	//For now, I assume the root is at examples. (perhaps a server root file can exist there...)
+	char *activeDir = NULL;
+	DIR *ds = NULL;
+	struct dirent *de;
+	const char *dirname = "example";
+	if ( !( ds = opendir( dirname ) ) ) 
+		return http_err( h, 500, "Couldn't access web root: %s.", strerror(errno) );
+
+	//fprintf( stderr, "Directory '%s' contains:\n", dirname );
+	while ((de = readdir( ds ))) {
+		//just use lstat
+		char *fd = strcmbd( "/", dirname, de->d_name );
+		if ( lstat( fd, &sb ) == -1 ) {
+			return http_err( h, 500, "Can't access directory %s: %s.", fd, strerror(errno));
+		}
+
+		//Check the name of the folder and see if the hostname matches
+		if (S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode))) {
+			if ( strcmp( de->d_name, h->hostname ) == 0 ) {
+				activeDir = fd;
+				break;
+			}	
+		}
+		free(fd);
+	}
+
+	//Default responses get handled here 
+	if ( !activeDir ) {
+		return http_err(h, 500, "No site matching hostname '%s' found.", h->hostname );
+	}
 
 	//Open Lua libraries.
 	luaL_openlibs( L );
 	lua_newtable( L );
-	//set_lua_functions( L, rg );
 
 	//Read the data file for whatever "site" is gonna be run.
-	char *file = "example/data.lua";
+	char *file = strcmbd( "/", activeDir, "data.lua" );
 
 	//Always waste some time looking for the file
 	if ( stat( file, &sb ) == -1 )
@@ -174,11 +240,37 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) )
 		return http_err( h, 500, "Converting routes from file '%s' failed.", file );
 
-	lua_stackdump( L );
-	lt_dump( &routes );
+	//lua_stackdump( L );
+	//lt_dump( &routes );
+	//return http_err(h,200,"yay");
 
 	//Clear the stack (TODO: come back and figure out why this is causing crashes)
 	lua_settop( L, 0 );
+
+	//Register each of the Lua functions (TODO: every time... not good for perf)
+	//lua_newtable( L ); //Do these go in the global scope or not
+	char *fSetName = NULL;
+	while ( rg->sentinel != -1 )
+	{
+		//Set the top table
+		if ( rg->sentinel == 1 ) {
+			lua_setglobal( L, fSetName );
+		}
+		else if ( !rg->name && rg->setname ) {
+			fSetName = rg->setname;
+			lua_newtable( L );
+		}
+		else if ( rg->name ) {
+			lua_pushstring( L, rg->name );
+			lua_pushcfunction( L, rg->func );
+			lua_settable( L, 1 );
+		}
+		rg++;
+	}
+
+	//lua_stackdump( L );
+	//if ( !lua_load_file( L, "example/fsets.lua", &err ) )
+	//	return http_err( h, 500, "Error running file: %s", err );	
 
 	//I wish there was a way to pass in a function that could control the look of this
 	//if ( 0 ) 
@@ -210,7 +302,6 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	 * - Do site lookup from hostname via headers 
 	 * ------------------ */
 	
-
 	//Parse the routes that come off of this file
 	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), h, &routes ) )
 		return http_err( h, 500, "Finding the model and view for the current route failed." );
@@ -221,7 +312,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 		//Load each model file (which is just running via Lua)
 		if ( l->type == CC_MODEL ) { 
 			//Somehow have to get the root directory of the site in question...
-			char *mfile = strcmbd( "/", "example/system", "models", l->content, "lua" );
+			char *mfile = strcmbd( "/", activeDir, "models", l->content, "lua" );
 			int mfilelen = strlen( mfile );
 			mfile[ mfilelen - 4 ] = '.';
 			fprintf( stderr, "%s\n", mfile );
@@ -269,8 +360,8 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 		//Load each view into a single buffer (can be malloc'd uint8 for now)
 		if ( l->type == CC_VIEW ) {
 			//Somehow have to get the root directory of the site in question...
-			char *vfile = strcmbd( "/", "example/system", "views", l->content, "html" );
-			int fd, bt, vfilelen = strlen( vfile );
+			char *vfile = strcmbd( "/", activeDir, "views", l->content, "html" );
+			int fd, bt = 0, vfilelen = strlen( vfile );
 			vfile[ vfilelen - 5 ] = '.';
 			fprintf( stderr, "%s\n", vfile );
 
@@ -295,12 +386,16 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	Render R;
 	if ( !render_init( &R, &ll ) )
 		return http_err( h, 500, "Couldn't initialize rendering engine." );
+
 	if ( !render_map( &R, (uint8_t *)rb, strlen( (char *)rb ) ) )
 		return http_err( h, 500, "Couldn't set up render mapping." );
+
 	if ( 1 )
 		0;//render_dump_mark( &R );
+
 	if ( !render_render( &R ) )	
 		return http_err( h, 500, "Failed to carry out templating on buffer." );
+
 	http_set_status( h, 200 );
 	http_set_content( h, "text/html", ( uint8_t * )
 		bf_data(render_rendered(&R)), bf_written(render_rendered(&R)) );
@@ -449,24 +544,115 @@ int lua_http_handler (HTTP *h, Table *p)
 
 	render_free( &R );
 	lt_free( &t );
+	return 1;
+}
+
+
+//Options
+Option opts[] = 
+{
+	{ "-s", "--start"    , "Start a server."                                },
+	{ "-k", "--kill",      "Kill a running server."                },
+
+#if 0
+	{ "-c", "--create",    "Create a new directory for hypno site.",'s' },	
+	{ "-l", "--list",      "List all hypno sites on the system.",'s' },	
+	//...
+	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
+	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },	
+	//I'm just thinking out loud here.
+	{ "-u", "--user",      "Choose who to run as.",'s' },
+	{ "-m", "--mode",      "Choose how server should evaluate hostnames.",'s' },
+	{ NULL, "--chroot-dir","Choose a directory to change root to.",     's' },
+#endif
+	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
+	{ "-m", "--max-conn",  "How many connections to enable at a time.", 'n' },
+	{ "-n", "--no-daemon", "Do not daemonize the server when starting."  },
+	{ "-p", "--port"    ,  "Choose port to start server on."          , 'n' },
+
+	{ .sentinel = 1 }
+};
+
+
+//Kill the server
+int kill_cmd( Option *opts, char *err ) 
+{
+#ifdef WIN32
+ #error "Kill (as written here anyway) does not work on Windows."
+#endif
+	pid_t pid;
+	int fd, len;
+	struct stat sb;
+	char buf[64] = {0};
+
+	//For right now, we can just naively assume that the server has not started yet.
+	if ( stat(pidfile, &sb) == -1 )	
+		return ERRL( "Could not locate server process: %s", strerror(errno)  );
+	
+	//Make sure size isn't bigger than buffer
+	if ( sb.st_size >= sizeof(buf) )
+		return ERRL( "Error initializing process id."  );
+ 
+	//Get the pid otherwise
+	if ((fd = open( pidfile, O_RDONLY )) == -1 || (len = read( fd, buf, sb.st_size )) == -1) { 
+		close( fd );
+		return ERRL( "Cannot access my PID file; %s", strerror(errno)  );
+	}
+
+	//More checking...
+	close( fd );
+	for (int i=0; i<len; i++) {
+		if ( !isdigit(buf[i]) ) {
+			return ERRL( "PID is not a number."  );
+		}
+	}
+
+	//Close the process
+	pid = atoi( buf );
+	if ( kill(pid, SIGTERM) == -1 )
+		return ERRL( "Failed to kill server process: %s", strerror( errno )  );
 
 	return 1;
 }
 
 
-//Starts up a new server
-/*
-int startServer ( int port, int connLimit, int daemonize )
-
-Returns a few different status depending on what happened:
-ERR_SRVFORK - Failed to daemonize
-ERR_PIDFAIL - Failed to open PID file, fatal b/c a zombie would exist
-ERR_PIDWRFL - Failed to write to PID file, fatal b/c a zombie would exist 
-SUC_PARENT  - Parent successfully started a daemon
-SUC_CHILD   - Child successfully exited the function 
- */
-int startServer ( int port, int connLimit, int daemonize )
+//Load a different data.lua file from main()
+int file_cmd( Option *opts, char *err ) 
 {
+	lua_State *L = NULL;  
+	char *f = opt_get( opts, "--file" ).s;
+	struct stat sb;
+	Table t;
+
+	if (!( L = luaL_newstate() ))
+		return ERRL( "L is not initialized..."  );
+
+	if ( stat( f, &sb ) == -1 )
+		return ERRL( "File %s inaccessbile. %s", f, strerror( errno ) );
+	
+	if ( !lt_init( &t, NULL, 127 ) ) 
+		return ERRL( "Couldn't initialize table for file reading."  );
+
+	if ( !lua_load_file( L, f, &err ) )
+		return ERRL( "Couldn't run file %s.  Error: %s", f, err  );
+
+	lua_to_table( L, 1, &t );
+	lt_dump( &t );
+	return 1;
+}
+
+
+//Start the server from main()
+int start_cmd( Option *opts, char *err ) 
+{
+	int stat, conn, port, daemonize;
+	daemonize = !opt_set(opts, "--no-daemon");
+	!(conn = opt_get(opts, "--max-conn").n) ? conn = 1000 : 0;
+	!(port = opt_get(opts, "--port").n) ? port = 2000 : 0; 
+	fprintf( stderr, "starting server on %d\n", port );
+	//stat   = startServer( port, conn, daemonize ); 
+
+	//I start a loop above, so... how to handle that when I need to jump out of it?
 	//Define stuff
 	Socket    sock = { 1/*Start a server*/, "localhost", "tcp", .port = port };
 	Selector  sel  = {
@@ -486,156 +672,47 @@ int startServer ( int port, int connLimit, int daemonize )
 	if ( daemonize )
 	{
 		pid_t pid = fork();
-		if ( pid == -1 )
-			return ERR_SRVFORK;//(fprintf(stderr, "Failed to daemonize.\n") ? 1 : 1);
+		if ( pid == -1 ) {
+			return ERRL( "Failed to daemonize server process: %s", strerror(errno) );
+		}
 		else if ( pid ) {
 			int len, fd = 0;
 			char buf[64] = { 0 };
 
 			if ( (fd = open( pidfile, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR )) == -1 )
-				return ERR_PIDFAIL;//(fprintf( stderr, "pid logging failed...\n" ) ? 1 : 1);
+				return ERRL( "Failed to access PID file: %s.", strerror(errno));
 
 			len = snprintf( buf, 63, "%d", pid );
 
 			//Write the pid down
 			if (write( fd, buf, len ) == -1)
-				return ERR_PIDWRFL;//(fprintf( stderr, "open of file failed miserably...\n" ) ? 1 : 1);
+				return ERRL( "Failed to log PID: %s.", strerror(errno));
 		
 			//The parent exited successfully.
-			close(fd);
+			if ( close(fd) == -1 )
+				return ERRL( "Could not close parent socket: %s", strerror(errno));
 			return SUC_PARENT;
 		}
 	}
 
 	//Open the socket
 	if ( !socket_open(&sock) || !socket_bind(&sock) || !socket_listen(&sock) )
-		return ERR_SSOCKET;//(fprintf(stderr, "Socket init error.\n") ? 1 : 1);
+		return ERRL("Failed to initialize a socket for port %d", port );
 
 	//Initialize details for a non-blocking server loop
 	if ( !initialize_selector(&sel, &sock) ) //&l, local_index))
-		return ERR_INITCON;//nw_err(0, "Selector init error.\n"); 
+		return ERRL("Failed to initialize server settings" );
 
 	//Dump some data
 	obprintf(stderr, "Listening at %s:%d\n", sock.hostname, sock.port);
 
 	//Start the non-blocking server loop
 	if ( !activate_selector(&sel) )
-		return ERR_SKLOOPS;//(fprintf(stderr, "Something went wrong inside the select loop.\n") ? 1 : 1);
+		return ERRL("Failure to properly initialize server select loop" );
 	
 	//Clean up and tear down.
 	free_selector(&sel);
-	obprintf(stderr, "HTTP server done...\n");
-	return SUC_CHILD;
-}
-
-
-//Kills a currently running server
-int killServer () 
-{
-#ifdef WIN32
- #error "Kill is not gonna work here, son... Sorry to burst yer bublet."
-#endif
-	pid_t pid;
-	int fd, len;
-	struct stat sb;
-	char buf[64] = {0};
-
-	//For right now, we can just naively assume that the server has not started yet.
-	if ( stat(pidfile, &sb) == -1 )	
-		return (fprintf( stderr, "No process running...\n" )? 1 : 1);	
-	
-	//Make sure size isn't bigger than buffer
-	if ( sb.st_size >= sizeof(buf) )
-		return ( fprintf( stderr, "pid initialization error..." ) ? 1 : 1 );
- 
-	//Get the pid otherwise
-	if ((fd = open( pidfile, O_RDONLY )) == -1 || (len = read( fd, buf, sb.st_size )) == -1) 
-	{
-		close( fd );
-		fprintf( stderr, "pid find error..." );
-		return 1;
-	}
-
-	//More checking...
-	close( fd );
-	for (int i=0; i<len; i++) {
-		if ( !isdigit(buf[i]) )  {
-			fprintf( stderr, "pid is not really a number..." );
-			return 1;
-		}
-	}
-
-	//Close the process
-	pid = atoi( buf );
-	fprintf( stderr, "attempting to kill server process...\n");
-
-	if ( kill(pid, SIGTERM) == -1 )
-		return (fprintf(stderr, "Failed to kill proc\n") ? 1 : 1);	
-
-	fprintf( stderr, "server dead...\n");
-	return 0;
-}
-
-
-//Options
-Option opts[] = 
-{
-	{ "-s", "--start"    , "Start a server."                                },
-	{ "-k", "--kill",      "Kill a running server."                },
-
-	{ NULL, "--chroot-dir","Choose a directory to change root to.",     's' },
-	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },
-	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
-	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
-	{ "-m", "--max-conn",  "How many connections to enable at a time.", 'n' },
-	{ "-n", "--no-daemon", "Do not daemonize the server when starting."  },
-	{ "-p", "--port"    ,  "Choose port to start server on."          , 'n' },
-
-	{ .sentinel = 1 }
-};
-
-
-//Run killServer() from main()
-int kill_cmd( Option *opts, char *err ) 
-{
-	killServer();
-	return 1;
-}
-
-
-//Load a different data.lua file from main()
-int file_cmd( Option *opts, char *err ) 
-{
-	lua_State *L = NULL;  
-	char *f = opt_get( opts, "--file" ).s;
-	Table t;
-
-	if (!( L = luaL_newstate() ))
-	{
-		fprintf( stderr, "L is not initialized...\n" );
-		return 0;
-	}
-	
-	lt_init( &t, NULL, 127 );
-	lua_load_file( L, f, &err );	
-	lua_to_table( L, 1, &t );
-	lt_dump( &t );
-	return 1;
-}
-
-
-//Start the server from main()
-int start_cmd( Option *opts, char *err ) 
-{
-	int stat, conn, port, daemonize;
-	daemonize = !opt_set(opts, "--no-daemon");
-	!(conn = opt_get(opts, "--max-conn").n) ? conn = 1000 : 0;
-	!(port = opt_get(opts, "--port").n) ? port = 2000 : 0; 
-	fprintf( stderr, "starting server on %d\n", port );
-	stat   = startServer( port, conn, daemonize ); 
-
-	//I start a loop above, so... how to handle that when I need to jump out of it?
-	return 1;
+	return 1; //SUC_CHILD
 }
 
 
@@ -661,46 +738,16 @@ int main (int argc, char *argv[])
 	//Evaluate all main stuff by looping through the above structure.
 	struct Cmd *cmd = Cmds;	
 	while ( cmd->cmd ) {
-		fprintf( stderr, "Got option: %s\n", cmd->cmd );
-		if ( opt_set( opts, cmd->cmd ) ) {
-			if ( !cmd->exec( opts, err ) ) {
-				fprintf( stderr, "hypno: %s\n", err );
-				return 1;
-			}
+	#ifdef TESTOPTS_H
+		fprintf( stderr, "Got option: %s? %s\n", cmd->cmd, opt_set(opts, cmd->cmd ) ? "YES" : "NO" );
+	#endif
+		if ( opt_set(opts, cmd->cmd ) && !cmd->exec( opts, err ) ) {
+			fprintf( stderr, PROG ": %s\n", err );
+			return 1;
 		}
 		cmd++;
 	}
 
-#if 0
-	//
-	if ( opt_set(opts, "--file") )
-	{
-		lua_State *L = NULL;  
-		char *f = opt_get( opts, "--file" ).s;
-		Table t;
-
-		if (!( L = luaL_newstate() ))
-		{
-			fprintf( stderr, "L is not initialized...\n" );
-			return 0;
-		}
-		
-		lt_init( &t, NULL, 127 );
-		lua_load_file( L, f, &err );	
-		lua_to_table( L, 1, &t );
-		lt_dump( &t );
-	}	
-
-	//Start a server (and possibly fork it)
-	if ( opt_set(opts, "--start") ) 
-	{
-		int stat, conn, port, daemonize;
-		daemonize = !opt_set(opts, "--no-daemon");
-		!(conn = opt_get(opts, "--max-conn").n) ? conn = 1000 : 0;
-		!(port = opt_get(opts, "--port").n) ? port = 2000 : 0; 
-		stat   = startServer( port, conn, daemonize ); 
-	}
-#endif
 	return 0;
 }
 
