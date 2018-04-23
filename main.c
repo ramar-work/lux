@@ -14,6 +14,12 @@
 #define SUC_PARENT  27
 #define SUC_CHILD   28
 
+//Skip adding Lua functions
+//#define DONT_ADD_LUA_FUNCTIONS_H
+
+//Skip adding ENV to Lua space
+//#define DONT_ADD_HTTP_TO_LUA_H
+
 //Testing: See specifically where certain functions are crapping out.
 //#define ERR_SUPERV
 
@@ -31,11 +37,15 @@
 
 //This define controls whether or not line numbers will also be included in the error message.
 #ifdef ERR_SUPERV
- #define ERRL(...) ( snprintf( err, 24, "[ @%s(), %d ]                 ", __FUNCTION__, __LINE__ ) ? 1 : 1 && ( err += 24 ) && snprintf( err, errlen - 24, __VA_ARGS__ ) ) ? 0 : 0
+ #define ERRL(...) \
+	( snprintf( err, 24, "[ @%s(), %d ]                 ", __FUNCTION__, __LINE__ ) ? 1 : 1 \
+	&& ( err += 24 ) && snprintf( err, errlen - 24, __VA_ARGS__ ) ) ? 0 : 0
 #else
  #define ERRL(...) snprintf( err, errlen, __VA_ARGS__ ) ? 0 : 0
 #endif
 
+//This define should be a bit easier to use than fully calling http_err
+#define ERRH(...) http_err( r, h, 500, __VA_ARGS__ ) 
 
 //Define some headers here
 _Bool http_run (Recvr *r, void *p, char *e);
@@ -97,41 +107,6 @@ luaCF lua_functions[] =
 };
 
 
-//Set Lua functions
-int set_lua_functions ( lua_State *L, luaCF *rg )
-{
-	//Loop through and add each UDF
-	while ( rg->sentinel != -1 )
-	{
-		//Set the top table
-		if ( rg->sentinel == 1 ) 
-		{
-			lua_settable( L, 1 );
-			lua_loop( L );
-		}
-
-		else if ( !rg->name && rg->setname )
-		{
-			obprintf( stderr, "Registering new table: %s\n", rg->setname );
-			lua_pushstring( L, rg->setname );
-			lua_newtable( L );
-			lua_loop( L );
-		}
-
-		else if ( rg->name )
-		{	
-			obprintf( stderr, "Registering funct: %s\n", rg->name );
-			lua_pushstring( L, rg->name );
-			lua_pushcfunction( L, rg->func );
-			lua_settable( L, 3 );
-		}
-		rg++;
-	}
-
-	return 1;
-}
-
-
 //Serve a list of files
 void srvListOfFiles() {
 #if 0
@@ -153,12 +128,46 @@ void srvListOfFiles() {
 #endif
 }
 
+
 //Serve binary files
+void srvBinaryFiles() {
+	
+}
 
 
 //This is the single-threaded HTTP run function
 _Bool http_run ( Recvr *r, void *p, char *err ) 
-{
+{ 
+	HTTP *h = (HTTP *)r->userdata;
+  #if 0 
+	//Static response, with no help from the server.
+	const char resp[] = 
+		"HTTP/2.0 200 OK\r\n"
+		"Content-Type: text/html\r\n"
+		"Content-Length: 23\r\n\r\n"
+		"<h2>Hello, world!</h2>\n";
+	http_set_status( h, 200 );
+	http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
+	#endif
+
+	#if 0
+	//Static response leaning on the server
+	const char resp[] = 
+		"<h2>Hello, world!</h2>\n";
+	http_set_status( h, 200 );
+	http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
+	http_pack_response( h );
+  #endif
+
+	#if 0
+	//Binary data using server stuff
+	#include "tests/why_tif.c"
+	http_set_status( h, 200 );
+	http_set_content( h, "image/tiff", ( uint8_t * )why_tif, why_tif_len );
+	http_pack_response( h );
+	#endif
+
+	#if 1
 	//This is a hell of a lot of data.
 	Table  routes
 				,request
@@ -167,7 +176,6 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	Loader ld[ 10 ];
 	char *ptr = NULL;
 	char buf[ 1024 ] = { 0 };
-	HTTP *h = (HTTP *)r->userdata;
 	HTTP_Request *req = &h->request;
 	lua_State *L  = luaL_newstate(); 
 	luaCF     *rg = lua_functions;
@@ -175,7 +183,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 	//Check that Lua initialized here
 	if ( !L )
-		return http_err( h, 500, "Failed to create new Lua state?" );
+		return ERRH("Failed to create new Lua state?" );
 
 	//Set up the "loader" structure
 	memset( ld, 0, sizeof( Loader ) * 10 );
@@ -185,25 +193,23 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 	//This should receive the entire request
 	if ( !http_get_remaining( h, r->request, r->recvd ) )
-		return http_err( h, 500, "Error processing request." );
+		return ERRH("Error processing request." );
 
-	//kind of need subhandlers, but for right now, I do this...
-
-	//Simplest way is to check for a folder in the root of the webdirectory
-	//For now, I assume the root is at examples. (perhaps a server root file can exist there...)
+	//For now, I assume the root is at 'example'.
 	char *activeDir = NULL;
 	DIR *ds = NULL;
 	struct dirent *de;
 	const char *dirname = "example";
-	if ( !( ds = opendir( dirname ) ) ) 
-		return http_err( h, 500, "Couldn't access web root: %s.", strerror(errno) );
+
+	if ( !( ds = opendir( dirname ) ) )
+		return ERRH("Couldn't access web root: %s.", strerror(errno) );
 
 	//fprintf( stderr, "Directory '%s' contains:\n", dirname );
 	while ((de = readdir( ds ))) {
 		//just use lstat
 		char *fd = strcmbd( "/", dirname, de->d_name );
 		if ( lstat( fd, &sb ) == -1 ) {
-			return http_err( h, 500, "Can't access directory %s: %s.", fd, strerror(errno));
+			return ERRH("Can't access directory %s: %s.", fd, strerror(errno));
 		}
 
 		//Check the name of the folder and see if the hostname matches
@@ -218,7 +224,12 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 	//Default responses get handled here 
 	if ( !activeDir ) {
-		return http_err(h, 500, "No site matching hostname '%s' found.", h->hostname );
+		return http_err( r,h, 500, "No site matching hostname '%s' found.", h->hostname );
+	}
+
+	//If the client is asking for 'favicon.ico', just stop and die...
+	if ( strcmp( h->request.path, "/favicon.ico" ) == 0 ) {
+		return http_err( r, h, 200, "Favicons aren't handled yet, sorry..." );
 	}
 
 	//Open Lua libraries.
@@ -229,26 +240,35 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	char *file = strcmbd( "/", activeDir, "data.lua" );
 
 	//Always waste some time looking for the file
-	if ( stat( file, &sb ) == -1 )
-		return http_err( h, 500, "Couldn't find file containing site data: %s.", file );
+	if ( stat( file, &sb ) == -1 ) {
+		lua_settop( L, 0 );	
+		return ERRH("Couldn't find file containing site data: %s.", file );
+	}
 
 	//Load the route file.
-	if ( !lua_load_file( L, file, &err ) ) 
-		return http_err( h, 500, "Loading routes failed at file '%s': %s", file, err );
+	if ( !lua_load_file( L, file, &err ) ) {
+		lua_settop( L, 0 );	
+		return ERRH("Loading routes failed at file '%s': %s", file, err );
+	}
 
 	//Convert this to an actual table so C can work with it...
-	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) )
-		return http_err( h, 500, "Converting routes from file '%s' failed.", file );
+	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) ) {
+		lua_settop( L, 0 );	
+		return ERRH("Converting routes from file '%s' failed.", file );
+	}
 
-	//lua_stackdump( L );
-	//lt_dump( &routes );
-	//return http_err(h,200,"yay");
-
-	//Clear the stack (TODO: come back and figure out why this is causing crashes)
+	//Add HTTP to the global space.
+	#ifndef DONT_ADD_HTTP_TO_LUA_H
+	//lt_dump( &h->request.table );
 	lua_settop( L, 0 );
+	lua_newtable( L );
+	table_to_lua( L, 1, &h->request.table );
+	lua_setglobal( L, "env" ); /*This needs to be readonly*/
+	#endif
 
 	//Register each of the Lua functions (TODO: every time... not good for perf)
-	//lua_newtable( L ); //Do these go in the global scope or not
+	#ifndef DONT_ADD_LUA_FUNCTIONS_H
+	lua_settop( L, 0 );
 	char *fSetName = NULL;
 	while ( rg->sentinel != -1 )
 	{
@@ -267,47 +287,26 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 		}
 		rg++;
 	}
+	#endif
 
-	//lua_stackdump( L );
-	//if ( !lua_load_file( L, "example/fsets.lua", &err ) )
-	//	return http_err( h, 500, "Error running file: %s", err );	
-
-	//I wish there was a way to pass in a function that could control the look of this
-	//if ( 0 ) 
-	//	lt_dump( &routes );
-	//	lt_dump( &h->request.table );
-
-	/* ------------------
-	 * TODO:
-	 * 
-	 *
-	 * For right now, let's just hardcode these "debugging" backends.
-	 * '/routes' (or 'debug/routes')
-	 * '/request'
-	 * '/luaf'
-	 * anything else...
-	 * after this function runs, I should have a structure that I cn loop through that will let me load each seperate thing.
-	 *
-	 * - Program 'default' route if not already done 
-	 *		(and if it's not defined, it's either an error or I'll have a default page hardcoded in)
-	 * - Move all the declarations back to the top (optionally, put them in a single structure to make life easy)
-	 * - Determine where the webroot of the current site is located
-	 *		(in order to get the paths of both models and views and etc)
-	 * - Add files as key names when including model files
-	 * - Consider execution of the entire process via a fork
-	 * - Write handlers for built-in endpoints (I always need this and it's something I can offer)
-	 *		(thinking of routes, log, execution (how do models work, which files are included)
-	 * - Don't forget to register custom Lua functions
-   * - Can the entire environment be transferred to Lua space?  ( I'm thinking of http/cgi )
-	 * - Do site lookup from hostname via headers 
-	 * ------------------ */
-	
 	//Parse the routes that come off of this file
+	Loader *l = NULL;
 	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), h, &routes ) )
-		return http_err( h, 500, "Finding the model and view for the current route failed." );
+		return ERRH("Finding the model and view for the current route failed." );
 
 	//Now, the fun part... it's all one function.
-	Loader *l = ld;
+	lt_dump( &routes );
+	l = &ld[0];
+	fprintf( stderr, "all elements in Loader\n" );
+	while ( l->content ) {
+		fprintf( stderr, "%d: %s\n", l->type, l->content );
+		l++;
+	}
+
+
+	l = &ld[0];
+	lua_settop( L, 0 );
+	//fprintf( stderr, "before model eval:\n" ); lua_stackdump( L ); getchar();
 	while ( l->content ) {
 		//Load each model file (which is just running via Lua)
 		if ( l->type == CC_MODEL ) { 
@@ -315,42 +314,73 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 			char *mfile = strcmbd( "/", activeDir, "models", l->content, "lua" );
 			int mfilelen = strlen( mfile );
 			mfile[ mfilelen - 4 ] = '.';
-			fprintf( stderr, "%s\n", mfile );
+			fprintf( stderr, "Attempting to load: %s\n", mfile );
 
-			if ( stat( mfile, &sb ) == -1 )
-				return http_err( h, 500, "Couldn't find model file: %s.", mfile );
-
-			if ( !lua_load_file( L, mfile, &err ) ) {
-				return http_err( h, 500, "Could not load Lua document at %s.  Error message: %s\n", mfile, err );
+			if ( stat( mfile, &sb ) == -1 ) {
+				lua_settop( L, 0 );
+				return ERRH("Couldn't find model file: %s.", mfile );
 			}
+
+		#if 0
+			if ( luaL_dofile( L, mfile ) )
+			{
+				fprintf( stderr, "Err occurred: %s\n", lua_tostring(L, -1));
+				char *msg = strdup( lua_tostring(L, -1) );
+				lua_settop( L, 0 );
+				return ERRH("Could not load Lua document at %s. Error message: %s\n", mfile, msg );
+			}
+		#else
+			char *mbuf = malloc( sb.st_size );
+			int fdh=0;
+			int status = 0;
+			if ( (fdh=open( mfile, O_RDONLY )) == -1 ) {
+				return ERRH("Couldn't open model file: %s.", mfile );
+			}
+
+			if ( read( fdh, mbuf, sb.st_size ) == -1 ) {
+				return ERRH("Couldn't read model file: %s.", mfile );
+			}
+
+			if ((status = luaL_loadstring( L, mbuf )) != LUA_OK ) {
+				if ( status == LUA_ERRSYNTAX ) 
+					return ERRH("Lua syntax error in model file: %s.", mfile );
+				else if ( status == LUA_ERRMEM ) 
+					return ERRH("Lua memory allocation error when loading model file: %s.", mfile );
+				else if ( status == LUA_ERRGCMM ) {
+					return ERRH("Lua GC error when loading file: %s.", mfile );
+				}
+			}
+
+			return ERRH("hi");
+		#endif
 		}
 
 		//Next
 		l++;
 	}
 
+	//fprintf( stderr, "after model eval:\n" ); lua_stackdump( L ); getchar();
+
 	//This is a working solution.  Still gotta figure out the reason for that crash...
-	//lua_stackdump( L );
 	lua_aggregate( L ); //1
 	lua_pushstring(L,"model"); //2
 	lua_pushvalue(L,1); //3
 	lua_newtable(L); //4
 	lua_replace(L,1); //3
 	lua_settable(L,1); //1
-	//lua_stackdump( L );	
 	
 	//There is a thing called model now.
 	Table ll;
 	lt_init( &ll, NULL, 127 );	
 	if ( !lua_to_table( L, 1, &ll ) ) {
-		return http_err( h, 500, "Couldn't turn aggregate table into a C table.\n" );
+		return ERRH("Couldn't turn aggregate table into a C table.\n" );
 	}
 	lt_dump( &ll );
 
 	//Make a new "render buffer"
 	uint8_t *rb = malloc( 30000 );
 	if ( !rb || !memset( rb, 0, 30000 ) ) {
-		return http_err( h, 500, "Couldn't allocate enough space for a render buffer.\n" );
+		return ERRH("Couldn't allocate enough space for a render buffer.\n" );
 	}	
 
 	//Rewind Loader ptr and load each view's raw text
@@ -366,13 +396,13 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 			fprintf( stderr, "%s\n", vfile );
 
 			if ( stat( vfile, &sb ) == -1 )
-				return http_err( h, 500, "Couldn't find view file: %s. Error: %s", vfile, strerror( errno ) );
+				return ERRH("Couldn't find view file: %s. Error: %s", vfile, strerror( errno ) );
 			
 			if ( (fd = open( vfile, O_RDONLY )) == -1 )
-				return http_err( h, 500, "Couldn't open view file: %s. Error: %s", vfile, strerror( errno ) );
+				return ERRH("Couldn't open view file: %s. Error: %s", vfile, strerror( errno ) );
 			
 			if ( (bt += read(fd, &rb[buflen], sb.st_size )) == -1 )
-				return http_err( h, 500, "Couldn't read view file into buffer: %s.  Error: %s", vfile, strerror( errno ) );
+				return ERRH("Couldn't read view file into buffer: %s.  Error: %s", vfile, strerror( errno ) );
 			
 			buflen += bt;
 		}
@@ -385,34 +415,26 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	//Render based on the last table that was converted
 	Render R;
 	if ( !render_init( &R, &ll ) )
-		return http_err( h, 500, "Couldn't initialize rendering engine." );
+		return ERRH("Couldn't initialize rendering engine." );
 
 	if ( !render_map( &R, (uint8_t *)rb, strlen( (char *)rb ) ) )
-		return http_err( h, 500, "Couldn't set up render mapping." );
+		return ERRH("Couldn't set up render mapping." );
 
 	if ( 1 )
 		0;//render_dump_mark( &R );
 
 	if ( !render_render( &R ) )	
-		return http_err( h, 500, "Failed to carry out templating on buffer." );
+		return ERRH("Failed to carry out templating on buffer." );
 
+	//Prepare the actual reponse
 	http_set_status( h, 200 );
 	http_set_content( h, "text/html", ( uint8_t * )
 		bf_data(render_rendered(&R)), bf_written(render_rendered(&R)) );
+	http_pack_response( h );
 
 	//Free the buffer
 	free( rb );
-
- #if 0
-	//Here's a response just because.	
-	const char resp[] = 
-		"HTTP/2.0 200 OK\r\n"
-		"Content-Type: text/html\r\n"
-		"Content-Length: 23\r\n\r\n"
-		"<h2>Hello, world!</h2>\n";
-	http_set_status( h, 200 );
-	http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
- #endif
+	#endif
 
 	//This has to be set if you don't fail...
 	//http_print_response( h );

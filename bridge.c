@@ -343,23 +343,19 @@ void lua_tdump (lua_State *L)
 
 
 //Parse the current route according to what was in the table.
-//Loader *parse_route ( Loader *l, int lsize, Table *httpTable, Table *routeTable )
 Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
 {
 	//Define and declare
 	Loader *LL = l;
 	Table *http_r = &http->request.table;
-	char us[ 1024 ] = { 0 };
+	char us[ 1024 ] = { 0 }, *fullRoute = NULL;
 	int szof_us = sizeof( us );
 	int b     = 0;
 	int count = 0; 
-
-	//Find the index of the URL key in HTTP 
-	int ind   = lt_get_long_i( http_r, (uint8_t *)"URL", 3 );
-	fprintf( stderr, "URL at: %d\n", ind );
+	int url_ind   = lt_get_long_i( http_r, (uint8_t *)"URL", 3 );
 
 	//This should be checked out of this function
-	while ( lt_rettype( http_r, 0, ind++ ) != LITE_TRM )
+	while ( lt_rettype( http_r, 0, url_ind++ ) != LITE_TRM )
 		count++;
 
 	//Fail if this happens, b/c the URL wasn't done right
@@ -367,119 +363,52 @@ Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
 		return err( NULL, "URL doesn't exist." );
 
 	//Reset count and set index to the top of the URL chain
-	ind -= count;	
-#if 0
-	fprintf( stderr, "indexof lt_get_long_i is at %d\n", ind );	
-	fprintf( stderr, "element count is %d\n", count );	
-	fprintf( stderr, "ind is %d\n", ind );
-#endif
+	url_ind -= count;	
 
-#if 1
-	//Now this loops through HTTP structure
-	lt_dump( http_r );
-	http_print_request( http );
-	//lt_dump( routeTable );
-#endif
-
-
-	//Guess this was written at some other time...
-	//Each one of these things is just a route... pretty easy for the most part...
-
-	// TODO:
-	// '/' always resolves to default, just makes sense...
-	// '/[a-zA-Z*]' always resolves to the domain
-	// combining once and just changing '/' to '.' should resolve much faster...
-	// no support for regexp yet...
-
-	// TODO some more:
-	// Combine the URL
-	char *fullRoute = NULL;
-	fprintf (stderr, "Path: %s\n", http->request.path );
-	fprintf (stderr, "Path: %d\n", (int)strlen( http->request.path ));
-
-	//Root domain check...
-	if ( (int)strlen( http->request.path ) == 1 && strcmp( http->request.path, "/" ) == 0 ) {
-		fprintf (stderr, "Path requested is root.\n" );
+	// TODO:'/' should always resolve to default
+	// TODO: add regexp support...
+	if ( (int)strlen( http->request.path ) == 1 && strcmp( http->request.path, "/" ) == 0 )
 		fullRoute = "routes.default";
-	}
-	//Do other domain-y things...
 	else {
-		fprintf (stderr, "Path requested is %s.\n", http->request.path );
 		fullRoute = strcmbd( "/", "routes", &http->request.path[1] );
-		for ( int i=0; i<strlen(fullRoute);i++ ) {
+		for ( int i=0; i<strlen(fullRoute); i++ ) {
 			( fullRoute[i] == '/' ) ? fullRoute[i] = '.' : 0;
 		}
 	}
 
-
 	//Now check the hash against the thing and loop through shit...
-	char 
-		*modelTag = strcmbd( ".", fullRoute, "model" ),
+	char *modelTag = strcmbd( ".", fullRoute, "model" ),
 		*viewTag = strcmbd( ".", fullRoute, "view" );
 
-	int 
-		mh = lt_get_long_i( routeTable, (uint8_t *)modelTag, strlen(modelTag) ),
+	int mh = lt_get_long_i( routeTable, (uint8_t *)modelTag, strlen(modelTag) ),
 		vh = lt_get_long_i( routeTable, (uint8_t *)viewTag, strlen(viewTag) );
 
-#if 0
-	fprintf( stderr, "%s\n", modelTag );
-	fprintf( stderr, "%s\n", viewTag );
-
-	fprintf( stderr, "mt hash: %d\n", mh );
-	fprintf( stderr, "vt hash: %d\n", vh );
-#endif
-
 	//Loop through until you get a terminator, means you're at the end...
-	for ( int i=mh + 1; ; i++ ) {
-		char *lt_char = NULL;
-		int lt_type =	lt_valuetypeat( routeTable, i );
-
-		// Stop at nul or term
-		if ( lt_type == LITE_NUL || lt_type == LITE_TRM ) {
-			break;
+	int h[2]={mh, vh};
+	for ( int ih=0; ih<2; ih++ ) {
+		if ( lt_valuetypeat( routeTable, h[ ih ] ) != LITE_TBL ) {
+			LL->type = (!ih) ? CC_MODEL : CC_VIEW;
+			LL->content = strdup( lt_text_at( routeTable, h[ ih ] )) ;
+			LL++ ;
 		}
+		else {
+			for ( int i=h[ ih ] + 1; ; i++ ) {
+				char *lt_char = NULL;
+				int lt_type =	lt_valuetypeat( routeTable, i );
 
-		//TODO: If this manages to be null or zero-length, it's probably a bug...
-		if ( !(lt_char =	lt_text_at( routeTable, i )) ) {
-			break;
+				// Stop at nul or term
+				if ( lt_type == LITE_NUL || lt_type == LITE_TRM || !(lt_char =	lt_text_at( routeTable, i )) )
+					break;
+
+				//LL is either accessed wrong or not init'd.
+				LL->type = CC_MODEL;
+				LL->content = strdup( lt_char );
+				LL++ ;
+			}
 		}
-
-		//LL is either accessed wrong or not init'd.
-		LL->type = CC_MODEL;
-	  LL->content = strdup( lt_char );
-	  LL++ ;
 	}
-
-	//Loop through until you get a terminator, means you're at the end...
-	for ( int i=vh + 1; ; i++ ) {
-		char *lt_char = NULL;
-		int lt_type =	lt_valuetypeat( routeTable, i );
-
-		// Stop at nul or term
-		if ( lt_type == LITE_NUL || lt_type == LITE_TRM ) {
-			break;
-		}
-
-		//TODO: If this manages to be null or zero-length, it's probably a bug...
-		if ( !(lt_char =	lt_text_at( routeTable, i )) ) {
-			break;
-		}
-
-		//LL is either accessed wrong or not init'd.
-		LL->type = CC_VIEW;
-	  LL->content = strdup( lt_char );
-	  LL++ ;
-	}
-
-#if 0
-	//Leave this, in case I want to see the structure before moving on.
-	printf( "Execution path for route: %s\n", http->url );
-	Loader *Ld = &l[0];
-	while ( Ld->type ) {
-		printf( "%s -> %s\n", printCCtype( Ld->type ), Ld->content );
-		Ld++;
-	}
-#endif
+	free( modelTag );
+	free( viewTag );
 	return l;
 }
 
@@ -630,7 +559,8 @@ int lua_writetable( lua_State *L, int *pos, int ti )
 		//Copy the index and rotate the top and bottom
 		lua_pushnil( L );
 		lua_copy( L, -3, lua_gettop( L ) );
-		lua_rotate( L, -2, -1 );
+	//lua_stackdump( L );
+		lrotate( L, -2, -1 );
 	#else
 		//There must be a way to do this that will run on older Luas
 	#endif
@@ -644,9 +574,9 @@ int lua_writetable( lua_State *L, int *pos, int ti )
 
 
 
-int lua_aggregate (lua_State *L)
-{
 #if 0
+int lua_stacktest( lua_State *L ) 
+{
 	//Stack Test
 	//==========
 	//Check that the lua_stackdump function works like it should.  Most of the
@@ -714,8 +644,11 @@ int lua_aggregate (lua_State *L)
 	//
 	fprintf( stderr, "Test is completed." );
 	exit( 0 );
+}
 #endif
 
+int lua_aggregate (lua_State *L)
+{
 	//Check that the stack has something on it
 	if ( lua_gettop( L ) == 0 )
 		return 0;
