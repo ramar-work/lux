@@ -4,9 +4,9 @@ OS = $(shell uname | sed 's/[_ ].*//')
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
-#GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 #-DDEBUG_H #-ansi
-#CC = gcc
-#CFLAGS = $(GCCFLAGS)
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 #-DDEBUG_H #-ansi
+CC = gcc
+CFLAGS = $(GCCFLAGS)
 PORT = 2200
 
 # Some Linux systems need these, but pkg-config should handle it
@@ -38,7 +38,18 @@ gohan:
 
 # This is a test request using a hostname to test hypno's virtual hosting capability
 khan:
-	@test `grep -c khan.org /etc/hosts` -gt 0 && wget -qO /tmp/index.html http://khan.org:$(PORT)/multi || echo "khan.org not found in /etc/hosts.  Run 'make hosts' to add it and others."
+	@test `grep -c khan.org /etc/hosts` -gt 0 && wget -O /tmp/index.html http://khan.org:$(PORT)/multi || echo "khan.org not found in /etc/hosts.  Run 'make hosts' to add it and others."
+
+# Add and test two localhost names
+add-hosts:
+	@printf "127.0.0.1\tkhan.org #added by hypno\n" >> /etc/hosts
+	@printf "127.0.0.1\twww.khan.org #added by hypno\n" >> /etc/hosts
+	@printf "127.0.0.1\tability.org #added by hypno\n" >> /etc/hosts
+	@printf "127.0.0.1\twww.ability.org #added by hypno\n" >> /etc/hosts
+
+# Remove hosts
+remove-hosts:
+	@sed -i '/#added by hypno/d' /etc/hosts
 
 # This is a test request to use with Curl or Wget	
 gotenks:

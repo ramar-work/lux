@@ -75,10 +75,19 @@ static void http_dump (uint8_t *blob, int adjust, const char *msg)
 
 
 //An http error handler
-_Bool http_error_h (HTTP *h, HTTP_Status st) 
+_Bool http_error_h (Recvr *r, HTTP *h, HTTP_Status st) 
 {
 	http_set_status(h, st);
+
+#if 0
+	const char *msg = "http response looks like:\n";
+	write( 2, msg, strlen( msg ));
+	write( 2, h->error, strlen( h->error ) );
+#endif
+
 	http_set_content(h, http_text_html, (uint8_t *)h->error, strlen(h->error));
+	http_pack_response( h );
+	r->stage = NW_AT_WRITE;
 	return 1;
 }
 
@@ -717,10 +726,10 @@ _Bool http_read (Recvr *r, void *p, char *e)
 					case ENOSPC:
 					case EPIPE:
 					case ERANGE:
-						http_err( h, 500, "%s\n", strerror( errno ) );
+						http_err( r, h, 500, "%s\n", strerror( errno ) );
 						break;
 					default:
-						http_err( h, 500, "unknown error occurred at read" );
+						http_err( r, h, 500, "unknown error occurred at read" );
 				}
 				return 1;	
 			}
@@ -730,7 +739,7 @@ _Bool http_read (Recvr *r, void *p, char *e)
 	//No support for other things yet
 	else {
 		//memcpy(r->response, http_405, strlen(http_405));
-		http_err( h, 405, "The method requested by the client was invalid." ); 
+		http_err( r, h, 405, "The method requested by the client was invalid." ); 
 		return 0;
 	}
 

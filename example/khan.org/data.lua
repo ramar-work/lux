@@ -52,13 +52,6 @@ return {
 		main =   "appCopy",
 		banner = "banner-prod"
 	},
-	data =       {
-		posts =     "post",
-		content =   "content",
-		class_rel = "class_rel",
-		metadata =  "metadata",
-		users =     "users"
-	},
 	css =        {
 		"zero", 
 		"gallery", 
@@ -73,7 +66,14 @@ return {
 			model = { "log", "default" }, 
 			view = { "main/head", "default", "main/footer" } },
 
+		-- Choosy pigeon
 		multi =      { 
+			--hint =   "Generates multiple PDFs for a student writing all PDFs to a folder and zipping it.",
+			model =  "simple",
+			view = "simple" 
+		},
+
+		realBig =      { 
 			hint =   "Generates multiple PDFs for a student writing all PDFs to a folder and zipping it.",
 			model =  { "log", "check", "view", "multi" }, 
 			view = { "pdf/multi", "pdf/confirmation-multi" } },

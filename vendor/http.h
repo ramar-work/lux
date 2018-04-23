@@ -28,8 +28,8 @@
 #endif
 
 //General error handler
-#define http_err(h, st, ...) \
-	((memset(h->error, 0, 2048) ? 1 : 1) && (snprintf(h->error, 2047, __VA_ARGS__) ? 1 : 1) && http_error_h(h, st))
+#define http_err(r, h, st, ...) \
+	((memset(h->error, 0, 2048) ? 1 : 1) && (snprintf(h->error, 2047, __VA_ARGS__) ? 1 : 1) && http_error_h(r, h, st))
 
 #define http_append( h, blob, bs ) \
 	bf_append( h->resb, (uint8_t *)blob, bs )
@@ -174,7 +174,7 @@ _Bool http_read (Recvr *r, void *p, char *e);
 _Bool http_proc (Recvr *r, void *p, char *e);
 _Bool http_test (Recvr *r, void *p, char *e);
 _Bool http_fin (Recvr *r, void *p, char *e);
-_Bool http_error_h (HTTP *h, HTTP_Status st) ;
+_Bool http_error_h (Recvr *r, HTTP *h, HTTP_Status st) ;
 
 void http_print_request (HTTP *h);
 void http_print_response (HTTP *h);
