@@ -1,25 +1,26 @@
-/*single.c - 
+/*
+single.c
+========
 A two-file library for common things in C (and eventually C++)
 
 LICENSE
 -------
 
+DOCUMENTATION
+-------------
 
-Documentation:
---------------
-
-
-Tests:
-------
-
-TODO:
+TESTS
 -----
-Package a tool to create documentation here.
 
+TODO
+----
+Package a tool to create documentation here.
 Package a way to build tests here.
 
 */
 #include "single.h"
+
+//This flag is here to control how table counts work...
 
 static const unsigned int lt_hash = 31;
 
@@ -268,8 +269,6 @@ int load_file2 (uint8_t *dest, const char *file, int *size)
 	*size = sb.st_size;
 	return 1;
 }
-
-
 
 
 
@@ -902,7 +901,6 @@ int print_uerr (const char *err)
 }
 
 
-#if 1
 void print_body ( Bod *b )
 {
 	 niprintf( b->beg );
@@ -915,20 +913,19 @@ void print_body ( Bod *b )
 	 niprintf( b->loop );
 	 niprintf( b->loopKeyLen );
 	 niprintf( b->loopValueLen );
- #if 0
+  #if 0
 	char    *srcTable;
 	uint8_t *tok,
 	        *loopKey,
 					*loopValue,
 					*value,
 					*loopBuf;
- #endif
+  #endif
 }
-#endif
-#endif
+ #endif
 
 
-static void render_dump_mark ( Render *r )
+void render_dump_mark ( Render *r )
 {
 	Mark *ct = &r->markers[0];
 	while ( ct->blob )
@@ -1018,20 +1015,25 @@ int render_map ( Render *r, uint8_t *src, int srclen )
 		//Just mark each section (and it's position)
 		if ((t = p.word[ p.tokenSize - 1 ]) == '#')
 		{
+			//The start of "positive" loops (items that should be true)
 			ct->blob = &src[p.prev],
 			ct->size = p.size,
 			ct->action = RAW;
 			REALLOC( raw, r->markers );
 			ct->action = POSLOOP;
 		}
-		else if (t == '^') {
+		else if (t == '^') 
+		{
+			//The start of "negative" loops (items that should be false)
 			ct->blob = &src[p.prev],
 			ct->size = p.size,
 			ct->action = RAW;
 			REALLOC( raw, r->markers );
 			ct->action = NEGLOOP;
 		}
-		else if (t == '/') {
+		else if (t == '/')
+		{
+			//The end of either a "positive" or "negative" loop
 			ct->blob = &src[p.prev],
 			ct->size = p.size,
 			ct->action = RAW;
@@ -1040,6 +1042,7 @@ int render_map ( Render *r, uint8_t *src, int srclen )
 		}
 		else if (t == '{')
 		{
+			//The start of a key (any type)
 			ct->blob = &src[p.prev],
 			ct->size = p.size,
 			ct->action = RAW;
@@ -1050,14 +1053,24 @@ int render_map ( Render *r, uint8_t *src, int srclen )
 		{
 			//Anything within here will always be a table
 			ct->blob  = trim( (uint8_t *)&src[ p.prev ], (char *)trimchars, p.size, &ct->size );
+		#ifdef RENDER_DEBUG_H
+			fprintf( stderr, "%s\n", "hi" );
+			write( 2, ct->blob, ct->size );
+			write( 2, "\n", 1 );
 
+			fprintf( stderr, "%s\n", "What is index?" );
+			fprintf( stderr, "%d\n", lt_get_long_i( r->srctable, ct->blob, ct->size ) );	
+		#endif
 			if ( *ct->blob == '.' )
 				ct->action = STUB;
 			else {
 				ct->index = lt_get_long_i( r->srctable, ct->blob, ct->size );
 				ct->type  = lt_vta( r->srctable, ct->index );
-				if ((ct->type == LITE_TBL) && (ct->action == POSLOOP || ct->action == NEGLOOP))
-					ct->parent = ct->blob, ct->psize = ct->size;	
+				if ((ct->type == LITE_TBL) && (ct->action == POSLOOP || ct->action == NEGLOOP)) 
+				{
+					ct->parent = ct->blob; 
+					ct->psize = ct->size;	
+				}
 			}
 			REALLOC( raw, r->markers );
 		}
@@ -1105,6 +1118,7 @@ int render_render ( Render *r )
 	//everytime you descend, src is what you got, size is length of src
 	//and times is times to repeat
 	struct DT *dt = d;
+	int top = 0;
 	memset( search, 0, sizeof(search) );
 	memset( dt, 0, sizeof (struct DT));
 	
@@ -1121,12 +1135,12 @@ int render_render ( Render *r )
 				if ( dt->skip )
 					dt->skip = 0;
 				else {
-#if 0
+				#if 0
 					//Write
 					write( 2, dt->parent, dt->psize );
 					fprintf( stderr, " => " );
 					write( 2, ct->blob, ct->size );
-#endif
+				#endif
 					//Decrement repetition
 					if ( dt->times == 0 )
 						dt--;
@@ -1141,37 +1155,54 @@ int render_render ( Render *r )
 
 		//Simply copy this data
 		if ( ct->action == RAW )
+		{
+		#ifdef RENDER_DEBUG_H
+			write( 2, ct->blob, ct->size );
+		#endif
 			bf_append( &r->dest, ct->blob, ct->size );
-
+		}
 		//Retrieve the reference and write it
 		else if ( ct->action == DIRECT && ct->index > -1 )
 		{
-			//fprintf( stderr, "Direct reference is of type: %s", lt_typename( ct->type ));
+		#ifdef RENDER_DEBUG_H
+			SHOWDATA( "in rdbgh" );
 			if ( ct->type == LITE_BLB )
-				bf_append( &r->dest, lt_blobdata_at( r->srctable, ct->index ), lt_blobsize_at( r->srctable, ct->index ));
-			else if ( ct->type == LITE_TXT ) {
-				char *a = lt_text_at( r->srctable, ct->index );
+				write( 2, lt_blobdata_at( r->srctable, ct->index ), lt_blobsize_at( r->srctable, ct->index ));
+			else if ( ct->type == LITE_INT )
+				fprintf( stderr, "%d", lt_int_at( r->srctable, ct->index )); 
+			else if ( ct->type == LITE_FLT )
+				fprintf( stderr, "%f", lt_float_at( r->srctable, ct->index )); 
+			else if ( ct->type == LITE_USR )
+				fprintf( stderr, "%p", lt_userdata_at( r->srctable, ct->index )); 
+			else if ( ct->type == LITE_TBL )
+				fprintf( stderr, "%p", (void *)&lt_table_at( r->srctable, ct->index )); 
+			else if ( ct->type == LITE_TXT )
+				fprintf( stderr, "%s\n", lt_text_at( r->srctable, ct->index ) );
+			else { 
+			}	
+		#endif
+			//fprintf( stderr, "Direct reference is of type: %s", lt_typename( ct->type ));
+			if ( ct->type == LITE_BLB ) {
+				uint8_t *b = lt_blobdata_at( r->srctable, ct->index );
+				bf_append( &r->dest, b, lt_blobsize_at( r->srctable, ct->index ));
+			}
+			else { 
+				char *a = NULL, b[128] = {0};
+				if ( ct->type == LITE_INT )
+					snprintf( a = b, 63, "%d", lt_int_at( r->srctable, ct->index )); 
+				else if ( ct->type == LITE_FLT )
+					snprintf( a = b, 127, "%f", lt_float_at( r->srctable, ct->index )); 
+				else if ( ct->type == LITE_USR )
+					snprintf( a = b, 127, "%p", lt_userdata_at( r->srctable, ct->index )); 
+				else if ( ct->type == LITE_TBL )
+					snprintf( a = b, 127, "%p", (void *)&lt_table_at( r->srctable, ct->index )); 
+				else if ( ct->type == LITE_TXT )
+					a = lt_text_at( r->srctable, ct->index );
+				else { 
+					a = 0;//Skip all other types
+				}	
 				bf_append( &r->dest, (uint8_t *)a, strlen( a ) );
 			}
-			else if ( ct->type == LITE_INT )
-			{ char a[ 64 ]={0}; 
-				snprintf( a, 63, "%d", lt_int_at( r->srctable, ct->index )); 
-				bf_append( &r->dest, (uint8_t *)a, strlen( a ) ); }
-			else if ( ct->type == LITE_FLT )
-			{ char a[ 128 ]={0}; 
-				snprintf( a, 127, "%f", lt_float_at( r->srctable, ct->index )); 
-				bf_append( &r->dest, (uint8_t *)a, strlen( a ) ); }
-			else if ( ct->type == LITE_USR )
-			{ char a[ 128 ]={0}; 
-				snprintf( a, 127, "%p", lt_userdata_at( r->srctable, ct->index )); 
-				bf_append( &r->dest, (uint8_t *)a, strlen( a ) ); }
-			else if ( ct->type == LITE_TBL )
-			{ char a[ 128 ]={0}; 
-				snprintf( a, 127, "%p", (void *)&lt_table_at( r->srctable, ct->index )); 
-				bf_append( &r->dest, (uint8_t *)a, strlen( a ) ); }
-			else { 
-				;//Skip all other types 
-			}	
 		}
 		else if ( ct->action == STUB )
 		{
@@ -1179,19 +1210,29 @@ int render_render ( Render *r )
 			int i=0, p=0;
 			memcpy( &search[ p ], dt->parent, dt->psize );
 			p += dt->psize;
+
+			//Reverse can be done by manipulating dt->times (top = dt->times; num = top - dt->times )
 			p += snprintf( (char *)&search[ p ], 64, ".%d", dt->times );
 			memcpy( &search[ p ], ct->blob, ct->size );
 			p += ct->size;
 		
-#if 1
+		#ifdef RENDER_DEBUG_H
+			niprintf( dt->psize );
+			niprintf( ct->size  );
+			niprintf( dt->times );
+			write( 2, "Search: ", 8 );
 			write( 2, search, p );
 			write( 2, "\n", 1 );
-			//getchar();
-#endif
-		
+			getchar();
+		#endif
+	
+			//Get long i, yay
 			if ( (i = lt_get_long_i( r->srctable, search, p )) == -1 )
-				{ ct++; continue; }//fprintf( stderr, "Looks like there's nothing here..." );		
-			else 
+			{
+				ct++;
+				continue;
+			}
+			else
 			{
 				uint8_t *src = NULL;
 				LiteType t = lt_vta( r->srctable, i );
@@ -1234,6 +1275,7 @@ int render_render ( Render *r )
 					{
 						dt++;
 						memset( dt, 0, sizeof (struct DT));
+
 						//Skip completely if this is a table and there are no entries
 						if ( (dt->times = lt_counti( r->srctable, ct->index )) > 0 )
 						{
@@ -1243,6 +1285,11 @@ int render_render ( Render *r )
 							dt->psize = ct->size;
 							dt->parent = ct->blob;
 						}
+					#if 0
+						lt_dump( r->srctable );
+						fprintf( stderr, "We is gonna repeat this, this many times: %d\n", dt->times );
+						return 0;	
+					#endif
 					}
 				}
 			}
@@ -1339,6 +1386,7 @@ static int build_backwards (LiteKv *t, unsigned char *buf, int bs)
 }
 
 
+
 //Trim things
 unsigned char *lt_trim (uint8_t *msg, char *trim, int len, int *nlen) 
 {
@@ -1353,8 +1401,7 @@ unsigned char *lt_trim (uint8_t *msg, char *trim, int len, int *nlen)
 }
 
 
-
-//Count indicies in a table. If index is greater than 1 and the item is a "table", then will return the number of elements in said table
+//Count indices in a table. If index is greater than 1 and the item is a "table", then will return the number of elements in said table
 int lt_counti ( Table *t, int index )
 {
 	//Return count of all elements
@@ -1385,13 +1432,10 @@ int lt_counti ( Table *t, int index )
 }
 
 
-
-
-
-
-
-
-
+int lt_countall( Table *t )
+{
+	return t->count + 1;
+}
 
 
 //Clear error
@@ -1408,9 +1452,12 @@ const char *lt_strerror (Table *t)
 	return ( t->error > -1 && t->error < ERR_LT_INDEX_MAX) ? __errors[ t->error ] : NULL; 
 }
 
+
 //Initiailizes a table data structure
 Table *lt_init (Table *t, LiteKv *k, int size) 
 {
+	SHOWDATA( "\n\tWorking with root table %p\n", t );
+
 	//Calculate optimal modulus for hashing
 	if ( size <= 63 )
 		t->modulo = 63; 
@@ -1438,8 +1485,9 @@ Table *lt_init (Table *t, LiteKv *k, int size)
 		t->modulo = 199999; 
 	else if ( size <= 199961 )
 		t->modulo = 199999; 
-	else
+	else {
 		t->modulo = 511997; 
+	}
 
 	int actual_size = size;
 	t->mallocd = (!k) ? 1 : 0;
@@ -1463,8 +1511,9 @@ Table *lt_init (Table *t, LiteKv *k, int size)
 	}
 
 	//Initialize all hash entries to -1
-	for (int i=0; i < actual_size; i++)
+	for ( int i=0; i < actual_size; i++ ) {
 		memset( k[i].hash, -1, sizeof(int) * lt_max_slots );
+	}
 
 	//Set this
 	t->current = NULL;
@@ -1497,7 +1546,8 @@ LiteType lt_add ( Table *t, int side, LiteType lt, int vi, float vf,
 		t->error = ERR_LT_OUT_OF_SPACE;
 		return 0;
 	}
-		
+
+	//...		
 	LiteValue  *v = (!side) ? &(t->head + t->index)->key : &(t->head + t->index)->value;
 	LiteRecord *r = &v->v;
 	v->type       = lt;
@@ -1593,8 +1643,7 @@ const char *lt_typename (int type)
 }
 
 
-
-//Descend one level (creating a table)
+//Move left or right within the hierarchy of tables
 int lt_move (Table *t, int dir) 
 {
 	//Out of space
@@ -1609,11 +1658,9 @@ int lt_move (Table *t, int dir)
 	LiteKv **cptr    = &curr;
 	LiteValue *value = &curr->value;
 
-
 	//Left or right?	
 	if ( !dir )
 	{
-		SHOWDATA( "Descending into table value to table at %p", ( void * )t );
 		//Set count of elements in this new table to actual count
 		LiteTable *T = &value->v.vtable;
 		value->type  = LITE_TBL;
@@ -1622,8 +1669,13 @@ int lt_move (Table *t, int dir)
 		/*Yay*/
 		T->parent  = ( !t->current ) ? NULL : t->current;
 		T->ptr     = *(long *)&T; 
-		//T->ptr   = (int)T; //for some reason, GCC doesn't like this...
 		t->current = T;
+
+		//Ascension shouldn't need pointer increment...
+	#ifdef SUPEREXTRA
+		t->count ++;
+		t->index ++;
+	#endif
 	}
 	else 
 	{
@@ -1632,13 +1684,13 @@ int lt_move (Table *t, int dir)
 		key->type      = LITE_TRM;
 		value->type    = LITE_NUL;
 		LiteRecord *r  = &key->v;	
-		SHOWDATA( "Ascending from inner table within at %p", ( void * )t );
 
-		//
+		//....
 		if ( !t->current->parent )
 		{
 			t->rCount = &t->count;
 			r->vptr = (long)t->current->ptr;
+			t->current = NULL;
 		}
 		else if ( t->current->parent )
 		{
@@ -1647,9 +1699,16 @@ int lt_move (Table *t, int dir)
 			t->rCount = &T->count;
 			t->current = T;
 		}
+
+	#ifdef SUPEREXTRA
+		lt_finalize (t);
+	#endif
 	}
-		
-	lt_finalize (t);
+
+#ifndef SUPEREXTRA
+	lt_finalize( t );		
+#endif
+
 	return 1;
 }
 
@@ -1658,7 +1717,8 @@ int lt_move (Table *t, int dir)
 //Finalize adding to both sides of a table data structure
 void lt_finalize (Table *t)
 {
-	( *t->rCount )++;
+	//if these are equal, don't increment both *t->rCount and t->count
+	( t->rCount == &t->count ) ? 0 : ( *t->rCount )++ ; 
 	t->count ++;
 	t->index ++;
 }
@@ -2078,13 +2138,8 @@ void lt_free (Table *t)
 	for ( int ii=0; ii < t->index; ii++ )
 	{
 		LiteKv *k = t->head + ii;
-		SHOWDATA( "Checking for and freeing key at index [%d] -> %p", ii, k->key.v.vchar );
 		( k->key.type == LITE_TXT ) ? free( k->key.v.vchar ), k->key.v.vchar = NULL : 0;
-		SHOWDATA( "Key at index is now                   [%d] -> %p", ii, k->key.v.vchar );
-
-		SHOWDATA( "Checking for & freeing value at index [%d] -> %p", ii, k->value.v.vchar );
 		( k->value.type == LITE_TXT ) ? free( k->value.v.vchar ), k->value.v.vchar = NULL : 0;
-		SHOWDATA( "Value at index is now                 [%d] -> %p", ii, k->value.v.vchar );
 	}
 
 	if ( t->mallocd )
@@ -2157,10 +2212,10 @@ static void lt_printindex (LiteKv *tt, int ind)
 			/*LITE_NODE is handled in printall*/
 			if (t == LITE_NON)
 				w += snprintf( &b[w], lt_buflen - w, "%s", "is uninitialized" );
-#ifdef LITE_NUL
+		#ifdef LITE_NUL
 			else if (t == LITE_NUL)
 				w += snprintf( &b[w], lt_buflen - w, "is terminator" );
-#endif
+		#endif
 			else if (t == LITE_USR)
 				w += snprintf( &b[w], lt_buflen - w, "userdata [address: %p]", r->vusrdata );
 			else if (t == LITE_TBL) 
@@ -3502,9 +3557,6 @@ _Bool sq_exec_complex (Database *gb, const char *sql, const SQWrite *w)
 
 	return 1;
 }
-
-
-
 /*Close a database and finalize any prepared statement*/
 _Bool sq_close (Database *gb) 
 {
@@ -3690,9 +3742,6 @@ int sq_reader_find (Database *gb, const char *colname) {
 }
 
 
-#define SQ_GO( fmt, ... ) \
-	fprintf( stderr, "%s: %d -> ", __FILE__, __LINE__ ); fprintf( stderr, fmt, __VA_ARGS__ ); getchar();
-
 //Save database results to table
 int sq_save (Database *db, const char *query, const char *name, const SQWrite *w )
 {
@@ -3712,6 +3761,8 @@ int sq_save (Database *db, const char *query, const char *name, const SQWrite *w
 		fprintf( stderr, "No open database was detected...\n" );
 		return 0;
 	}
+
+
 
 	//Trim the received query
 	pq = (char *)trim((uint8_t *)query, " \t\n\r", strlen(query), &len ); 
@@ -3833,9 +3884,6 @@ int sq_save (Database *db, const char *query, const char *name, const SQWrite *w
 		bf_append( &db->results, (uint8_t *)"\0", 1 );
 		src = bf_data( &db->results );
 		bfw = bf_written( &db->results );
-
-		//All of the data is in this big ass block...
-		//write( 2, src, bfw );
 		memset( &src[ bfw - ( sqlite3_L + 1 ) ], '3', sqlite3_L );
 
 		//Set everything needed for parsing
@@ -3885,6 +3933,7 @@ int sq_save (Database *db, const char *query, const char *name, const SQWrite *w
 	}
 
 	lt_lock( &db->kvt );
+	//lt_printall ( &db->kvt );
 	return 1;	
 }
 #endif
@@ -4030,6 +4079,8 @@ char * rand_any
 static const unsigned long CV_1T = 1000;
 static const unsigned long CV_1M = 1000000;
 static const unsigned long CV_1B = 1000000000;
+#ifdef DEBUG_H
+#endif
 
 //Initiailize a timer
 void __timer_init (Timer *t, LiteTimetype type) 
@@ -4047,7 +4098,7 @@ void __timer_set_name (Timer *t, const char *label)
 
 
 //Start a currently running timer
- #ifndef CV_VERBOSE_TIMER 
+ #ifndef DEBUG_H 
 void __timer_start (Timer *t)
 {
  #else
@@ -4062,7 +4113,7 @@ void __timer_start (Timer *t, const char *file, int line)
 
 
 //Stop a currently running timer
- #ifndef CV_VERBOSE_TIMER 
+ #ifndef DEBUG_H 
 void __timer_end (Timer *t)
 {
  #else
@@ -4072,6 +4123,38 @@ void __timer_end (Timer *t, const char *file, int line)
 	t->lineend = line;
  #endif 
 	clock_gettime( t->clockid, &t->end );
+}
+
+
+//Return the current time (in a platform agnostic way)
+char *timer_now( Timer *t )
+{
+#if 1
+	time_t tm = time( NULL ); 
+	snprintf( t->ts_string, sizeof( t->ts_string ), "%s", ctime( &tm )); 
+	if ( t->ts_string[ strlen( t->ts_string ) - 1 ] == '\n' ) {
+		t->ts_string[ strlen( t->ts_string ) - 1 ] = '\0';
+	}
+#else
+	t->clockid = CLOCK_REALTIME;
+	clock_gettime( t->clockid, &t->start );
+	struct tm tm;
+	//tm.tm_sec = t->start.tv_sec % 60;
+	fprintf( stderr, "seconds\n" );
+	nlprintf( t->start.tv_sec % 60 ); 
+	fprintf( stderr, "min\n" );
+	nlprintf( ( t->start.tv_sec / 60 ) % 60 ); 
+	fprintf( stderr, "hour\n" ); //This seems wrong, but we are 5 hours ahead
+	nlprintf( ( ( t->start.tv_sec / 60 ) / 60 ) % 12 ); 
+	fprintf( stderr, "day\n" );
+	//60 secs * 60 min * 24 = 86400 secs per day, crude math would give me this...
+	//add all leap years since 1970, then the remaining
+	nlprintf(( t->start.tv_sec / 86400 ) % 365 );
+	//nlprintf( ( ( ( t->start.tv_sec / 60 ) / 60 ) / 24 ) % 365 ); 
+	//nlprintf( t->start.tv_sec % 60 ); 
+	//strftime( t->ts_string, sizeof( t->ts_string ), "%a %b %d %I:%M:%S %Y", t-> );
+#endif
+	return t->ts_string;
 }
 
 

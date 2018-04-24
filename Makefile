@@ -40,12 +40,17 @@ gohan:
 khan:
 	@test `grep -c khan.org /etc/hosts` -gt 0 && wget -O /tmp/index.html http://khan.org:$(PORT)/multi || echo "khan.org not found in /etc/hosts.  Run 'make hosts' to add it and others."
 
+errors:
+	@test `grep -c errors.com /etc/hosts` -gt 0 && wget -O /tmp/index.html http://errors.com:$(PORT)/failure || echo "errors.com not found in /etc/hosts.  Run 'make hosts' to add it and others."
+
 # Add and test two localhost names
 add-hosts:
 	@printf "127.0.0.1\tkhan.org #added by hypno\n" >> /etc/hosts
 	@printf "127.0.0.1\twww.khan.org #added by hypno\n" >> /etc/hosts
 	@printf "127.0.0.1\tability.org #added by hypno\n" >> /etc/hosts
 	@printf "127.0.0.1\twww.ability.org #added by hypno\n" >> /etc/hosts
+	@printf "127.0.0.1\terrors.com #added by hypno\n" >> /etc/hosts
+	@printf "127.0.0.1\twww.errors.com #added by hypno\n" >> /etc/hosts
 
 # Remove hosts
 remove-hosts:

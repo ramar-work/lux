@@ -567,7 +567,7 @@ int lua_writetable( lua_State *L, int *pos, int ti )
 
 		//Now, setting the table works about the same as popping
 		lua_settable( L, ti );	
-		lua_stackdump( L );
+		//lua_stackdump( L );
 	}
 	return 1;
 }
@@ -655,26 +655,24 @@ int lua_aggregate (lua_State *L)
 
 	//Add a table
 	lua_newtable(L);
-	fprintf(stderr,"Stackdump:\n");
 	const int tp = lua_gettop( L ); //The top
 	int pos = tp - 1; //The index on the stack I'm at
 	int ti  = 1; //Where the table is on the stack
+	#if 0
+	fprintf(stderr,"Stackdump:\n");
 	fprintf( stderr, "table position is %d\n", ti );
 	fprintf( stderr, "top (const table) is at %d\n", tp );
 	fprintf( stderr, "currently at %d\n", pos );
+	#endif
 
 	//Loop again, but show the value of each key on the stack
-	for ( int pos = tp - 1 ; pos > 0 ; )
-	{
-		//
+	for ( int pos = tp - 1 ; pos > 0 ; ) {
 		int t = lua_type( L, pos );
 		const char *type = lua_typename( L, t );
-		fprintf( stderr, "Adding key [%3d] => ", pos );
+		//fprintf( stderr, "Adding key [%3d] => ", pos );
 
-	#if 1
 		//Push a numeric index, since all of this should be in one table.
 		lua_pushnumber( L, ti++ );
-	#endif
 
 		//Write the value into table...
 		if ( t == LUA_TSTRING )
@@ -685,8 +683,7 @@ int lua_aggregate (lua_State *L)
 			lua_pushnumber( L, lua_tonumber( L, pos ) );
 		else if ( t == LUA_TBOOLEAN)
 			lua_pushboolean( L, lua_toboolean( L, pos ) );
-		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
-		{
+		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA ) {
 			void *p = lua_touserdata( L, pos );
 			lua_pushlightuserdata( L, p );
 		}
@@ -696,18 +693,17 @@ int lua_aggregate (lua_State *L)
 		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
 			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, pos ) );
 	#endif
-		else if ( t == LUA_TTABLE )
-		{
+		else if ( t == LUA_TTABLE ) {
 			int np = tp + 2;
 			lua_newtable( L );
 			lua_writetable( L, &pos, tp + 2 );
 		}
 
-		fprintf( stderr, "Setting table at index %d\n", tp );
+		//fprintf( stderr, "Setting table at index %d\n", tp );
 		//getchar();
 		lua_settable( L, tp );	
-		lua_stackdump( L );
-		fprintf( stderr, "\n" );
+		//lua_stackdump( L );
+		//fprintf( stderr, "\n" );
 		pos--;
 	}
 

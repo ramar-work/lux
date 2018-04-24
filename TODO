@@ -1,9 +1,15 @@
 ???
 ---
 
-- negotiate the system path from the hostname
+x negotiate the system path from the hostname
 
-- handle binary data and static files
+- define how to handle files that aren't scripts
+	1) do I use a mimetype?
+	2) is there a better way to let hypno figure it out?
+
+	check if the file is a regular file or not, use mimetypes when it is
+	leave no rules for now...
+	keep all handlers in some big table... maybe
 
 - load model subtables as filenames
 

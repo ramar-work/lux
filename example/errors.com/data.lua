@@ -48,19 +48,24 @@ return {
 		verboseLog = 0,
 		addLogLine = 0
 	},
+
+	-- Here's a comment
 	db = {
 		main =   "appCopy",
 		banner = "banner-prod"
 	},
+
 	css =        {
 		"zero", 
 		"gallery", 
 		"https://unpkg.com/purecss@0.6.2/build/pure-min"
 	},
+
 	js =         {
 		"lib", 
 		"index" 
 	},
+
 	routes =     {
 		default =    { 
 			model = { "log", "default" }, 
