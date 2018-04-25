@@ -213,7 +213,6 @@ void lua_stackclear ( lua_State *L )
 void lua_dumptable ( lua_State *L, int *pos, int *sd )
 {
 	lua_pushnil( L );
-	LUA_DUMPSTK( L );
 	//fprintf( stderr, "*pos = %d\n", *pos );
 
 	while ( lua_next( L, *pos ) != 0 ) 
@@ -221,7 +220,6 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 		//Fancy printing
 		//fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - *sd ] );
 		PRETTY_TABS( *sd );
-		LUA_DUMPSTK( L );
 		fprintf( stderr, "[%3d:%2d] => ", *pos, *sd );
 
 		//Print both left and right side
@@ -256,7 +254,6 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 		}
 
 		lua_pop( L, 1 );
-		LUA_DUMPSTK( L );
 	}
 	return;
 }
@@ -269,9 +266,6 @@ void lua_stackdump ( lua_State *L )
 	//No top
 	if ( lua_gettop( L ) == 0 )
 		return;
-
-	//Loop through all of the values that are on the stack
-	LUA_DUMPSTK( L );
 
 	//Loop again, but show the value of each key on the stack
 	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) 
@@ -301,7 +295,6 @@ void lua_stackdump ( lua_State *L )
 		#else
 			fprintf( stderr, "(%8s) %p {\n", type, lua_topointer( L, pos ) );
 			int sd = 1;
-			LUA_DUMPSTK( L );
 			lua_dumptable( L, &pos, &sd );
 			fprintf( stderr, "}" );
 		#endif
@@ -716,6 +709,11 @@ int lua_aggregate (lua_State *L)
 	//lua_stackdump( L );
 	return 1;
 }
+
+
+//Table of Lua functions
+int abc ( lua_State *L ) { fprintf( stderr, "chicken" ); return 0; } 
+
 
 /*
 

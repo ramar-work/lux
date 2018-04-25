@@ -24,6 +24,12 @@ main: test-build-$(OS)
 main: 
 	mv $(RICKROSS) hypno
 
+# CLI
+cli: RICKROSS=$(NAME)b
+cli: test-build-$(OS)
+cli: 	
+	@printf ''>/dev/null
+
 # This tests how hypno starts with a certain set of criteria.
 goku:
 	./hypno --no-daemon --start --port $(PORT) 
@@ -40,6 +46,11 @@ gohan:
 khan:
 	@test `grep -c khan.org /etc/hosts` -gt 0 && wget -O /tmp/index.html http://khan.org:$(PORT)/multi || echo "khan.org not found in /etc/hosts.  Run 'make hosts' to add it and others."
 
+# This is a test request to use with Curl or Wget	
+gotenks:
+	wget -O /tmp/index.html http://localhost:$(PORT)
+
+# This is a test request that grabs files full of errors
 errors:
 	@test `grep -c errors.com /etc/hosts` -gt 0 && wget -O /tmp/index.html http://errors.com:$(PORT)/failure || echo "errors.com not found in /etc/hosts.  Run 'make hosts' to add it and others."
 
@@ -56,15 +67,6 @@ add-hosts:
 remove-hosts:
 	@sed -i '/#added by hypno/d' /etc/hosts
 
-# This is a test request to use with Curl or Wget	
-gotenks:
-	wget -O /tmp/index.html http://localhost:$(PORT)
-
-# Change the top-level target for convience
-lasttest:
-	make chains && ./testchains
-
-
 # A top-level target that builds everything
 top:
 	make router; \
@@ -72,7 +74,6 @@ top:
 	make render; \
 	make sql; \
 	make main
-
 
 # Router test program
 router: RICKROSS=testrouter
@@ -110,6 +111,7 @@ test-build-Darwin:
 	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
 	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
 
+# Cygwin / Windows
 test-build-CYGWIN: $(OBJ)
 test-build-CYGWIN:
 	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua
@@ -123,17 +125,6 @@ test-build-Linux: $(OBJ)
 test-build-Linux:
 	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
 	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
-
-	
-# A not-so-main target, that will probably result in a few object files...
-objs: $(OBJ)
-	@printf "Finished building objects\n"
-
-
-# An update target?  (checks for new versions of all your vendor dependencies...)	
-update:
-	@printf "Not yet finished."
-
 
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 

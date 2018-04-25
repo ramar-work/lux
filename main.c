@@ -1,3 +1,4 @@
+/* hypno.c */
 #include "vendor/single.h"
 #include "vendor/nw.h"
 #include "vendor/http.h"
@@ -17,29 +18,17 @@
 //Add timing functions
 #define INCLUDE_TIMING_INFO_H
 
-//Skip adding Lua functions
-//#define DONT_ADD_LUA_FUNCTIONS_H
-
-//Skip adding ENV to Lua space
-//#define DONT_ADD_HTTP_TO_LUA_H
-
-//Testing: See specifically where certain functions are crapping out.
-//#define ERR_SUPERV
+//Testing: See line numbers in error messages
+//#define INCLUDE_LINE_NO_ERROR_H ERR_SUPERV                 
 
 //Testing: I'm going to include an EXAMPLE define that uses the 'example' folder.
 #define EXAMPLE_H
 
 //Testing: Option module is not so wonderful yet, so use this to test out things having to do with it.
-#define TESTOPTS_H
-
-#ifndef LUA_53
- #define lua_rotate( a, b, c ) 
- #define lua_geti( a, b, c ) 
- #define lua_seti( a, b, c ) 
-#endif
+#define TESTOPTS_H                   
 
 //This define controls whether or not line numbers will also be included in the error message.
-#ifdef ERR_SUPERV
+#ifdef INCLUDE_LINE_NO_ERROR_H
  #define ERRL(...) \
 	( snprintf( err, 24, "[ @%s(), %d ]                 ", __FUNCTION__, __LINE__ ) ? 1 : 1 \
 	&& ( err += 24 ) && snprintf( err, errlen - 24, __VA_ARGS__ ) ) ? 0 : 0
@@ -50,15 +39,17 @@
 //This define should be a bit easier to use than fully calling http_err
 #define ERRH(...) http_err( r, h, 500, __VA_ARGS__ ) 
 
-//Define some headers here
+//Lua structure
+typedef struct 
+{
+	char *name; 
+	lua_CFunction func; 
+	char *setname; 
+	int sentinel;
+} luaCF;
+
+//Signature for handling a server.
 _Bool http_run (Recvr *r, void *p, char *e);
-
-//Specify a pidfile
-const char pidfile[] = "hypno.pid";
-
-//Error buffer
-char err[ 4096 ] = { 0 };
-const int errlen = 4096; 
 
 //This is nw's data structure for handling protocols 
 Executor runners[] = 
@@ -69,18 +60,7 @@ Executor runners[] =
 	[NW_COMPLETED]      = { .exe = http_fin , NW_NOTHING }
 };
 
-
-//Table of Lua functions
-typedef struct 
-{
-	char *name; 
-	lua_CFunction func; 
-	char *setname; 
-	int sentinel;
-} luaCF;
-
-int abc ( lua_State *L ) { fprintf( stderr, "chicken" ); return 0; } 
-
+//Lua functions
 luaCF lua_functions[] =
 {
 	{ .setname = "set1" },
@@ -109,6 +89,10 @@ luaCF lua_functions[] =
 	{ .sentinel = -1 },
 };
 
+//Useful variables for main()
+static const char pidfile[] = "hypno.pid";
+static char err[ 4096 ] = { 0 };
+static const int errlen = 4096; 
 static luaCF *rg = lua_functions;
 
 //Serve a list of files
@@ -170,13 +154,13 @@ void srvBasicCannedResponse() {
 //This is the single-threaded HTTP run function
 _Bool http_run ( Recvr *r, void *p, char *err ) 
 { 
-	#ifdef INCLUDE_TIMING_INFO_H
-	Timer t;
+ #ifdef INCLUDE_TIMING_INFO_H
 	char tbuf[1024]={0};
+	Timer t;
 	sprintf( tbuf,  "http_run at %s:%d\n", __FUNCTION__, __LINE__ ); 
 	timer_use_us( &t );
 	timer_start( &t );
-	#endif	
+ #endif	
 	//This is a hell of a lot of data.
 	Table  routes, request, model;
 	struct stat sb;
@@ -210,6 +194,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 	//fprintf( stderr, "Directory '%s' contains:\n", dirname );
 	while ((de = readdir( ds ))) {
+		//Make a fully qualified path from the filename
 		char *fd = strcmbd( "/", dirname, de->d_name );
 
 		//Check that the child inode is accessible
@@ -270,7 +255,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	//Add HTTP to the global space.
 	lua_newtable( L );
 	table_to_lua( L, 1, &h->request.table );
-	lua_setglobal( L, "env" ); /*This needs to be readonly*/
+	lua_setglobal( L, "env" );
 
 	//Register each of the Lua functions (TODO: every time... not good for perf)
 	while ( rg->sentinel != -1 ) {
@@ -303,31 +288,25 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 		if ( l->type == CC_MODEL ) { 
 			//Somehow have to get the root directory of the site in question...
 			char *mfile = strcmbd( "/", activeDir, "models", l->content, "lua" );
-			int mfilelen = strlen( mfile );
-			mfile[ mfilelen - 4 ] = '.';
+			mfile[ strlen(mfile) - 4 ] = '.';
 			fprintf( stderr, "Attempting to load: %s\n", mfile );
 
 			if ( stat( mfile, &sb ) == -1 )
 				return ERRH("Couldn't find model file: %s.", mfile );
 
 			if ( luaL_dofile( L, mfile ) )
-			{
-				const char *msg = lua_tostring(L, -1);
-				lua_settop( L, 0 );
-				return ERRH("Could not load Lua document at %s. Error message: %s\n", mfile, msg );
-			}
+				return ERRH("Could not load Lua file: %s. %s\n", mfile, lua_tostring(L, -1));
 		}
-
 		l++;
 	}
 
 	//This is a working solution.  Still gotta figure out the reason for that crash...
-	lua_aggregate( L ); //1
-	lua_pushstring(L,"model"); //2
-	lua_pushvalue(L,1); //3
-	lua_newtable(L); //4
-	lua_replace(L,1); //3
-	lua_settable(L,1); //1
+	lua_aggregate( L );
+	lua_pushstring( L,"model" );
+	lua_pushvalue( L, 1 );
+	lua_newtable( L );
+	lua_replace( L, 1 );
+	lua_settable( L, 1 );
 	
 	//There is a thing called model now.
 	if ( !lt_init( &model, NULL, 1027 ) || !lua_to_table( L, 1, &model ) )
@@ -345,8 +324,8 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 		if ( l->type == CC_VIEW ) {
 			//Somehow have to get the root directory of the site in question...
 			char *vfile = strcmbd( "/", activeDir, "views", l->content, "html" );
-			int fd, bt = 0, vfilelen = strlen( vfile );
-			vfile[ vfilelen - 5 ] = '.';
+			int fd = 0, bt = 0;
+			vfile[ strlen(vfile) - 5 ] = '.';
 
 			if ( stat( vfile, &sb ) == -1 )
 				return ERRH("Couldn't find view file: %s. Error: %s", vfile, strerror( errno ) );
@@ -366,6 +345,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 		l++;
 	}
 
+	//um
 	if ( !render_init( &ren, &model ) )
 		return ERRH("Couldn't initialize rendering engine." );
 
@@ -382,139 +362,12 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 	//Set the end of the response preparation step
 	http_pack_response( h );
-	#ifdef INCLUDE_TIMING_INFO_H
+ #ifdef INCLUDE_TIMING_INFO_H
 	timer_end( &t );
 	timer_print( &t );
-	#endif	
+ #endif	
 	r->stage = NW_AT_WRITE;
 	free( renbuf );
-	return 1;
-}
-
-
-//Handle http requests via Lua
-int lua_http_handler (HTTP *h, Table *p)
-{
-	//Initialize Lua's environment and set up everything else
-	char renderblock[ 60000 ] = { 0 };
-	lua_State *L = luaL_newstate(); 
-	luaCF *rg = lua_functions;
-	LiteBlob *b  = NULL;
-	Table t;     
-	Render R; 
-	Buffer *rr = NULL;
-	char *modelfile = NULL, 
-       *viewfile = NULL;
-
-	//Set up a table
-	lt_init( &t, NULL, 127 );
-	
-	//Check that Lua initialized here
-	if ( !L )
-		return 0;
-
-	//Now create two tables: 1 for env, and another for 
-	//user defined functions 
-	luaL_openlibs( L );
-	lua_newtable( L );
-	int at=2;
-	lua_loop( L );
-
-	//Loop through and add each UDF
-	while ( rg->sentinel != -1 )
-	{
-		//Set the top table
-		if ( rg->sentinel == 1 ) 
-		{
-			lua_settable( L, 1 );
-			lua_loop( L );
-		}
-
-		else if ( !rg->name && rg->setname )
-		{
-			obprintf( stderr, "Registering new table: %s\n", rg->setname );
-			lua_pushstring( L, rg->setname );
-			lua_newtable( L );
-			lua_loop( L );
-		}
-
-		else if ( rg->name )
-		{	
-			obprintf( stderr, "Registering funct: %s\n", rg->name );
-			lua_pushstring( L, rg->name );
-			lua_pushcfunction( L, rg->func );
-			lua_settable( L, 3 );
-		}
-		rg++;
-	}
-
-	//Loop through all of the http structure
-	table_to_lua( L, 1, &h->request.table );
-
-	//Each one of these needs to be in a table
-	obprintf( stderr," Finished converting HTTP data into Lua... " );
-	lua_setglobal( L, "env" ); /*This needs to be readonly*/
-
-	//Reverse lookup of host
-	char hh[ 2048 ] = { 0 };
-	char *dir = NULL;
-	int ad=0;
-	memcpy( &hh[ ad ], "sites.", 6 ); ad += 6;
-	memcpy( &hh[ ad ], h->hostname, strlen( h->hostname ) ); ad+=strlen(h->hostname);
-	memcpy( &hh[ ad ], ".dir", 4 );ad+=4;
-	dir = lt_text( p, hh );
-
-	//Reuse buffer for model file
-	ad = 0;
-	memcpy( &hh [ ad ], dir, strlen( dir ) );
-	ad += strlen( dir );
-	memcpy( &hh [ ad ], "/index.lua", 10 );
-	ad += 10;
-	hh[ ad ] = '\0';	
-
-	//Get data.lua if it's available and load routes
-	fprintf( stderr, "about to execute: %s\n", hh );
-
-	if ( luaL_dofile( L, hh ) != 0 )
-	{
-		fprintf( stderr, "Error occurred!\n" );
-		if ( lua_gettop( L ) > 0 ) {
-			fprintf( stderr, "%s\n", lua_tostring( L, 1 ) );
-		}
-	}
-
-	//Converts what came from the stack
-	lua_loop( L );
-	lua_to_table( L, 1, &t );
-	lt_dump( &t );
-
-	//Reuse buffer for view file
-	ad = 0;
-	memcpy( &hh [ ad ], dir, strlen( dir ) ); ad += strlen( dir );
-	memcpy( &hh [ ad ], "/index.html", 11 ); ad += 11;
-	hh[ ad ] = '\0';	
-
-
-	//Initialize the rendering module	
-	//TODO: Error handling is non-existent here...
-	int fd = open( hh, O_RDONLY );
-	read( fd, renderblock, sizeof( renderblock )); 
-	close(fd);
-	render_init( &R, &t );
-	render_map( &R, (uint8_t *)renderblock, strlen( renderblock ));
-	render_render( &R ); 
-	rr = render_rendered( &R );
-	//write( 2, bf_data( rr ), bf_written( rr ) );
-
-#if 1
-	http_set_status( h, 200 );
-	http_set_content( h, "text/html", bf_data( rr ), bf_written( rr ));
-	//http_set_content_length( h, );
-	//http_set_content_type( h, "text/html" );
-#endif
-
-	render_free( &R );
-	lt_free( &t );
 	return 1;
 }
 

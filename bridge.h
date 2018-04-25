@@ -26,16 +26,6 @@
 	lua_setglobal( L, fn_name );
 
 
-#if 1
-#define LUA_DUMPSTK( L )
-#else
-#define LUA_DUMPSTK( L ) \
-	fprintf( stderr, "Line %d:\n", __LINE__ ); \
-	for ( int i=1; i <= lua_gettop(L); i++ ) \
-		printf("[%d] %s\n", i, lua_typename(L, lua_type(L, i))); \
-	getchar();
-#endif
-
 typedef enum 
 {
 	CC_NONE, 
@@ -60,11 +50,6 @@ typedef struct
 #endif
 } Loader;
 
-
-
-
-
-
 int table_to_lua (lua_State *, int, Table *);
 int lua_to_table (lua_State *, int, Table *);
 void lua_loop ( lua_State *L );
@@ -73,13 +58,8 @@ int lua_load_file2( lua_State *, Table *, const char *, char * );
 void lua_tdump (lua_State *L);
 void lua_stackclear ( lua_State *L );
 void lua_stackdump ( lua_State *L );
-#if 0
-void lua_stackdump ( lua_State *L, int *p, int *sd );
-#define lua_stackdump(L) \
-	do { int in=0, sd=0; lua__stackdump( L, &in, &sd ); } while ( 0 ) 
-#endif
-//Loader *parse_route( Loader *, int, Table *src, Table *route );
 Loader *parse_route( Loader *, int, HTTP *http, Table *routeTable );
 char *printCCtype ( CCtype cc );
 int lua_db ( lua_State *L );
 int lua_aggregate (lua_State *L);
+int abc ( lua_State *L ); 
