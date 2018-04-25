@@ -3,13 +3,9 @@
 -- This exists just to check that things work.
 --
 
-023
 print( env.headers.Accept );
-
---[[
 return {
 	frosty = "Santa"
  ,accept = env.Accept
  ,host   = env.Host
 }
---]]
