@@ -56,6 +56,9 @@ static const char *__errors[] =
   [ERR_DB_BIND_VALUE]   = "Failed to bind value." ,
   [ERR_DB_STEP]         = "Failed to execute statement." ,
   [ERR_DB_BIND_LONG]    = "Error binding SQL %s at position %d: %s." ,
+
+  [ERR_DB_QUERY]        = "No query specified." ,
+  [ERR_DB_NO]           = "No open database was detected." ,
 #endif
 
 #ifndef RAND_H 
@@ -118,6 +121,8 @@ static const char *__errors[] =
 };
 
 
+static char errmsg[ ERROR_LEN ];
+
 #ifndef UTIL_H
 //lf_         - an iterator for reading files sequentially
 //lf_start    - get "metadata" (size, chunks, etc)
@@ -150,7 +155,6 @@ int hashint( char *str )
 }
 
 
-
 //Write a string or blob as hex
 const char *hash_long ( char *dest, const unsigned char *src, int len, int dlen )
 {
@@ -164,6 +168,8 @@ const char *hash_long ( char *dest, const unsigned char *src, int len, int dlen 
 	return (char *)dest;
 }
 
+
+//
 const char *shash_long ( const char *src, int len )
 {
 	char aa[ 3 ] = { 0 };
@@ -188,8 +194,6 @@ const char *shash_long ( const char *src, int len )
 	bf_free( &b );
 	return f;
 }
-
-
 
 
 //Combine a string using varargs and buff
@@ -3752,12 +3756,14 @@ int sq_save (Database *db, const char *query, const char *name, const SQWrite *w
 
 	//Shut down attempts to send null queries
 	if ( !query ) {
+		return err( ERR_DB_NO ); 		
 		fprintf( stderr, "No query specified...\n" );
 		return 0;
 	}
 
 	//Shut down attempts to read unopened databases
 	if ( !db ) {
+		return err( ERR_DB_NO );
 		fprintf( stderr, "No open database was detected...\n" );
 		return 0;
 	}

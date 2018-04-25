@@ -36,6 +36,9 @@
  #include <netdb.h>
 #endif
 
+#ifndef ERROR_H
+ #define ERROR_LEN 2048
+#endif
 
 #if 0
  //Test suite stuff
@@ -103,15 +106,19 @@
 	fprintf(stderr, "Size of %-22s: %ld\n", #k, sizeof(k));
 
 #ifndef ERR_H
- #if 1
-  #define err(n, ...) (( fprintf(stderr, __VA_ARGS__) ? 0 : 0 ) || fprintf( stderr, "\n" ) ? n : n)
+ #ifndef ERROR_H
+  #define err(n, ...) ( snprintf( errmsg, ERROR_LEN, __VA_ARGS__ ) ? 0 : 0 )
+  #define berr(n, c) snprintf( errmsg, ERROR_LEN, "%s", __errors[ c ] ) ? n : n
+  #define perr(n, ...) ( snprintf( errmsg, ERROR_LEN, "%s: ", PROGRAM_NAME ) ? 0 : 0 ) || ( snprintf( s, __VA_ARGS__ ) ? 0 : 0 )
+ #else
+  #define err(n, ...) (( fprintf(stderr, __VA_ARGS__ ) ? 0 : 0 ) || fprintf( stderr, "\n" ) ? n : n)
   #define berr(n, c) fprintf(stderr, "%s\n", __errors[ c ] ) ? n : n
   #define perr(n, ...) ( fprintf(stderr, "%s: ", PROGRAM_NAME ) ? 0 : 0 ) || (( fprintf(stderr, __VA_ARGS__ ) ? 0 : 0 ) || fprintf( stderr, "\n" ) ? n : n )
- #else
-  #define err(n, ...) 0
-  #define berr(n, ...) 0
-  #define perr(n, c) fprintf(stderr, PROGRAM_NAME, fprintf(stderr, "%s\n", __errors[ c ] ) ? n : n
  #endif
+#else
+ #define err(n, ...) n
+ #define berr(n, c) n
+ #define perr(n, ...) n
 #endif
 
 #ifdef DEBUG_H
@@ -630,6 +637,9 @@ enum
 	ERR_DB_BIND_VALUE,
 	ERR_DB_STEP,
 	ERR_DB_BIND_LONG,
+	
+	ERR_DB_QUERY,
+	ERR_DB_NO,
 #endif
 #ifndef MEM_H
 #endif
@@ -715,6 +725,9 @@ typedef struct
   int written;
   int fixed;
   int error;
+ #ifndef ERROR_H
+	char errmsg[ERROR_LEN];
+ #endif
 } Buffer;
 #endif
 
@@ -739,6 +752,10 @@ typedef struct
        *catch,      //If you found *word, skip all other characters until you find this 
        *negate;     //If you found *word, skip *catch until you find this
   }              words[31];
+  int error;
+ #ifndef ERROR_H
+	char errmsg[ERROR_LEN];	
+ #endif
 } Parser;
 
 #endif
@@ -796,6 +813,9 @@ typedef struct
   unsigned char *buf   ;     //Pointer for trimmed keys and values
   LiteKv        *head  ;     //Pointer to the first element
   LiteTable     *current;    //Pointer to the first element
+ #ifndef ERROR_H
+	char errmsg[ERROR_LEN];	
+ #endif
   
 } Table;
 
@@ -862,6 +882,10 @@ struct Option
 	_Bool (*callback)(char **av, Value *v, char *err);
 	_Bool set;  /*If set is not bool, it can define the order of demos*/
 	_Bool sentinel;
+  int error;
+ #ifndef ERROR_H
+	char errmsg[ERROR_LEN];	
+ #endif
 };
 #endif
 
@@ -900,6 +924,10 @@ typedef struct
   
   Parser  *p;
   char     buf[RENDER_MAX_BUF_SIZE];
+  int error;
+ #ifndef ERROR_H
+	char errmsg[ERROR_LEN];	
+ #endif
  #ifdef RENDER_VERBOSE
   char     errbuf[ 4096 ];
  #endif
@@ -994,12 +1022,15 @@ typedef struct
   char   *qname;  //Name of query
   sqlite3      *db;
   sqlite3_stmt *stmt;
-  int error;
   /*Try to start using FLAGS*/
   _Bool         read_started;
   Buffer        header;  
   Buffer        results;  
   Table         kvt;
+  int error;
+ #ifndef ERROR_H
+	char errmsg[ERROR_LEN];	
+ #endif
 } Database;
 
 #endif
@@ -1238,16 +1269,11 @@ uint8_t *bf_data (Buffer *b) ;
 void bf_softinit (Buffer *b) ;
 #endif
 
-
 #ifndef PARSELY_H
 void pr_prepare( Parser *p );
 Parser *pr_next( Parser *p, unsigned char *src, int len );
 void pr_print ( Parser *p );
 #endif
-
-
-
-
 
 #ifndef TAB_H
 LiteType lt_add (Table *, int, LiteType, int, float, char *,
@@ -1299,7 +1325,6 @@ int render_map ( Render *r, uint8_t *src, int srclen );
 void render_dump_mark ( Render *r );
 Buffer *render_rendered (Render *r);
 #endif
-
 
 #ifndef SQROOGE_H
 _Bool sq_init (Database *);
