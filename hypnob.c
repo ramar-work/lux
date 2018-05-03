@@ -46,12 +46,11 @@ typedef struct
 
 File Filelist[] = 
 {
-	{ "app", 'd', S_IRWXU },
 	{ "assets", 'd', S_IRWXU },
-	{ "data", 'd', S_IRWXU },
+	{ "models", 'd', S_IRWXU },
 	{ "db", 'd', S_IRWXU },
 	{ "files", 'd', S_IRWXU },
-	{ "orm", 'd', S_IRWXU  },
+	{ "sql", 'd', S_IRWXU  },
 	{ "views", 'd', S_IRWXU  },
 	{ NULL }
 };
@@ -110,8 +109,7 @@ int init_hypno_local ( Option *opts, UserArgs *args, char *err )
 		return 1;
 	else if ( status == -1 && errno != ENOENT )
 		return ERRL( "Can't access directory: %s - %s.", args->confdir, strerror(errno) ); 
-	else if ( status == -1 ) 
-	{	
+	else if ( status == -1 ) {
 		VPRINT( "Creating directory: %s\n", args->confdir ) 
 
 		if ( mkdir( args->confdir, S_IRWXU ) == -1 )
@@ -142,64 +140,70 @@ void free_new ( UserArgs *args )
 int create_cmd ( Option *opts, UserArgs *args, char *err )
 {
 	File *f = Filelist;
+	Database db;
+	memset(&db,0,sizeof(db));
 	char *file = NULL;
 	int   fd = 0;
 	char *hash = 0;
 	char  md[ 2048 ] = { 0 };
 
 	if ( !args->dirname )
-		return 0;
-	else 
-	{
-#if 1
-		//Hash first 12 characters to make a unique id
-		SQWrite SqlCheck[] = 
-		{{ SQ_TXT, .v.c = ( hash = (char *)shash_long( args->sitename, 4 ) ) }};
-	#if 0
-		if ( sq_insert_oneshot( args->dbpath, CheckStmt, SqlCheck ) )
-		{ //If the hash exists, die...
-			return err( 0, "Site bla already exists..." );
-		}
-	#endif
-#endif
-		
-		//Create directories
-		mkdir( args->dirname, S_IRWXU );
-		while ( f->name != NULL ) 
-		{
-			file = strcmbd( "/", args->dirname, f->name );
-			fprintf( stderr, "Creating directory: %s\n", file );
-			( f->type == 'd' ) ? mkdir( file, f->mode ) : 0;
-			free( file ); 
-			f++;
-		}
-
-		//Generate metadata
-		file = strcmbd( "/", args->dirname, "data.lua" );
-		fprintf( stderr, "Creating metadata file: %s\n", file );
-		if ( (fd = open( file, O_CREAT | O_RDWR, S_IRWXU )) == -1 )
-			return err( 0, "Error opening file: %s\n", strerror( errno ) );
+		return ERRL( "Argument --at either not specified or empty." );
 	
-		fprintf( stderr, "%s\n", md );
-		write( fd, md, strlen( md )); 
-		close( fd );
-		free( file );
+	//Hash first 12 characters to make a unique id
+	SQWrite SqlCheck[] = {
+		{ SQ_TXT, .v.c = ( hash = (char *)shash_long( args->sitename, 4 ) ) }
+	 ,{ .sentinel = 1 }
+	};
 
+	if ( !sq_save( &db, CheckStmt, "check", NULL ) ) 
+		return ERRL( "Failed to access database data:..." );// %s.", db.error );
 
-		//Add a record to a database
-		SQWrite SqlImporter[] = 
-		{
-			{ SQ_TXT, .v.c = hash },
-			{ SQ_TXT, .v.c = (char *)args->sitename },
-			{ SQ_TXT, .v.c = (char *)args->dirname },
-			{ SQ_DTE },
-			{ SQ_DTE },
-			{ .sentinel = 1 }
-		};
-
-		if ( !sq_insert_oneshot( args->dbpath, AddStmt, SqlImporter ) )
-			return err( 0, "Failed to add database record for new site." );
+	lt_dump( &db.kvt );
+#if 0
+	if ( sq_insert_oneshot( args->dbpath, CheckStmt, SqlCheck ) )
+	{ //If the hash exists, die...
+		return err( 0, "Site bla already exists..." );
 	}
+#endif
+
+	return ERRL("mrdrmrdr mrdr kill kill killll" );	
+	//Create directories
+	mkdir( args->dirname, S_IRWXU );
+	while ( f->name != NULL ) 
+	{
+		file = strcmbd( "/", args->dirname, f->name );
+		fprintf( stderr, "Creating directory: %s\n", file );
+		( f->type == 'd' ) ? mkdir( file, f->mode ) : 0;
+		free( file ); 
+		f++;
+	}
+
+	//Generate metadata
+	file = strcmbd( "/", args->dirname, "data.lua" );
+	fprintf( stderr, "Creating metadata file: %s\n", file );
+	if ( (fd = open( file, O_CREAT | O_RDWR, S_IRWXU )) == -1 )
+		return err( 0, "Error opening file: %s\n", strerror( errno ) );
+
+	fprintf( stderr, "%s\n", md );
+	write( fd, md, strlen( md )); 
+	close( fd );
+	free( file );
+
+
+	//Add a record to a database
+	SQWrite SqlImporter[] = 
+	{
+		{ SQ_TXT, .v.c = hash },
+		{ SQ_TXT, .v.c = (char *)args->sitename },
+		{ SQ_TXT, .v.c = (char *)args->dirname },
+		{ SQ_DTE },
+		{ SQ_DTE },
+		{ .sentinel = 1 }
+	};
+
+	if ( !sq_insert_oneshot( args->dbpath, AddStmt, SqlImporter ) )
+		return err( 0, "Failed to add database record for new site." );
 
 	return 1;
 }
@@ -249,9 +253,9 @@ int list_cmd ( Option *opts, UserArgs *args, char *err )
 
 Option opts[] =
 {
-	{ "-c", "--create",   "Create a new application directory here.",'s' },
-	{ "-l", "--list",     "List all sites and their statuses." },
+	{ "-c", "--create",   "Create a new application directory here.", 's' },
 	{ "-e", "--eat",      "Feed this a certain URL and see how it evaluates.",'s' },
+	{ "-l", "--list",     "List all sites and their statuses." },
 
 	{ "-a", "--at",       "Create a new application directory here.",'s' },
 	{ "-n", "--name",     "Use this as a site name.", 's' },
@@ -279,8 +283,13 @@ int main (int argc, char *argv[])
 	UserArgs ua;
 	memset( &ua, 0, sizeof(UserArgs));
 	ua.dirname = opt_get( opts, "--at" ).s;
-	ua.sitename = opt_get( opts, "--name" ).s;
+	ua.sitename = !opt_get( opts, "--create" ).s
+		? opt_get( opts, "--name" ).s : opt_get( opts, "--create" ).s; 
 	ua.domain = opt_get( opts, "--domain" ).s;
+
+	//Check --flag
+	if ( ua.sitename[0] == '-' || ua.sitename[1] == '-' )
+		return fprintf( stderr, PROG ": --create or --name does not have an argument." ) ? 1 : 1;
 
 	//Check if the HOME/.hypno directory exists, creating it if it does not.
 	if ( !init_hypno_local( opts, &ua, err ) )
