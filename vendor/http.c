@@ -238,22 +238,29 @@ int http_get_remaining (HTTP *h, uint8_t *msg, int len)
 	HTTP_Request *r = &h->request;
 	LiteBlob *host = NULL;
 	int runner = 0;
-	struct HS { char *name,a,s; Parser p; /*LiteKv *kv;*/ uint8_t *msg; int ml, type, inc; } hs[] = 
+#if 1
+	struct HS { 
+		char *name, a, s; 
+		Parser p; 
+		/*LiteKv *kv;*/ 
+		uint8_t *msg; 
+		int ml, type, inc; 
+	} hs[] = 
 	{
 		//URL
-		{ "URL",'u', 0  ,.p.words = {{"/"}, {"?"}, {"\0"}, {NULL}},
+		{ "URL",'u', 0  ,{ .words = {{"/"}, {"?"}, {"\0"}, {NULL}} },
 			/*r->URL,*/ (uint8_t *)r->path, strlen(r->path), 1, 0 },
 		//Headers
-		{ "headers",'h','\n',.p.words = {{"\r\n"}, {":"}, {"="}, {";"}, {NULL}},
+		{ "headers",'h','\n',{ .words = {{"\r\n"}, {":"}, {"="}, {";"}, {NULL}} },
 			/*r->headers, */  msg, r->hlen    , 1, 1 },
 		/*GET*/
-		{ "GET",'g','?' ,.p.words = {{"?"}, {"&"}, {"="}, {NULL}},
+		{ "GET",'g','?' ,{ .words = {{"?"}, {"&"}, {"="}, {NULL}} },
 			/*r->GET,*/ (uint8_t *)r->path, strlen(r->path), 1, 1 },
 		/*MPP*/
-		{ "POST",'m', 0  ,.p.words = {{r->boundary},{"\r\n\r\n"},{"\r\n"},{":"},{"="},{";"},{NULL}},
+		{ "POST",'m', 0  ,{ .words = {{r->boundary},{"\r\n\r\n"},{"\r\n"},{":"},{"="},{";"},{NULL}} },
 			/*r->body,*/ &msg[r->hlen + 4], r->clen        , 1, 0 },
 		/*APP*/
-		{ "POST",'a', 0  ,.p.words = {{"\r\n"}, {":"},{"="},{"&"},{NULL}},
+		{ "POST",'a', 0  ,{ .words = {{"\r\n"}, {":"},{"="},{"&"},{NULL}} },
 			/*r->body,*/ &msg[r->hlen + 4], r->clen        , 1 }
 	};
 
@@ -446,6 +453,7 @@ int http_get_remaining (HTTP *h, uint8_t *msg, int len)
 		memcpy( h->hostname, host->blob, pos );
 		h->hostname[ pos ] = '\0';		
 	}
+#endif
 	return 1;
 }
 

@@ -352,8 +352,9 @@ Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
 		count++;
 
 	//Fail if this happens, b/c the URL wasn't done right
-	if ( count < 2 )
-		return err( NULL, "URL doesn't exist." );
+	if ( count < 2 ) {
+		return NULL; //err( NULL, "URL doesn't exist." );
+	}
 
 	//Reset count and set index to the top of the URL chain
 	url_ind -= count;	
@@ -479,7 +480,7 @@ int lua_db ( lua_State *L )
 	}
 
 	//Save the results to table
-	if ( !sq_save( &b, final_query, "db", NULL ) )
+	if ( !sq_lexec( &b, final_query, "db", NULL ) )
 	{
 		fprintf( stderr, "Error was: %d, %s\n", __LINE__, "unknown as of yet..." );
 		return 0; /*return an error to Lua*/
