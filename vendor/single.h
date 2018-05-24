@@ -1,4 +1,39 @@
-/*single.h*/
+/*
+ * single.h
+ * --------
+ *
+ *  This library has gotten big.  It handles most basic utilities. 
+ *  Let's start with errors.
+ *
+ *  There are two ways to report errors from the library.  A third one is being worked on to make it easier for embedded libraries to do their thing.
+ *
+ *  1) There is a member called error of type int on all functions that use a specific struct.  
+ *  This can be used to do either sstrerror() or something similar.
+ *  Compile with -DERRV_H to get this behavior.
+ *
+ *
+ *  2) The simplest way to report errors involves using a structure type that makes all of the structs much larger.  
+ *  The 'error' member present in each structure is there and also a member named 'errmsg'.  
+ *  The length of this message can be changed at compile time via ERRV_LENGTH.
+ * 	No compile options are needed for this behavior.
+ *
+ *
+ *  *) The lightest version will just return a status from the function (true or false nine times out of ten).
+ *  An errno like number is used to tell what exactly occurred.  It's a static variable.  This would be the lightest solution.
+ *  Compile with -DERR_H to get this behavior.
+ *  This is not done yet.
+ * 
+ *  Right now, there are three macros that handle actualy returning errors:
+ *
+ *  err( ) - Handles message output and returns a status (or simply returns a status)
+ *  serr( ) - Handles message output and returns a status using the appropriate struct member.  ( e.g. assuming I've initialized Buffer *b somewhere, serr() will use b->errmsg to hold the error string.
+ *  perr( ) - Will use a defined program name to report errors and error messages.
+ *
+ *  Line numbers can also be compiled in and out when bugs are tricky.  
+ *  Admittedly, this is mostly for my own purposes, but it can be useful outside of testing.
+ *  Use -DERRLNO_H to enable line number and function macros as part of error messages.
+ *
+ * */
 //Start with includes, not all modules need all headers
 #ifndef _WIN32
  #define _POSIX_C_SOURCE 200809L
@@ -103,14 +138,73 @@
 	fprintf(stderr, "Size of %-22s: %ld\n", #k, sizeof(k));
 
 #ifndef ERR_H
- #if 1
-  #define err(n, ...) (( fprintf(stderr, __VA_ARGS__) ? 0 : 0 ) || fprintf( stderr, "\n" ) ? n : n)
-  #define berr(n, c) fprintf(stderr, "%s\n", __errors[ c ] ) ? n : n
-  #define perr(n, ...) ( fprintf(stderr, "%s: ", PROGRAM_NAME ) ? 0 : 0 ) || (( fprintf(stderr, __VA_ARGS__ ) ? 0 : 0 ) || fprintf( stderr, "\n" ) ? n : n )
+	//TODO: There isn't a great way to solve the vararg problem.  
+	//I've pasted a test program below to illustrate how
+	//difficult it can get to do this right.
+	#if 0
+			#include <stdio.h>
+
+			#define VA(...) \
+				fprintf( stderr, "va args is '%s' long\n", ##__VA_ARGS__ ) 
+
+			int main (int argc, char *argv[] ) {
+				//how long is va args here?
+				VA( "aasdfsadf", "cbcdfef" );
+				//how about here?
+				VA( " " );
+				//and here?
+				VA( NULL );
+				//how about here?
+				VA( );
+			}
+	#endif
+
+	//TODO: the option to add \n should be somewhere too
+ #ifndef ERRV_H
+	#define ERRV_LENGTH 2048
+ #endif
+
+	//TODO: I can compile with line numbers using the following #define, but
+	//I may also want to compile without char errmsg[] in the library's structs.
+	//I say all this to say that the same logic below will be needed in that conditional as well.
+ #ifdef ERRLNO_H
+  #define err(n, ...) ( \
+		( fprintf( stderr, __VA_ARGS__ ) ? 0 : 0 ) || \
+		(	fprintf( stderr, "\n" ) ? n : n ) \
+	)
+
+	//Uses s->error as a temporary hold for current buffer length.
+  #define serr(n, s, ...) ( \
+		((s->error = snprintf(s->errmsg, ERRV_LENGTH - 1, "[%s:%d, %s] ", __FILE__, __LINE__, __func__ )) ? 0 : 0 ) || \
+		( snprintf(&s->errmsg[ s->error ], ERRV_LENGTH - 1, __SingleLibErrors[ n ], __VA_ARGS__ ) ? 0 : 0 ) || \
+		((s->error = n) ? 0 : 0 ) \
+	)
+
+  #define perr(n, c) ( \
+		( fprintf(stderr, "%s", PROGRAM_NAME) ? 0 : 0 ) || \
+		( fprintf(stderr, "%s\n", __SingleLibErrors[ c ] ) ? n : n ) \
+	)
+
  #else
-  #define err(n, ...) 0
-  #define berr(n, ...) 0
-  #define perr(n, c) fprintf(stderr, PROGRAM_NAME, fprintf(stderr, "%s\n", __errors[ c ] ) ? n : n
+  #define err(n, ...) ( \
+		( fprintf( stderr, __VA_ARGS__ ) ? 0 : 0 ) || \
+		(	fprintf( stderr, "\n" ) ? n : n ) \
+	)
+
+  #define serr(n, s, ...) ( \
+		((s->error = n) ? 0 : 0 ) || \
+		( snprintf(s->errmsg, ERRV_LENGTH - 1, __SingleLibErrors[ n ], __VA_ARGS__ ) ? n : n ) \
+	)
+
+  #define perr(n, c) ( \
+		( fprintf(stderr, "%s", PROGRAM_NAME) ? 0 : 0 ) || \
+		( fprintf(stderr, "%s\n", __SingleLibErrors[ c ] ) ? n : n ) \
+	)
+#if 0
+  #define err(n, ...) (( fprintf(stderr, __VA_ARGS__) ? 0 : 0 ) || fprintf( stderr, "\n" ) ? n : n)
+  #define serr(n, s, ...) ((s->error = n ) ? 0 : 0 ) || ( snprintf(s->errmsg, ERRV_LENGTH - 1, __SingleLibErrors[ n ], __VA_ARGS__ ) ? n : n ) 
+  #define perr(n, c) ( fprintf(stderr, "%s", PROGRAM_NAME) ? 0 : 0 ) || ( fprintf(stderr, "%s\n", __SingleLibErrors[ c ] ) ? n : n )
+#endif
  #endif
 #endif
 
@@ -140,6 +234,10 @@
   write( 2, d, len ); \
   write( 2, "'", 1 ); \
   write( 2, "\n", 1 )
+
+ #define VPRINT(...) \
+	fprintf( stderr, "[%s:%d @%s]", __FILE__, __LINE__, __func__ ); \
+	fprintf( stderr, __VA_ARGS__ )
 #else
   #define PATH( a )
 	#define SUSP(...)
@@ -147,6 +245,7 @@
   #define SHOWDATA(...)
 	#define SHOWBDATA(a,b, ...) 
 	#define ENCAPS( d, len )
+	#define VPRINT(...)
 #endif
 
 
@@ -156,6 +255,7 @@
   hash_long( dest, (unsigned char *)src, strlen((char *)src), len )
 #endif
 
+
 #ifndef PARSELY_H
  #define PARSER_MAXMATCH_LEN 127
  #define PARSER_MOD 31 
@@ -163,9 +263,12 @@
  #define PARSER_NEGATE_MATCH 1 << 0
 #endif
 
+
 #ifndef TAB_H
  #define LT_POLYMORPH_BUFLEN 2048
  #define LT_MAX_HASH 7 
+ #define lt_dump(t) \
+	lt_exec( t, &__lt_int, __lt_dump )
  #define lt_blob_at( t, i ) \
  	lt_ret( t, LITE_BLB, i )->vblob
  #define lt_blobdata_at( t, i ) \
@@ -625,7 +728,15 @@ enum
 #endif
 #ifndef SQROOGE_H 
 	ERR_DB_OPEN,
+	ERR_DB_UNINITIALIZED,
+	ERR_DB_NO_QUERY,
 	ERR_DB_CLOSE,
+	ERR_DB_COLUMN_MAX,
+	ERR_DB_COLUMN_ADD,
+	ERR_DB_ZERO_TERM,
+	ERR_DB_ADD_VALUE,
+	ERR_DB_ADD_TERM,
+	ERR_DB_RESULT_INIT,
 	ERR_DB_PREPARE_STMT,
 	ERR_DB_BIND_VALUE,
 	ERR_DB_STEP,
@@ -638,10 +749,14 @@ enum
 #ifndef TIMER_H
 	ERR_LITE_TIMER_ERROR,
 #endif
-#ifndef OPTION_H 
-	ERR_LITE_OPT_EXPECTED_ANY,
-	ERR_LITE_OPT_EXPECTED_STRING,
-	ERR_LITE_OPT_EXPECTED_NUMBER,
+#ifndef OPT_H 
+	ERR_OPT_UNINITIALIZED,
+	ERR_OPT_TOO_LONG,
+	ERR_OPT_UNEXPECTED_FLAG,
+	ERR_OPT_UNEXPECTED_ARGUMENT,
+	ERR_OPT_EXPECTED_ANY,
+	ERR_OPT_EXPECTED_STRING,
+	ERR_OPT_EXPECTED_NUMBER,
 #endif
 #ifndef SOCKET_H 
 	ERR_LITE_SOCKET_EXPECTED_ANY,
@@ -693,10 +808,10 @@ enum
 	ERR_FILE_READ_ERROR,
 	ERR_FILE_CLOSE,
 #endif
+#ifndef FILES_H
+#endif
 	ERR_ERR_INDEX_MAX,
 };
-
-
 
 
 #ifndef MIME_H
@@ -707,6 +822,16 @@ typedef struct
 } Mime; 
 #endif
 
+
+#ifndef ERR_H
+typedef struct
+{
+	int error;
+	char name[2048];
+	char err[2048];
+} Err;
+#endif
+
 #ifndef BUFF_H
 typedef struct 
 {
@@ -714,9 +839,29 @@ typedef struct
   int size;
   int written;
   int fixed;
+ #ifndef ERR_H
   int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
 } Buffer;
 #endif
+
+
+#ifndef FILES_H
+typedef struct 
+{
+	struct stat sb;
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
+} FileInfo;
+#endif
+
 
 #ifndef PARSELY_H
 typedef struct 
@@ -739,9 +884,15 @@ typedef struct
        *catch,      //If you found *word, skip all other characters until you find this 
        *negate;     //If you found *word, skip *catch until you find this
   }              words[31];
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
 } Parser;
-
 #endif
+
 
 #ifndef TAB_H
 //Define a type polymorph with a bunch of things to help type inference
@@ -784,18 +935,23 @@ typedef struct
                 index  ,     //Index to current element
                 count  ,     //Elements in table
                 *rCount;     //Elements in current table 
-  int           error  ;     //An error occurred, read it...
-  int           mallocd;     //An error occurred, read it...
-  int           srcmallocd;  //An error occurred, read it...
-  int           size   ;     //Size of newly trimmed key or pointer
-  int           cptr;        //Table will stop here
-  int           start  ,     //Table bounds are here if "lt_within" is used
+  int           mallocd,     //An error occurred, read it...
+                srcmallocd,  //An error occurred, read it...
+                size   ,     //Size of newly trimmed key or pointer
+                cptr   ,     //Table will stop here
+                start  ,     //Table bounds are here if "lt_within" is used
                 end    ,
                 buflen ;
   unsigned char *src   ;     //Source for when you need it
   unsigned char *buf   ;     //Pointer for trimmed keys and values
   LiteKv        *head  ;     //Pointer to the first element
   LiteTable     *current;    //Pointer to the first element
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
   
 } Table;
 
@@ -862,6 +1018,12 @@ struct Option
 	_Bool (*callback)(char **av, Value *v, char *err);
 	_Bool set;  /*If set is not bool, it can define the order of demos*/
 	_Bool sentinel;
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
 };
 #endif
 
@@ -900,6 +1062,12 @@ typedef struct
   
   Parser  *p;
   char     buf[RENDER_MAX_BUF_SIZE];
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
  #ifdef RENDER_VERBOSE
   char     errbuf[ 4096 ];
  #endif
@@ -913,6 +1081,8 @@ enum {
 	SQL_JUICY,
 };
 
+#define SQ_TYPE(n) \
+	( n >= SQ_INT && n <= SQ_DTE ) ? sq_names[ n ] : "unknown"
 
 #if 0
 static const char *sq_names[] = {
@@ -988,18 +1158,23 @@ typedef struct
 
 typedef struct 
 {
-  const char   *filename;
-  const char   *sql;
-  const char   *table;
-  char   *qname;  //Name of query
+  char   *filename,
+         *sql,
+         *table,
+         *qname;  //Name of query
   sqlite3      *db;
   sqlite3_stmt *stmt;
-  int error;
-  /*Try to start using FLAGS*/
+  //Try to start using FLAGS
   _Bool         read_started;
   Buffer        header;  
-  Buffer        results;  
+  Buffer        results;
   Table         kvt;
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
 } Database;
 
 #endif
@@ -1009,6 +1184,12 @@ typedef struct
 {
 	struct timespec rand_ts;
 	char   buf[RAND_BUF_SIZE];
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
 } Random;
 #endif
 
@@ -1031,13 +1212,19 @@ typedef struct
   timespec    start,     
               end;      
 	const char *label; 
+	LiteTimetype  type;     
+	char        ts_string[1024];
  #ifdef DEBUG_H 
   const char *file;        
 	int         linestart,   
               lineend;	  
  #endif
-	LiteTimetype  type;     
-	char        ts_string[1024];
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
 } Timer;
 #endif
 
@@ -1050,6 +1237,12 @@ typedef struct
          size,  //Size of something
 	         it;
 	uint8_t chr;  //Character found
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
 } Mem ;
 #endif
 
@@ -1099,6 +1292,12 @@ typedef struct
        srvaddrlen;     //Server
 	size_t addrsize;     //Address information size
 	void *ssl_ctx  ;                  /* If SSL is in use, use this */
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
 } 
 Socket;
 #endif
@@ -1134,14 +1333,14 @@ typedef struct
                     recvd, 
                      sent;  //Total bytes sent or received
   uint8_t          errbuf[2048];  //For error messages when everything may fail
-#if 0
+ #if 0
   int          request_fd;  
   int         response_fd;
-#endif
-#ifdef NW_BUFF_FIXED
+ #endif
+ #ifdef NW_BUFF_FIXED
   uint8_t        request_[NW_MAX_BUFFER_SIZE];
   uint8_t       response_[NW_MAX_BUFFER_SIZE];
-#endif
+ #endif
   uint8_t        *request;
   uint8_t       *response;
 	Buffer       _request;
@@ -1151,13 +1350,19 @@ typedef struct
 	int          send_retry;/*5*/
 	int          *socket_fd;  //Pointer to parent socket?
 	struct pollfd   *client;  //Pointer to currently being served client
-#ifndef NW_DISABLE_LOCAL_USERDATA
+ #ifndef NW_DISABLE_LOCAL_USERDATA
 	void          *userdata;
-#endif
+ #endif
 	//This allows nw to cut connections that have been on too long
 	struct timespec start;
 	struct timespec end;
 	int      status; 
+ #ifndef ERR_H
+  int error;
+	#ifndef ERRV_H
+	char  errmsg[ ERRV_LENGTH ];
+	#endif 
+ #endif
 } Recvr;
 
 
@@ -1255,7 +1460,11 @@ LiteType lt_add (Table *, int, LiteType, int, float, char *,
 Table *lt_init (Table *, LiteKv *, int) ;
 void lt_printall ( Table *t );
 void lt_finalize (Table *t) ;
-void lt_dump (Table *t) ;
+int __lt_dump ( LiteKv *kv, int i, void *p );
+unsigned int __lt_int;
+//void lt_dump (Table *t) ;
+//void lt_complex_exec (Table *t, int (*fp)( LiteType t, LiteValue *k, LiteValue *v, void *p ) );
+int lt_exec (Table *t, void *p, int (*fp)( LiteKv *kv, int i, void *p ) );
 int lt_move(Table *t, int dir) ;
 static void lt_printindex (LiteKv *tt, int ind);
 LiteType lt_rettype( Table *t, int side, int index );
@@ -1305,6 +1514,7 @@ Buffer *render_rendered (Render *r);
 _Bool sq_init (Database *);
 _Bool sq_open (Database *, const char *filename) ;
 _Bool sq_exec (Database *, const char *sql) ;
+ int sq_lexec (Database *, const char *, const char *, const SQWrite *);
 _Bool sq_insert (Database *, const char *sql, const SQWrite *w);
 _Bool sq_reader_start (Database *, const char *sql, const SQWrite *w) ;
 _Bool sq_reader_continue (Database *) ;
@@ -1312,10 +1522,10 @@ int sq_reader_find (Database *, const char *colname) ;
 _Bool sq_close (Database *);
 int sq_find (Database *, const char *);
 void print_db (Database *) ;
-_Bool sq_create_oneshot (const char *, const char *) ;
-int sq_insert_oneshot (const char *, const char *, const SQWrite *) ;
-uint8_t *sq_read_oneshot(const char *, const char *, int) ;
-int sq_get_query_size ( sqlite3_stmt *stmt ) ;
+_Bool sq_create_oneshot (const char *, const char *, char *) ;
+int sq_insert_oneshot (const char *, const char *, const SQWrite *, char *) ;
+uint8_t *sq_read_oneshot(const char *, const char *, int, char *) ;
+//int sq_get_query_size ( sqlite3_stmt *stmt ) ;
 _Bool sq_setval (SQWrite *j, uint8_t *p, int len) ;
 void sq_write_print (Database *, SQWrite *) ;
 void sq_write_value_print (SQWrite *) ;
@@ -1489,9 +1699,8 @@ const char *hash_long ( char *dest, const unsigned char *src, int len, int dlen 
 #ifndef OPT_H
 _Bool opt_usage (Option *, const char *, const char *, int);
 _Bool opt_eval (Option *opts, int argc, char **argv);
- //union opt_value *get(Option *opts, const char *name);	
 _Bool opt_set (Option *opts, const char *flag); 
 Value opt_get (Option *opts, const char *flag); 
-
+//union opt_value *get(Option *opts, const char *name);	
 #endif
 #endif

@@ -1,23 +1,33 @@
 ???
 ---
 
-x negotiate the system path from the hostname
+hypnob:
+	- first run: 
+	x	create a folder at ~/.hypno
+	x	create a database
+	x	create the first table (or the others)
+	x	fail on empty list
+		fail on blank --create // crashes...
+		show all list items without crashing
+		create a site folder successfully
 
-- define how to handle files that aren't scripts
-	1) do I use a mimetype?
-	2) is there a better way to let hypno figure it out?
 
-	check if the file is a regular file or not, use mimetypes when it is
-	leave no rules for now...
-	keep all handlers in some big table... maybe
+single stuff:
+	- add sq_oneshot?
+
+- ready 2 start writing bind functions.  Tables / JSON should be returned by everything...
+
 
 - load model subtables as filenames
+
 
 - what would a bunch of automated tests look like?
 	http_run - test routes
 	http_run - test Lua functions (which need their own tests)
+
 	
 - write some basic dump functions to test HTTP run at different parts in the process (what does that mean?  stop at table_to_lua and examine results, stop at parse_route and examine results, etc.)
+
 
 - write (either from scratch or not) new directories that hypno can read
 	database should be setup somewhere in there... 

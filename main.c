@@ -457,8 +457,12 @@ int file_cmd( Option *opts, char *err )
 	if ( !lt_init( &t, NULL, 127 ) ) 
 		return ERRL( "Couldn't initialize table for file reading."  );
 
-	if ( !lua_load_file( L, f, &err ) )
-		return ERRL( "Couldn't run file %s.  Error: %s", f, err  );
+	if ( !lua_load_file( L, f, &err ) ) {
+		//TODO: Why does ERRL( str, f, err ) throw a compiler error? 
+		char err2[4096] = { 0 };
+		snprintf( err2, 4095, "%s", err );
+		return ERRL( "Couldn't run file %s.  Error: %s", f, err2 );
+	}
 
 	lua_to_table( L, 1, &t );
 	lt_dump( &t );
