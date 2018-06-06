@@ -30,6 +30,11 @@ cli: test-build-$(OS)
 cli: 	
 	@printf ''>/dev/null
 
+#Objects
+#.c.o:
+#	@echo $(CC) $(CFLAGS) -c $<
+#	@$(CC) $(CFLAGS) -c $<
+
 # This tests how hypno starts with a certain set of criteria.
 goku:
 	./hypno --no-daemon --start --port $(PORT) 
