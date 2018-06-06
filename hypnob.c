@@ -9,12 +9,12 @@
 #define DB_SITELIST "hypno_sitelist"
 
 #define PRINT_UA( args ) \
-	fprintf( stderr, "%s\n", args->dirname ); \
-	fprintf( stderr, "%s\n", args->sitename ); \
-	fprintf( stderr, "%s\n", args->domain ); \
-	fprintf( stderr, "%s\n", args->home ); \
-	fprintf( stderr, "%s\n", args->confdir ); \
-	fprintf( stderr, "%s\n", args->dbpath );
+	nsprintf(args->dirname ); \
+	nsprintf(args->sitename ); \
+	nsprintf(args->domain ); \
+	nsprintf(args->home ); \
+	nsprintf(args->confdir ); \
+	nsprintf(args->dbpath );
 
 #ifdef INCLUDE_LINE_NO_ERROR_H
  #define ERRL(...) \
@@ -312,7 +312,7 @@ int main (int argc, char *argv[])
 	ua.dirname = opt_get( opts, "--at" ).s;
 	ua.sitename = ( !opt_set( opts, "--create" ) ) ? opt_get( opts, "--name" ).s : opt_get( opts, "--create" ).s; 
 	ua.domain = opt_get( opts, "--domain" ).s;
-return 0;
+	PRINT_UA( (&ua) );
 
 
 	//Check --flag

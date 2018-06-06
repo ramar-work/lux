@@ -318,6 +318,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 	//Rewind Loader ptr and load each view's raw text
 	l = &ld[0];
+	lt_dump( &model );
 
 	//Load each view into a single buffer (can be malloc'd uint8 for now)
 	while ( l->content ) {
