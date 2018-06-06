@@ -6,22 +6,90 @@ A two-file library for common things in C (and eventually C++)
 LICENSE
 -------
 
-DOCUMENTATION
--------------
+Summary
+-------
+single.c is a two file open-source library for common functionality in C.
 
-TESTS
+It includes:
+- TCP Sockets
+- Buffers
+- Option processing
+- Parsing primitives
+- A Mime library
+- A clock timer
+- Rendering
+- A Table implementation (similar to Lua's table structure)
+- A JSON parser
+- An SQL driver (but only for SQLite right now)
+- Random number and string generator
+- ...and many general utilities
+
+
+Usage
 -----
+### Building
+
+An object can be built with the following:
+<pre>
+$	gcc -Wall -Werror -Wno-unused -c single.c  
+</pre>
+
+### Using with your programs
+Reference the library's functions using 
+<pre>
+#include "single.h"
+</pre>
+
+### Package selection 
+
+single will let you remove certain parts of the build by defining compile-time flags.  For example, if you do not want
+the timer library, you can define TIMER_H to skip building the module. 
+<pre>
+$	gcc -Wall -Werror -Wno-unused -c single.c -DTIMER_H
+</pre>
+
+There are about seven different parts that comprise the utilities used to make single.c work.
+
+| Library    | Flag             | Description
+| ---------- | ----             | ----------- 
+| buffer     | -DBUFFER_H       | Includes support for buffers.
+| socket     | -DSOCKET_H       | Includes support for sockets.
+| file       | -DFILES_H        | File system writing and reading.
+| nw         | -DSINW_H         | Single includes part of a library called <a href="https://github.com/zaiah-dj/tmnw">tmnw</a> that handles TCP sockets and handy abstractions for servers.
+| errors     | -DERR_H          | Includes support for strerror functionality.  This can be defined out to save space in a final binary.
+| parsely    | -DPARSELY_H      | Includes support for writing basic parsers.
+| tab        | -DTAB_H          | Includes support for a hash table library. 
+| render     | -DRENDER_H       | Includes support for a basic templating system.
+| sqrooge    | -DSQROOGE_H      | includes support for SQL engine work. ( Only works with Sqlite3 for now)
+| timer      | -DTIMER_H        | Includes support for precision timing.
+| mem        | -DMEM_H          | Includes support for improved memory utilities.
+| json       | -DJSON_H         | Includes support for parsing JSON
+| random     | -DRAND_H         | Includes support for working with random numbers. 
+| options    | -DOPT_H          | Includes support for basic option processing.
+
+Unfortunately, basic graphics support is not included.   Single's best uses are for utilities, command line and daemon programs.   I am working on another library that will solve some basic graphics needs called <a href="https://github.com/zaiah-dj/canvas">Canvas</a>. 
+
+
+Tests
+-----
+Running `make` in single's project directory will yield a test programcalled 'single-test'.  Running:
+<pre>
+./single-test --all
+</pre>
+
+will run tests for all of the program's libraries.
+
 
 TODO
 ----
-Package a tool to create documentation here.
-Package a way to build tests here.
+- Package a tool to create documentation here.
+- Package a way to build tests here.
+- Add `file` support.  Just need to take the time to do it.
+- 
 
  * ------------------------------------------- */
 
 #include "single.h"
-
-//This flag is here to control how table counts work...
 
 static const unsigned int lt_hash = 31;
 
@@ -81,11 +149,12 @@ static const char *__SingleLibErrors[] =
 #ifndef OPT_H 
 	[ERR_OPT_UNINITIALIZED]  = "Option module uninitialized\n",
 	[ERR_OPT_TOO_LONG]                  = "Option flag too long\n",
-	[ERR_OPT_UNEXPECTED_FLAG]           = "Received unexpected flag\n",
+	[ERR_OPT_UNEXPECTED_FLAG]           = "Received unexpected flag: %s\n",
 	[ERR_OPT_UNEXPECTED_ARGUMENT]       = "Received unexpected argument\n",
 	[ERR_OPT_EXPECTED_ANY]              = "Expected argument after flag %s\n" ,
-	[ERR_OPT_EXPECTED_STRING]           = "Expected string after flag %s\n" ,
-	[ERR_OPT_EXPECTED_NUMBER]           = "Expected number after flag %s\n" ,
+	[ERR_OPT_EXPECTED_STRING_ARG]       = "Expected string after flag %s\n" ,
+	[ERR_OPT_EXPECTED_NUMERIC_ARG]      = "Expected number after flag %s\n" ,
+	[ERR_OPT_VALIDATION_FAILED]         = "Validation failed.\n" ,
 #endif
 
 #ifndef SOCKET_H 
@@ -360,6 +429,8 @@ unsigned char *trim (uint8_t *msg, char *trim, int len, int *nlen)
 
 
 #ifndef OPT_H
+static char opt_errmsg[ ERRV_LENGTH ] = { 0 };
+
 //Set values when the user asks for them
 static _Bool opt_set_value (char **av, Value *v, char type, char *err) 
 {
@@ -453,22 +524,83 @@ Value opt_get (Option *opts, const char *flag)
 
 //Evaluate options that the user gave and die with a message
 _Bool opt_eval (Option *opts, int argc, char **av) {
-	//Evaulate options
-	char buf[1024]={0};
+	char buf[1024] = { 0 };
+
+	//Since this "object" is moved through, the errmsg needs to point to the same string
+	#if 0
+	if ( 1 ) {
+		Option *o1 = opts;
+	#ifndef ERRV_H
+		char *errmsg = malloc( ERRV_LENGTH );
+		while ( !o1->sentinel )	{
+			o1->errmsg = opt_errmsg;
+			o1++;
+		}
+	#endif
+	}	
+	#endif
+
+	
 	while ( *av ) {
 		Option *o = opts;
 		while ( !o->sentinel ) {
 			//Find option, set boolean, and run a validator callback
-			if ((o->sht && strcmp(*av, o->sht) == 0) || (o->lng && strcmp(*av, o->lng) == 0)) {
-				o->set=1;
-				if (o->callback) {
-					if (!o->callback(++av, &o->v, buf))
-						return 0;
+			if ( (o->sht && strcmp(*av, o->sht) == 0) || (o->lng && strcmp(*av, o->lng) == 0) ) {
+				o->set = 1;
+				if ( o->callback ) {
+					if ( !o->callback( ++av, &o->v, buf ) ) {
+						//NOTE: This is stupid, but the user will have no need for the Option array if an error occurs.
+						o = &opts[0];
+						o->errmsg = opt_errmsg;
+						return serr( ERR_OPT_VALIDATION_FAILED, o, NULL );
+					}
 				}
-				else if (o->type == 'n' || o->type == 's' || o->type == 'c') {
-					if (!opt_set_value(av, &o->v, o->type, buf)) {
-						//errprintf(buf);
-						return 0;
+				else if ( o->type == 'n' || o->type == 's' || o->type == 'c' ) {
+					//Why would this ever be?
+					if ( !(*av) ) {
+						o = &opts[0];
+						o->errmsg = opt_errmsg;
+						return serr( ERR_OPT_EXPECTED_ANY, o, NULL );
+					}
+
+					//Catch what may be a flag
+					if ( strlen(*av) > 1 && *av[0] == '-' && *av[1] == '-' ) {
+						o = &opts[0];
+						o->errmsg = opt_errmsg;
+						return serr( ERR_OPT_UNEXPECTED_FLAG, o, *av );
+					}
+					
+					//Evaluate the three different types
+					if ( o->type == 'c' ) {
+						(&o->v)->c = *av[0];
+					}
+					else if ( o->type == 'n' ) {
+						//char *a = *av; //Crashes for some reason if I just use dereference
+						for ( int i=0; i < strlen( *av ); i++ ) {
+							if ( (int)(*av)[i] < 48 || (int)(*av)[i] > 57 ) { //Not a number check
+								o = &opts[0];
+								o->errmsg = opt_errmsg;
+								return serr( ERR_OPT_EXPECTED_NUMERIC_ARG, o, *av );
+							}
+						}
+						(&o->v)->n = atoi( *av );	
+					}
+					else if ( o->type == 's' ) {
+						_Bool isstr=0;
+						for ( int i=0; i < strlen(*av); i++ ) { 
+							//We can safely assume this is an ascii string, if this passes
+							if ( ( *av[i] > 32 && *av[i] < 48 ) || ( *av[i] > 57 && *av[i] < 127 ) ) {
+								isstr = 1;
+								break;
+							}
+						}
+
+						if ( !isstr ) {
+							o = &opts[0];
+							o->errmsg = opt_errmsg;
+							return serr( ERR_OPT_EXPECTED_STRING_ARG, o, *av );
+						}
+						(&o->v)->s = *av;
 					}
 				}
 			}
@@ -3150,7 +3282,7 @@ int sq_lexec ( Database *gb, const char *sql, const char *name, const SQWrite *w
 	int	title= 0;
 	const char *pq = NULL;
 	//SQInsert *stack = sq_inserters[0];
-	struct { char *names[127]; int count, ints[127]; } col = { 0 };
+	struct { char *names[127]; int count, ints[127]; } col = {{0}, 0, {0} };
 	uint8_t *src = NULL;
 	Parser q = { 
 		.words={
@@ -4175,5 +4307,55 @@ _Bool socket_tcp_send (Socket *sock, uint8_t *msg, uint32_t length)
 		len -= t ;	
 	}
 	return 1;
+}
+#endif
+
+
+#ifdef DOCS_H
+Option cli_opts[] = {
+	{ "-m", "--man", "Make documentation in man page format.", 0 }
+ ,{ "-l", "--html", "Make documentation in HTML format.", 0 }
+ ,{ "-d", "--markdown", "Make documentation in Markdown page format.", 0 }
+ ,{ .sentinel = 1 }
+};
+
+int cmdMan( Option *opts, char *err ) {
+return 0;
+}
+
+struct Cmd {
+	const char *cmd;
+	int (*exec)( Option *, char * );
+} cmds[] = {
+	{ "--man", cmdMan }
+ ,{ "--html", cmdMan }
+ ,{ "--markdown", cmdMan }
+};
+
+#define ERROUT(chr) \
+	fprintf( stderr, "%s: %s\n", chr, strerror(errno) ); \
+	return errno;
+
+int main( int argc, char *argv[] )
+{
+	//This tool is (for now anyway), just used for my single's docs...
+	//I don't mind shipping a program that can do all of the work though...
+	( argc < 2 ) ? opt_usage( cli_opts, argv[0], "nothing to do.", 0 ) : opt_eval( cli_opts, argc, argv );
+	
+	//Read in all the documentation
+	int fd;
+	char msg[ 300000 ] = { 0 };
+	if ( ( fd = open( "single.c", O_RDONLY ) ) == -1 ) {
+		ERROUT( "open failed" );
+	}
+
+	if ( read( fd, msg, sizeof(msg) ) == -1 ) {
+		ERROUT( "read failed" );
+	}
+
+	//memfind( msg, sizeof(msg), "*/" ) //find the first ending comment, this prog assumes that the goods are in the first comment block...
+
+	close( fd );
+	return 0;
 }
 #endif
