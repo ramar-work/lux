@@ -755,8 +755,9 @@ enum
 	ERR_OPT_UNEXPECTED_FLAG,
 	ERR_OPT_UNEXPECTED_ARGUMENT,
 	ERR_OPT_EXPECTED_ANY,
-	ERR_OPT_EXPECTED_STRING,
-	ERR_OPT_EXPECTED_NUMBER,
+	ERR_OPT_EXPECTED_STRING_ARG,
+	ERR_OPT_EXPECTED_NUMERIC_ARG,
+	ERR_OPT_VALIDATION_FAILED,
 #endif
 #ifndef SOCKET_H 
 	ERR_SOCKET_EXPECTED_ANY,
@@ -1031,7 +1032,8 @@ struct Option
  #ifndef ERR_H
   int error;
 	#ifndef ERRV_H
-	char  errmsg[ ERRV_LENGTH ];
+	//char  errmsg[ ERRV_LENGTH ];
+	char  *errmsg;
 	#endif 
  #endif
 };
