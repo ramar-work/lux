@@ -79,17 +79,17 @@ Running `make` in single's project directory will yield a test programcalled 'si
 
 will run tests for all of the program's libraries.
 
-
 TODO
 ----
 - Package a tool to create documentation here.
 - Package a way to build tests here.
 - Add `file` support.  Just need to take the time to do it.
-- 
 
  * ------------------------------------------- */
 
 #include "single.h"
+
+//This flag is here to control how table counts work...
 
 static const unsigned int lt_hash = 31;
 
@@ -169,7 +169,7 @@ static const char *__SingleLibErrors[] =
 	[ERR_SOCKET_CONNECT] = "Could not connect to server: %s\n",
 	[ERR_SOCKET_CONNECT_PARENT] = "Attempt to close parent socket file failed: %s\n",
 	[ERR_SOCKET_TCP_WRITE] = "Failed to send all data: %s\n",
-	[ERR_SOCKET_TCP_READ] = "Failed to send all data: %s\n",
+	[ERR_SOCKET_TCP_READ] = "Failed to read all data: %s\n",
 	[ERR_SOCKET_INVALID_PORT_NUMBER] = "Got invalid port number: %d\n",
 #endif
 
@@ -526,21 +526,6 @@ Value opt_get (Option *opts, const char *flag)
 _Bool opt_eval (Option *opts, int argc, char **av) {
 	char buf[1024] = { 0 };
 
-	//Since this "object" is moved through, the errmsg needs to point to the same string
-	#if 0
-	if ( 1 ) {
-		Option *o1 = opts;
-	#ifndef ERRV_H
-		char *errmsg = malloc( ERRV_LENGTH );
-		while ( !o1->sentinel )	{
-			o1->errmsg = opt_errmsg;
-			o1++;
-		}
-	#endif
-	}	
-	#endif
-
-	
 	while ( *av ) {
 		Option *o = opts;
 		while ( !o->sentinel ) {
@@ -556,6 +541,9 @@ _Bool opt_eval (Option *opts, int argc, char **av) {
 					}
 				}
 				else if ( o->type == 'n' || o->type == 's' || o->type == 'c' ) {
+					//Move all args up
+					++av;
+
 					//Why would this ever be?
 					if ( !(*av) ) {
 						o = &opts[0];
@@ -569,7 +557,8 @@ _Bool opt_eval (Option *opts, int argc, char **av) {
 						o->errmsg = opt_errmsg;
 						return serr( ERR_OPT_UNEXPECTED_FLAG, o, *av );
 					}
-					
+			
+
 					//Evaluate the three different types
 					if ( o->type == 'c' ) {
 						(&o->v)->c = *av[0];
@@ -3907,6 +3896,16 @@ void __timer_eprint (Timer *t)
 
 
 #ifndef SOCKET_H
+void socket_free (Socket *sock)
+{
+	;	
+}
+
+_Bool socket_close (Socket *sock)
+{
+	return ( close( sock->fd ) == -1 ) ? 0 : 1;
+}
+
 //Get the address information of a socket.
 int socket_addrinfo (Socket *sock)
 {
@@ -4046,28 +4045,56 @@ _Bool socket_tcp_recv (Socket *sock, uint8_t *msg, int *len)
       w = ( *len > 0 ) ? *len : 64;
 
 	//If it's -1, die.  If it's less than buffer, die
+	//TODO: Could also do while ( r > 0 ) {
 	while (1) {
 		//Error occurred, free or reset the buffer and die
-		if ( (r = read(sock->fd, &msg[ t ], w )) == -1 ) {
-			//handle recv() errors...
-			sock->err = errno;
+		//if ( (r = read(sock->fd, &msg[ t ], w )) == -1 ) {
+		r = recv(sock->fd, &msg[ t ], w, 0 );
+
+		//Simply try again momentarily if this happens...
+		if ( r == -1 && ( errno == EAGAIN || errno == EWOULDBLOCK ) ) {
+			continue;
+		}
+		else if ( r == -1 ) {
+			if ( errno == EBADF )
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			else if ( errno == ECONNRESET )
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			else if ( errno == EINTR )
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			else if ( errno == EINVAL )
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			else if ( errno == ENOTCONN )
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			else if ( errno == ENOTSOCK )
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			else if ( errno == EOPNOTSUPP )
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			else if ( errno == ETIMEDOUT )
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			else if ( errno == EIO )
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			else if ( errno == ENOBUFS )
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			else if ( errno == ENOMEM ) {
+				return serr( ERR_SOCKET_TCP_READ, sock, strerror( errno ) );
+			}
 			return 0;
 		}
 
-		//...
+		//If byte length is zero, I'm probably finished reading
 		if ( !r ) {
-			fprintf( stderr, "socket_tcp_recv should be done...\n" );
+			//fprintf( stderr, "socket_tcp_recv should be done...\n" );
 			break;
 		}
 
+		VPRINT( "%d bytes received\n", r );
 		t += r;
 	}
 
 	*len = t;
 	return 1;
 }
-
-
 
 #if 0
 //Open a socket for UDP
@@ -4295,11 +4322,55 @@ _Bool socket_tcp_send (Socket *sock, uint8_t *msg, uint32_t length)
 	int len = length;
 
 	while ( len ) {
-		//Try to send data
-		//TODO: Can't other things return -1?
+		#if 0	
 		if ( (bs = write(sock->fd, &msg[ t ], len)) == -1 ) {
 			return serr( ERR_SOCKET_TCP_WRITE, sock, strerror(errno) );
 		}
+		#else
+		//Try to send data
+		bs = send(sock->fd, &msg[ t ], len, 0);
+		if ( bs == -1 && ( errno == EAGAIN || errno == EWOULDBLOCK ) ) {
+			continue;
+		} 	
+		else if ( bs == -1 && errno == EMSGSIZE) {
+		#if 1
+			//Seems like I could just wait, but...
+			VPRINT( "Not yet ready to send all data via chosen socket" );
+			continue;	
+		#else
+			return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+		#endif
+		}
+		else if ( bs == -1 ) { 
+			if ( errno == EBADF )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == ECONNRESET )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == EDESTADDRREQ)
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == EINTR )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == ENOTCONN )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == ENOTSOCK )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == EOPNOTSUPP )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == EPIPE )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == EACCES )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == EIO )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == ENETDOWN )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == ENETUNREACH )
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			else if ( errno == ENOBUFS ) {
+				return serr( ERR_SOCKET_TCP_WRITE, sock, strerror( errno ) );
+			}
+		}
+		#endif
 
 		//This should keep running
 		VPRINT( "%d bytes written\n", bs );

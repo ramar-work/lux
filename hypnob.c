@@ -279,7 +279,7 @@ int list_cmd ( Option *opts, UserArgs *args, char *err )
 
 Option opts[] =
 {
-	{ "-c", "--create",   "Create a new application directory here.", 's' },
+	{ "-c", "--create",   "Create a new application directory here." },
 	{ "-e", "--eat",      "Feed this a certain URL and see how it evaluates.",'s' },
 	{ "-l", "--list",     "List all sites and their statuses." },
 
@@ -313,7 +313,7 @@ int main (int argc, char *argv[])
 	ua.sitename = ( !opt_set( opts, "--create" ) ) ? opt_get( opts, "--name" ).s : opt_get( opts, "--create" ).s; 
 	ua.domain = opt_get( opts, "--domain" ).s;
 	PRINT_UA( (&ua) );
-
+return 1;
 
 	//Check --flag
 	if ( opt_set( opts, "--create" ) ) {

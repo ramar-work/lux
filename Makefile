@@ -134,5 +134,5 @@ test-build-Linux:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) testrouter testchains testsql testrender
+	-@rm $(NAME) hypnob testrouter testchains testsql testrender
 	-@find . | egrep '\.o$$' | grep -v sqlite | xargs rm

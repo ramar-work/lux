@@ -282,7 +282,17 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	//Reset Loader pointer and clear the stack
 	l = &ld[0];
 	lua_settop( L, 0 );
-	
+
+	//What's in this weird little data structure thing that never works?
+	while ( l->content ) {
+		fprintf( stderr, "%s: %s\n", (l->type==CC_MODEL)?"model":"view",l->content );
+		l++;
+	}
+
+exit( 0 );
+
+	//Loop through all of this content	
+	l = &ld[0];
 	while ( l->content ) {
 		//Load each model file (which is just running via Lua)
 		if ( l->type == CC_MODEL ) { 

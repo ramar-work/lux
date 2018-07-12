@@ -371,11 +371,16 @@ Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
 	}
 
 	//Now check the hash against the thing and loop through shit...
-	char *modelTag = strcmbd( ".", fullRoute, "model" ),
-		*viewTag = strcmbd( ".", fullRoute, "view" );
+	char *modelTag = strcmbd( ".", fullRoute, "model" );
+	char	*viewTag = strcmbd( ".", fullRoute, "view" );
 
 	int mh = lt_get_long_i( routeTable, (uint8_t *)modelTag, strlen(modelTag) ),
 		vh = lt_get_long_i( routeTable, (uint8_t *)viewTag, strlen(viewTag) );
+#if 0
+fprintf( stderr, "%s, %s\n", modelTag, viewTag );
+fprintf( stderr, "%d, %d\n", mh, vh );
+exit(0);
+#endif
 
 	//Loop through until you get a terminator, means you're at the end...
 	int h[2]={mh, vh};
@@ -395,7 +400,8 @@ Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
 					break;
 
 				//LL is either accessed wrong or not init'd.
-				LL->type = CC_MODEL;
+			//	LL->type = CC_MODEL;
+				LL->type = (!ih) ? CC_MODEL : CC_VIEW;
 				LL->content = strdup( lt_char );
 				LL++ ;
 			}
