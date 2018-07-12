@@ -400,7 +400,6 @@ exit(0);
 					break;
 
 				//LL is either accessed wrong or not init'd.
-			//	LL->type = CC_MODEL;
 				LL->type = (!ih) ? CC_MODEL : CC_VIEW;
 				LL->content = strdup( lt_char );
 				LL++ ;
