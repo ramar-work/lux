@@ -7,30 +7,19 @@ hypnob:
 	x	create a database
 	x	create the first table (or the others)
 	x	fail on empty list
-		fail on blank --create // crashes...
+	x	fail on blank --create
 		show all list items without crashing
-		create a site folder successfully
+	x	create a site folder successfully
+		load and serve one directory
+		load and serve from a bunch of directories
 
 
-single stuff:
-	- add sq_oneshot?
+hypno:
+	-	write a test suite that can throw GET x <1M
+	-	write a test suite that can throw POST x <1M
+	-	write a test suite that tests route parsing
+	-	load model subtables as filenames
 
-- ready 2 start writing bind functions.  Tables / JSON should be returned by everything...
-
-
-- load model subtables as filenames
-
-
-- what would a bunch of automated tests look like?
-	http_run - test routes
-	http_run - test Lua functions (which need their own tests)
-
-	
-- write some basic dump functions to test HTTP run at different parts in the process (what does that mean?  stop at table_to_lua and examine results, stop at parse_route and examine results, etc.)
-
-
-- write (either from scratch or not) new directories that hypno can read
-	database should be setup somewhere in there... 
 
 
 today

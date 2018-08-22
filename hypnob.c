@@ -1,4 +1,10 @@
-/* hypnob.c */
+/* ------------------------------------ * 
+hypnob.c
+
+TODO
+- Fix argument parsing to reject --flags 
+  if the previous flag expects an argument.
+ * ------------------------------------ */
 #include "vendor/single.h"
 #include <dirent.h>
 
@@ -279,7 +285,7 @@ int list_cmd ( Option *opts, UserArgs *args, char *err )
 
 Option opts[] =
 {
-	{ "-c", "--create",   "Create a new application directory here." },
+	{ "-c", "--create",   "Create a new application directory.", 's' },
 	{ "-e", "--eat",      "Feed this a certain URL and see how it evaluates.",'s' },
 	{ "-l", "--list",     "List all sites and their statuses." },
 
@@ -312,8 +318,6 @@ int main (int argc, char *argv[])
 	ua.dirname = opt_get( opts, "--at" ).s;
 	ua.sitename = ( !opt_set( opts, "--create" ) ) ? opt_get( opts, "--name" ).s : opt_get( opts, "--create" ).s; 
 	ua.domain = opt_get( opts, "--domain" ).s;
-	PRINT_UA( (&ua) );
-return 1;
 
 	//Check --flag
 	if ( opt_set( opts, "--create" ) ) {
@@ -322,7 +326,7 @@ return 1;
 		if ( ua.sitename[0] == '-' || ua.sitename[1] == '-' )
 			return fprintf( stderr, PROG ": --create or --name does not have an argument." ) ? 1 : 1;
 	}
-	
+
 	//Check if the HOME/.hypno directory exists, creating it if it does not.
 	if ( !init_hypno_local( opts, &ua, err ) )
 		return fprintf( stderr, PROG ": %s\n", err ) ? 1 : 1;

@@ -6,6 +6,8 @@
 #include <dirent.h>
 
 #define PROG "hypno"
+#define DIRNAME_DEFAULT "example"
+#define DATAFILE_NAME "data.lua"
 #define ERR_SRVFORK 20
 #define ERR_PIDFAIL 21
 #define ERR_PIDWRFL 22 
@@ -38,6 +40,9 @@
 
 //This define should be a bit easier to use than fully calling http_err
 #define ERRH(...) http_err( r, h, 500, __VA_ARGS__ ) 
+
+//
+char default_dirname[] = DIRNAME_DEFAULT;
 
 //Lua structure
 typedef struct 
@@ -151,6 +156,32 @@ void srvBasicCannedResponse() {
 }
 
 
+
+
+typedef struct Passthru {
+
+	//struct stat sb;
+	char *webroot;
+	char *activeDir;
+	char *datafile ;
+	DIR *ds; 
+	struct dirent *de;
+	short singleDir;
+
+#if 0
+	Table  routes, request, model;
+	Loader ld[ 10 ], *l = NULL;
+	Render ren;
+	uint8_t *renbuf = NULL;
+	int renbuflen = 0;
+	HTTP *h = (HTTP *)r->userdata;
+	HTTP_Request *req = &h->request;
+	lua_State *L  = luaL_newstate(); 
+#endif
+	
+} Passthru;
+
+
 //This is the single-threaded HTTP run function
 _Bool http_run ( Recvr *r, void *p, char *err ) 
 { 
@@ -161,22 +192,31 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	timer_use_us( &t );
 	timer_start( &t );
  #endif	
-	//This is a hell of a lot of data.
-	Table  routes, request, model;
+ #if 0
 	struct stat sb;
-	Loader ld[ 10 ], *l = NULL;
-	Render ren;
-	uint8_t *renbuf = NULL;
-	int renbuflen = 0;
-	HTTP *h = (HTTP *)r->userdata;
-	HTTP_Request *req = &h->request;
-	lua_State *L  = luaL_newstate(); 
-	char *activeDir = NULL;
+	char *ag->activeDir = NULL;
 	char *datafile = NULL;
 	char *fSetName = NULL;
 	DIR *ds = NULL;
 	struct dirent *de;
-	const char *dirname = "example";
+	const char *ag->webroot = "example";
+ #endif
+
+	//This is a hell of a lot of data.
+	char *fSetName;
+	char *datafile;
+	struct stat sb;
+	Table  routes, request, model;
+	Loader ld[ 10 ], *l = NULL;
+	Render ren;
+	uint8_t *renbuf = NULL;
+	int renbuflen = 0;
+
+	//Anything that should be set or initialized is here
+	Passthru *ag = (Passthru *)p;
+	HTTP *h = (HTTP *)r->userdata;
+	HTTP_Request *req = &h->request;
+	lua_State *L  = luaL_newstate(); 
 
 	//Set the message length
 	req->mlen = r->recvd;
@@ -188,31 +228,47 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	if ( !http_get_remaining( h, r->request, r->recvd ) )
 		return ERRH("Error processing request." );
 
-	//For now, I assume the root is at 'example'.
-	if ( !( ds = opendir( dirname ) ) )
+	//Try to open the web root
+	if ( !( ag->ds = opendir( ag->webroot ) ) )
 		return ERRH("Couldn't access web root: %s.", strerror(errno) );
 
-	//fprintf( stderr, "Directory '%s' contains:\n", dirname );
-	while ((de = readdir( ds ))) {
+	//If the webroot is the web application directory, set things accordingly
+	if ( ag->singleDir ) {
 		//Make a fully qualified path from the filename
-		char *fd = strcmbd( "/", dirname, de->d_name );
-
-		//Check that the child inode is accessible
-		if ( lstat( fd, &sb ) == -1 )
-			return ERRH("Can't access directory %s: %s.", fd, strerror(errno));
+		char *fd = strcmbd( "/", ag->webroot, ag->de->d_name );
 
 		//Check the name of the folder and see if the hostname matches
-		if (S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode))) {
-			if ( strcmp( de->d_name, h->hostname ) == 0 ) {
-				activeDir = fd;
+		if ( S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode)) ) {
+			if ( strcmp( ag->de->d_name, h->hostname ) == 0 ) {
+				ag->activeDir = fd;
 				break;
 			}	
 		}
-		free(fd);
+	}
+	else {
+		//fprintf( stderr, "Directory '%s' contains:\n", ag->webroot );
+		while ( (ag->de = readdir( ag->ds )) ) {
+			//Make a fully qualified path from the filename
+			char *fd = strcmbd( "/", ag->webroot, ag->de->d_name );
+
+			//Check that the child inode is accessible
+			if ( lstat( fd, &sb ) == -1 )
+				return ERRH("Can't access directory %s: %s.", fd, strerror(errno));
+
+			//Check the name of the folder and see if the hostname matches
+			if ( S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode)) ) {
+				if ( strcmp( ag->de->d_name, h->hostname ) == 0 ) {
+					ag->activeDir = fd;
+					break;
+				}	
+			}
+
+			free(fd);
+		}
 	}
 
 	//Default responses get handled here 
-	if ( !activeDir ) {
+	if ( !ag->activeDir ) {
 		return ERRH( "No site matching hostname '%s' found.", h->hostname );
 	}
 	else {
@@ -235,7 +291,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 	lua_newtable( L );
 
 	//Read the data file for whatever "site" is gonna be run.
-	datafile = strcmbd( "/", activeDir, "data.lua" );
+	datafile = strcmbd( "/", ag->activeDir, DATAFILE_NAME ); 
 
 	//Always waste some time looking for the file
 	if ( stat( datafile, &sb ) == -1 )
@@ -298,7 +354,7 @@ exit( 0 );
 		//Load each model file (which is just running via Lua)
 		if ( l->type == CC_MODEL ) { 
 			//Somehow have to get the root directory of the site in question...
-			char *mfile = strcmbd( "/", activeDir, "models", l->content, "lua" );
+			char *mfile = strcmbd( "/", ag->activeDir, "models", l->content, "lua" );
 			mfile[ strlen(mfile) - 4 ] = '.';
 			fprintf( stderr, "Attempting to load: %s\n", mfile );
 
@@ -313,7 +369,7 @@ exit( 0 );
 
 	//This is a working solution.  Still gotta figure out the reason for that crash...
 	lua_aggregate( L );
-	lua_pushstring( L,"model" );
+	lua_pushstring( L, "model" );
 	lua_pushvalue( L, 1 );
 	lua_newtable( L );
 	lua_replace( L, 1 );
@@ -335,7 +391,7 @@ exit( 0 );
 	while ( l->content ) {
 		if ( l->type == CC_VIEW ) {
 			//Somehow have to get the root directory of the site in question...
-			char *vfile = strcmbd( "/", activeDir, "views", l->content, "html" );
+			char *vfile = strcmbd( "/", ag->activeDir, "views", l->content, "html" );
 			int fd = 0, bt = 0;
 			vfile[ strlen(vfile) - 5 ] = '.';
 
@@ -401,6 +457,7 @@ Option opts[] =
 	{ "-m", "--mode",      "Choose how server should evaluate hostnames.",'s' },
 	{ NULL, "--chroot-dir","Choose a directory to change root to.",     's' },
 #endif
+	{ "-d", "--dir",       "Serve just one specific directory.",'s' },
 	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
 	{ "-m", "--max-conn",  "How many connections to enable at a time.", 'n' },
 	{ "-n", "--no-daemon", "Do not daemonize the server when starting."  },
@@ -411,7 +468,7 @@ Option opts[] =
 
 
 //Kill the server
-int kill_cmd( Option *opts, char *err ) 
+int kill_cmd( Option *opts, char *err, Passthru *pt ) 
 {
 #ifdef WIN32
  #error "Kill (as written here anyway) does not work on Windows."
@@ -453,7 +510,7 @@ int kill_cmd( Option *opts, char *err )
 
 
 //Load a different data.lua file from main()
-int file_cmd( Option *opts, char *err ) 
+int file_cmd( Option *opts, char *err, Passthru *pt ) 
 {
 	lua_State *L = NULL;  
 	char *f = opt_get( opts, "--file" ).s;
@@ -483,7 +540,7 @@ int file_cmd( Option *opts, char *err )
 
 
 //Start the server from main()
-int start_cmd( Option *opts, char *err ) 
+int start_cmd( Option *opts, char *err, Passthru *pt ) 
 {
 	int stat, conn, port, daemonize;
 	daemonize = !opt_set(opts, "--no-daemon");
@@ -499,7 +556,7 @@ int start_cmd( Option *opts, char *err )
 		.read_min   = 12, 
 		.write_min  = 12, 
 		.max_events = 1000, 
-		.global_ud  = NULL, //(void *)&obsidian,
+		.global_ud  = pt,
 		.lsize      = sizeof(HTTP),
 		.recv_retry = 10, 
 		.send_retry = 10, 
@@ -560,7 +617,7 @@ int start_cmd( Option *opts, char *err )
 struct Cmd
 { 
 	const char *cmd;
-	int (*exec)( Option *, char *);
+	int (*exec)( Option *, char *, Passthru *pt );
 } Cmds[] = {
 	{ "--kill"     , kill_cmd  }
  ,{ "--file"     , file_cmd  }
@@ -575,19 +632,43 @@ int main (int argc, char *argv[])
 	//Values
 	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
 
+	//Allocate user data here
+	Passthru *pt = malloc( sizeof(Passthru ) );
+	memset( pt, 0, sizeof(Passthru) );
+
+	//Set things
+	if ( !opt_set( opts, "--dir" ) )
+		pt->singleDir = 1, pt->webroot = default_dirname;
+	else {
+		//check that dir exists and can be touched
+		struct stat check;
+		pt->webroot = opt_get( opts, "--dir" ).s;
+
+		if ( !pt->webroot || *pt->webroot == 0 || strlen( pt->webroot ) == 0 ) {
+			fprintf( stderr, PROG ": %s\n", "Invalid directory specified." );
+			return 1;
+		}
+
+		if ( stat( pt->webroot, &check ) == -1 ) { 
+			fprintf( stderr, PROG ": %s\n", strerror( errno ) );
+			return 1;
+		}
+	}
+
 	//Evaluate all main stuff by looping through the above structure.
 	struct Cmd *cmd = Cmds;	
 	while ( cmd->cmd ) {
 	#ifdef TESTOPTS_H
 		fprintf( stderr, "Got option: %s? %s\n", cmd->cmd, opt_set(opts, cmd->cmd ) ? "YES" : "NO" );
 	#endif
-		if ( opt_set(opts, cmd->cmd ) && !cmd->exec( opts, err ) ) {
+		if ( opt_set(opts, cmd->cmd ) && !cmd->exec( opts, err, pt ) ) {
 			fprintf( stderr, PROG ": %s\n", err );
 			return 1;
 		}
 		cmd++;
 	}
 
+	free( pt );
 	return 0;
 }
 
