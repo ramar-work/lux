@@ -918,7 +918,6 @@ static const Mime mime[] = {
   {        "jpg", "image/jpeg"                                                                     },
   {         "js", "application/javascript"                                                         },
   {       "json", "application/json"                                                               },
-  {         "js", "text/javascript"                                                                },
   {        "kml", "application/vnd.google-earth.kml+xml"                                           },
   {        "kmz", "application/vnd.google-earth.kmz+xml"                                           },
   {        "l24", "audio/l24"                                                                      },
@@ -991,6 +990,8 @@ static const Mime mime[] = {
   {        "xps", "application/vnd.ms-xpsdocument"                                                 },
   {        "xul", "application/vnd.mozilla.xul+xml"                                                },
   {        "zip", "application/zip"                                                                },
+
+  {        NULL, NULL                                                                },
 };
 
 
@@ -1012,6 +1013,16 @@ const char *mtref (const char *mimename) {
 //Why is this here?
 const char *file_type_from_mime (const char *filename) {
 	return NULL;
+}
+
+
+//Supply extension only and return the mimetype
+const char *mtfref ( const char *extension ) {
+	Mime *m = (Mime *)mime;
+	while ( (++m)->mimetype ) {
+		if ( strcmp(m->filetype, extension) == 0 ) return m->mimetype;
+	} 
+	return mime[0].mimetype;
 }
 
 

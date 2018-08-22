@@ -19,7 +19,9 @@ hypno:
 	-	write a test suite that can throw POST x <1M
 	-	write a test suite that tests route parsing
 	-	load model subtables as filenames
-
+	- js does odd things in chrome, and chrome will throw some crazy names your way ( /:10 and such, hmm... )
+	- also don't know how to handle streaming / chunked responses
+	- to make things safe, use a fork(), then kill that...
 
 
 today

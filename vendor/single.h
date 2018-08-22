@@ -1595,6 +1595,7 @@ void json_free ( Table *t );
 
 #ifndef MIME_H
 const char *mtref (const char *) ;  //Always returns a reference
+const char *mtfref (const char *) ;
 const char *mime_type_from_file (const char *) ;
 const char *file_type_from_mime (const char *) ;
 #endif

@@ -4,9 +4,9 @@ OS = $(shell uname | sed 's/[_ ].*//')
 CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 #-DDEBUG_H #-ansi
-CC = gcc
-CFLAGS = $(GCCFLAGS)
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H #-ansi
+#CC = gcc
+#CFLAGS = $(GCCFLAGS)
 PORT = 2200
 
 # Some Linux systems need these, but pkg-config should handle it
@@ -128,7 +128,7 @@ test-build-CYGWIN:
 # $(shell pkg-config --cflags lua5.3)
 test-build-Linux: $(OBJ) 
 test-build-Linux:
-	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
+	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm 
 	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
 
 # Clean target...

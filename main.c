@@ -39,7 +39,8 @@
 #endif
 
 //This define should be a bit easier to use than fully calling http_err
-#define ERRH(...) http_err( r, h, 500, __VA_ARGS__ ) 
+#define ERR_500(...) http_err( r, h, 500, __VA_ARGS__ ) 
+#define ERR_404(...) http_err( r, h, 404, __VA_ARGS__ ) 
 
 //
 char default_dirname[] = DIRNAME_DEFAULT;
@@ -182,6 +183,12 @@ typedef struct Passthru {
 } Passthru;
 
 
+int glean_extension( char *pathname, Passthru *pt ) {
+
+	return 1;
+}
+
+
 //This is the single-threaded HTTP run function
 _Bool http_run ( Recvr *r, void *p, char *err ) 
 { 
@@ -226,12 +233,13 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 	//This should receive the entire request
 	if ( !http_get_remaining( h, r->request, r->recvd ) )
-		return ERRH("Error processing request." );
+		return ERR_500("Error processing request." );
 
 	//Try to open the web root
 	if ( !( ag->ds = opendir( ag->webroot ) ) )
-		return ERRH("Couldn't access web root: %s.", strerror(errno) );
+		return ERR_500("Couldn't access web root: %s.", strerror(errno) );
 
+#if 0
 	//If the webroot is the web application directory, set things accordingly
 	if ( ag->singleDir ) {
 		//Make a fully qualified path from the filename
@@ -241,11 +249,11 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 		if ( S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode)) ) {
 			if ( strcmp( ag->de->d_name, h->hostname ) == 0 ) {
 				ag->activeDir = fd;
-				break;
 			}	
 		}
 	}
 	else {
+#endif
 		//fprintf( stderr, "Directory '%s' contains:\n", ag->webroot );
 		while ( (ag->de = readdir( ag->ds )) ) {
 			//Make a fully qualified path from the filename
@@ -253,7 +261,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 			//Check that the child inode is accessible
 			if ( lstat( fd, &sb ) == -1 )
-				return ERRH("Can't access directory %s: %s.", fd, strerror(errno));
+				return ERR_500("Can't access directory %s: %s.", fd, strerror(errno));
 
 			//Check the name of the folder and see if the hostname matches
 			if ( S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode)) ) {
@@ -265,45 +273,119 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 			free(fd);
 		}
+#if 0
 	}
+#endif
 
 	//Default responses get handled here 
-	if ( !ag->activeDir ) {
-		return ERRH( "No site matching hostname '%s' found.", h->hostname );
-	}
-	else {
-		//Seems like the mime chain would go here.
-		//If I were another server, I would configure mime types on a per site basis and evaluate them here.
-		0;
-	}
+	if ( !ag->activeDir )
+		return ERR_404( "No site matching hostname '%s' found.", h->hostname );
 
-	//If the client is asking for 'favicon.ico', just stop and die...
-	if ( strcmp( h->request.path, "/favicon.ico" ) == 0 ) {
-		return ERRH( "Favicons aren't handled yet, sorry..." );
+	//Lastly, check that the client isn't asking for actual files.
+	int rplen = strlen( h->request.path );
+	if ( memchr( h->request.path, '.', rplen ) ) {
+		//Check for a known extension
+		char *mt = NULL, *extck = &h->request.path[ rplen ];
+		while ( extck-- && *extck != '.' ) ; 	
+		extck++;
+
+		//Now check for a valid mimetype	
+		mt = (char *)mtfref( extck );
+	
+		//If the mimetype is not supported, that's technically a 404
+		//but right now, use application/octet-stream to check for validity
+		if ( strcmp( mt, "application/octet-stream" ) > 0 ) {
+			//Check for the path name relative to the currently chosen directory
+			uint8_t *fb = NULL;
+			char *fn = strcmbd( "/", ag->activeDir, &h->request.path[ 1 ] );
+			int fd = 0;
+
+			//File not found, should return a 404
+			if ( stat( fn, &sb ) == -1 ) {	
+				return ERR_404( "File not found: %s", fn );
+			}
+
+			//Don't allow zero-length files...?
+			if ( sb.st_size == 0 ) {
+				return ERR_500( "Requested file: %s is zero length.", fn );
+			}
+
+			//Allocate...
+			if ( !(fb = malloc( sb.st_size )) || !memset( fb, 0, sb.st_size ) ) {
+				return ERR_500( "Memory error: %s\n", strerror( errno ) );
+			}
+			
+			//Couldn't open	
+			if ( (fd = open( fn, O_RDONLY )) == -1 || read( fd, fb, sb.st_size ) == -1 ) {	
+				return ERR_500( "Error occurred while trying to open file: %s. %s",
+										 fn, strerror( errno ) );
+			}
+
+			//Prepare the actual reponse
+			http_set_status( h, 200 );
+			http_set_content( h, mt, fb, sb.st_size );
+			http_pack_response( h );
+			free( fn );
+			r->stage = NW_AT_WRITE;
+			return 1;
+		}
 	}
 
 	//Check that Lua initialized here
-	if ( !L )
-		return ERRH("Failed to create new Lua state?" );
+	if ( !L ) {
+		return ERR_500("Failed to create new Lua state?" );
+	}
 
 	//Open Lua libraries.
 	luaL_openlibs( L );
 	lua_newtable( L );
 
 	//Read the data file for whatever "site" is gonna be run.
-	datafile = strcmbd( "/", ag->activeDir, DATAFILE_NAME ); 
+	if ( !(datafile = strcmbd( "/", ag->activeDir, DATAFILE_NAME )) ) {
+		return ERR_500("Low mem" );
+	}
 
 	//Always waste some time looking for the file
-	if ( stat( datafile, &sb ) == -1 )
-		return ERRH("Couldn't find file containing site data: %s.", datafile );
+	if ( stat( datafile, &sb ) == -1 ) {
+		return ERR_500("Couldn't find file containing site data: %s.", datafile );
+	}
 
 	//Load the route file.
-	if ( !lua_load_file( L, datafile, &err ) )
-		return ERRH("Loading routes failed at file '%s': %s", datafile, err );
+	if ( !lua_load_file( L, datafile, &err ) ) {
+		return ERR_500("Loading routes failed at file '%s': %s", datafile, err );
+	}
+
+	//If there is no data, then I shouldn't move forward
+	char *dfbuf = NULL; 
+	int dfd = open( datafile, O_RDONLY );
+	dfbuf = malloc( sb.st_size );
+	memset( dfbuf, 0, sb.st_size );
+
+	if ( !dfbuf || dfd == -1 || read( dfd, dfbuf, sb.st_size ) == -1)  {
+		free( dfbuf );
+		return ERR_500( "Issues reading %s to buffer: %s", datafile, strerror( errno ) );
+	}
+
+	//Then check that there is something besides blank space in the file
+	if ( sb.st_size == 0 )
+		return ERR_500( "Datafile at %s is zero length, can't continue...\n", datafile );
+	else {
+		int fnd_oc = 0;
+		while ( dfbuf++ ) {
+			if ( *dfbuf != '\0' && *dfbuf != '\t' && *dfbuf != ' ' ) {
+				fnd_oc = 1;
+				break;
+			}
+		}
+		if ( fnd_oc == 0 ) {
+			return ERR_500( "Datafile at %s is blank, can't continue...\n", datafile );
+		}
+	}
 
 	//Convert this to an actual table so C can work with it...
-	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) )
-		return ERRH("Converting routes from file '%s' failed.", datafile );
+	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) ) {
+		return ERR_500("Converting routes from file '%s' failed.", datafile );
+	}
 
 	//Clear stack to get rid of what came from routes
 	lua_settop( L, 0 );
@@ -333,7 +415,7 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 
 	//Parse the routes that come off of this file
 	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), h, &routes ) )
-		return ERRH("Finding the model and view for the current route failed." );
+		return ERR_500("Finding the model and view for the current route failed." );
 
 	//Reset Loader pointer and clear the stack
 	l = &ld[0];
@@ -359,10 +441,10 @@ exit( 0 );
 			fprintf( stderr, "Attempting to load: %s\n", mfile );
 
 			if ( stat( mfile, &sb ) == -1 )
-				return ERRH("Couldn't find model file: %s.", mfile );
+				return ERR_500("Couldn't find model file: %s.", mfile );
 
 			if ( luaL_dofile( L, mfile ) )
-				return ERRH("Could not load Lua file: %s. %s\n", mfile, lua_tostring(L, -1));
+				return ERR_500("Could not load Lua file: %s. %s\n", mfile, lua_tostring(L, -1));
 		}
 		l++;
 	}
@@ -377,11 +459,11 @@ exit( 0 );
 	
 	//There is a thing called model now.
 	if ( !lt_init( &model, NULL, 1027 ) || !lua_to_table( L, 1, &model ) )
-		return ERRH("Couldn't turn aggregate table into a C table.\n" );
+		return ERR_500("Couldn't turn aggregate table into a C table.\n" );
 
 	//Make a new "render buffer"
 	if ( !(renbuf = malloc( 30000 )) || !memset( renbuf, 0, 30000 ) )
-		return ERRH("Couldn't allocate enough space for a render buffer.\n" );
+		return ERR_500("Couldn't allocate enough space for a render buffer.\n" );
 
 	//Rewind Loader ptr and load each view's raw text
 	l = &ld[0];
@@ -396,17 +478,17 @@ exit( 0 );
 			vfile[ strlen(vfile) - 5 ] = '.';
 
 			if ( stat( vfile, &sb ) == -1 )
-				return ERRH("Couldn't find view file: %s. Error: %s", vfile, strerror( errno ) );
+				return ERR_500("Couldn't find view file: %s. Error: %s", vfile, strerror( errno ) );
 
 			//TODO: Pull a realloc here and just keep adding to the same buffer.
 			//if ( !(renbuf = realloc( sb.st_size )) )
-			//	return ERRH("Couldn't reallocate enough space for output buffer." );
+			//	return ERR_500("Couldn't reallocate enough space for output buffer." );
 			
 			if ( (fd = open( vfile, O_RDONLY )) == -1 )
-				return ERRH("Couldn't open view file: %s. Error: %s", vfile, strerror( errno ) );
+				return ERR_500("Couldn't open view file: %s. Error: %s", vfile, strerror( errno ) );
 			
 			if ( (bt += read(fd, &renbuf[renbuflen], sb.st_size )) == -1 )
-				return ERRH("Couldn't read view file into buffer: %s.  Error: %s", vfile, strerror( errno ) );
+				return ERR_500("Couldn't read view file into buffer: %s.  Error: %s", vfile, strerror( errno ) );
 			
 			renbuflen += bt;
 		}
@@ -415,13 +497,13 @@ exit( 0 );
 
 	//um
 	if ( !render_init( &ren, &model ) )
-		return ERRH("Couldn't initialize rendering engine." );
+		return ERR_500("Couldn't initialize rendering engine." );
 
 	if ( !render_map( &ren, (uint8_t *)renbuf, strlen( (char *)renbuf ) ) )
-		return ERRH("Couldn't set up render mapping." );
+		return ERR_500("Couldn't set up render mapping." );
 
 	if ( !render_render( &ren ) )	
-		return ERRH("Failed to carry out templating on buffer." );
+		return ERR_500("Failed to carry out templating on buffer." );
 
 	//Prepare the actual reponse
 	http_set_status( h, 200 );
