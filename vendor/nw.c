@@ -1,10 +1,13 @@
-/*Choose dynamic buffers by default*/
+//Choose dynamic buffers by default
 #ifndef NW_BUFF_FIXED
  #define NW_BUFF_DYNAMIC
 #endif
 
 //#define NW_QUEUE_WRITES
 #undef NW_FOLLOW
+
+#define READ_READY(rd) rd & POLLRDNORM
+#define WRITE_READY(rd) rd & POLLWRNORM
 
 #ifdef NW_QUEUE_WRITES
  #define NW_QUEUE_WRITE_DIRNAME "local"
@@ -103,7 +106,7 @@
 #define nw_get_fd() \
 	r->client->fd
 
-#ifdef NW_VERBOSE
+#ifdef NW_DEBUG
 /*Dump the selector*/
 void print_selector (Selector *s) 
 {
@@ -120,12 +123,12 @@ void print_selector (Selector *s)
 
 
 /*Dump the selector*/
-void print_recvr (Recvr *r) 
-{
+void print_recvr (Recvr *r) {
 	fprintf(stderr, "child:       %p\n", (void *)&r->child);
 	fprintf(stderr, "recvd:       %d\n", r->recvd);
 	fprintf(stderr, "sent:        %d\n", r->sent);
 	fprintf(stderr, "stage:       %d\n", r->stage);
+	fprintf(stderr, "status:      %d\n", r->status);
  #if 0
 	fprintf(stderr, "request_fd:  %d\n", r->request_fd);
 	fprintf(stderr, "response_fd: %d\n", r->response_fd);
@@ -152,8 +155,7 @@ void print_recvr (Recvr *r)
 
 
 /*Static list of error codes in text*/
-const char *nw_error_map[] = 
-{
+const char *nw_error_map[] = {
 	[ERR_POLL_INITIAL_ALLOCATOR]        = "File allocation failure.\n",
 	[ERR_POLL_TOO_MANY_FILES]           = "Attempt to open too many files.\n",
 	[ERR_POLL_RECVD_SIGNAL ]            = "Received signal interrupting accept().\n",
@@ -298,7 +300,6 @@ static void reset_recvr (Recvr *r)
 }
 
 
-
 //Read from a socket
 int nw_read (Recvr *r) 
 {
@@ -354,11 +355,11 @@ int nw_read (Recvr *r)
 
 
 //Write to socket - always assumes the message is ready (and it should be...)
-_Bool nw_write (Recvr *r) 
-{
+_Bool nw_write (Recvr *r) {
 	//Check that you're not writing to uninitialized memory.
 	SHOWDATA( "file             %d\n", r->client->fd );	
 	SHOWDATA( "actual length    %d\n", bf_written( &r->_response ));
+	SHOWDATA( "CHONK CHONK %d\n", 1);
 
 	int len = bf_written( &r->_response );
 #ifdef NW_QUEUE_WRITES
@@ -370,8 +371,8 @@ _Bool nw_write (Recvr *r)
 	char fbuf[64] = {0};
 
 	//?
-	snprintf( fbuf, 63, "%s/%d", NW_QUEUE_WRITE_DIRNAME, fn++ );
-	mkdir( NW_QUEUE_WRITE_DIRNAME, S_IRWXU );
+	//snprintf( fbuf, 63, "%s/%d", NW_QUEUE_WRITE_DIRNAME, fn++ );
+	//mkdir( NW_QUEUE_WRITE_DIRNAME, S_IRWXU );
 	if ( open( fbuf, O_CREAT | O_RDWR, S_IRWXU ) == -1 )
 		return 1;
 	if ( (r->sb = write( fd, wB, len - r->sent)) == -1 )
@@ -386,13 +387,11 @@ _Bool nw_write (Recvr *r)
 
 	SHOWDATA( "write() syscall returned %d\n", r->sb );
 
-	if ( !r->sb ) 
-	{
+	if ( !r->sb ) {
 		reset_recvr(r);
 		return ERR_WRITE_CONN_CLOSED_BY_PEER;
 	}
-	else if ( r->sb == -1 ) 
-	{
+	else if ( r->sb == -1 ) {
 		switch (errno) {
 			case EAGAIN: /*This shoudn't happen, but if it does...*/
 				return ERR_WRITE_EGAIN;
@@ -442,14 +441,12 @@ _Bool nw_write (Recvr *r)
 }
 
 
-
 /*Reset file descriptor for reading*/
 _Bool reset_read_fd (Recvr *r, void *ud, char *err) 
 {
 	r->client->events = POLLRDNORM;
 	return 1;
 }
-
 
 
 /*Reset file descriptor for writing */
@@ -460,13 +457,11 @@ _Bool reset_write_fd (Recvr *r, void *ud, char *err)
 }
 
 
-
 /*Clear buffer*/
 _Bool reset_buffer (Recvr *r, void *ud, char *err) 
 {
 	return (memset(r->response, 0, NW_MAX_BUFFER_SIZE) != NULL);
 }
-
 
 
 /*A dummy function for the purposes of this tutorial*/
@@ -621,9 +616,8 @@ SHOWDATA( "rq: => %p vs rs: => %p\n", (void *)&j->_request, (void *)&j->_respons
 
 
 //Activate the poll server loop
-_Bool activate_selector (Selector *s) 
-{
-	/*Define stuff*/
+_Bool activate_selector (Selector *s) {
+	//Define stuff
 	Recvr *rr = s->rarr;
 	int maxi = 0, conn = 1, ready;
 	int connCount = 0;
@@ -631,40 +625,49 @@ _Bool activate_selector (Selector *s)
 	int watching  = 0;
 	int maxbuf    = NW_MAX_BUFFER_SIZE;
 
-	/*Wait for new connections and spawn children*/
-	for (;;) 
-	{
-		if (NW_CALL(((ready = poll(s->clients, (watching = maxi + 1), timeout)) == -1))) 
-			{ switch (errno) {
-					case EAGAIN: fprintf( stderr, "repeat the call...\n" ); continue;
-					case EINVAL: case EINTR: exit( 0 ); 
-					default: break; }}
+	//Wait for new connections and spawn children
+	for (;;) {
+		//Handling ready connections MAY not work this way
+		if ( NW_CALL(((ready = poll(s->clients, (watching = maxi + 1), timeout)) == -1)) ) {
+			//There are a lot of other things that need to be handled here...
+			if ( errno == EAGAIN )
+				continue;
+			else if ( errno == EINVAL || errno == EINTR )
+				exit( 0 );	
+			else if ( errno == ENOMEM )
+				exit( 0 );	
+			else if ( errno == EFAULT )
+				exit( 0 );	
+			else {
+				break;
+			}
+		}
 
-		/*Check event, accept, set non-block and set last open file*/
-		/*NOTE: the following is just an unclear way to specify that the parent received a Read event*/
-		if (NW_CALL( s->clients[0].revents & POLLRDNORM )) 
-		{
-			Recvr  *r     = &rr[conn]; 
+		//Check event, accept, set non-block and set last open file
+		if ( NW_CALL( s->clients[0].revents & POLLRDNORM ) ) {
+			Recvr *r = &rr[conn]; 
+			r->sstatus = malloc( sizeof(int) );
+			*r->sstatus = 0;
 			Socket *child = &r->child;
 
-			/*What does the server do when we reach the maximum connections?*/
-			if (NW_CALL( conn == s->max_events ))
+			//What does the server do when we reach the maximum connections?
+			if ( NW_CALL( conn == s->max_events ) ) {
 				handle(ERR_SPAWN_MAX_CLIENTS);
+			}
 
 			/* if (NW_CALL( accept( s->clients[0].fd, NULL, NULL ) )*/
-			if (NW_CALL( !socket_accept(s->parent, child) ))
+			if ( NW_CALL( !socket_accept(s->parent, child) ) ) {
 				handle(ERR_SPAWN_ACCEPT);
+			}
 
 		#ifdef NW_BUFF_FIXED
 			//Initialize space for messages
-			if (NW_CALL( !bf_init( &r->_request, r->request_, maxbuf ) || !bf_init( &r->_response, r->response_, maxbuf )))
-			{
+			if (NW_CALL( !bf_init( &r->_request, r->request_, maxbuf ) || !bf_init( &r->_response, r->response_, maxbuf ))) {
 				fprintf( stderr, "Failed to allocate thingy." );
 				exit( 0 );
 			}
 		#else
-			if ( !bf_init( &r->_request, NULL, maxbuf ) || !bf_init( &r->_response, NULL, maxbuf ) ) 
-			{
+			if ( !bf_init( &r->_request, NULL, maxbuf ) || !bf_init( &r->_response, NULL, maxbuf ) ) {
 				fprintf( stderr, "Failed to allocate request buffer." );
 				exit( 0 );
 			}
@@ -683,16 +686,15 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 			}
 		#endif
 
-			/*Make the new socket non-blocking*/
-			if (NW_CALL( fcntl(child->fd, F_SETFD, O_NONBLOCK) == -1 ))
+			//Make the new socket non-blocking
+			if ( NW_CALL( fcntl(child->fd, F_SETFD, O_NONBLOCK) == -1 ) ) {
 				handle(ERR_SPAWN_NON_BLOCK_SET);
+			}
 
-			/*Find the last open connection (there must be a better way)*/
-			for (conn=1; conn<s->max_events; conn++)
-			{
+			//Find the last open connection (there must be a better way)
+			for ( conn=1; conn<s->max_events; conn++ ) {
 				SHOWDATA( "conn: %d -> connfd: %d\n", conn, s->clients[conn].fd );
-				if (s->clients[conn].fd < 0) 
-				{
+				if ( s->clients[conn].fd < 0 ) { 
 					/*Set descriptor event*/
 					s->clients[conn].fd = child->fd;
 					s->clients[conn].events = POLLRDNORM;
@@ -703,7 +705,7 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 				}
 			}
 
-			/*Finally, set the new top and start the real work*/
+			//Finally, set the new top and start the real work
 			if ( conn > maxi )
 				maxi = conn;
 			if ( --ready <= 0 )
@@ -713,12 +715,9 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 		/*maxi needs to drop when connections go away - if not, the poll structure
 			is watching for events on descriptors that it doesn't have to*/
 
-		for (int i = 1; i <= maxi; i++) 
-		{
+		for ( int i = 1; i <= maxi; i++ ) {
 			Recvr  *r    = &rr[i]; 
 			r->client    = &s->clients[i];
-			//r->request = r->_request.buffer;
-			//r->response = r->_response.buffer;
 			r->request   = (&r->_request)->buffer;
 			r->response  = (&r->_response)->buffer;
 			int error;
@@ -738,8 +737,9 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 			;
 
 			//Skip untouched or closed descriptors
-			if (NW_CALL( r->client->fd < 0 ))
+			if ( NW_CALL( r->client->fd < 0 ) ) {
 				continue;
+			}
 
 		#if 0
 			/*Check if the server should stop the timer*/
@@ -750,34 +750,32 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 		#endif
 
 			//Read what's on the socket
-			if (NW_CALL( r->client->revents & POLLRDNORM /*| POLLERR)*/ )) 
-			{
+			if (NW_CALL( r->client->revents & POLLRDNORM /*| POLLERR)*/ )) {
 				r->stage = NW_AT_READ; 
 
 				//NOTE: It would be more consitent to set an error within the recvr
-				if (NW_CALL( (error  = nw_read( r ) ))) {
-					handle ( error );
+				if ( NW_CALL((error = nw_read( r ))) ) {
+					handle( error );
 				}
-				else 
-				{
+				else {
 					//Close clients that are too slow
-					if (NW_CALL( r->rb < min_read ))
-						handle(ERR_READ_BELOW_THRESHOLD);
+					if ( NW_CALL( r->rb < min_read ) ) {
+						handle( ERR_READ_BELOW_THRESHOLD );
+					}
 
-					/*Call user read handler*/
-					uhandle(NW_AT_READ);
+					//Call user read handler
+					uhandle( NW_AT_READ );
 
-					/*HANDLE - Set retries when receiving TCP*/
-					if (NW_CALL( r->stage != NW_AT_READ )) {
+					//HANDLE - Set retries when receiving TCP
+					if ( NW_CALL( r->stage != NW_AT_READ ) ) {
 						r->client->events = POLLWRNORM;
 					}
-					else 
-					{
-						if (NW_CALL( ++r->recv_retry >= s->recv_retry)) {
-							handle(ERR_READ_MAX_READ_RETRY_REACHED);
+					else {
+						if ( NW_CALL( ++r->recv_retry >= s->recv_retry) ) {
+							handle( ERR_READ_MAX_READ_RETRY_REACHED );
 						}
-						else 
-						{ /*Set event on the newest descriptor*/
+						else {
+						  //Set event on the newest descriptor
 							r->client->events = POLLRDNORM;
 							continue;
 						}
@@ -792,23 +790,14 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 			continue;
 		#endif
 
-
 		#ifndef NW_SKIP_PROC
-			if (NW_CALL( r->stage == NW_AT_PROC )) 
-			{
+			if ( NW_CALL( r->stage == NW_AT_PROC ) ) {
 				//Build the response, but I need to handle errors...
-
-				//The easiest way to use this is return a status
-				//If it's 0, it failed, move on
-				//If it's 1, it's good, move on
-				//If it's 2 or more, continue until something else happens
-				uhandle(NW_AT_PROC);
-
+				uhandle( NW_AT_PROC );
 				SHOWDATA( "r->status %d\n", r->status );
 
-				/*Status of 0, means run again.*/
-				if ( r->status > 0 )
-				{
+				//Status of 0, means run again.
+				if ( r->status > 0 ) {
 					r->stage = NW_AT_WRITE;
 					r->client->events = POLLWRNORM;
 				}
@@ -822,40 +811,46 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 		 #endif
 		#endif
 
-
 		#ifdef NW_SKIP_WRITE
 		#else
-			if (NW_CALL( r->client->revents & POLLWRNORM && r->stage == NW_AT_WRITE )) 
-			{
-				if (NW_CALL( (error  = nw_write( r ) ))) {
+			if ( NW_CALL( r->client->revents & POLLWRNORM && r->stage == NW_AT_WRITE ) ) {
+				if ( NW_CALL( (error = nw_write( r )) ) ) {
 					handle ( error );
 				}
 			#ifdef NW_QUEUE_WRITES
-				if ( maxi == 6 ) { wtf( s, maxi ); exit( 0 ); }
+				//if ( maxi == 6 ) { wtf( s, maxi ); exit( 0 ); }
 			#else
-				else 
-				{
+				else {
 					//Close clients that are too slow
-					if (NW_CALL( r->sb < min_write ))
+					if ( NW_CALL( r->sb < min_write ) ) {
 						handle(ERR_WRITE_BELOW_THRESHOLD);
+					}
 		
 					//Perform whatever handler
 					uhandle( NW_AT_WRITE );
-					SHOWDATA( "error:         %d\n", error );
-					SHOWDATA( "current stage: %s\n", GETSTAGE( r->stage ) );
+#if 1
+niprintf( r->status );
+niprintf( *r->sstatus );
+#endif
+					//Check r->status
+					if ( *r->sstatus == 200 ) {
+fprintf( stderr, "response writer has run... died at [%s: %d]\n", __func__,  __LINE__ );
+exit( 0 );
+					}
 
-					/*Check if all data came off*/
-					if (NW_CALL( r->stage == NW_COMPLETED )) 
-					{
+	print_recvr( r );
+	fprintf( stderr, "response writer has run... died at [%s: %d]\n", __func__,  __LINE__ );
+exit( 0 );
+					//Check if all data came off
+					if ( NW_CALL( r->stage == NW_COMPLETED ) ) {
 						uhandle(NW_COMPLETED);
 						close(r->client->fd);
 						r->client->fd = -1;
 						reset_recvr(r);	
 					}
-					else 
-					{
-						/*Set event on the newest descriptor or die with an error*/
-						if (NW_CALL( (r->send_retry += 1) < s->send_retry )) {
+					else {
+						//Set event on the newest descriptor or die with an error*
+						if ( NW_CALL( (r->send_retry += 1) < s->send_retry ) ) {
 							r->client->events = POLLWRNORM;
 							continue;
 						}
@@ -877,8 +872,7 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 		#endif
 
 		#ifdef NW_SKIP_ERR /*Bad idea...*/
-			if (NW_CALL( r->client->revents & POLLERR ))
-			{
+			if ( NW_CALL( r->client->revents & POLLERR ) ) {
 			}
 		#endif
 		}/*for*/

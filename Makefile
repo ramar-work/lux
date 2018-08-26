@@ -1,12 +1,12 @@
 # This project...
 NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
-CLANGFLAGS = -g -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
+CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H
 CC = clang
 CFLAGS = $(CLANGFLAGS)
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DDEBUG_H #-ansi
-#CC = gcc
-#CFLAGS = $(GCCFLAGS)
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DNW_DEBUG #-ansi
+CC = gcc
+CFLAGS = $(GCCFLAGS)
 PORT = 2200
 
 # Some Linux systems need these, but pkg-config should handle it
@@ -34,6 +34,10 @@ cli:
 #.c.o:
 #	@echo $(CC) $(CFLAGS) -c $<
 #	@$(CC) $(CFLAGS) -c $<
+
+#
+chim:
+	./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/prj/hypno-wwwroot
 
 # This tests how hypno starts with a certain set of criteria.
 goku:

@@ -254,6 +254,7 @@ typedef struct
 	struct timespec start;
 	struct timespec end;
 	int      status; 
+	int      *sstatus; 
 } Recvr;
 
 
@@ -344,4 +345,10 @@ _Bool nw_finish_fd (Recvr *r, void *ud, char *err);
 _Bool nw_reset_fd (Recvr *r, void *ud, char *err);
 _Bool nw_add_read (Recvr *r, uint8_t *msg, int size);
 _Bool nw_add_write (Recvr *r, uint8_t *msg, int size); 
+#endif
+
+
+#ifdef NW_DEBUG
+void print_recvr (Recvr *r) ;
+void print_selector (Selector *s) ;
 #endif

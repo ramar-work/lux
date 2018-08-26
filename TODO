@@ -1,5 +1,12 @@
 ???
 ---
+- set status by dereferencing pointer: 
+		add to Recvr strcture, move on and call it a day 
+		remember to free it at the end of the cycle
+		modify nw_write or the loop to bypass writing automatically if something like streaming needs to be done
+			1. add a member to Recvr that just bypasses nw_write and returns 1?
+			2. add an if at 824 to choose between write and no write
+			3. just overwrite nw_write?  since this needs to get done for TLS anyway...
 
 hypnob:
 	- first run: 

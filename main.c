@@ -56,13 +56,13 @@ typedef struct
 
 //Signature for handling a server.
 _Bool http_run (Recvr *r, void *p, char *e);
+_Bool http_send (Recvr *r, void *p, char *e);
 
 //This is nw's data structure for handling protocols 
-Executor runners[] = 
-{
+Executor etc[] = {
 	[NW_AT_READ]        = { .exe = http_read, NW_NOTHING },
 	[NW_AT_PROC]        = { .exe = http_run , NW_NOTHING },
-	[NW_AT_WRITE]       = { .exe = http_fin , NW_NOTHING },
+	[NW_AT_WRITE]       = { .exe = http_send, NW_NOTHING },
 	[NW_COMPLETED]      = { .exe = http_fin , NW_NOTHING }
 };
 
@@ -134,6 +134,7 @@ void srvBinaryFiles() {
 	#endif
 }
 
+
 //Serve a basic canned response
 void srvBasicCannedResponse() {
   #if 0 
@@ -155,8 +156,6 @@ void srvBasicCannedResponse() {
 	http_pack_response( h );
   #endif
 }
-
-
 
 
 typedef struct Passthru {
@@ -189,9 +188,39 @@ int glean_extension( char *pathname, Passthru *pt ) {
 }
 
 
+int hssent = 0;
+#include "tests/char-char.c"
+
+//This is what handles streaming in case it's needed.
+_Bool http_send (Recvr *r, void *p, char *e) {
+	HTTP *h = (HTTP *)r->userdata;
+	//r->status = 2;
+	*r->sstatus = 200;
+
+#if 1
+	//fprintf( stderr, "RECVR @ http_send\n==================\n" );
+	//print_recvr( r );
+#else
+	http_print_response( h );
+	uint8_t *a = tests_char_char_jpeg;
+	int alen = tests_char_char_jpeg_len; 
+#endif
+
+	//Set this for everything else...
+	//r->status = 2;
+	r->stage = NW_AT_WRITE;
+
+	//Open a database and start writing requests to it...
+	if ( r->stage == NW_COMPLETED ) {	//r->stage = NW_AT_WRITE;
+		memset(h, 0, sizeof(HTTP));
+	}
+
+	return 1;
+} 
+
+
 //This is the single-threaded HTTP run function
-_Bool http_run ( Recvr *r, void *p, char *err ) 
-{ 
+_Bool http_run ( Recvr *r, void *p, char *err ) { 
  #ifdef INCLUDE_TIMING_INFO_H
 	char tbuf[1024]={0};
 	Timer t;
@@ -317,8 +346,9 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 			
 			//Couldn't open	
 			if ( (fd = open( fn, O_RDONLY )) == -1 || read( fd, fb, sb.st_size ) == -1 ) {	
-				return ERR_500( "Error occurred while trying to open file: %s. %s",
-										 fn, strerror( errno ) );
+				return ERR_500( 
+					"Error occurred while trying to open file: %s. %s",
+					 fn, strerror( errno ) );
 			}
 
 			//Prepare the actual reponse
@@ -326,6 +356,9 @@ _Bool http_run ( Recvr *r, void *p, char *err )
 			http_set_content( h, mt, fb, sb.st_size );
 			http_pack_response( h );
 			free( fn );
+
+			//a certain size needs to put the server in stream mode...
+			http_print_response( h );
 			r->stage = NW_AT_WRITE;
 			return 1;
 		}
@@ -449,7 +482,7 @@ exit( 0 );
 		l++;
 	}
 
-	//This is a working solution.  Still gotta figure out the reason for that crash...
+	//Still gotta figure out the reason for that crash...
 	lua_aggregate( L );
 	lua_pushstring( L, "model" );
 	lua_pushvalue( L, 1 );
@@ -516,15 +549,18 @@ exit( 0 );
 	timer_end( &t );
 	timer_print( &t );
  #endif	
+
+	fprintf( stderr, "RECVR @ http_run\n==================\n" );
+	print_recvr( r );
+
 	r->stage = NW_AT_WRITE;
-	free( renbuf );
+	//free( renbuf );
 	return 1;
 }
 
 
 //Options
-Option opts[] = 
-{
+Option opts[] = {
 	{ "-s", "--start"    , "Start a server."                                },
 	{ "-k", "--kill",      "Kill a running server."                },
 
@@ -550,8 +586,7 @@ Option opts[] =
 
 
 //Kill the server
-int kill_cmd( Option *opts, char *err, Passthru *pt ) 
-{
+int kill_cmd( Option *opts, char *err, Passthru *pt ) {
 #ifdef WIN32
  #error "Kill (as written here anyway) does not work on Windows."
 #endif
@@ -643,13 +678,12 @@ int start_cmd( Option *opts, char *err, Passthru *pt )
 		.recv_retry = 10, 
 		.send_retry = 10, 
 		.errors     = _nw_errors,
-		.runners    = runners, 
+		.runners    = etc, 
 		.run_limit  = 3, /*No more than 3 seconds per client*/
 	};
 
 	//Fork the children
-	if ( daemonize )
-	{
+	if ( daemonize ) {
 		pid_t pid = fork();
 		if ( pid == -1 ) {
 			return ERRL( "Failed to daemonize server process: %s", strerror(errno) );
