@@ -183,7 +183,6 @@ typedef struct Passthru {
 
 
 int glean_extension( char *pathname, Passthru *pt ) {
-
 	return 1;
 }
 
@@ -194,25 +193,24 @@ int hssent = 0;
 //This is what handles streaming in case it's needed.
 _Bool http_send (Recvr *r, void *p, char *e) {
 	HTTP *h = (HTTP *)r->userdata;
-	//r->status = 2;
-	*r->sstatus = 200;
 
+	fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+	http_print_response( h );
 #if 1
 	//fprintf( stderr, "RECVR @ http_send\n==================\n" );
 	//print_recvr( r );
 #else
-	http_print_response( h );
 	uint8_t *a = tests_char_char_jpeg;
 	int alen = tests_char_char_jpeg_len; 
 #endif
 
 	//Set this for everything else...
-	//r->status = 2;
 	r->stage = NW_AT_WRITE;
+	r->stage = NW_COMPLETED;
 
 	//Open a database and start writing requests to it...
 	if ( r->stage == NW_COMPLETED ) {	//r->stage = NW_AT_WRITE;
-		memset(h, 0, sizeof(HTTP));
+		//memset(h, 0, sizeof(HTTP));
 	}
 
 	return 1;
@@ -252,7 +250,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 	Passthru *ag = (Passthru *)p;
 	HTTP *h = (HTTP *)r->userdata;
 	HTTP_Request *req = &h->request;
-	lua_State *L  = luaL_newstate(); 
+	lua_State *L = luaL_newstate(); 
 
 	//Set the message length
 	req->mlen = r->recvd;
@@ -282,29 +280,26 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 		}
 	}
 	else {
-#endif
-		//fprintf( stderr, "Directory '%s' contains:\n", ag->webroot );
-		while ( (ag->de = readdir( ag->ds )) ) {
-			//Make a fully qualified path from the filename
-			char *fd = strcmbd( "/", ag->webroot, ag->de->d_name );
-
-			//Check that the child inode is accessible
-			if ( lstat( fd, &sb ) == -1 )
-				return ERR_500("Can't access directory %s: %s.", fd, strerror(errno));
-
-			//Check the name of the folder and see if the hostname matches
-			if ( S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode)) ) {
-				if ( strcmp( ag->de->d_name, h->hostname ) == 0 ) {
-					ag->activeDir = fd;
-					break;
-				}	
-			}
-
-			free(fd);
-		}
-#if 0
 	}
 #endif
+		//fprintf( stderr, "Directory '%s' contains:\n", ag->webroot );
+	while ( (ag->de = readdir( ag->ds )) ) {
+		//Make a fully qualified path from the filename
+		char *fd = strcmbd( "/", ag->webroot, ag->de->d_name );
+
+		//Check that the child inode is accessible
+		if ( lstat( fd, &sb ) == -1 )
+			return ERR_500("Can't access directory %s: %s.", fd, strerror(errno));
+
+		//Check the name of the folder and see if the hostname matches
+		if ( S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode)) ) {
+			if ( strcmp( ag->de->d_name, h->hostname ) == 0 ) {
+				ag->activeDir = fd;
+				break;
+			}	
+		}
+		free(fd);
+	}
 
 	//Default responses get handled here 
 	if ( !ag->activeDir )
@@ -346,9 +341,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 			
 			//Couldn't open	
 			if ( (fd = open( fn, O_RDONLY )) == -1 || read( fd, fb, sb.st_size ) == -1 ) {	
-				return ERR_500( 
-					"Error occurred while trying to open file: %s. %s",
-					 fn, strerror( errno ) );
+				return ERR_500( "Error occurred while trying to open file: %s. %s", fn, strerror( errno ));
 			}
 
 			//Prepare the actual reponse
@@ -358,7 +351,11 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 			free( fn );
 
 			//a certain size needs to put the server in stream mode...
-			http_print_response( h );
+			//http_print_response( h );
+			fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+			*r->bypass = 1;
+			fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+
 			r->stage = NW_AT_WRITE;
 			return 1;
 		}
@@ -561,9 +558,8 @@ exit( 0 );
 
 //Options
 Option opts[] = {
-	{ "-s", "--start"    , "Start a server."                                },
-	{ "-k", "--kill",      "Kill a running server."                },
-
+	{ "-s", "--start"    , "Start a server." },
+	{ "-k", "--kill",      "Kill a running server." },
 #if 0
 	{ "-c", "--create",    "Create a new directory for hypno site.",'s' },	
 	{ "-l", "--list",      "List all hypno sites on the system.",'s' },	
@@ -627,8 +623,7 @@ int kill_cmd( Option *opts, char *err, Passthru *pt ) {
 
 
 //Load a different data.lua file from main()
-int file_cmd( Option *opts, char *err, Passthru *pt ) 
-{
+int file_cmd( Option *opts, char *err, Passthru *pt ) {
 	lua_State *L = NULL;  
 	char *f = opt_get( opts, "--file" ).s;
 	struct stat sb;
@@ -657,8 +652,7 @@ int file_cmd( Option *opts, char *err, Passthru *pt )
 
 
 //Start the server from main()
-int start_cmd( Option *opts, char *err, Passthru *pt ) 
-{
+int start_cmd( Option *opts, char *err, Passthru *pt ) {
 	int stat, conn, port, daemonize;
 	daemonize = !opt_set(opts, "--no-daemon");
 	!(conn = opt_get(opts, "--max-conn").n) ? conn = 1000 : 0;

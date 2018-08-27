@@ -277,8 +277,7 @@ static Selector _default = {
 
 
 /*Close fd and reset all memory and "trackers" for this connection*/
-static void reset_recvr (Recvr *r) 
-{
+static void reset_recvr (Recvr *r) {
 	//SHOWDATA( "resetting recvr structure and freeing scratch space... " );
 	memset(&r->child, 0, sizeof(Socket));
 #ifdef NW_BUFF_FIXED
@@ -290,6 +289,8 @@ static void reset_recvr (Recvr *r)
 #endif
 	memset(&r->start, 0, sizeof(struct timespec));
 	memset(&r->end, 0, sizeof(struct timespec));
+	free( r->bypass );
+	r->bypass = NULL;
 	r->rb = 0, 
 	r->sb = 0, 
 	r->recvd = 0, 
@@ -356,37 +357,20 @@ int nw_read (Recvr *r)
 
 //Write to socket - always assumes the message is ready (and it should be...)
 _Bool nw_write (Recvr *r) {
+	//Don't write if the user is not ready 
+	//fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+
+	if ( *r->bypass > 0 ) {
+		return 0;
+	}
+
 	//Check that you're not writing to uninitialized memory.
 	SHOWDATA( "file             %d\n", r->client->fd );	
 	SHOWDATA( "actual length    %d\n", bf_written( &r->_response ));
-	SHOWDATA( "CHONK CHONK %d\n", 1);
-
 	int len = bf_written( &r->_response );
-#ifdef NW_QUEUE_WRITES
-	//This has the same failures, we don't really care...
-	int fd = 0;
-	static int fn = 0;
-	struct stat sb;
-	uint8_t *wB = bf_data( &r->_response );
-	char fbuf[64] = {0};
-
-	//?
-	//snprintf( fbuf, 63, "%s/%d", NW_QUEUE_WRITE_DIRNAME, fn++ );
-	//mkdir( NW_QUEUE_WRITE_DIRNAME, S_IRWXU );
-	if ( open( fbuf, O_CREAT | O_RDWR, S_IRWXU ) == -1 )
-		return 1;
-	if ( (r->sb = write( fd, wB, len - r->sent)) == -1 )
-		return 1;
-	if ( close( fd ) == -1 )
-		return 1;
-	SHOWDATA( "%-5d bytes written to file %s\n", r->sb, fbuf);
-
-#else
 	uint8_t *wB = &r->_response.buffer[r->sent];
-	r->sb = write(r->client->fd, wB, len - r->sent);
-
-	SHOWDATA( "write() syscall returned %d\n", r->sb );
-
+	r->sb = write(r->client->fd, wB, len - r->sent); SHOWDATA( "write() syscall returned %d\n", r->sb );
+	
 	if ( !r->sb ) {
 		reset_recvr(r);
 		return ERR_WRITE_CONN_CLOSED_BY_PEER;
@@ -426,17 +410,17 @@ _Bool nw_write (Recvr *r) {
 			case EPERM: /*I can't write, b/c another process disallowed it*/
 				reset_recvr(r);
 				return ERR_WRITE_EPERM;
-			/*case EDESTADDREQ: //TODO: GCC complains.  Why?
+			#if 0
+			case EDESTADDREQ: //TODO: GCC complains.  Why?
 				handle(ERR_WRITE_EDESTADDREQ); 
-				close_fds(i); */
+				close_fds(i); 
+			#endif
 			default:
 				break;		
 		}
 	}
 
 	r->sent += r->sb;
-	//This needs to repeat if it wasn't done...
-#endif
 	return 0;
 }
 
@@ -591,7 +575,7 @@ void free_selector (Selector *s)
 }
 
 
-
+#if 0
 void wtf (Selector *s, int count) 
 {
 	//print a header 
@@ -613,7 +597,7 @@ SHOWDATA( "rq: => %p vs rs: => %p\n", (void *)&j->_request, (void *)&j->_respons
 			bf_written( &j->_request ), bf_written( &j->_response ), bf_data( &j->_request ), bf_data( &j->_response ), (void *)j->client );
 	}
 }
-
+#endif
 
 //Activate the poll server loop
 _Bool activate_selector (Selector *s) {
@@ -629,7 +613,7 @@ _Bool activate_selector (Selector *s) {
 	for (;;) {
 		//Handling ready connections MAY not work this way
 		if ( NW_CALL(((ready = poll(s->clients, (watching = maxi + 1), timeout)) == -1)) ) {
-			//There are a lot of other things that need to be handled here...
+			//Handle errors that may occur after a poll read
 			if ( errno == EAGAIN )
 				continue;
 			else if ( errno == EINVAL || errno == EINTR )
@@ -643,11 +627,9 @@ _Bool activate_selector (Selector *s) {
 			}
 		}
 
-		//Check event, accept, set non-block and set last open file
+		//Check event, accept a connection, set socket to non-blocking and mark last open file
 		if ( NW_CALL( s->clients[0].revents & POLLRDNORM ) ) {
 			Recvr *r = &rr[conn]; 
-			r->sstatus = malloc( sizeof(int) );
-			*r->sstatus = 0;
 			Socket *child = &r->child;
 
 			//What does the server do when we reach the maximum connections?
@@ -695,7 +677,6 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 			for ( conn=1; conn<s->max_events; conn++ ) {
 				SHOWDATA( "conn: %d -> connfd: %d\n", conn, s->clients[conn].fd );
 				if ( s->clients[conn].fd < 0 ) { 
-					/*Set descriptor event*/
 					s->clients[conn].fd = child->fd;
 					s->clients[conn].events = POLLRDNORM;
 					SHOWDATA( "conn: %d -> now connfd: %d\n", conn, s->clients[conn].fd );
@@ -712,6 +693,19 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 				continue;	
 		} /*(NW_CALL( s->clients[0].revents & POLLRDNORM ))*/
 
+		//Define these before the loop
+	#ifdef NW_MIN_ACCEPTABLE_READ
+		int min_read = NW_MIN_ACCEPTABLE_READ;
+	#else
+		int min_read = s->read_min;
+	#endif
+
+	#ifdef NW_MIN_ACCEPTABLE_WRITE
+		int min_write =	NW_MIN_ACCEPTABLE_WRITE;
+	#else
+		int min_write =	s->write_min;
+	#endif
+
 		/*maxi needs to drop when connections go away - if not, the poll structure
 			is watching for events on descriptors that it doesn't have to*/
 
@@ -720,21 +714,14 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 			r->client    = &s->clients[i];
 			r->request   = (&r->_request)->buffer;
 			r->response  = (&r->_response)->buffer;
+			r->connNo    = i; 
 			int error;
-			int min_read =
-			#ifdef NW_MIN_ACCEPTABLE_READ
-				NW_MIN_ACCEPTABLE_READ
-			#else
-				s->read_min
-			#endif
-			;
-			int min_write = 
-			#ifdef NW_MIN_ACCEPTABLE_WRITE
-				NW_MIN_ACCEPTABLE_WRITE
-			#else
-				s->write_min
-			#endif
-			;
+
+			//Initialize the write bypass flag
+			if ( !r->bypass ) {
+				r->bypass = malloc( sizeof(int) ); 
+				*r->bypass = 0;
+			}
 
 			//Skip untouched or closed descriptors
 			if ( NW_CALL( r->client->fd < 0 ) ) {
@@ -750,7 +737,7 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 		#endif
 
 			//Read what's on the socket
-			if (NW_CALL( r->client->revents & POLLRDNORM /*| POLLERR)*/ )) {
+			if (NW_CALL( r->client->revents & POLLRDNORM )) {
 				r->stage = NW_AT_READ; 
 
 				//NOTE: It would be more consitent to set an error within the recvr
@@ -781,66 +768,38 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 						}
 					}
 				} /*(NW_CALL( (rb = read(r->client->fd, &r->request[0], 6400)) == -1 ))*/
-			#ifdef NW_QUEUE_READS
-				if ( maxi == 6 ) { wtf( s, maxi ); exit( 0 ); }
-			#endif
 			} /*(NW_CALL( r->client->revents & (POLLRDNORM | POLLERR) ))*/ 
 
-		#ifdef NW_QUEUE_READS
-			continue;
-		#endif
-
-		#ifndef NW_SKIP_PROC
 			if ( NW_CALL( r->stage == NW_AT_PROC ) ) {
 				//Build the response, but I need to handle errors...
 				uhandle( NW_AT_PROC );
-				SHOWDATA( "r->status %d\n", r->status );
 
 				//Status of 0, means run again.
 				if ( r->status > 0 ) {
 					r->stage = NW_AT_WRITE;
 					r->client->events = POLLWRNORM;
 				}
-			#ifdef NW_QUEUE_PROCS
-				if ( maxi == 6 ) { wtf( s, maxi ); exit( 0 ); }
-			#endif
 				continue;
 			}
-		 #ifdef NW_QUEUE_PROCS
-			continue;
-		 #endif
-		#endif
 
-		#ifdef NW_SKIP_WRITE
-		#else
 			if ( NW_CALL( r->client->revents & POLLWRNORM && r->stage == NW_AT_WRITE ) ) {
+				//fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+
+				//Process the data before sending
+				uhandle( NW_AT_WRITE );
+
 				if ( NW_CALL( (error = nw_write( r )) ) ) {
 					handle ( error );
 				}
-			#ifdef NW_QUEUE_WRITES
-				//if ( maxi == 6 ) { wtf( s, maxi ); exit( 0 ); }
-			#else
 				else {
-					//Close clients that are too slow
-					if ( NW_CALL( r->sb < min_write ) ) {
-						handle(ERR_WRITE_BELOW_THRESHOLD);
+					//TODO: Get rid of NW_CALL and combine these checks
+					if ( *r->bypass == 0 ) {
+						//Close clients that are too slow
+						if ( NW_CALL( r->sb < min_write ) ) {
+							handle(ERR_WRITE_BELOW_THRESHOLD);
+						}
 					}
 		
-					//Perform whatever handler
-					uhandle( NW_AT_WRITE );
-#if 1
-niprintf( r->status );
-niprintf( *r->sstatus );
-#endif
-					//Check r->status
-					if ( *r->sstatus == 200 ) {
-fprintf( stderr, "response writer has run... died at [%s: %d]\n", __func__,  __LINE__ );
-exit( 0 );
-					}
-
-	print_recvr( r );
-	fprintf( stderr, "response writer has run... died at [%s: %d]\n", __func__,  __LINE__ );
-exit( 0 );
 					//Check if all data came off
 					if ( NW_CALL( r->stage == NW_COMPLETED ) ) {
 						uhandle(NW_COMPLETED);
@@ -859,22 +818,10 @@ exit( 0 );
 						}
 					}
 				}
-			#endif
-
-			#ifdef NW_QUEUE_WRITES
-				SHOWDATA( "error before exit:    %d\n", error );
-				r->stage = NW_COMPLETED;
-				close(r->client->fd);
-				r->client->fd = -1;
-				reset_recvr( r );
-			#endif
 			}
-		#endif
 
-		#ifdef NW_SKIP_ERR /*Bad idea...*/
 			if ( NW_CALL( r->client->revents & POLLERR ) ) {
 			}
-		#endif
 		}/*for*/
 	}/*for*/
 	return 1;

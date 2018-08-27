@@ -254,7 +254,8 @@ typedef struct
 	struct timespec start;
 	struct timespec end;
 	int      status; 
-	int      *sstatus; 
+	int      connNo; 
+	int     *bypass; 
 } Recvr;
 
 

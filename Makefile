@@ -36,6 +36,9 @@ cli:
 #	@$(CC) $(CFLAGS) -c $<
 
 #
+vchim:
+	valgrind ./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/prj/hypno-wwwroot
+
 chim:
 	./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/prj/hypno-wwwroot
 
