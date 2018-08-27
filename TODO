@@ -1,12 +1,38 @@
 ???
 ---
-- set status by dereferencing pointer: 
-		add to Recvr strcture, move on and call it a day 
-		remember to free it at the end of the cycle
-		modify nw_write or the loop to bypass writing automatically if something like streaming needs to be done
-			1. add a member to Recvr that just bypasses nw_write and returns 1?
-			2. add an if at 824 to choose between write and no write
-			3. just overwrite nw_write?  since this needs to get done for TLS anyway...
+
+document all your work on youtube or something...
+
+
+the best way to handle static files is preparing a header (and only a header)
+then either passing a pointer to an open file handle or opening it from http_send and passing stuff
+
+
+	- find slots (or modify Recvr to include slots) for a file handle and progress tracker
+
+	- appending to r->response via bf_append should allow files to send off w/o trouble
+
+	- pseudocode:
+
+		const int bufsize = 200;
+		if ( r->filepos == 0 )
+			return ( r->stage = NW_COMPLETED );
+		else {
+			filepos	= r->filepos;
+			*fileref = r->file;
+			snprintf( buf, sizeof(buf), "%d\r\n", bufsize );
+			bf_append( r->response, buf, strlen(buf) ); 
+			bf_append( r->response, fileref, bufsize );
+			*fileref += bufsize;
+			r->stage = NW_AT_WRITE;
+			return 1; 
+		}
+
+	- this seems easy, but will probably involve something weird...
+		
+	- TLS is easier to modify.  Change signature of nw_write and nw_read to use ( Selector *, Recvr * ) - Then the write and read functions can be thrown in w/o touching the Recvr again...
+
+
 
 hypnob:
 	- first run: 

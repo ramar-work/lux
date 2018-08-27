@@ -2590,8 +2590,7 @@ fprintf(stderr, "mm->size: %d\n", mm->size);
 
 
 //Where exactly is a substr in memory
-int32_t memstrat (const void *a, const void *b, int32_t size) 
-{
+int32_t memstrat (const void *a, const void *b, int32_t size) {
 	_Bool stop=1;
 	int32_t ct=0;//, occ=0;
 	uint8_t *aa = (uint8_t *)a;

@@ -251,8 +251,7 @@ typedef struct
 	void          *userdata;
 #endif
 	//This allows nw to cut connections that have been on too long
-	struct timespec start;
-	struct timespec end;
+	struct timespec start, end;
 	int      status; 
 	int      connNo; 
 	int     *bypass; 

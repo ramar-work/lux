@@ -338,8 +338,7 @@ int nw_read (Recvr *r)
 	}
 
 	//Now depending on model, this will or won't shut down on you...
-	if ( !bf_append( &r->_request, etc, r->rb ) ) 
-	{
+	if ( !bf_append( &r->_request, etc, r->rb ) ) {
 		if ( r->_request.error == ERR_BUFF_REALLOC_FAILURE ) {
 			return ERR_OUT_OF_MEMORY;
 		}
@@ -359,10 +358,6 @@ int nw_read (Recvr *r)
 _Bool nw_write (Recvr *r) {
 	//Don't write if the user is not ready 
 	//fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
-
-	if ( *r->bypass > 0 ) {
-		return 0;
-	}
 
 	//Check that you're not writing to uninitialized memory.
 	SHOWDATA( "file             %d\n", r->client->fd );	
@@ -783,10 +778,9 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 			}
 
 			if ( NW_CALL( r->client->revents & POLLWRNORM && r->stage == NW_AT_WRITE ) ) {
-				//fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
-
 				//Process the data before sending
 				uhandle( NW_AT_WRITE );
+				fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
 
 				if ( NW_CALL( (error = nw_write( r )) ) ) {
 					handle ( error );

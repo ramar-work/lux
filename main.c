@@ -194,15 +194,32 @@ int hssent = 0;
 _Bool http_send (Recvr *r, void *p, char *e) {
 	HTTP *h = (HTTP *)r->userdata;
 
-	fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
-	http_print_response( h );
 #if 1
-	//fprintf( stderr, "RECVR @ http_send\n==================\n" );
-	//print_recvr( r );
-#else
+	//Stream a response
+	fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+	print_recvr( r );
+	http_print_response( h ) ; 
+	HTTP_Response *y = &h->response;
+	write( 2, y->msg, y->mlen );
+
+	//Search for the end of the message thing
+	int ret = memstrat( y->msg, "\r\n\r\n", y->mlen );
+	fprintf (stderr, "http header stops at: %d\n", ret );	
+	
+	//This is a real problem, since there is no message ready
+	if ( ret == -1 ) {
+		0;
+	}
+	write( 2, &y->msg[ ret + 4 ], y->mlen - ( ret + 4 ) );
+#endif
+
+#if 0
 	uint8_t *a = tests_char_char_jpeg;
 	int alen = tests_char_char_jpeg_len; 
 #endif
+
+	//exit everytime b/c i'm not done yet...
+exit( 0 );
 
 	//Set this for everything else...
 	r->stage = NW_AT_WRITE;
