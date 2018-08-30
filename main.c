@@ -210,9 +210,8 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 #endif
 	
 	//Stop here, because the message was never prepared correctly. 
-	if ( ret == -1 ) {
+	if ( ret == -1 )
 		ERR_500( "Can't read packaged HTTP message." );	
-	}
 	else {
 		//add carriage return
 		ret += 4;
@@ -334,7 +333,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 	else {
 	}
 #endif
-		//fprintf( stderr, "Directory '%s' contains:\n", ag->webroot );
+	//fprintf( stderr, "Directory '%s' contains:\n", ag->webroot );
 	while ( (ag->de = readdir( ag->ds )) ) {
 		//Make a fully qualified path from the filename
 		char *fd = strcmbd( "/", ag->webroot, ag->de->d_name );
