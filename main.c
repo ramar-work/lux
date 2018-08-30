@@ -46,8 +46,7 @@
 char default_dirname[] = DIRNAME_DEFAULT;
 
 //Lua structure
-typedef struct 
-{
+typedef struct {
 	char *name; 
 	lua_CFunction func; 
 	char *setname; 
@@ -189,45 +188,81 @@ int glean_extension( char *pathname, Passthru *pt ) {
 
 int hssent = 0;
 #include "tests/char-char.c"
+static uint8_t *tccf = NULL; 
+static int tccflen = 0, tccfpos = 0; 
 
 //This is what handles streaming in case it's needed.
 _Bool http_send (Recvr *r, void *p, char *e) {
 	HTTP *h = (HTTP *)r->userdata;
+	HTTP_Response *y = &h->response;
+	int ret = memstrat( y->msg, "\r\n\r\n", y->mlen );
 
 #if 1
-	//Stream a response
+	//Dump Recvr and response body for debugging purposes
 	fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
 	print_recvr( r );
 	http_print_response( h ) ; 
-	HTTP_Response *y = &h->response;
 	write( 2, y->msg, y->mlen );
 
 	//Search for the end of the message thing
-	int ret = memstrat( y->msg, "\r\n\r\n", y->mlen );
-	fprintf (stderr, "http header stops at: %d\n", ret );	
-	
-	//This is a real problem, since there is no message ready
-	if ( ret == -1 ) {
-		0;
-	}
+	fprintf (stderr, "http header stops at: %d\n", ret ); 
 	write( 2, &y->msg[ ret + 4 ], y->mlen - ( ret + 4 ) );
 #endif
+	
+	//Stop here, because the message was never prepared correctly. 
+	if ( ret == -1 ) {
+		ERR_500( "Can't read packaged HTTP message." );	
+	}
+	else {
+		//add carriage return
+		ret += 4;
+	}
 
-#if 0
-	uint8_t *a = tests_char_char_jpeg;
-	int alen = tests_char_char_jpeg_len; 
-#endif
+	//Set the current byte position and sent bytes
+#if 1
+	if ( !tccf ) {
+		//this is the first time I've sent the message
+		tccflen = tests_char_char_jpeg_len; 
+		tccf = tests_char_char_jpeg; 
+		//wipe the rest of r (so wget should only get a header or like carriage return as a message
+		memset( &y->msg[ ret ], 0, y->mlen - ret );
+		
+		//write both recvr->msg or response.buffer and http message
+		y->mlen = ret;
+		fprintf( stderr, "New message:\n=================\n" );
+		write( 2, y->msg, y->mlen );
+		//write( 2, r->_response.buffer, y->len );
+		fprintf( stderr, "Lengths:\n============\n" );
+		niprintf( y->mlen );
+		niprintf( bf_written( &r->_response ) );
+		fprintf( stderr, "Same buffer?:\n============\n" );
+		write( 2, bf_data( &r->_response ), bf_written( &r->_response ) );
 
-	//exit everytime b/c i'm not done yet...
-exit( 0 );
-
-	//Set this for everything else...
-	r->stage = NW_AT_WRITE;
+		//bf_written is not being pointed to by anything
+		//bf_data is pointed to by y->msg
+		//how to modify directly?
+			
+		//write data to r	
+		//bf_append( h->response, "200\r\n", strlen("200\r\n") );	
+		//bf_append( h->response, tccf, 200 );	
+		//tccfpos += 200;
+		r->stage = NW_AT_WRITE;
+	}
+	else {
+		fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+		exit( 0 );
+		//write more data, unless i'm at the end...
+	}
+#else
 	r->stage = NW_COMPLETED;
+#endif
 
 	//Open a database and start writing requests to it...
 	if ( r->stage == NW_COMPLETED ) {	//r->stage = NW_AT_WRITE;
 		//memset(h, 0, sizeof(HTTP));
+	}
+	else {
+
 	}
 
 	return 1;

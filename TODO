@@ -7,6 +7,7 @@ document all your work on youtube or something...
 the best way to handle static files is preparing a header (and only a header)
 then either passing a pointer to an open file handle or opening it from http_send and passing stuff
 
+	- need a bf_delete? (not really, but it makes it easy to modify that structure)
 
 	- find slots (or modify Recvr to include slots) for a file handle and progress tracker
 

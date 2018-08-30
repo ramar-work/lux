@@ -796,10 +796,10 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 		
 					//Check if all data came off
 					if ( NW_CALL( r->stage == NW_COMPLETED ) ) {
-						uhandle(NW_COMPLETED);
-						close(r->client->fd);
+						uhandle( NW_COMPLETED );
+						close( r->client->fd );
 						r->client->fd = -1;
-						reset_recvr(r);	
+						reset_recvr( r );	
 					}
 					else {
 						//Set event on the newest descriptor or die with an error*
