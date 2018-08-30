@@ -4,6 +4,32 @@
 document all your work on youtube or something...
 
 
+opening and closing things...
+	can't remember how multiple threads handle things
+	as long as they aren't literally reading the same thing it should be fine
+	multiple handles can be the same on each file
+
+	allocate the HttpStreamer object and modify http.c to contain this.  This stuff should really be in the library...
+
+	you might want to skip the embedded file check, but it's a good test to have either way...
+
+	once that's done try these:
+		Cincinnati-skyline-from-kentucky-shore-night.jpg
+		morewindows.jpg
+		mrdr404.jpg
+		op-blue.png
+		road.jpg
+		room.jpg
+		room2.jpg
+		sign.jpg
+		sisfrac.jpg
+		walkway.jpg
+		water.jpg
+		weiner.jpg
+		windows.jpg
+		windows.new.jpg
+
+
 the best way to handle static files is preparing a header (and only a header)
 then either passing a pointer to an open file handle or opening it from http_send and passing stuff
 

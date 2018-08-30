@@ -715,8 +715,7 @@ _Bool http_read (Recvr *r, void *p, char *e)
 		//fprintf(stderr, "(request->mlen = %d) - (request->clen = %d)\n", request->mlen, request->clen);
 
 		//Check if we've finally received everything
-		if (h->request.mlen == h->request.clen) 
-		{
+		if (h->request.mlen == h->request.clen) {
 			rd_all_data = 1;
 			h->request.mlen += h->request.hlen;
 		}

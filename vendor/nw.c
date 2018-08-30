@@ -23,7 +23,7 @@
 #endif
 
 
-/*Call logging function*/
+//Call logging function
 #ifdef NW_VERBOSE 
  #define nw_log(...) \
 	fprintf(stderr, __VA_ARGS__);
@@ -38,7 +38,7 @@
 #define GETSTAGE(i) \
 	(i == NW_AT_WRITE) ? "write" : (i == NW_AT_READ ) ? "read" : (i == NW_AT_PROC) ? "proc" : "completed"
 
-/*Handle errors via the nw_error_map function pointer table.*/
+//Handle errors via the nw_error_map function pointer table.
 #define handle(ERRCODE) { \
 	nw_error_log(nw_error_map, ERRCODE); \
 	if (!(&s->errors[ERRCODE])->exe(r, s->global_ud, (&s->errors[ERRCODE])->err)) { \
@@ -55,7 +55,7 @@
 	} \
 }
 
-/*Handle errors via the rwp_error_map function pointer table.*/
+//Handle errors via the rwp_error_map function pointer table.
 #define uhandle(CODE) \
 	if (NW_CALL( ( r->status = (&s->runners[CODE])->exe(r, s->global_ud, (&s->runners[CODE])->err) ) )) { \
 		/*Success*/ \
@@ -85,7 +85,7 @@
 		} \
 	}
 
-/*Print a message as we move through branches within the program flow*/
+//Print a message as we move through branches within the program flow
 #ifdef NW_VERBOSE
  #define NW_LOG(c) \
 	(c) || (fprintf(stderr, "%s: %d - %s\n", __FILE__, __LINE__, #c)? 0: 0)
@@ -94,22 +94,21 @@
 	c
 #endif
 
-/*Reset read event*/
+//Reset read event
 #define nw_reset_read() \
 	r->client->events = POLLRDNORM
 
-/*Reset write event*/
+//Reset write event
 #define nw_reset_write() \
 	r->client->events = POLLWRNORM
 
-/*Get fd without worrying about pollfd structure*/
+//Get fd without worrying about pollfd structure
 #define nw_get_fd() \
 	r->client->fd
 
 #ifdef NW_DEBUG
-/*Dump the selector*/
-void print_selector (Selector *s) 
-{
+//Dump the selector
+void print_selector (Selector *s) {
 	fprintf(stderr, "max_events: %d\n", s->max_events);
 	fprintf(stderr, "rarr:       %p\n", (void *)s->rarr);
 	fprintf(stderr, "userdata:   %p\n", (void *)s->global_ud);
@@ -122,7 +121,7 @@ void print_selector (Selector *s)
 }
 
 
-/*Dump the selector*/
+//Dump the selector
 void print_recvr (Recvr *r) {
 	fprintf(stderr, "child:       %p\n", (void *)&r->child);
 	fprintf(stderr, "recvd:       %d\n", r->recvd);
@@ -289,6 +288,7 @@ static void reset_recvr (Recvr *r) {
 #endif
 	memset(&r->start, 0, sizeof(struct timespec));
 	memset(&r->end, 0, sizeof(struct timespec));
+	//free( r->userdata );
 	free( r->bypass );
 	r->bypass = NULL;
 	r->rb = 0, 
@@ -302,15 +302,13 @@ static void reset_recvr (Recvr *r) {
 
 
 //Read from a socket
-int nw_read (Recvr *r) 
-{
+int nw_read (Recvr *r) {
 	uint8_t etc[ NW_MAX_BUFFER_SIZE ] = { 0 };
 	r->rb = read(r->client->fd, etc, NW_MAX_BUFFER_SIZE - 1);
 
 	if ( !r->rb )
 		return ERR_READ_CONN_CLOSED_BY_PEER;
-	else if ( r->rb == -1 ) 
-	{
+	else if ( r->rb == -1 ) {
 		switch (errno) {
 			case ECONNRESET:
 				return ERR_READ_CONN_RESET;
@@ -351,7 +349,6 @@ int nw_read (Recvr *r)
 	r->request = (&r->_request)->buffer;
 	return 0;
 }
-
 
 
 //Write to socket - always assumes the message is ready (and it should be...)
@@ -420,48 +417,40 @@ _Bool nw_write (Recvr *r) {
 }
 
 
-/*Reset file descriptor for reading*/
-_Bool reset_read_fd (Recvr *r, void *ud, char *err) 
-{
+//Reset file descriptor for reading
+_Bool reset_read_fd (Recvr *r, void *ud, char *err) {
 	r->client->events = POLLRDNORM;
 	return 1;
 }
 
 
-/*Reset file descriptor for writing */
-_Bool reset_write_fd (Recvr *r, void *ud, char *err) 
-{
+//Reset file descriptor for writing
+_Bool reset_write_fd (Recvr *r, void *ud, char *err) {
 	r->client->events = POLLWRNORM;
 	return 1;
 }
 
 
-/*Clear buffer*/
-_Bool reset_buffer (Recvr *r, void *ud, char *err) 
-{
+//Clear buffer
+_Bool reset_buffer (Recvr *r, void *ud, char *err) {
 	return (memset(r->response, 0, NW_MAX_BUFFER_SIZE) != NULL);
 }
 
 
-/*A dummy function for the purposes of this tutorial*/
-static _Bool dummy (Recvr *r, void *ud, char *err) 
-{
+//A dummy function for the purposes of this tutorial
+static _Bool dummy (Recvr *r, void *ud, char *err) {
 	return 0;
 }
 
 
-
-/*Close*/
-_Bool nw_close_fd (Recvr *r, void *ud, char *err) 
-{
+//Close
+_Bool nw_close_fd (Recvr *r, void *ud, char *err) {
 	return ((close(r->client->fd) != -1) && (r->client->fd = -1));
 }
 
 
-
 /*...*/
-_Bool nw_reset_fd (Recvr *r, void *ud, char *err) 
-{
+_Bool nw_reset_fd (Recvr *r, void *ud, char *err) {
 	fprintf(stderr, "r->client is:   %p\n",  (void *)r->client);
 	fprintf(stderr, "r->client->fd:  %d\n",  r->client->fd);
 	reset_recvr(r);
@@ -475,8 +464,7 @@ _Bool nw_reset_fd (Recvr *r, void *ud, char *err)
 
 
 //Initialize the selectors
-_Bool initialize_selector (Selector *s, Socket *sock) 
-{
+_Bool initialize_selector (Selector *s, Socket *sock) {
 	//Always set up the parent on behalf of the user
 	s->parent = sock;
 
@@ -494,13 +482,11 @@ _Bool initialize_selector (Selector *s, Socket *sock)
 
  #ifndef NW_DISABLE_LOCAL_USERDATA
 	//Allocate any local userdata
-	if (s->lsize && s->lsize < 0) 
-	{
+	if (s->lsize && s->lsize < 0) {
 		return nw_err(0, "Local userdata size cannot be negative.\n");
 	}
 	//TODO: Can't use static userdata yet.
-	else if (s->lsize) 
-	{
+	else if (s->lsize) {
 		if (NW_CALL( !(s->local_ud = malloc(s->lsize * s->max_events)) )) {
 			return nw_err(0, "Failed to allocate space for local userdata.\n");
 		}
@@ -510,8 +496,7 @@ _Bool initialize_selector (Selector *s, Socket *sock)
  #endif
 
 	//Initialize all fds in pollfd to -1, and allocate any local userdata
-	for (int i=0; i<s->max_events; i++) 
-	{
+	for (int i=0; i<s->max_events; i++) {
 		//Initialize local userdata
 	 #ifndef NW_DISABLE_LOCAL_USERDATA
 		char *p = (!s->lsize) ? NULL : (char *)s->local_ud;
@@ -522,7 +507,6 @@ _Bool initialize_selector (Selector *s, Socket *sock)
 		//Initialize file descriptors to an agreed upon "uninitialized" value (-1 in this case)
 		(&s->clients[i])->fd = -1; 
 		(&s->rarr[i])->socket_fd = &(&s->clients[i])->fd ;
-	
 	}
 
 	/*Ready to read regular data over TCP or UDP*/ 
@@ -557,8 +541,7 @@ _Bool initialize_selector (Selector *s, Socket *sock)
 
 
 //If fd's are in use, you might not want to do this...
-void free_selector (Selector *s) 
-{
+void free_selector (Selector *s) {
 	free(s->clients);
 	free(s->rarr);
 #ifndef NW_DISABLE_LOCAL_USERDATA
@@ -571,8 +554,7 @@ void free_selector (Selector *s)
 
 
 #if 0
-void wtf (Selector *s, int count) 
-{
+void wtf (Selector *s, int count) {
 	//print a header 
 	fprintf( stderr, "\n" );
 	fprintf( stderr, "%-5s;%-5s;%-5s;%-7s;%-7s;%-7s;%-15s;%-15s;%-15s\n",
@@ -581,8 +563,7 @@ void wtf (Selector *s, int count)
 		"==============================================================================================\n" );	
 
 	//print all open files...
-	for ( int y=1; y < count; y++ ) 
-	{
+	for ( int y=1; y < count; y++ ) {
 		//print all data in CSV like format
 		Recvr *j = &s->rarr[ y ];
 SHOWDATA( "rq: => %p vs rs: => %p\n", (void *)&j->_request, (void *)&j->_response );

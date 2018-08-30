@@ -253,8 +253,10 @@ typedef struct
 	//This allows nw to cut connections that have been on too long
 	struct timespec start, end;
 	int      status; 
+#if 1
 	int      connNo; 
 	int     *bypass; 
+#endif
 } Recvr;
 
 

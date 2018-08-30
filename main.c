@@ -42,7 +42,7 @@
 #define ERR_500(...) http_err( r, h, 500, __VA_ARGS__ ) 
 #define ERR_404(...) http_err( r, h, 404, __VA_ARGS__ ) 
 
-//
+//???
 char default_dirname[] = DIRNAME_DEFAULT;
 
 //Lua structure
@@ -188,8 +188,16 @@ int glean_extension( char *pathname, Passthru *pt ) {
 
 int hssent = 0;
 #include "tests/char-char.c"
-static uint8_t *tccf = NULL; 
-static int tccflen = 0, tccfpos = 0; 
+static uint8_t *tccf = NULL;
+static int tccflen = 0, tccfpos = 0;
+
+typedef struct {
+	char *filename; //should be utf-8
+	int fd;
+	//really should do something with mmap() here, but...
+	int pos;		
+	int size;		
+} HttpStreamer;
 
 //This is what handles streaming in case it's needed.
 _Bool http_send (Recvr *r, void *p, char *e) {
@@ -225,6 +233,9 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 		tccf = tests_char_char_jpeg; 
 		//wipe the rest of r (so wget should only get a header or like carriage return as a message
 		memset( &y->msg[ ret ], 0, y->mlen - ret );
+
+nsprintf( "3|6 Mafia" );
+npprintf( h->userdata ); 
 		
 		//write both recvr->msg or response.buffer and http message
 		y->mlen = ret;
@@ -385,10 +396,12 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 				return ERR_500( "Requested file: %s is zero length.", fn );
 			}
 
+/*
 			//Allocate...
 			if ( !(fb = malloc( sb.st_size )) || !memset( fb, 0, sb.st_size ) ) {
 				return ERR_500( "Memory error: %s\n", strerror( errno ) );
 			}
+*/
 			
 			//Couldn't open	
 			if ( (fd = open( fn, O_RDONLY )) == -1 || read( fd, fb, sb.st_size ) == -1 ) {	
