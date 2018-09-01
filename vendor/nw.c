@@ -782,6 +782,11 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 						r->client->fd = -1;
 						reset_recvr( r );	
 					}
+					else if ( *r->bypass > 0 ) {
+						//this is for when I want to do it myself
+						0;
+					}
+#if 1
 					else {
 						//Set event on the newest descriptor or die with an error*
 						if ( NW_CALL( (r->send_retry += 1) < s->send_retry ) ) {
@@ -792,6 +797,7 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 							handle(ERR_WRITE_MAX_WRITE_RETRY_REACHED);
 						}
 					}
+#endif
 				}
 			}
 

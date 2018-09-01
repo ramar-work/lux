@@ -532,8 +532,17 @@ _Bool http_set_content_and_status (HTTP *h, HTTP_Status st, const char *type, ui
 
 
 //Set the http header, moves the LiteKv structure underneath
-_Bool http_set_header (HTTP *h, const char *key, const char *value) {
-	return 1;
+_Bool http_set_header (HTTP *h, const char *key, const char *value) {	
+	HTTP_Response *res = &h->response;
+	uint8_t buf[ 2048 ];
+	//TODO: Obviously someone could write a ridiculously sized header here... 
+	int wb = snprintf( (char *)buf, sizeof( buf ), "%s: %s\r\n", key, value );
+	if ( !bf_written( &res->headers ) ) {
+		if ( !bf_init( &res->headers, NULL, 1 ) ) {
+			return 0;
+		}
+	}
+	return ( bf_append( &res->headers, buf, wb ) );
 }
 
 
@@ -562,12 +571,12 @@ int http_pack_request (HTTP *h) {
 
 
 //Pack an HTTP response
-int http_pack_response (HTTP *h) 
-{
+int http_pack_response (HTTP *h) {
 	//Define 
 	HTTP_Response *res = &h->response;
-	uint8_t statline[1024] = { 0 };
+	uint8_t statline[2048] = { 0 };
 	char ff[4] = { 0 };
+	int bpl = 0;
 	const char *fmt   = "HTTP/%s %d %s\r\n";
 	const char *cfmt  = "Content-Length: %d\r\n";
 	const char *ctfmt = "Content-Type: %s\r\n\r\n";
@@ -583,11 +592,22 @@ int http_pack_response (HTTP *h)
 	res->mlen += snprintf( (char *)&statline[res->mlen], 1024, fmt, 
 		ff, res->status, res->sttext);
 
-	//All other headers get res->mlen here
-	//....?
+	//All other headers add to res->mlen here
+	if (( bpl = bf_written( &res->headers ) ) > 0 ) {
+		uint8_t *bp = bf_data( &res->headers );
+		Mem m;
+		memset( &m, 0, sizeof(Mem) );
+		while ( memwalk( &m, bp, (uint8_t *)"\r", bpl, 1 ) ) {
+			if ( !m.size ) continue;
+			res->mlen += snprintf( (char *)&statline[res->mlen], m.size + 2, 
+				(char *)&bp[m.pos], m.size);
+		} 
+	}
 
-	//Always have at least a content length line
-	res->mlen += snprintf( (char *)&statline[res->mlen], 1024, cfmt, res->clen);
+	//For most messages, a content length line will be necessary
+	if ( res->clen ) {
+		res->mlen += snprintf( (char *)&statline[res->mlen], 1024, cfmt, res->clen);
+	}
 
 	//Finally, set a content-type
 	res->mlen += snprintf( (char *)&statline[res->mlen], 1024, ctfmt, res->ctype);
@@ -661,7 +681,6 @@ void http_print_response (HTTP *h)
 //Read messages (no streaming or anything else)
 _Bool http_read (Recvr *r, void *p, char *e) 
 {
-	//I'm sorry.  This looks terrible...
 	_Bool rd_all_data = 0;
 	HTTP *h                 = (HTTP *)r->userdata;
 	HTTP_Request *request   = &h->request;

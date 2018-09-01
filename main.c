@@ -65,6 +65,9 @@ Executor etc[] = {
 	[NW_COMPLETED]      = { .exe = http_fin , NW_NOTHING }
 };
 
+//Static buffer for quickly expanding how much memory is available?
+uint8_t zbuf[ 10485760 ] = { 0 };
+
 //Lua functions
 luaCF lua_functions[] =
 {
@@ -99,6 +102,29 @@ static const char pidfile[] = "hypno.pid";
 static char err[ 4096 ] = { 0 };
 static const int errlen = 4096; 
 static luaCF *rg = lua_functions;
+
+typedef struct 
+{
+	char *filename; //should be utf-8
+	//really should do something with mmap() here, but...
+	int size;		
+	int fd; 
+	int bufsize;
+} HttpStreamer;
+
+
+void free_hs( HttpStreamer *hs ) {
+	free( hs->filename );
+	free( hs );
+}
+
+void print_hs ( HttpStreamer *hs ) {
+	nsprintf( hs->filename );
+	niprintf( hs->bufsize );
+	niprintf( hs->size );
+	niprintf( hs->fd );
+}
+
 
 //Serve a list of files
 void srvListOfFiles() {
@@ -191,13 +217,6 @@ int hssent = 0;
 static uint8_t *tccf = NULL;
 static int tccflen = 0, tccfpos = 0;
 
-typedef struct {
-	char *filename; //should be utf-8
-	int fd;
-	//really should do something with mmap() here, but...
-	int pos;		
-	int size;		
-} HttpStreamer;
 
 //This is what handles streaming in case it's needed.
 _Bool http_send (Recvr *r, void *p, char *e) {
@@ -205,87 +224,62 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 	HTTP_Response *y = &h->response;
 	int ret = memstrat( y->msg, "\r\n\r\n", y->mlen );
 
-#if 1
-	//Dump Recvr and response body for debugging purposes
-	print_recvr( r );
-	http_print_response( h ) ; 
-	write( 2, y->msg, y->mlen );
+	//Setting bypass here means that I don't want the library to handle read and write
+	if ( *r->bypass ) {
+		//cast to reading thing
+		HttpStreamer *hs = (HttpStreamer *)h->userdata; 
+		if ( !hs ) {
+			return ERR_500( "Issues with HttpStreamer structure." );	
+		}
 
-	//Search for the end of the message thing
-	fprintf (stderr, "http header stops at: %d\n", ret ); 
-	write( 2, &y->msg[ ret + 4 ], y->mlen - ( ret + 4 ) );
-#endif
-	
-	//Stop here, because the message was never prepared correctly. 
-	if ( ret == -1 )
-		ERR_500( "Can't read packaged HTTP message." );	
-	else {
-		//add carriage return
-		ret += 4;
-	}
+		//Define things
+		char statline[ 32 ]; 
+		uint8_t tmpbuf[ hs->bufsize ];
+		memset( statline, 0, sizeof( statline )); 
+		memset( tmpbuf, 0, hs->bufsize ); 
 
-	//Set the current byte position and sent bytes
+		//Add a size and status line
+		snprintf( statline, sizeof(statline), "%d\r\n", hs->bufsize ); 
+		bf_append( &r->_response, (uint8_t *)statline, strlen( statline ) ); 
+
+		//Read file contents into a buffer
+		if ( read( hs->fd, tmpbuf, hs->bufsize ) == -1 ) {
+			free_hs( hs );	
+			return ERR_500( "Issues with reading from file into buffer." );	
+		}
+
+		//Append data
+		if ( !bf_append( &r->_response, tmpbuf, hs->bufsize ) || 
+			   !bf_append( &r->_response, (uint8_t *)"\r\n", 2 ) ) {
+			free_hs( hs );	
+			return ERR_500( "Issues with adding to message queue." );	
+		}
+
+		//Move file pointer
+		if ( lseek( hs->fd, hs->bufsize, SEEK_CUR ) == -1 ) {
+			free_hs( hs );	
+			return ERR_500( "Issues with changing file pos: %s.", strerror(errno) );	
+		}
+		
+		//Quick and dirty size calc, will overflow or crash... so fix this
+		if ((hs->size -= hs->bufsize ) <= 0 ) {
+			free_hs( hs );
+			r->stage = NW_COMPLETED;
+fprintf( stderr, "move no further, message is finished...\n" );
+exit( 0 );
+		}
+		else {
+			r->stage = NW_AT_WRITE;
+		}
+
 #if 1
-	if ( !tccf ) {
-		//this is the first time I've sent the message
-		tccflen = tests_char_char_jpeg_len; 
-		tccf = tests_char_char_jpeg; 
-		//wipe the rest of r (so wget should only get a header) 
-		memset( &y->msg[ ret ], 0, y->mlen - ret );
-//nsprintf( "3|6 Mafia" );npprintf( h->userdata ); 
-		//write both recvr->msg or response.buffer and http message
-		y->mlen = ret;
-		fprintf( stderr, "New message:\n=================\n" );
-		write( 2, y->msg, y->mlen );
-		//write( 2, r->_response.buffer, y->len );
-		fprintf( stderr, "Lengths:\n============\n" );
-		niprintf( y->mlen );
-		niprintf( bf_written( &r->_response ) );
-		fprintf( stderr, "Same buffer?:\n============\n" );
 		write( 2, bf_data( &r->_response ), bf_written( &r->_response ) );
-		int fd = *(int *)h->userdata;
-		if ( !(h->userdata = malloc( sizeof( HttpStreamer ) ) ) ) {
-			ERR_500( "Memory allocation issue at file writer" );
-		}
-
-		fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, fd, h->userdata );
-		exit( 0 );
-#if 0
-		HttpStreamer *hs = (HttpStreamer *)h->userdata;
-		if (( hs->fd = open( )) == -1) {
-
-		}
+		//exit( 0 );
 #endif
-
-		//bf_written is not being pointed to by anything
-		//bf_data is pointed to by y->msg
-		//how to modify directly?
-			
-		//write data to r	
-		//bf_append( h->response, "200\r\n", strlen("200\r\n") );	
-		//bf_append( h->response, tccf, 200 );	
-		//tccfpos += 200;
-		r->stage = NW_AT_WRITE;
 	}
-	else {
-		fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
-		exit( 0 );
-		//write more data, unless i'm at the end...
-	}
-#else
-	r->stage = NW_COMPLETED;
-#endif
-
-	//Open a database and start writing requests to it...
-	if ( r->stage == NW_COMPLETED ) {	//r->stage = NW_AT_WRITE;
-		//memset(h, 0, sizeof(HTTP));
-	}
-	else {
-
-	}
-
 	return 1;
 } 
+
 
 
 //This is the single-threaded HTTP run function
@@ -391,44 +385,43 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 		//but right now, use application/octet-stream to check for validity
 		if ( strcmp( mt, "application/octet-stream" ) > 0 ) {
 			//Check for the path name relative to the currently chosen directory
-			uint8_t *fb = NULL;
-			char *fn = strcmbd( "/", ag->activeDir, &h->request.path[ 1 ] );
-			int *fd = malloc( sizeof(int) );
+			HttpStreamer *hs = malloc( sizeof( HttpStreamer ) );
+			memset( hs, 0, sizeof(HttpStreamer) );
+			hs->filename = strcmbd( "/", ag->activeDir, &h->request.path[ 1 ] );
+			hs->fd = 0;
+			hs->size = 0;
+			hs->bufsize = 128;
 
-			//File not found, should return a 404
-			if ( stat( fn, &sb ) == -1 ) {	
-				return ERR_404( "File not found: %s", fn );
+			if ( stat( hs->filename, &sb ) == -1 ) {	
+				free_hs( hs );
+				return ERR_404( "File not found: %s", hs->filename );
 			}
 
-			//Don't allow zero-length files...?
-			if ( sb.st_size == 0 ) {
-				return ERR_500( "Requested file: %s is zero length.", fn );
+			if (( hs->size = sb.st_size ) == 0 ) {
+				free_hs( hs );
+				return ERR_500( "Requested file: %s is zero length.", hs->filename );
 			}
 
-			//Couldn't open	
-			if ( (*fd = open( fn, O_RDONLY )) == -1 ) { 
-				return ERR_500( "Error occurred while trying to open file: %s. %s", fn, strerror( errno ));
+			if (( hs->fd = open( hs->filename, O_RDONLY ) ) == -1 ) {
+				free_hs( hs );
+				return ERR_500( "Requested file: %s could not be opened.", hs->filename );
 			}
-
-			//Use the userdata and move later
-			h->userdata = fd;
-#if 1
-			fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *(int *)h->userdata, h->userdata );  
-#endif
 
 			//Prepare the actual reponse
+			h->userdata = hs;
 			http_set_status( h, 200 );
-			//http_set_content( h, mt, fb, sb.st_size );
+			http_set_content_type( h, mt );
+			http_set_header( h, "Transfer-Encoding", "Chunked" );
 			http_pack_response( h );
-			free( fn );
 #if 0
-			//a certain size needs to put the server in stream mode...
-			//http_print_response( h );
-			fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
-			*r->bypass = 1;
-			fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+//print_recvr( r );
+//http_print_response( h );
+HTTP_Response *y = &h->response;
+write( 2, y->msg, y->mlen );
+exit( 0 );
 #endif
 			r->stage = NW_AT_WRITE;
+			*r->bypass = 1;
 			return 1;
 		}
 	}
@@ -809,7 +802,8 @@ struct Cmd
 
 
 //Server loop
-int main (int argc, char *argv[]) {
+int main (int argc, char *argv[]) 
+{
 	//Values
 	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
 

@@ -121,8 +121,9 @@ struct HTTP_Response
 	const char  *sttext;
 	const char  *ctype;
 	uint8_t     *msg;
+	Buffer       headers;
 	//LiteKv       headers[HTTP_MAX_ELEMENTS];
-  Table        headers;
+  //Table        headers;
 }; 
 
 
