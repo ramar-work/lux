@@ -445,6 +445,9 @@ static _Bool dummy (Recvr *r, void *ud, char *err) {
 
 //Close
 _Bool nw_close_fd (Recvr *r, void *ud, char *err) {
+fprintf( stderr, "ALL GOOD THINGS MUST END!" );
+fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+exit( 0 );
 	return ((close(r->client->fd) != -1) && (r->client->fd = -1));
 }
 
@@ -453,6 +456,9 @@ _Bool nw_close_fd (Recvr *r, void *ud, char *err) {
 _Bool nw_reset_fd (Recvr *r, void *ud, char *err) {
 	fprintf(stderr, "r->client is:   %p\n",  (void *)r->client);
 	fprintf(stderr, "r->client->fd:  %d\n",  r->client->fd);
+fprintf( stderr, "ALL GOOD THINGS MUST END!" );
+fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+exit( 0 );
 	reset_recvr(r);
 	if (close(r->client->fd) == -1) {
 		return 0;
@@ -761,7 +767,6 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 			if ( NW_CALL( r->client->revents & POLLWRNORM && r->stage == NW_AT_WRITE ) ) {
 				//Process the data before sending
 				uhandle( NW_AT_WRITE );
-				fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
 
 				if ( NW_CALL( (error = nw_write( r )) ) ) {
 					handle ( error );
@@ -777,6 +782,9 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 		
 					//Check if all data came off
 					if ( NW_CALL( r->stage == NW_COMPLETED ) ) {
+fprintf( stderr, "ALL GOOD THINGS MUST END!" );
+fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
+exit( 0 );
 						uhandle( NW_COMPLETED );
 						close( r->client->fd );
 						r->client->fd = -1;
@@ -785,6 +793,11 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 					else if ( *r->bypass > 0 ) {
 						//this is for when I want to do it myself
 						0;
+
+niprintf( r->send_retry );  
+niprintf( s->send_retry );
+fprintf( stderr, "conn #%d; %s, %d: %d (%p) - %s\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass,  "i should just keep running forever..." );
+getchar();
 					}
 #if 1
 					else {

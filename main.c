@@ -234,48 +234,64 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 
 		//Define things
 		char statline[ 32 ]; 
-		uint8_t tmpbuf[ hs->bufsize ];
+		int bufmv = ( hs->size < hs->bufsize ) ? hs->size : hs->bufsize;
+		uint8_t tmpbuf[ bufmv ];
+
+		//???
+		fprintf( stderr, "pushing %d bytes through buffer.\n", bufmv );
 		memset( statline, 0, sizeof( statline )); 
-		memset( tmpbuf, 0, hs->bufsize ); 
+		memset( tmpbuf, 0, bufmv ); 
 
 		//Add a size and status line
-		snprintf( statline, sizeof(statline), "%d\r\n", hs->bufsize ); 
+		snprintf( statline, sizeof(statline), "%d\r\n", bufmv ); 
 		bf_append( &r->_response, (uint8_t *)statline, strlen( statline ) ); 
 
 		//Read file contents into a buffer
-		if ( read( hs->fd, tmpbuf, hs->bufsize ) == -1 ) {
+		if ( read( hs->fd, tmpbuf, bufmv ) == -1 ) {
 			free_hs( hs );	
 			return ERR_500( "Issues with reading from file into buffer." );	
 		}
 
 		//Append data
-		if ( !bf_append( &r->_response, tmpbuf, hs->bufsize ) || 
-			   !bf_append( &r->_response, (uint8_t *)"\r\n", 2 ) ) {
+		if ( !bf_append( &r->_response, tmpbuf, bufmv ) || !bf_append( &r->_response, (uint8_t *)"\r\n", 2 ) ) {
 			free_hs( hs );	
 			return ERR_500( "Issues with adding to message queue." );	
 		}
 
 		//Move file pointer
-		if ( lseek( hs->fd, hs->bufsize, SEEK_CUR ) == -1 ) {
+		if ( lseek( hs->fd, bufmv, SEEK_SET ) == -1 ) {
 			free_hs( hs );	
 			return ERR_500( "Issues with changing file pos: %s.", strerror(errno) );	
 		}
-		
+
+		hs->size -= bufmv ;
+		if ( !hs->size ) exit( 0 );
+#if 1
+uint8_t *b = bf_data( &r->_response );
+int bl = bf_written( &r->_response );
+write( 2, b, bl );
+#endif
+
+#if 0
+for ( int ii=0; ii<bf_written( &r->_response ); ii++ ) {
+	( b[ii] == 13 || b[ii] == 10 ) ? fprintf( stderr, (b[ii]==10) ? "\n\\n" : "\\r" ) : write( 2, &b[ii], 1 );
+	fprintf( stderr, "%s%3d ", (b[ii]==10) ? "" : " ", b[ii] );
+}
+exit( 0 );
+#endif
+
 		//Quick and dirty size calc, will overflow or crash... so fix this
-		if ((hs->size -= hs->bufsize ) <= 0 ) {
+		if ( hs->size < 0 ) {
 			free_hs( hs );
 			r->stage = NW_COMPLETED;
 fprintf( stderr, "move no further, message is finished...\n" );
-exit( 0 );
+//exit( 0 );
 		}
 		else {
+fprintf( stderr, "%d bytes left in file.\n", hs->size );
+getchar();
 			r->stage = NW_AT_WRITE;
 		}
-
-#if 1
-		write( 2, bf_data( &r->_response ), bf_written( &r->_response ) );
-		//exit( 0 );
-#endif
 	}
 	return 1;
 } 
@@ -367,8 +383,9 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 	}
 
 	//Default responses get handled here 
-	if ( !ag->activeDir )
+	if ( !ag->activeDir ) {
 		return ERR_404( "No site matching hostname '%s' found.", h->hostname );
+	}
 
 	//Lastly, check that the client isn't asking for actual files.
 	int rplen = strlen( h->request.path );
@@ -390,7 +407,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 			hs->filename = strcmbd( "/", ag->activeDir, &h->request.path[ 1 ] );
 			hs->fd = 0;
 			hs->size = 0;
-			hs->bufsize = 128;
+			hs->bufsize = 12800;
 
 			if ( stat( hs->filename, &sb ) == -1 ) {	
 				free_hs( hs );
@@ -411,15 +428,8 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 			h->userdata = hs;
 			http_set_status( h, 200 );
 			http_set_content_type( h, mt );
-			http_set_header( h, "Transfer-Encoding", "Chunked" );
+			http_set_header( h, "Transfer-Encoding", "chunked" );
 			http_pack_response( h );
-#if 0
-//print_recvr( r );
-//http_print_response( h );
-HTTP_Response *y = &h->response;
-write( 2, y->msg, y->mlen );
-exit( 0 );
-#endif
 			r->stage = NW_AT_WRITE;
 			*r->bypass = 1;
 			return 1;
