@@ -39,7 +39,7 @@ vchim:
 	valgrind ./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/prj/hypno-wwwroot
 
 chim:
-	./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/hypno-wwwroot
+	./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/prj/hypno-wwwroot
 
 # This tests how hypno starts with a certain set of criteria.
 goku:

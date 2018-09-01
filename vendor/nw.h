@@ -225,10 +225,8 @@ typedef struct
 {
   Socket            child;
 	Stage             stage;
-	int                  rb, 
-                       sb,  //Bytes received at an invocation of the "read loop"
-                    recvd, 
-                     sent;  //Total bytes sent or received
+	int              rb, sb, 
+              recvd, sent;  //Total bytes sent or received
   uint8_t          errbuf[2048];  //For error messages when everything may fail
 #if 0
   int          request_fd;  

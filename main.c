@@ -207,7 +207,6 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 
 #if 1
 	//Dump Recvr and response body for debugging purposes
-	fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
 	print_recvr( r );
 	http_print_response( h ) ; 
 	write( 2, y->msg, y->mlen );
@@ -231,12 +230,9 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 		//this is the first time I've sent the message
 		tccflen = tests_char_char_jpeg_len; 
 		tccf = tests_char_char_jpeg; 
-		//wipe the rest of r (so wget should only get a header or like carriage return as a message
+		//wipe the rest of r (so wget should only get a header) 
 		memset( &y->msg[ ret ], 0, y->mlen - ret );
-
-nsprintf( "3|6 Mafia" );
-npprintf( h->userdata ); 
-		
+//nsprintf( "3|6 Mafia" );npprintf( h->userdata ); 
 		//write both recvr->msg or response.buffer and http message
 		y->mlen = ret;
 		fprintf( stderr, "New message:\n=================\n" );
@@ -247,6 +243,19 @@ npprintf( h->userdata );
 		niprintf( bf_written( &r->_response ) );
 		fprintf( stderr, "Same buffer?:\n============\n" );
 		write( 2, bf_data( &r->_response ), bf_written( &r->_response ) );
+		int fd = *(int *)h->userdata;
+		if ( !(h->userdata = malloc( sizeof( HttpStreamer ) ) ) ) {
+			ERR_500( "Memory allocation issue at file writer" );
+		}
+
+		fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, fd, h->userdata );
+		exit( 0 );
+#if 0
+		HttpStreamer *hs = (HttpStreamer *)h->userdata;
+		if (( hs->fd = open( )) == -1) {
+
+		}
+#endif
 
 		//bf_written is not being pointed to by anything
 		//bf_data is pointed to by y->msg
@@ -384,7 +393,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 			//Check for the path name relative to the currently chosen directory
 			uint8_t *fb = NULL;
 			char *fn = strcmbd( "/", ag->activeDir, &h->request.path[ 1 ] );
-			int fd = 0;
+			int *fd = malloc( sizeof(int) );
 
 			//File not found, should return a 404
 			if ( stat( fn, &sb ) == -1 ) {	
@@ -396,30 +405,29 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 				return ERR_500( "Requested file: %s is zero length.", fn );
 			}
 
-/*
-			//Allocate...
-			if ( !(fb = malloc( sb.st_size )) || !memset( fb, 0, sb.st_size ) ) {
-				return ERR_500( "Memory error: %s\n", strerror( errno ) );
-			}
-*/
-			
 			//Couldn't open	
-			if ( (fd = open( fn, O_RDONLY )) == -1 || read( fd, fb, sb.st_size ) == -1 ) {	
+			if ( (*fd = open( fn, O_RDONLY )) == -1 ) { 
 				return ERR_500( "Error occurred while trying to open file: %s. %s", fn, strerror( errno ));
 			}
 
+			//Use the userdata and move later
+			h->userdata = fd;
+#if 1
+			fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *(int *)h->userdata, h->userdata );  
+#endif
+
 			//Prepare the actual reponse
 			http_set_status( h, 200 );
-			http_set_content( h, mt, fb, sb.st_size );
+			//http_set_content( h, mt, fb, sb.st_size );
 			http_pack_response( h );
 			free( fn );
-
+#if 0
 			//a certain size needs to put the server in stream mode...
 			//http_print_response( h );
 			fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
 			*r->bypass = 1;
 			fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
-
+#endif
 			r->stage = NW_AT_WRITE;
 			return 1;
 		}
@@ -801,8 +809,7 @@ struct Cmd
 
 
 //Server loop
-int main (int argc, char *argv[])
-{
+int main (int argc, char *argv[]) {
 	//Values
 	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
 
