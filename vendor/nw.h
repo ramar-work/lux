@@ -136,6 +136,20 @@ curl --verbose --request POST \
 #define nw_get_fd() \
 	r->client->fd
 
+#ifdef NW_PERFLOG
+ //Successful request with content
+ #define REQUEST_1(r) statreq( r, "SUCCESS", __func__, __LINE__, stConn, s )
+
+ //Unsuccessful request (and why) 
+ #define REQUEST_0(r) statreq( r, "FAILED ", __func__, __LINE__, stConn, s )
+#else
+ //Successful request with content
+ #define REQUEST_1(...)
+
+ //Unsuccessful request (and why) 
+ #define REQUEST_0(...)
+#endif 
+
 /*Error map or a big struct?*/
 enum {
 	ERR_SO_HAPPY_THERE_ARE_NO_ERRORS = 0,
@@ -220,6 +234,10 @@ struct Buffer {
 };
 #endif
 
+#ifdef NW_PERFLOG
+ #define NW_PERFLOG_LEN 2048
+#endif
+
 /*Here is a similar structure*/
 typedef struct 
 {
@@ -247,6 +265,9 @@ typedef struct
 	struct pollfd   *client;  //Pointer to currently being served client
 #ifndef NW_DISABLE_LOCAL_USERDATA
 	void          *userdata;
+#endif
+#ifdef NW_PERFLOG
+	char perflog[ NW_PERFLOG_LEN ];
 #endif
 	//This allows nw to cut connections that have been on too long
 	struct timespec start, end;

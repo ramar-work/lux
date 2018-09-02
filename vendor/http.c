@@ -75,8 +75,7 @@ static void http_dump (uint8_t *blob, int adjust, const char *msg)
 
 
 //An http error handler
-_Bool http_error_h (Recvr *r, HTTP *h, HTTP_Status st) 
-{
+_Bool http_error_h (Recvr *r, HTTP *h, HTTP_Status st) {
 	http_set_status(h, st);
 
 #if 0
@@ -94,8 +93,7 @@ _Bool http_error_h (Recvr *r, HTTP *h, HTTP_Status st)
 
 
 //Get the method, version and location
-_Bool http_parse_first_line (HTTP *h, uint8_t *msg, int len) 
-{
+_Bool http_parse_first_line (HTTP *h, uint8_t *msg, int len) {
 	//Define stuff
 	HTTP_Request *r = &h->request;
 	Parser p={ .words={{" "},{"\r"},{NULL}} }; 
@@ -168,8 +166,7 @@ _Bool http_get_header_length (HTTP *h, uint8_t *msg, int32_t len)
 
 
 //Figure out the message length
-_Bool http_get_message_length (HTTP *h, uint8_t *msg, int32_t len) 
-{
+_Bool http_get_message_length (HTTP *h, uint8_t *msg, int32_t len) {
 	//if these are equal, then we haven't gotten the full thing yet...
 	HTTP_Request *r = &h->request;
 	if (r->hlen + 4 == len)
@@ -181,8 +178,7 @@ _Bool http_get_message_length (HTTP *h, uint8_t *msg, int32_t len)
 
 
 //Set the boundary
-_Bool http_get_boundary (HTTP *h, uint8_t *msg, int32_t len) 
-{
+_Bool http_get_boundary (HTTP *h, uint8_t *msg, int32_t len) {
 	//Define
 	HTTP_Request *r = &h->request;
 	int bs, be;
@@ -202,8 +198,7 @@ _Bool http_get_boundary (HTTP *h, uint8_t *msg, int32_t len)
 
 
 //Trim whitespace
-unsigned char *httpvtrim (uint8_t *msg, int len, int *nlen) 
-{
+unsigned char *httpvtrim (uint8_t *msg, int len, int *nlen) {
 	//Define stuff
 	uint8_t *m = msg;
 	int nl= len;
@@ -217,8 +212,7 @@ unsigned char *httpvtrim (uint8_t *msg, int len, int *nlen)
 
 
 //Trim any characters 
-unsigned char *httptrim (uint8_t *msg, const char *trim, int len, int *nlen) 
-{
+unsigned char *httptrim (uint8_t *msg, const char *trim, int len, int *nlen) {
 	//Define stuff
 	uint8_t *m = msg;
 	int nl= len;
@@ -232,8 +226,7 @@ unsigned char *httptrim (uint8_t *msg, const char *trim, int len, int *nlen)
 
 
 //Create the rest of the request (then send it on)
-int http_get_remaining (HTTP *h, uint8_t *msg, int len) 
-{
+int http_get_remaining (HTTP *h, uint8_t *msg, int len) {
 	//Define
 	HTTP_Request *r = &h->request;
 	LiteBlob *host = NULL;
@@ -309,8 +302,7 @@ int http_get_remaining (HTTP *h, uint8_t *msg, int len)
 		h->msg += h->inc;
 		pr_prepare( ps );
 
-		while ( pr_next( ps, h->msg, h->ml ) ) 
-		{
+		while ( pr_next( ps, h->msg, h->ml ) ) {
 			int adjust=0;
 			if ( ps->word == NULL )
 			{
@@ -574,7 +566,9 @@ int http_pack_request (HTTP *h) {
 int http_pack_response (HTTP *h) {
 	//Define 
 	HTTP_Response *res = &h->response;
-	uint8_t statline[2048] = { 0 };
+	short buflen = 4096;
+	uint8_t statline[buflen];
+	memset( statline, 0, buflen );
 	char ff[4] = { 0 };
 	int bpl = 0;
 	const char *fmt   = "HTTP/%s %d %s\r\n";
@@ -589,7 +583,7 @@ int http_pack_response (HTTP *h) {
 	snprintf(ff, 4, (res->version < 2) ? "%1.1f" : "%1.0f", res->version);
 
 	//Copy the status line
-	res->mlen += snprintf( (char *)&statline[res->mlen], 1024, fmt, 
+	res->mlen += snprintf( (char *)&statline[res->mlen], (buflen -= res->mlen), fmt, 
 		ff, res->status, res->sttext);
 
 	//All other headers add to res->mlen here
@@ -598,29 +592,32 @@ int http_pack_response (HTTP *h) {
 		Mem m;
 		memset( &m, 0, sizeof(Mem) );
 		while ( memwalk( &m, bp, (uint8_t *)"\r", bpl, 1 ) ) {
-			if ( !m.size ) continue;
-			res->mlen += snprintf( (char *)&statline[res->mlen], m.size + 2, 
-				(char *)&bp[m.pos], m.size);
+			if ( m.size < 2 ) continue;
+			memcpy( &statline[res->mlen], &bp[m.pos], m.size );
+			res->mlen += m.size;
+			memcpy( &statline[res->mlen], "\r\n", 2 );
+			res->mlen += 2;
+			buflen -= res->mlen;
 		} 
 	}
 
 	//For most messages, a content length line will be necessary
 	if ( res->clen ) {
-		res->mlen += snprintf( (char *)&statline[res->mlen], 1024, cfmt, res->clen);
+		res->mlen += snprintf( (char *)&statline[res->mlen], (buflen -= res->mlen), cfmt, res->clen);
 	}
 
 	//Finally, set a content-type
-	res->mlen += snprintf( (char *)&statline[res->mlen], 1024, ctfmt, res->ctype);
+	res->mlen += snprintf( (char *)&statline[res->mlen], (buflen -= res->mlen), ctfmt, res->ctype);
 
 	//Stop now if this is a zero length message.
 	if (!res->clen) {
 		//memcpy( &res->msg[0], statline, res->mlen );
-		if ( !bf_append( h->resb, statline, res->mlen ) ) {
-			return 0;
-		}
-		return 1;
+		return ( bf_append( h->resb, statline, res->mlen ) ); 
 	}
 
+#if 1
+	return ( bf_prepend( h->resb, statline, res->mlen += res->clen ) );
+#else 
 	//Move the message (provided there's space)		
 	//This will fail when using fixed buffers...
 	if ( !bf_prepend( h->resb, statline, res->mlen ) ) {
@@ -630,6 +627,7 @@ int http_pack_response (HTTP *h) {
 	//memcpy( &res->msg[0], statline, res->mlen ); 
 	res->mlen += res->clen;
 	return 1;
+#endif
 }
 
 

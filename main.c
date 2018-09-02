@@ -207,11 +207,6 @@ typedef struct Passthru {
 } Passthru;
 
 
-int glean_extension( char *pathname, Passthru *pt ) {
-	return 1;
-}
-
-
 int hssent = 0;
 #include "tests/char-char.c"
 static uint8_t *tccf = NULL;
@@ -221,24 +216,20 @@ static int tccflen = 0, tccfpos = 0;
 //This is what handles streaming in case it's needed.
 _Bool http_send (Recvr *r, void *p, char *e) {
 	HTTP *h = (HTTP *)r->userdata;
-	HTTP_Response *y = &h->response;
-	int ret = memstrat( y->msg, "\r\n\r\n", y->mlen );
+	HttpStreamer *hs = NULL;
 
-	//Setting bypass here means that I don't want the library to handle read and write
-	if ( *r->bypass ) {
-		//cast to reading thing
-		HttpStreamer *hs = (HttpStreamer *)h->userdata; 
-		if ( !hs ) {
+	if ( *r->bypass == 0 ) {
+		r->stage = NW_COMPLETED;	
+	}	
+	else {
+		if ( !(hs = (HttpStreamer *)h->userdata) ) {
 			return ERR_500( "Issues with HttpStreamer structure." );	
 		}
 
-		//Define things
+		//Define and initialize
 		char statline[ 32 ]; 
 		int bufmv = ( hs->size < hs->bufsize ) ? hs->size : hs->bufsize;
 		uint8_t tmpbuf[ bufmv ];
-
-		//???
-		fprintf( stderr, "pushing %d bytes through buffer.\n", bufmv );
 		memset( statline, 0, sizeof( statline )); 
 		memset( tmpbuf, 0, bufmv ); 
 
@@ -253,7 +244,13 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 		}
 
 		//Append data
-		if ( !bf_append( &r->_response, tmpbuf, bufmv ) || !bf_append( &r->_response, (uint8_t *)"\r\n", 2 ) ) {
+		if ( !bf_append( &r->_response, tmpbuf, bufmv ) ) { 
+			free_hs( hs );	
+			return ERR_500( "Issues with adding to message queue." );	
+		}
+	
+		//TODO: Fix this, this is stupid...
+		if ( !bf_append( &r->_response, (uint8_t *)"\r\n", 2 ) ) {
 			free_hs( hs );	
 			return ERR_500( "Issues with adding to message queue." );	
 		}
@@ -264,33 +261,14 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 			return ERR_500( "Issues with changing file pos: %s.", strerror(errno) );	
 		}
 
-		hs->size -= bufmv ;
-		if ( !hs->size ) exit( 0 );
-#if 1
-uint8_t *b = bf_data( &r->_response );
-int bl = bf_written( &r->_response );
-write( 2, b, bl );
-#endif
-
-#if 0
-for ( int ii=0; ii<bf_written( &r->_response ); ii++ ) {
-	( b[ii] == 13 || b[ii] == 10 ) ? fprintf( stderr, (b[ii]==10) ? "\n\\n" : "\\r" ) : write( 2, &b[ii], 1 );
-	fprintf( stderr, "%s%3d ", (b[ii]==10) ? "" : " ", b[ii] );
-}
-exit( 0 );
-#endif
-
-		//Quick and dirty size calc, will overflow or crash... so fix this
-		if ( hs->size < 0 ) {
+		//Either end it or keep it going
+		if ( (hs->size -= bufmv) > 0 ) 
+			r->stage = NW_AT_WRITE;
+		else {
 			free_hs( hs );
 			r->stage = NW_COMPLETED;
-fprintf( stderr, "move no further, message is finished...\n" );
-//exit( 0 );
-		}
-		else {
-fprintf( stderr, "%d bytes left in file.\n", hs->size );
-getchar();
-			r->stage = NW_AT_WRITE;
+			memset( h, 0, sizeof(HTTP) ); 
+			return 1;
 		}
 	}
 	return 1;
@@ -407,7 +385,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 			hs->filename = strcmbd( "/", ag->activeDir, &h->request.path[ 1 ] );
 			hs->fd = 0;
 			hs->size = 0;
-			hs->bufsize = 12800;
+			hs->bufsize = 1028;
 
 			if ( stat( hs->filename, &sb ) == -1 ) {	
 				free_hs( hs );
@@ -800,7 +778,7 @@ int start_cmd( Option *opts, char *err, Passthru *pt ) {
 
 //Command loop
 struct Cmd
-{ 
+{
 	const char *cmd;
 	int (*exec)( Option *, char *, Passthru *pt );
 } Cmds[] = {
