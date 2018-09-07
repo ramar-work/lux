@@ -318,7 +318,7 @@ int main (int argc, char *argv[])
 	ua.dirname = opt_get( opts, "--at" ).s;
 	ua.sitename = ( !opt_set( opts, "--create" ) ) ? opt_get( opts, "--name" ).s : opt_get( opts, "--create" ).s; 
 	ua.domain = opt_get( opts, "--domain" ).s;
-	PRINT_UA( &ua );
+	PRINT_UA((&ua));
 
 	//Check --flag
 	if ( opt_set( opts, "--create" ) ) {

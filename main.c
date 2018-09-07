@@ -212,6 +212,7 @@ int hssent = 0;
 static uint8_t *tccf = NULL;
 static int tccflen = 0, tccfpos = 0;
 
+static int fd2 = 0;
 
 //This is what handles streaming in case it's needed.
 _Bool http_send (Recvr *r, void *p, char *e) {
@@ -234,7 +235,7 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 		memset( tmpbuf, 0, bufmv ); 
 
 		//Add a size and status line
-		snprintf( statline, sizeof(statline), "%d\r\n", bufmv ); 
+		snprintf( statline, sizeof(statline), "%2x\r\n", bufmv ); 
 		bf_append( &r->_response, (uint8_t *)statline, strlen( statline ) ); 
 
 		//Read file contents into a buffer
@@ -256,7 +257,7 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 		}
 
 		//Move file pointer
-		if ( lseek( hs->fd, bufmv, SEEK_SET ) == -1 ) {
+		if ( lseek( hs->fd, 0, SEEK_CUR ) == -1 ) {
 			free_hs( hs );	
 			return ERR_500( "Issues with changing file pos: %s.", strerror(errno) );	
 		}
@@ -266,6 +267,10 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 			r->stage = NW_AT_WRITE;
 		else {
 			free_hs( hs );
+			if ( !bf_append( &r->_response, (uint8_t *)"0\r\n", 3 ) ) {
+				free_hs( hs );	
+				return ERR_500( "Couldn't send final chunk." );	
+			}
 			r->stage = NW_COMPLETED;
 			memset( h, 0, sizeof(HTTP) ); 
 			return 1;
