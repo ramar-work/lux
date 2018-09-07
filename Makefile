@@ -35,6 +35,9 @@ cli:
 #	@$(CC) $(CFLAGS) -c $<
 
 #
+ssl:
+	./hypno --no-daemon --start --port 443 --dir $(HOME)/prj/hypno-wwwroot
+
 vchim:
 	valgrind ./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/prj/hypno-wwwroot
 

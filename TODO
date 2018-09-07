@@ -4,6 +4,12 @@
 document all your work on youtube or something...
 
 
+
+???
+	all i needed now was tls??? can't be...	
+	add fp's to nw_write(...) and nw_read(...)
+
+
 opening and closing things...
 	can't remember how multiple threads handle things
 	as long as they aren't literally reading the same thing it should be fine

@@ -106,7 +106,6 @@ static luaCF *rg = lua_functions;
 typedef struct 
 {
 	char *filename; //should be utf-8
-	//really should do something with mmap() here, but...
 	int size;		
 	int fd; 
 	int bufsize;
@@ -210,9 +209,7 @@ typedef struct Passthru {
 int hssent = 0;
 #include "tests/char-char.c"
 static uint8_t *tccf = NULL;
-static int tccflen = 0, tccfpos = 0;
-
-static int fd2 = 0;
+static int tccflen = 0, tccfpos = 0, fd2 = 0;
 
 //This is what handles streaming in case it's needed.
 _Bool http_send (Recvr *r, void *p, char *e) {
@@ -315,6 +312,8 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 	HTTP *h = (HTTP *)r->userdata;
 	HTTP_Request *req = &h->request;
 	lua_State *L = luaL_newstate(); 
+http_print( h );
+http_print_request( h ); exit( 0 );
 
 	//Set the message length
 	req->mlen = r->recvd;
