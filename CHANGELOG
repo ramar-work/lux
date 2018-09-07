@@ -1,0 +1,15 @@
+Where is the rest of my changelog???
+
+
+Fri Sep  7 21:17:01 UTC 2018
+	- Fixed a read off by one error at http.c:594, quit reading the whole message
+	- Added Selector reference to Recvr body structures.  Should be easy to reference port number now if needed (still don't know how to handle SSL/TLS negotiation yet...)
+	- @nw.h: 342-345 - Added (*pre)(...) and (*post)(...) function pointers to Selector structure.  This will allow one to run code before entering the read,process,write loop and run code after all three have completed.  
+	- @nw.h: 342-345 - Also added (*read)(...) and (*write)(...) function pointers.  As long as they're in Selector, it shouldn't take up extra space.  Both of these changes are needed for SSL/TLS and any other TCP level protocols to work correctly...	
+	- Neither of these have been tested or even run yet... but they're there and compile...
+	- Also, the read and write overriding functions will probably change signatures...
+
+	- NOTES:
+	- There are a couple of single file SSL/TLS libraries lurking around on Github.  I want to give those a try, but I can fallback on gnutls (cuz it's everywhere) and axtls (because it builds easy and can ship with the program).
+
+	- https://github.com/eduardsui/tlse 

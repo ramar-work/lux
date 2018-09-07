@@ -591,7 +591,7 @@ int http_pack_response (HTTP *h) {
 		uint8_t *bp = bf_data( &res->headers );
 		Mem m;
 		memset( &m, 0, sizeof(Mem) );
-		while ( memwalk( &m, bp, (uint8_t *)"\r", bpl, 1 ) ) {
+		while ( memwalk( &m, bp, (uint8_t *)"\r", bpl-1, 1 ) ) {
 			if ( m.size < 2 ) continue;
 			memcpy( &statline[res->mlen], &bp[m.pos], m.size );
 			res->mlen += m.size;

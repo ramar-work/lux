@@ -540,20 +540,24 @@ static _Bool dummy (Recvr *r, void *ud, char *err) {
 
 //Close
 _Bool nw_close_fd (Recvr *r, void *ud, char *err) {
+#if 0
 fprintf( stderr, "ALL GOOD THINGS MUST END!" );
 fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
 exit( 0 );
+#endif
 	return ((close(r->client->fd) != -1) && (r->client->fd = -1));
 }
 
 
 /*...*/
 _Bool nw_reset_fd (Recvr *r, void *ud, char *err) {
+#if 0
 	fprintf(stderr, "r->client is:   %p\n",  (void *)r->client);
 	fprintf(stderr, "r->client->fd:  %d\n",  r->client->fd);
 fprintf( stderr, "ALL GOOD THINGS MUST END!" );
 fprintf( stderr, "conn #%d; %s, %d: %d (%p)\n", r->connNo, __func__, __LINE__, *r->bypass, r->bypass );
 exit( 0 );
+#endif
 	reset_recvr(r);
 	if (close(r->client->fd) == -1) {
 		return 0;
@@ -608,7 +612,10 @@ _Bool initialize_selector (Selector *s, Socket *sock) {
 		//Initialize file descriptors to an agreed upon "uninitialized" value (-1 in this case)
 		(&s->clients[i])->fd = -1; 
 		(&s->rarr[i])->socket_fd = &(&s->clients[i])->fd ;
-	
+
+		//The Selector reference is always the same, but the "hook" functions may need these values
+		(&s->rarr[i])->selector = s;
+
 	#ifdef NW_PERFLOG	
 		(&s->rarr[i])->connNo = i;
 	#endif
@@ -715,6 +722,9 @@ _Bool activate_selector (Selector *s) {
 				REQUEST_0( r );
 				handle(ERR_SPAWN_MAX_CLIENTS);
 			}
+
+
+nsprintf( "woah woah woah" );
 
 			/* if (NW_CALL( accept( s->clients[0].fd, NULL, NULL ) )*/
 			if ( NW_CALL( !socket_accept(s->parent, child) ) ) {

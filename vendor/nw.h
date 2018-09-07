@@ -238,9 +238,16 @@ struct Buffer {
  #define NW_PERFLOG_LEN 2048
 #endif
 
+
+typedef struct Selector Selector;
+typedef struct Executor Executor;
+typedef struct Streamer Streamer;
+typedef struct Recvr Recvr;
+
+
+
 /*Here is a similar structure*/
-typedef struct 
-{
+struct Recvr {
   Socket            child;
 	Stage             stage;
 	int              rb, sb, 
@@ -276,11 +283,12 @@ typedef struct
 	int      connNo; 
 	int     *bypass; 
 #endif
-} Recvr;
+	const Selector *selector;
+};
 
 
 /*Structure to control event handlers*/
-typedef struct { 
+struct Executor { 
 	_Bool (*exe)(Recvr *r, void *ud, char *err);
 	enum {
 		NW_CONTINUE = 0,
@@ -290,21 +298,11 @@ typedef struct {
 	}       action;
 	int     status;
 	char    err[2048]; 
-} Executor;
-
-
-/*Structure to control "stream" handlers*/
-typedef struct {
-	/*Should support writing to file or to memory*/ 
-	//_Bool (*exe)(void *in, void *out);
-	_Bool (*read) (Recvr *r);
-	_Bool (*write)(Recvr *r);
-} Streamer;
+};
 
 
 /*Structure for setting up the loop*/
-typedef struct 
-{
+struct Selector {
 #if 0
 	int       min[2]     ;  /*min read is first index 0, min write is second index 1*/
 	int       max[2]     ;  /*max read is first index 0, max write is second index 1*/
@@ -341,7 +339,23 @@ typedef struct
 	int       tsize      ;  /*Total size of all local userdata (not touched)*/
 	Socket   *parent     ;  /*The big daddy socket of whatever server you're running*/
 	Recvr    *rarr       ;  /*Array to choose which "receiver" you want*/
-} Selector;
+	int (*pre)(Recvr *r, void *ud, char *err);
+	int (*post)(Recvr *r, void *ud, char *err);
+	int (*read)(int fd, void *buf, int len);
+	int (*write)(int fd, void *buf, int len);
+};
+
+
+
+/*Structure to control "stream" handlers*/
+struct Streamer {
+	/*Should support writing to file or to memory*/ 
+	//_Bool (*exe)(void *in, void *out);
+	_Bool (*read) (Recvr *r);
+	_Bool (*write)(Recvr *r);
+};
+
+
 
 
 extern Executor _nw_errors[ERR_END_OF_CHAIN + 1];

@@ -312,8 +312,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 	HTTP *h = (HTTP *)r->userdata;
 	HTTP_Request *req = &h->request;
 	lua_State *L = luaL_newstate(); 
-http_print( h );
-http_print_request( h ); exit( 0 );
+//http_print_request( h ); exit( 0 );
 
 	//Set the message length
 	req->mlen = r->recvd;
@@ -708,6 +707,17 @@ int file_cmd( Option *opts, char *err, Passthru *pt ) {
 }
 
 
+//Runs at every invocation
+int http_pre ( Recvr *r, void *ud, char *err ) {
+	return 1;
+}
+
+//Runs at every invocation
+int http_post ( Recvr *r, void *ud, char *err ) {
+	return 1;
+}
+
+
 //Start the server from main()
 int start_cmd( Option *opts, char *err, Passthru *pt ) {
 	int stat, conn, port, daemonize;
@@ -731,6 +741,9 @@ int start_cmd( Option *opts, char *err, Passthru *pt ) {
 		.errors     = _nw_errors,
 		.runners    = etc, 
 		.run_limit  = 3, /*No more than 3 seconds per client*/
+
+		.pre = http_pre,
+		.post = http_post
 	};
 
 	//Fork the children
