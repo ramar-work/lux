@@ -116,6 +116,14 @@ render: test-build-$(OS)
 render: 
 	@printf ''>/dev/null
 
+# Make an SSL Client
+tlscli:
+	$(CC) -DSQROOGE_H $(CFLAGS) -o cx vendor/single.c tlscli.c -lgnutls
+
+# Build a client with axtls
+axtlscli:
+	$(CC) -DSQROOGE_H $(CFLAGS) -o cxax vendor/single.c tlscli-axtls.c -laxtls
+
 
 # All test build programs use this recipe
 # But notice that a version exists for different operating systems. 

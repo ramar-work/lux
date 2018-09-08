@@ -723,14 +723,14 @@ _Bool activate_selector (Selector *s) {
 				handle(ERR_SPAWN_MAX_CLIENTS);
 			}
 
-
-nsprintf( "woah woah woah" );
-
 			/* if (NW_CALL( accept( s->clients[0].fd, NULL, NULL ) )*/
 			if ( NW_CALL( !socket_accept(s->parent, child) ) ) {
 				REQUEST_0( r );
 				handle(ERR_SPAWN_ACCEPT);
 			}
+
+			//Run 'pre' if it's there...
+			( s->pre ) ? s->pre( r, NULL, NULL ) : 0; 
 
 		#ifdef NW_BUFF_FIXED
 			//Initialize space for messages
@@ -888,8 +888,8 @@ niprintf( stConn );
 					//Check if all data came off
 					if ( NW_CALL( r->stage == NW_COMPLETED ) ) {
 						//SUCCESSFUL REQUESTS
-						//fprintf( stderr, "REQUEST is DONE!\n" );
 						uhandle( NW_COMPLETED );
+						( s->post ) ? s->post( r, NULL, NULL ) : 0;
 						REQUEST_1( r );
 						close( r->client->fd );
 						r->client->fd = -1;

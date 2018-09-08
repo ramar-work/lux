@@ -709,11 +709,21 @@ int file_cmd( Option *opts, char *err, Passthru *pt ) {
 
 //Runs at every invocation
 int http_pre ( Recvr *r, void *ud, char *err ) {
+	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "ran something." );
+
+	//Still may have to negotiate when to initiailize SSL and when not...
+	
+
+	//Also may need some hook functions to determine who's cert to use and where traffic is intended to go... BOY!
+
+
+		
 	return 1;
 }
 
 //Runs at every invocation
 int http_post ( Recvr *r, void *ud, char *err ) {
+	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "ran something." );
 	return 1;
 }
 
