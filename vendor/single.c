@@ -4185,8 +4185,10 @@ _Bool socket_accept (Socket *sock, Socket *new) {
 	}
 
 	/* Accept a connection. */	
-	if ((new->fd = accept(sock->fd, NULL, NULL)) == -1) 
-		return ((sock->err = errno) ? 0 : 0);
+	if ((new->fd = accept(sock->fd, NULL, NULL)) == -1) {
+		sock->err = errno;
+		return 0; 
+	}
 		
 	/* Set socket description */
 	new->_class = 'd';

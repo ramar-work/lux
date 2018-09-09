@@ -120,6 +120,11 @@ render:
 tlscli:
 	$(CC) -DSQROOGE_H $(CFLAGS) -o cx vendor/single.c tlscli.c -lgnutls
 
+# Make an SSL server that just runs forever... 
+tlssvr:
+	$(CC) -DSQROOGE_H $(CFLAGS) -o sx vendor/single.c tlssvr.c -lgnutls
+
+
 # Build a client with axtls
 axtlscli:
 	$(CC) -DSQROOGE_H $(CFLAGS) -o cxax vendor/single.c tlscli-axtls.c -laxtls
