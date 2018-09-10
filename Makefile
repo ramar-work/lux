@@ -4,7 +4,7 @@ OS = $(shell uname | sed 's/[_ ].*//')
 CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H -DNW_PERFLOG
 CC = clang
 CFLAGS = $(CLANGFLAGS)
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DNW_DEBUG -DNW_PERFLOG #-ansi
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecated-declarations -O0 -DNW_DEBUG -DNW_PERFLOG -Wno-format-security #-ansi
 CC = gcc
 CFLAGS = $(GCCFLAGS)
 PORT = 2200

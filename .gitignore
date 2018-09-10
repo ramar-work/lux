@@ -1,11 +1,6 @@
-*.o
-*.jpeg
-*.gif
-*.bmp
-*.png
-
-# Binary
-hypno
-hypno.pid
-
-
+# Track nothing and add by force
+*
+!Makefile
+!*.md
+!*.c
+!*.h
