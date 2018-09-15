@@ -374,8 +374,8 @@ Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
 	char *modelTag = strcmbd( ".", fullRoute, "model" );
 	char	*viewTag = strcmbd( ".", fullRoute, "view" );
 
-	int mh = lt_get_long_i( routeTable, (uint8_t *)modelTag, strlen(modelTag) ),
-		vh = lt_get_long_i( routeTable, (uint8_t *)viewTag, strlen(viewTag) );
+	int mh = lt_get_long_i( routeTable, (uint8_t *)modelTag, strlen(modelTag) );
+	int	vh = lt_get_long_i( routeTable, (uint8_t *)viewTag, strlen(viewTag) );
 #if 0
 fprintf( stderr, "%s, %s\n", modelTag, viewTag );
 fprintf( stderr, "%d, %d\n", mh, vh );
@@ -384,13 +384,22 @@ exit(0);
 
 	//Dump the routeTable, cuz I think this where the bug is...
 	lt_dump( routeTable );
-	exit(0);
+//exit(0);
 
 	//Loop through 'til you get a terminator, means you're at the end...
 	int h[2]={mh, vh};
+#if 0
+nsprintf( modelTag );
+nsprintf( viewTag );
+niprintf( h[0] );
+niprintf( h[1] );
+exit(0);
+#endif
+
 	for ( int ih=0; ih<2; ih++ ) {
 		if ( lt_valuetypeat( routeTable, h[ ih ] ) != LITE_TBL ) {
 			LL->type = (!ih) ? CC_MODEL : CC_VIEW;
+			//TODO: This will crash on zero-length route strings... (why oen would do that, idk. but still have to account for it.)
 			LL->content = strdup( lt_text_at( routeTable, h[ ih ] )) ;
 			LL++ ;
 		}
