@@ -382,7 +382,11 @@ fprintf( stderr, "%d, %d\n", mh, vh );
 exit(0);
 #endif
 
-	//Loop through until you get a terminator, means you're at the end...
+	//Dump the routeTable, cuz I think this where the bug is...
+	lt_dump( routeTable );
+	exit(0);
+
+	//Loop through 'til you get a terminator, means you're at the end...
 	int h[2]={mh, vh};
 	for ( int ih=0; ih<2; ih++ ) {
 		if ( lt_valuetypeat( routeTable, h[ ih ] ) != LITE_TBL ) {

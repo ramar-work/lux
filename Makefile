@@ -8,6 +8,8 @@ GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -std=c99 -Wno-deprecat
 CC = gcc
 CFLAGS = $(GCCFLAGS)
 PORT = 2200
+PREFIX = /usr/local
+VERSION = 0.01
 
 # Some Linux systems need these, but pkg-config should handle it
 INCLUDE_DIR=-I/usr/include/lua5.3
@@ -21,7 +23,14 @@ OBJ = ${SRC:.c=.o}
 main: RICKROSS=main
 main: test-build-$(OS)
 main: 
-	mv $(RICKROSS) hypno
+	mv $(RICKROSS) $(NAME) 
+
+
+# Install
+install:
+	cp $(NAME) $(PREFIX)/bin/
+	[ -f $(NAME)b ] && cp $(NAME)b $(PREFIX)/bin/
+
 
 # CLI
 cli: RICKROSS=$(NAME)b
@@ -153,3 +162,33 @@ test-build-Linux:
 clean:
 	-@rm $(NAME) hypnob testrouter testchains testsql testrender
 	-@find . | egrep '\.o$$' | grep -v sqlite | xargs rm
+
+
+# Make a package for distribution
+pkg: clean
+pkg: gitlog
+pkg:
+	git clone . $(NAME)-$(VERSION)
+	make gitlog > $(NAME)-$(VERSION)/changelog.md
+	markdown changelog.md > $(NAME)-$(VERSION)/changelog.html && rm $(NAME)-$(VERSION)/changelog.md
+	rm -rf $(NAME)-$(VERSION)/tests/
+	tar czf $(NAME)-$(VERSION).tar.gz $(NAME)-$(VERSION)
+	rm -rf $(NAME)-$(VERSION)/
+			
+
+# gitlog - Generate a full changelog from the commit history
+gitlog:
+	@printf "# CHANGELOG\n\n"
+	@printf "## STATS\n\n"
+	@printf -- "- Commit count: "
+	@git log --full-history --oneline | wc -l
+	@printf -- "- Project Inception "
+	@git log --full-history | grep Date: | tail -n 1
+	@printf -- "- Last Commit "
+	@git log -n 1 | grep Date:
+	@printf -- "- Authors:\n"
+	@git log --full-history | grep Author: | sort | uniq | sed '{ s/Author: //; s/^/\t- /; }'
+	@printf "\n"
+	@printf "## HISTORY\n\n"
+	@git log --full-history --author=Antonio | sed '{ s/^   /- /; }'
+	@printf "\n<link rel=stylesheet href=changelog.css>\n"
