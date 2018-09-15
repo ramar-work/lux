@@ -1,7 +1,4 @@
-/* ------------------------------------- *
- *
- *
- * ------------------------------------- */
+/* tlscli.c */
 #include "vendor/single.h"
 #include <gnutls/gnutls.h>
 #define PROG "cx"
@@ -19,10 +16,14 @@
 #endif
 #if 0
  #define PORT 80
+ #define LOCATION "/article2/0,2817,2471051,00.asp"
  #define HOSTNAME "ramarcollins.com"
  #define NOHTTPS
 #else
  #define PORT 443
+ //#define LOCATION "/article2/0,2817,2471051,00.asp"
+ //#define HOSTNAME "pcmag.com"
+ #define LOCATION "/"
  #define HOSTNAME "deep909.com"
 #endif
 
@@ -35,21 +36,20 @@ int main (int argc, char *argv[]) {
 
 	int err, ret, sd, ii, type, len;
 	unsigned int status;
-	char buf[ 2048 ] = { 0 }, *desc = NULL;
-	Socket s = {
-	  .server   = 0
-	, .proto    = "tcp"
-	};
+	Socket s = { .server   = 0, .proto    = "tcp" };
 	gnutls_session_t session;
 	gnutls_datum_t out;
 	gnutls_certificate_credentials_t xcred;
+	char buf[ 4096 ] = { 0 }, *desc = NULL;
 	char msg[ 32000 ] = { 0 };
 	char GetMsg[2048] = { 0 };	
-	//	"Content-Type: text/html\r\n"
 	char GetMsgFmt[] = 
-		"GET / HTTP/1.1\r\n"
+		"GET " LOCATION " HTTP/1.1\r\n"
 		"Host: %s\r\n\r\n"
 	;
+
+	nsprintf( HOSTNAME );
+	nsprintf( LOCATION );
 
 	if ( RUN( !gnutls_check_version("3.4.6") ) ) { 
 		errexit( 0, "GnuTLS 3.4.6 or later is required for this example." );	
@@ -77,7 +77,17 @@ int main (int argc, char *argv[]) {
 	int port = PORT;
 
 	//pack a message
-	len = snprintf( GetMsg, sizeof(GetMsg) - 1, GetMsgFmt, hostname );
+	if ( port != 443 )
+		len = snprintf( GetMsg, sizeof(GetMsg) - 1, GetMsgFmt, hostname );
+	else {
+		char hbbuf[ 128 ] = { 0 };
+		//snprintf( hbbuf, sizeof( hbbuf ) - 1, "%s://%s:%d", "https", hostname, port );
+		snprintf( hbbuf, sizeof( hbbuf ) - 1, "www.%s:%d", hostname, port );
+		len = snprintf( GetMsg, sizeof(GetMsg) - 1, GetMsgFmt, hbbuf );
+	}
+
+	//???
+	fprintf( stderr, "%s\n", GetMsg ); //exit( 0 );
  	
 	//Do socket connect (but after initial connect, I need the file desc)
 	if ( RUN( !socket_connect( &s, hostname, port ) ) ) {
@@ -155,8 +165,10 @@ int main (int argc, char *argv[]) {
 	}
 
 	if ( ret > 0 ) {
-		fprintf( stdout, " - Recvd %d bytes: ", ret );
+		fprintf( stdout, "Recvd %d bytes:\n", ret );
+		fflush( stdout );
 		write( 1, buf, ret );
+		fflush( stdout );
 		fputs( "\n", stdout );
 	}
 
