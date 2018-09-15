@@ -166,11 +166,10 @@ clean:
 
 # Make a package for distribution
 pkg: clean
-pkg: gitlog
 pkg:
 	git clone . $(NAME)-$(VERSION)
 	make gitlog > $(NAME)-$(VERSION)/changelog.md
-	markdown changelog.md > $(NAME)-$(VERSION)/changelog.html && rm $(NAME)-$(VERSION)/changelog.md
+	markdown $(NAME)-$(VERSION)/changelog.md > $(NAME)-$(VERSION)/changelog.html && rm $(NAME)-$(VERSION)/changelog.md
 	rm -rf $(NAME)-$(VERSION)/tests/
 	tar czf $(NAME)-$(VERSION).tar.gz $(NAME)-$(VERSION)
 	rm -rf $(NAME)-$(VERSION)/
