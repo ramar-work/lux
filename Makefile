@@ -10,6 +10,8 @@ CFLAGS = $(GCCFLAGS)
 PORT = 2200
 PREFIX = /usr/local
 VERSION = 0.01
+WWWROOT = $(HOME)/prj/$(NAME)-wwwroot
+HOSTS = hypno.local hypno-test.local
 
 # Some Linux systems need these, but pkg-config should handle it
 INCLUDE_DIR=-I/usr/include/lua5.3
@@ -29,11 +31,11 @@ main:
 # Install
 install:
 	cp $(NAME) $(PREFIX)/bin/
-	[ -f $(NAME)b ] && cp $(NAME)b $(PREFIX)/bin/
+	[ -f $(NAME)-admin ] && cp $(NAME)-admin $(PREFIX)/bin/
 
 
 # CLI
-cli: RICKROSS=$(NAME)b
+cli: RICKROSS=$(NAME)-admin
 cli: test-build-$(OS)
 cli: 	
 	@printf ''>/dev/null
@@ -43,23 +45,27 @@ cli:
 #	@echo $(CC) $(CFLAGS) -c $<
 #	@$(CC) $(CFLAGS) -c $<
 
+# Kill a running server
+kill:
+	ps aux | grep './$(NAME) --no-daemon --start' | awk '{ print $$2 }' | xargs kill -9 
+
 #
 ssl:
-	./hypno --no-daemon --start --port 443 --dir $(HOME)/prj/hypno-wwwroot
+	./$(NAME) --no-daemon --start --port 443 --dir $(WWWROOT)
 
 vchim:
-	valgrind ./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/prj/hypno-wwwroot
+	valgrind ./$(NAME) --no-daemon --start --port $(PORT) --dir $(WWWROOT)
 
 chim:
-	./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/prj/hypno-wwwroot
+	./$(NAME) --no-daemon --start --port $(PORT) --dir $(WWWROOT)
 
-# This tests how hypno starts with a certain set of criteria.
+# This tests how $(NAME) starts with a certain set of criteria.
 goku:
-	./hypno --no-daemon --start --port $(PORT) 
+	./$(NAME) --no-daemon --start --port $(PORT) 
 
-# This tests hypno and logs to a file named baby.log
+# This tests $(NAME) and logs to a file named baby.log
 baby:
-	./hypno --no-daemon --start --port $(PORT) 2>baby.log
+	./$(NAME) --no-daemon --start --port $(PORT) 2>baby.log
 
 # This is a test request to use with Curl or Wget	
 gohan:
@@ -79,19 +85,14 @@ errors:
 
 # Add and test two localhost names
 add-hosts:
-	@printf "127.0.0.1\tkhan.org #added by hypno\n" >> /etc/hosts
-	@printf "127.0.0.1\twww.khan.org #added by hypno\n" >> /etc/hosts
-	@printf "127.0.0.1\tability.org #added by hypno\n" >> /etc/hosts
-	@printf "127.0.0.1\twww.ability.org #added by hypno\n" >> /etc/hosts
-	@printf "127.0.0.1\terrors.com #added by hypno\n" >> /etc/hosts
-	@printf "127.0.0.1\twww.errors.com #added by hypno\n" >> /etc/hosts
+	@for n in $(HOSTS); do printf "127.0.0.1\t$$n # added by hypno\n"; done >> /etc/hosts
 
 # Remove hosts
 remove-hosts:
 	@sed -i '/#added by hypno/d' /etc/hosts
 
 # A top-level target that builds everything
-top:
+test:
 	make router; \
 	make chains; \
 	make render; \
@@ -165,8 +166,9 @@ test-build-Linux:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) hypnob testrouter testchains testsql testrender
-	-@find . | egrep '\.o$$' | grep -v sqlite | xargs rm
+	-@rm $(NAME) $(NAME)-admin test{chains,render,router,sql} $(NAME)-$(VERSION).tar.gz 2>/dev/null
+	-@rm -rf $(NAME)-$(VERSION) *dSYM 2>/dev/null
+	-@find . | egrep '\.o$$' | grep -v sqlite | xargs rm 2>/dev/null
 
 
 # Make a package for distribution
