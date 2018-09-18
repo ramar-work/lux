@@ -49,6 +49,10 @@ cli:
 kill:
 	ps aux | grep './$(NAME) --no-daemon --start' | awk '{ print $$2 }' | xargs kill -9 
 
+# Make a request
+req:
+	curl http://billtracker.local:$(PORT)/home > tests/home.html
+
 #
 ssl:
 	./$(NAME) --no-daemon --start --port 443 --dir $(WWWROOT)

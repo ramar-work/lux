@@ -38,10 +38,15 @@
  #define ERRL(...) snprintf( err, errlen, __VA_ARGS__ ) ? 0 : 0
 #endif
 
+#define ERRP(...) \
+ ( (snprintf( err, 24, "[ @%s(), %d ]                 ", __FUNCTION__, __LINE__ ) ? 1 : 1) \
+ && ( err += 24 ) && (snprintf( err, errlen - 24, __VA_ARGS__ ) ? 0 : 0 ) && fprintf(stderr, err ))
 //This define should be a bit easier to use than fully calling http_err
-#define ERR_500(...) http_err( r, h, 500, __VA_ARGS__ ) 
-#define ERR_404(...) http_err( r, h, 404, __VA_ARGS__ ) 
+//#define ERR_500(...) http_err( r, h, 500, __VA_ARGS__ ) 
+//#define ERR_404(...) http_err( r, h, 404, __VA_ARGS__ ) 
 
+#define ERR_500(...) ( ( http_err( r, h, 500, __VA_ARGS__ ) ? 1 : 1 ) && ( fprintf( stderr, "[%s:%d] ",__FILE__,__LINE__) ? 1 : 1 ) && fprintf( stderr, __VA_ARGS__ ) )
+#define ERR_404(...) ( ( http_err( r, h, 404, __VA_ARGS__ ) ? 1 : 1 ) && ( fprintf( stderr, "[%s:%d] ",__FILE__,__LINE__) ? 1 : 1 ) && fprintf( stderr, __VA_ARGS__ ) )
 //???
 char default_dirname[] = DIRNAME_DEFAULT;
 
@@ -524,18 +529,21 @@ exit( 0 );
 			//Somehow have to get the root directory of the site in question...
 			char *mfile = strcmbd( "/", ag->activeDir, "models", l->content, "lua" );
 			mfile[ strlen(mfile) - 4 ] = '.';
-			fprintf( stderr, "Attempting to load: %s\n", mfile );
+		fprintf( stderr, "Attempting to load: %s\n", mfile );
 
-			if ( stat( mfile, &sb ) == -1 )
+			if ( stat( mfile, &sb ) == -1 ) {
 				return ERR_500("Couldn't find model file: %s.", mfile );
+			}
 
-			if ( luaL_dofile( L, mfile ) )
+			if ( luaL_dofile( L, mfile ) ) {
 				return ERR_500("Could not load Lua file: %s. %s\n", mfile, lua_tostring(L, -1));
+			}
 		}
 		l++;
 	}
 
 	//Still gotta figure out the reason for that crash...
+fprintf( stderr, "%s\n", "Lua table aggregation is taking place." );
 	lua_aggregate( L );
 	lua_pushstring( L, "model" );
 	lua_pushvalue( L, 1 );
@@ -544,6 +552,7 @@ exit( 0 );
 	lua_settable( L, 1 );
 	
 	//There is a thing called model now.
+fprintf( stderr, "%s\n", "C table stuff is taking place." );
 	if ( !lt_init( &model, NULL, 1027 ) || !lua_to_table( L, 1, &model ) )
 		return ERR_500("Couldn't turn aggregate table into a C table.\n" );
 
@@ -562,6 +571,7 @@ exit( 0 );
 			char *vfile = strcmbd( "/", ag->activeDir, "views", l->content, "html" );
 			int fd = 0, bt = 0;
 			vfile[ strlen(vfile) - 5 ] = '.';
+		fprintf( stderr, "Attempting to load: %s\n", vfile );
 
 			if ( stat( vfile, &sb ) == -1 )
 				return ERR_500("Couldn't find view file: %s. Error: %s", vfile, strerror( errno ) );
@@ -581,10 +591,12 @@ exit( 0 );
 		l++;
 	}
 
-	//um
+	//A bug(?) in the rendering engine prevents anything from showing up when no model is there
+	//Should just copy data, but it's not...
 	if ( !render_init( &ren, &model ) )
 		return ERR_500("Couldn't initialize rendering engine." );
 
+	//This may or may not return something, if it returns nothing, i dunno...
 	if ( !render_map( &ren, (uint8_t *)renbuf, strlen( (char *)renbuf ) ) )
 		return ERR_500("Couldn't set up render mapping." );
 
@@ -602,6 +614,10 @@ exit( 0 );
 	timer_end( &t );
 	timer_print( &t );
  #endif	
+
+	fprintf( stderr, "HTTP @ http_run\n==================\n" );
+	http_print_request( h );
+	http_print_response( h );
 
 	fprintf( stderr, "RECVR @ http_run\n==================\n" );
 	print_recvr( r );
