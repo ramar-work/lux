@@ -13,8 +13,7 @@ char *CCtypes[] = {
 
 
 //Loop through a table in memory
-void lua_loop ( lua_State *L )
-{
+void lua_loop ( lua_State *L ) {
 	int a = lua_gettop( L );
 	obprintf( stderr, "Looping through %d values.\n", a );
 
