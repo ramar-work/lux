@@ -1,4 +1,23 @@
-/* hypno.c */
+/* ---------------------------------------------- *
+ * hypno.c
+ * =======
+ * 
+ * Summary
+ * ------- 
+ * Hypno is a full blown web application environment
+ * using Lua as its primary server language.  
+ *
+ * Author 
+ * ------- 
+ * Antonio R. Collins II (ramar@tubularmodular.com, ramar.collins@gmail.com)
+ * Original Author Date:   Wed Oct 18 20:33:27 2017 -0400
+ *
+ * Usage 
+ * ------- 
+ *
+ * TODO 
+ * ------- 
+ * ---------------------------------------------- */
 #include "vendor/single.h"
 #include "vendor/nw.h"
 #include "vendor/http.h"
@@ -47,8 +66,6 @@
 
 #define ERR_500(...) ( ( http_err( r, h, 500, __VA_ARGS__ ) ? 1 : 1 ) && ( fprintf( stderr, "[%s:%d] ",__FILE__,__LINE__) ? 1 : 1 ) && fprintf( stderr, __VA_ARGS__ ) )
 #define ERR_404(...) ( ( http_err( r, h, 404, __VA_ARGS__ ) ? 1 : 1 ) && ( fprintf( stderr, "[%s:%d] ",__FILE__,__LINE__) ? 1 : 1 ) && fprintf( stderr, __VA_ARGS__ ) )
-//???
-char default_dirname[] = DIRNAME_DEFAULT;
 
 //Lua structure
 typedef struct {
@@ -72,7 +89,16 @@ Executor etc[] = {
 
 //Static buffer for quickly expanding how much memory is available?
 uint8_t zbuf[ 10485760 ] = { 0 };
+//Useful variables for main()
+static const char pidfile[] = "hypno.pid";
+static char err[ 4096 ] = { 0 };
+static const int errlen = 4096; 
+char default_dirname[] = DIRNAME_DEFAULT;
 
+int hssent = 0;
+#include "tests/char-char.c"
+static uint8_t *tccf = NULL;
+static int tccflen = 0, tccfpos = 0, fd2 = 0;
 //Lua functions
 luaCF lua_functions[] =
 {
@@ -102,14 +128,11 @@ luaCF lua_functions[] =
 	{ .sentinel = -1 },
 };
 
-//Useful variables for main()
-static const char pidfile[] = "hypno.pid";
-static char err[ 4096 ] = { 0 };
-static const int errlen = 4096; 
+
 static luaCF *rg = lua_functions;
 
-typedef struct 
-{
+
+typedef struct {
 	char *filename; //should be utf-8
 	int size;		
 	int fd; 
@@ -121,6 +144,7 @@ void free_hs( HttpStreamer *hs ) {
 	free( hs->filename );
 	free( hs );
 }
+
 
 void print_hs ( HttpStreamer *hs ) {
 	nsprintf( hs->filename );
@@ -211,10 +235,6 @@ typedef struct Passthru {
 } Passthru;
 
 
-int hssent = 0;
-#include "tests/char-char.c"
-static uint8_t *tccf = NULL;
-static int tccflen = 0, tccfpos = 0, fd2 = 0;
 
 //This is what handles streaming in case it's needed.
 _Bool http_send (Recvr *r, void *p, char *e) {
@@ -285,6 +305,9 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 
 //This is the single-threaded HTTP run function
 _Bool http_run ( Recvr *r, void *p, char *err ) { 
+
+fprintf( stderr, "BYE!\n" );
+exit( 0 );
  #ifdef INCLUDE_TIMING_INFO_H
 	char tbuf[1024]={0};
 	Timer t;
@@ -377,12 +400,12 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 	int rplen = strlen( h->request.path );
 	if ( memchr( h->request.path, '.', rplen ) ) {
 		//Check for a known extension
-		char *mt = NULL, *extck = &h->request.path[ rplen ];
+		char *extck = &h->request.path[ rplen ];
 		while ( extck-- && *extck != '.' ) ; 	
 		extck++;
 
 		//Now check for a valid mimetype	
-		mt = (char *)mtfref( extck );
+		char *mt = (char *)mtfref( extck );
 	
 		//If the mimetype is not supported, that's technically a 404
 		//but right now, use application/octet-stream to check for validity
@@ -643,6 +666,7 @@ Option opts[] = {
 	{ "-m", "--mode",      "Choose how server should evaluate hostnames.",'s' },
 	{ NULL, "--chroot-dir","Choose a directory to change root to.",     's' },
 #endif
+	{ "-x", "--hostname",  "Respond only to this specific host name.",'s' },	
 	{ "-d", "--dir",       "Serve just one specific directory.",'s' },
 	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
 	{ "-m", "--max-conn",  "How many connections to enable at a time.", 'n' },
@@ -833,8 +857,7 @@ struct Cmd
 
 
 //Server loop
-int main (int argc, char *argv[]) 
-{
+int main (int argc, char *argv[]) {
 	//Values
 	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
 

@@ -1,13 +1,40 @@
-???
----
+hypno's checklist
+-----------------
+
+what's absolutely needed to get something done?
+	stability (of the network layer, and I have little idea of how to test this,
+		maybe dabble in multithreading?)
+	ssl / tls
+	email for anything modern
+
+
+what defines stability
+	*this thing should never crash, for any reason
+	*this thing should be able to count its connections
+
+	a comprehensive test suite would include:
+		a way to grab all of your dependencies (and possibly build them)
+		a way to reliably start a server and kill it
+		a way to reliably run a client (curl or wget is a better idea b/c someone
+			else wrote it)
+		regular GET of a variety of files (you can just embed them in a file and
+			generate them, pack no seperate files, too hard to keep them seperate)
+		regular POSTs back to a server somehow
+		stress testing of the weird chainy thing in data.lua (or whatever)	
+
+
+
+return to rendering
+
+
 
 document all your work on youtube or something...
 
 
-
-???
-	all i needed now was tls??? can't be...	
-	add fp's to nw_write(...) and nw_read(...)
+extra things that still need to be done
+	tls / ssl
+	add function pointers to nw_write(...) and nw_read(...) (this way ssl or any
+other library function that overrides typical read and write will work)
 
 
 opening and closing things...
@@ -15,25 +42,27 @@ opening and closing things...
 	as long as they aren't literally reading the same thing it should be fine
 	multiple handles can be the same on each file
 
-	allocate the HttpStreamer object and modify http.c to contain this.  This stuff should really be in the library...
+	x allocate the HttpStreamer object and modify http.c to contain this.  This stuff should really be in the library...
 
 	you might want to skip the embedded file check, but it's a good test to have either way...
 
-	once that's done try these:
-		Cincinnati-skyline-from-kentucky-shore-night.jpg
-		morewindows.jpg
-		mrdr404.jpg
-		op-blue.png
-		road.jpg
-		room.jpg
-		room2.jpg
-		sign.jpg
-		sisfrac.jpg
-		walkway.jpg
-		water.jpg
-		weiner.jpg
-		windows.jpg
-		windows.new.jpg
+
+
+additional binary tests:
+	Cincinnati-skyline-from-kentucky-shore-night.jpg
+	morewindows.jpg
+	mrdr404.jpg
+	op-blue.png
+	road.jpg
+	room.jpg
+	room2.jpg
+	sign.jpg
+	sisfrac.jpg
+	walkway.jpg
+	water.jpg
+	weiner.jpg
+	windows.jpg
+	windows.new.jpg
 
 
 the best way to handle static files is preparing a header (and only a header)

@@ -1,8 +1,8 @@
 #include "vendor/single.h"
 #include "vendor/http.h"
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
+#include "hypno/lua.h"
+#include "hypno/lauxlib.h"
+#include "hypno/lualib.h"
 
 #ifdef DEBUG_H
  #define obprintf( f, ... ) fprintf( f, __VA_ARGS__ )
