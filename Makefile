@@ -19,12 +19,32 @@ VERSION = 0.01
 SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c bridge.c
 OBJ = ${SRC:.c=.o}
 
+
 # A main target, that will most likely result in a binary
 main: BINNAME=main
 main: build-$(OS)
 main: 
 	mv $(BINNAME) bin/$(NAME)
 
+# zmq w/ czmq
+czmq:
+	gcc -g -Wall -Werror -Wno-unused -Wstrict-overflow \
+	-Wno-deprecated-declarations -Wno-format-security -O0 -DNW_DEBUG -DNW_PERFLOG \
+		zmqss.c -Iinclude -lczmq -o zy
+
+# zmq
+zmq: 
+	gcc -g -Wall -Werror -Wno-unused -Wstrict-overflow \
+	-Wno-deprecated-declarations -Wno-format-security -O0 -DNW_DEBUG -DNW_PERFLOG \
+		zmqc.c -Iinclude -L. -lzmq -o zc 
+	gcc -g -Wall -Werror -Wno-unused -Wstrict-overflow \
+	-Wno-deprecated-declarations -Wno-format-security -O0 -DNW_DEBUG -DNW_PERFLOG \
+		zmqs.c -Iinclude -L. -lzmq -o zs
+	gcc -g -Wall -Werror -Wno-unused -Wstrict-overflow \
+	-Wno-deprecated-declarations -Wno-format-security -O0 -DNW_DEBUG -DNW_PERFLOG \
+		zmq.c -Iinclude -L. -lzmq -o zz 
+	
+#$(CC) $(CFLAGS) zmq.c -lzmq -o zz 
 
 # Install
 install:
