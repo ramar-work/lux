@@ -27,6 +27,7 @@ It includes:
 
 Usage
 -----
+
 ### Building
 
 An object can be built with the following:
@@ -91,13 +92,20 @@ TODO
 
 //This flag is here to control how table counts work...
 
+#define ERROUT(chr) \
+	fprintf( stderr, "%s: %s\n", chr, strerror(errno) ); \
+	return errno;
+
 static const unsigned int lt_hash = 31;
 
-unsigned int __lt_int = 0;
+//unsigned int __lt_int = 0;
+
+LtInner __ltComplex = { LT_DUMP_LONG, LT_VERBOSE, NULL, 0 };
+LtInner __ltHistoric = { LT_DUMP_SHORT, LT_VERBOSE, NULL, 0 };
+LtInner __ltSimple = { LT_DUMP_SHORT, LT_CONDENSED, NULL, 0 };
 
 #ifndef ERR_H
-static const char *__SingleLibErrors[] = 
-{
+static const char *__SingleLibErrors[] = {
   [ERR_NONE] = "No errors",
 
 #ifndef BUFF_H
@@ -429,7 +437,9 @@ unsigned char *trim (uint8_t *msg, char *trim, int len, int *nlen)
 
 
 #ifndef OPT_H
+#ifndef ERR_H
 static char opt_errmsg[ ERRV_LENGTH ] = { 0 };
+#endif
 
 //Set values when the user asks for them
 static _Bool opt_set_value (char **av, Value *v, char type, char *err) 
@@ -536,7 +546,9 @@ _Bool opt_eval (Option *opts, int argc, char **av) {
 					if ( !o->callback( ++av, &o->v, buf ) ) {
 						//NOTE: This is stupid, but the user will have no need for the Option array if an error occurs.
 						o = &opts[0];
+					#ifndef ERR_H
 						o->errmsg = opt_errmsg;
+					#endif
 						return serr( ERR_OPT_VALIDATION_FAILED, o, NULL );
 					}
 				}
@@ -547,14 +559,18 @@ _Bool opt_eval (Option *opts, int argc, char **av) {
 					//Why would this ever be?
 					if ( !(*av) ) {
 						o = &opts[0];
+					#ifndef ERR_H
 						o->errmsg = opt_errmsg;
+					#endif
 						return serr( ERR_OPT_EXPECTED_ANY, o, NULL );
 					}
 
 					//Catch what may be a flag
 					if ( strlen(*av) > 1 && *av[0] == '-' && *av[1] == '-' ) {
 						o = &opts[0];
+					#ifndef ERR_H
 						o->errmsg = opt_errmsg;
+					#endif
 						return serr( ERR_OPT_UNEXPECTED_FLAG, o, *av );
 					}
 			
@@ -568,7 +584,9 @@ _Bool opt_eval (Option *opts, int argc, char **av) {
 						for ( int i=0; i < strlen( *av ); i++ ) {
 							if ( (int)(*av)[i] < 48 || (int)(*av)[i] > 57 ) { //Not a number check
 								o = &opts[0];
+							#ifndef ERR_H
 								o->errmsg = opt_errmsg;
+							#endif
 								return serr( ERR_OPT_EXPECTED_NUMERIC_ARG, o, *av );
 							}
 						}
@@ -586,7 +604,9 @@ _Bool opt_eval (Option *opts, int argc, char **av) {
 
 						if ( !isstr ) {
 							o = &opts[0];
+						#ifndef ERR_H
 							o->errmsg = opt_errmsg;
+						#endif
 							return serr( ERR_OPT_EXPECTED_STRING_ARG, o, *av );
 						}
 						(&o->v)->s = *av;
@@ -918,6 +938,7 @@ static const Mime mime[] = {
   {        "jpg", "image/jpeg"                                                                     },
   {         "js", "application/javascript"                                                         },
   {       "json", "application/json"                                                               },
+  {         "js", "text/javascript"                                                                },
   {        "kml", "application/vnd.google-earth.kml+xml"                                           },
   {        "kmz", "application/vnd.google-earth.kmz+xml"                                           },
   {        "l24", "audio/l24"                                                                      },
@@ -1094,28 +1115,10 @@ void print_body ( Bod *b )
  #endif
 
 
-void render_dump_mark ( Render *r )
-{
-	Mark *ct = &r->markers[0];
-	while ( ct->blob )
-	{
-		fprintf( stderr, "{ size:   %-4d,", ct->size  );
-		fprintf( stderr,  " type:   %-1d,", ct->type  );
-		fprintf( stderr,  " index:  %-4d,", ct->index );
-		fprintf( stderr,  " action: %-6s,'",
-			&"RAW  \0""-LOOP\0""^LOOP\0""$LOOP\0""STUB \0""DIRECT"[ ct->action * 6 ] ); 
-		for ( int i=0 ; i < ct->size ; i++ )
-			fprintf( stderr, "%c", (ct->blob[ i ] == '\n' ) ? '@' : ct->blob[ i ] ); 
-		//write( 2, ct->blob, ct->size );
-		fprintf( stderr, "' },\n" );
-		ct++;
-	}
-}
 
 
 //render_init - Initializes a render block
-int render_init ( Render *r, Table *t )
-{
+int render_init ( Render *r, Table *t ) {
 	r->depth = 0;
 	r->maxbuf = 2048;
 	r->srctable = t;
@@ -1126,8 +1129,7 @@ int render_init ( Render *r, Table *t )
 
 
 //Set the render
-void render_free ( Render *r )
-{
+void render_free ( Render *r ) {
 	free( r->markers );
 	bf_free( &r->dest );
 }
@@ -1135,136 +1137,38 @@ void render_free ( Render *r )
 
 
 //Set the render source data?
-void render_set_srcdata (Render *r, uint8_t *src)
-{
+void render_set_srcdata (Render *r, uint8_t *src) {
 	r->src = src;
 }
 
 
 
 //Set the render source
-void render_set_srctable (Render *r, Table *t)
-{
+void render_set_srctable (Render *r, Table *t) {
 	r->srctable = t;
 } 
 
 
-//Do a map
-int render_map ( Render *r, uint8_t *src, int srclen )
-{
-	//Define stuff
-	Parser p   = {.words = {{"{{#"}, {"{{/"}, {"{{^"}, {"{{>"}, {"{{"}, {"}}"}, {NULL}}};
-	Mark *raw  = NULL, 
-			  *ct  = NULL; 
-	int follow = 1;
-	pr_prepare( &p );
-
-	//Prepare the markers
-	if ( !(r->markers = malloc( sizeof( Mark ) )) )
-		return 0;
-	else 
-	{
-		memset( r->markers, 0, sizeof(Mark) );
-		ct = r->markers;
-	}
-
-	//Loop through a thing
-	for ( int alloc=2, t;  pr_next( &p, src, srclen );  ) 
-	{
-		//Copy the last of the stream
-		if ( p.word == NULL )
-		{
-			ct->action = RAW;
-			ct->blob = &src[ p.prev ];
-			ct->size = srclen - p.prev; 
-			REALLOC( raw, r->markers );
-			break;
-		}
-
-		//Just mark each section (and it's position)
-		if ((t = p.word[ p.tokenSize - 1 ]) == '#')
-		{
-			//The start of "positive" loops (items that should be true)
-			ct->blob = &src[p.prev],
-			ct->size = p.size,
-			ct->action = RAW;
-			REALLOC( raw, r->markers );
-			ct->action = POSLOOP;
-		}
-		else if (t == '^') 
-		{
-			//The start of "negative" loops (items that should be false)
-			ct->blob = &src[p.prev],
-			ct->size = p.size,
-			ct->action = RAW;
-			REALLOC( raw, r->markers );
-			ct->action = NEGLOOP;
-		}
-		else if (t == '/')
-		{
-			//The end of either a "positive" or "negative" loop
-			ct->blob = &src[p.prev],
-			ct->size = p.size,
-			ct->action = RAW;
-			REALLOC( raw, r->markers );
-			ct->action = ENDLOOP;
-		}
-		else if (t == '{')
-		{
-			//The start of a key (any type)
-			ct->blob = &src[p.prev],
-			ct->size = p.size,
-			ct->action = RAW;
-			REALLOC( raw, r->markers );
-			ct->action = DIRECT;
-		}
-		else if (t == '}' /*|| t == '!'*/ )
-		{
-			//Anything within here will always be a table
-			ct->blob  = trim( (uint8_t *)&src[ p.prev ], (char *)trimchars, p.size, &ct->size );
-		#ifdef RENDER_DEBUG_H
-			fprintf( stderr, "%s\n", "hi" );
-			write( 2, ct->blob, ct->size );
-			write( 2, "\n", 1 );
-
-			fprintf( stderr, "%s\n", "What is index?" );
-			fprintf( stderr, "%d\n", lt_get_long_i( r->srctable, ct->blob, ct->size ) );	
-		#endif
-			if ( *ct->blob == '.' )
-				ct->action = STUB;
-			else {
-				ct->index = lt_get_long_i( r->srctable, ct->blob, ct->size );
-				ct->type  = lt_vta( r->srctable, ct->index );
-				if ((ct->type == LITE_TBL) && (ct->action == POSLOOP || ct->action == NEGLOOP)) 
-				{
-					ct->parent = ct->blob; 
-					ct->psize = ct->size;	
-				}
-			}
-			REALLOC( raw, r->markers );
-		}
-	}
-
-	//render_dump_mark( r );
-	return 1;
-}
+#if 0
+#if 0
+#include "render1.c"
+#else
+#include "render2.c"
+#endif
+#endif
 
 
 
 //Append to block
-static int append ( uint8_t *dest, int dmax, uint8_t *src, int srclen, int item, int *pos )
-{
+static int append (uint8_t *dest, int dmax, uint8_t *src, int srclen, int item, int *pos) {
 	if ( *pos + srclen >= dmax ) 
 		return -1;
-	else 
-	{
-		if ( item == -1 )
-		{
+	else {
+		if ( item == -1 ) {
 			memcpy( &dest[ *pos ], src, srclen );
 			*pos += srclen;
 		}
-		else 
-		{
+		else {
 			char buf[ 64 ] = { 0 };
 			int sl = snprintf( buf, 64, "%d", item );
 			memcpy( &dest[ *pos ], buf, sl );
@@ -1272,202 +1176,6 @@ static int append ( uint8_t *dest, int dmax, uint8_t *src, int srclen, int item,
 		}
 	}
 	return *pos;
-}
-
-
-
-//Render
-int render_render ( Render *r )
-{
-	//Loops can just use pointers... probably...
-	Mark *lt=NULL, *ct = &r->markers[0];
-	unsigned char search[ 2048 ];
-	struct DT { Mark *mark; uint8_t *src, *parent; int size, psize, skip, times, position; } d[10]; 
-
-	//everytime you descend, src is what you got, size is length of src
-	//and times is times to repeat
-	struct DT *dt = d;
-	int top = 0;
-	memset( search, 0, sizeof(search) );
-	memset( dt, 0, sizeof (struct DT));
-	
-	while ( ct->blob ) 
-	{
-		//Is the skip bit on?
-		if ( ct->action != ENDLOOP && dt->skip ) 
-			{ ct++; continue; }
-		else if ( ct->action == ENDLOOP ) 
-		{
-			//Stop skipping if these match
-			if ( ct->size == dt->psize && (memcmp( dt->parent, ct->blob, dt->size ) == 0))
-			{
-				if ( dt->skip )
-					dt->skip = 0;
-				else {
-				#if 0
-					//Write
-					write( 2, dt->parent, dt->psize );
-					fprintf( stderr, " => " );
-					write( 2, ct->blob, ct->size );
-				#endif
-					//Decrement repetition
-					if ( dt->times == 0 )
-						dt--;
-					else {
-						--dt->times;
-						ct = dt->mark;
-						continue;
-					}
-				}
-			}
-		}
-
-		//Simply copy this data
-		if ( ct->action == RAW )
-		{
-		#ifdef RENDER_DEBUG_H
-			write( 2, ct->blob, ct->size );
-		#endif
-			bf_append( &r->dest, ct->blob, ct->size );
-		}
-		//Retrieve the reference and write it
-		else if ( ct->action == DIRECT && ct->index > -1 )
-		{
-		#ifdef RENDER_DEBUG_H
-			SHOWDATA( "in rdbgh" );
-			if ( ct->type == LITE_BLB )
-				write( 2, lt_blobdata_at( r->srctable, ct->index ), lt_blobsize_at( r->srctable, ct->index ));
-			else if ( ct->type == LITE_INT )
-				fprintf( stderr, "%d", lt_int_at( r->srctable, ct->index )); 
-			else if ( ct->type == LITE_FLT )
-				fprintf( stderr, "%f", lt_float_at( r->srctable, ct->index )); 
-			else if ( ct->type == LITE_USR )
-				fprintf( stderr, "%p", lt_userdata_at( r->srctable, ct->index )); 
-			else if ( ct->type == LITE_TBL )
-				fprintf( stderr, "%p", (void *)&lt_table_at( r->srctable, ct->index )); 
-			else if ( ct->type == LITE_TXT )
-				fprintf( stderr, "%s\n", lt_text_at( r->srctable, ct->index ) );
-			else { 
-			}	
-		#endif
-			//fprintf( stderr, "Direct reference is of type: %s", lt_typename( ct->type ));
-			if ( ct->type == LITE_BLB ) {
-				uint8_t *b = lt_blobdata_at( r->srctable, ct->index );
-				bf_append( &r->dest, b, lt_blobsize_at( r->srctable, ct->index ));
-			}
-			else { 
-				char *a = NULL, b[128] = {0};
-				if ( ct->type == LITE_INT )
-					snprintf( a = b, 63, "%d", lt_int_at( r->srctable, ct->index )); 
-				else if ( ct->type == LITE_FLT )
-					snprintf( a = b, 127, "%f", lt_float_at( r->srctable, ct->index )); 
-				else if ( ct->type == LITE_USR )
-					snprintf( a = b, 127, "%p", lt_userdata_at( r->srctable, ct->index )); 
-				else if ( ct->type == LITE_TBL )
-					snprintf( a = b, 127, "%p", (void *)&lt_table_at( r->srctable, ct->index )); 
-				else if ( ct->type == LITE_TXT )
-					a = lt_text_at( r->srctable, ct->index );
-				else { 
-					a = 0;//Skip all other types
-				}	
-				bf_append( &r->dest, (uint8_t *)a, strlen( a ) );
-			}
-		}
-		else if ( ct->action == STUB )
-		{
-			//Check if the key is .key or .value. This will allow me to loop through keys and values...
-			int i=0, p=0;
-			memcpy( &search[ p ], dt->parent, dt->psize );
-			p += dt->psize;
-
-			//Reverse can be done by manipulating dt->times (top = dt->times; num = top - dt->times )
-			p += snprintf( (char *)&search[ p ], 64, ".%d", dt->times );
-			memcpy( &search[ p ], ct->blob, ct->size );
-			p += ct->size;
-		
-		#ifdef RENDER_DEBUG_H
-			niprintf( dt->psize );
-			niprintf( ct->size  );
-			niprintf( dt->times );
-			write( 2, "Search: ", 8 );
-			write( 2, search, p );
-			write( 2, "\n", 1 );
-			getchar();
-		#endif
-	
-			//Get long i, yay
-			if ( (i = lt_get_long_i( r->srctable, search, p )) == -1 )
-			{
-				ct++;
-				continue;
-			}
-			else
-			{
-				uint8_t *src = NULL;
-				LiteType t = lt_vta( r->srctable, i );
-				memset( search, 0, sizeof(search) );
-
-				if (t == LITE_USR)
-					p = snprintf( (char *)( src = search ), sizeof(search), "%p", lt_userdata_at( r->srctable, i ));
-				else if (t == LITE_FLT) 
-					p = snprintf( (char *)( src = search ), sizeof(search), "%0.2f", lt_float_at( r->srctable, i ));
-				else if (t == LITE_INT)
-					p = snprintf( (char *)( src = search ), sizeof(search), "%d", lt_int_at( r->srctable, i ));
-				else if (t == LITE_TBL)
-					p = snprintf( (char *)( src = search ), sizeof(search), "%p", &lt_table_at( r->srctable, i ));
-				else if (t == LITE_TXT)
-					p = strlen( lt_text_at(r->srctable, i) ), src = (uint8_t *)lt_text_at( r->srctable, i );
-				else if (t == LITE_BLB) 
-					p = lt_blobsize_at( r->srctable, i), src = lt_blobdata_at( r->srctable, i ); 
-				else {
-					ct++;
-					continue;
-				}
-				bf_append( &r->dest, src, p ); 
-			}	
-			memset( search, 0, sizeof(search) );
-		}
-		else if ( ct->action == NEGLOOP || ct->action == POSLOOP )
-		{
-			if ( ct->action == NEGLOOP && ct->index > -1 )
-				dt->skip = 1; //Set something
-			else 
-			{
-				if ( ct->index == -1 )
-					dt->skip = 1;
-				else 
-				{
-					//No looping necessary
-					if ( ct->type != LITE_TBL )
-						;
-					else 
-					{
-						dt++;
-						memset( dt, 0, sizeof (struct DT));
-
-						//Skip completely if this is a table and there are no entries
-						if ( (dt->times = lt_counti( r->srctable, ct->index )) > 0 )
-						{
-							--dt->times;  /*Adjust count b/c the sentinel has its own index*/
-							//dt->times -= 2;  /*Adjust count b/c the sentinel has its own index*/
-							dt->mark = ct + 1;
-							dt->psize = ct->size;
-							dt->parent = ct->blob;
-						}
-					#if 0
-						lt_dump( r->srctable );
-						fprintf( stderr, "We is gonna repeat this, this many times: %d\n", dt->times );
-						return 0;	
-					#endif
-					}
-				}
-			}
-		}
-
-		ct++;
-	}
-	
-	return 1;
 }
 
 
@@ -1509,18 +1217,15 @@ static const char *lt_polymorph_type_names[] =
 
 
 //Build a string or some other index in reverse
-static int build_backwards (LiteKv *t, unsigned char *buf, int bs)
-{ 
+static int build_backwards (LiteKv *t, unsigned char *buf, int bs) { 
 	//This should return if there is no value...
-	int    size =  0,  
-           mm = bs;
-	LiteKv   *p =  t; 
+	int size =  0, 
+      mm = bs;
+	LiteKv *p =  t; 
 
-	while (p)
-	{
+	while (p) {
 		//This should only run if there is a blob or pKey	
-		if (p->key.type == LITE_INT || p->key.type == LITE_FLT) 
-		{
+		if (p->key.type == LITE_INT || p->key.type == LITE_FLT) {
 			char b[128] = {0};
 			double f = (t->key.type == LITE_FLT) ? p->key.v.vfloat : (double)p->key.v.vint;
 			int a =	snprintf( b, 127, (t->key.type == LITE_FLT) ? "%f" : "%.0f", f);
@@ -1555,10 +1260,20 @@ static int build_backwards (LiteKv *t, unsigned char *buf, int bs)
 }
 
 
+//Get full string (using build_backwards) 
+unsigned char *lt_get_full_key ( Table *t, int hash, unsigned char *buf, int bs ) {
+	LiteKv *kv = lt_retkv( t, hash );	
+	//unsigned char tmp[ 2048 ] = { 0 };
+	if ( kv ) {
+		build_backwards( kv, buf, bs - 1 );
+		return buf;
+	}
+	return NULL;
+}
+
 
 //Trim things
-unsigned char *lt_trim (uint8_t *msg, char *trim, int len, int *nlen) 
-{
+unsigned char *lt_trim (uint8_t *msg, char *trim, int len, int *nlen) {
 	//Define stuff
 	uint8_t *m = msg;
 	int nl= len;
@@ -1571,8 +1286,7 @@ unsigned char *lt_trim (uint8_t *msg, char *trim, int len, int *nlen)
 
 
 //Count indices in a table. If index is greater than 1 and the item is a "table", then will return the number of elements in said table
-int lt_counti ( Table *t, int index )
-{
+int lt_counti ( Table *t, int index ) {
 	//Return count of all elements
 	if ( index == -1 )
 		return t->count;
@@ -1601,8 +1315,7 @@ int lt_counti ( Table *t, int index )
 }
 
 
-int lt_countall( Table *t )
-{
+int lt_countall( Table *t ) {
 	return t->count + 1;
 }
 
@@ -1615,16 +1328,14 @@ void lt_clearerror (Table *t)
 
 
 //Return errors as strings
-const char *lt_strerror (Table *t)
-{
+const char *lt_strerror (Table *t) {
 	//Paranoid bounds checking
 	return ( t->error > -1 && t->error < ERR_LT_INDEX_MAX) ? __SingleLibErrors[ t->error ] : NULL; 
 }
 
 
 //Initiailizes a table data structure
-Table *lt_init (Table *t, LiteKv *k, int size) 
-{
+Table *lt_init (Table *t, LiteKv *k, int size) {
 	SHOWDATA( "Working with root table %p\n", t );
 
 	//Calculate optimal modulus for hashing
@@ -1662,19 +1373,16 @@ Table *lt_init (Table *t, LiteKv *k, int size)
 	t->mallocd = (!k) ? 1 : 0;
 
 	//Allocate space for users that don't pass in their own structure 
-	if ( !k )
-	{
+	if ( !k ) {
 		actual_size = t->modulo;
 		k = malloc(t->modulo * sizeof(LiteKv));
-		if ( !k ) 
-		{	
+		if ( !k ) {	
 			t->error = ERR_LT_ALLOCATE;
 			return 0;
 		}
 	}
 
-	if ( memset((void *)k, 0, sizeof(LiteKv) * actual_size) == NULL ) 
-	{
+	if ( memset((void *)k, 0, sizeof(LiteKv) * actual_size) == NULL ) {
 		t->error = ERR_LT_ALLOCATE;
 		return 0;
 	}
@@ -1710,8 +1418,7 @@ LiteType lt_add ( Table *t, int side, LiteType lt, int vi, float vf,
 	char *vc, unsigned char *vb, unsigned int vblen, void *vn, Table *vt, char *trim )
 {
 
-	if ( t->index >= t->total ) 
-	{
+	if ( t->index >= t->total ) {
 		t->error = ERR_LT_OUT_OF_SPACE;
 		return 0;
 	}
@@ -1726,55 +1433,46 @@ LiteType lt_add ( Table *t, int side, LiteType lt, int vi, float vf,
 		return 0;
 
 	//Set each value to its matching type
-	if ( lt == LITE_INT )
-	{
+	if ( lt == LITE_INT ) {
 		r->vint = vi;
 		SHOWDATA( "Adding int %s %d to table at %p", ( !side ) ? "key" : "value", r->vint, ( void * )t );
 	}
-	else if ( lt == LITE_FLT )
-	{
+	else if ( lt == LITE_FLT ) {
 		r->vfloat = vf;
 		SHOWDATA( "Adding float %s %f to table at %p", ( !side ) ? "key" : "value", r->vfloat, ( void * )t );
 	}
 #ifdef LITE_NUL
-	else if ( lt == LITE_NUL )
-	{
+	else if ( lt == LITE_NUL ) {
 		r->vnull = NULL;
 		SHOWDATA( "Adding null %s to table at %p", ( !side ) ? "key" : "value", ( void * )t );
 	}
 #endif
-	else if ( lt == LITE_USR )
-	{
+	else if ( lt == LITE_USR ) {
 		r->vusrdata = vn;
 		SHOWDATA( "Adding userdata %p to table at %p", ( void * )r->vusrdata, ( void * )t );
 	}
-	else if ( lt == LITE_TBL )
-	{
+	else if ( lt == LITE_TBL ) {
 		SHOWDATA( "Adding invalid value table!" );
 		return ( t->error = ERR_LT_INVALID_VALUE ) ? -1 : -1;
 	}
-	else if ( lt == LITE_BLB )
-	{
+	else if ( lt == LITE_BLB ) {
 		r->vblob.blob = vb, r->vblob.size = vblen;
 		SHOWDATA( "Adding blob %s of length %d to table at %p", (!side) ? "key" : "value", r->vblob.size, ( void * )t );
 	}
-	else if ( lt == LITE_TXT )
-	{
+	else if ( lt == LITE_TXT ) {
 		//Even though this says LITE_TXT, the assumption 
 		//is that tab needs to duplicate the data. 
 		r->vchar = malloc( vblen + 1 );
 		if ( !r->vchar )
 			return 0;
-		else 
-		{
+		else {
 			memset( r->vchar, 0, vblen + 1 );
 			memcpy( r->vchar, vb, vblen );
 			r->vchar[ vblen ] = '\0';
 			SHOWDATA( "Adding text %s '%s' to table at %p", ( !side ) ? "key" : "value", r->vchar, ( void * )t );
 		}
 	}
-	else 
-	{
+	else {
 		SHOWDATA( "Attempted to add unknown %s type to table at %p", ( !side ) ? "key" : "value", ( void * )t );
 		return 0;
 	}
@@ -1784,18 +1482,17 @@ LiteType lt_add ( Table *t, int side, LiteType lt, int vi, float vf,
 
 
 //Return types
-LiteType lt_rettype( Table *t, int side, int index )
-{
-	if ( index < 0 || index > t->count )
+LiteType lt_rettype( Table *t, int side, int index ) {
+	if ( index < 0 || index > t->count ) {
 		return ( t->error = ERR_LT_INVALID_INDEX ) ? 0 : 0;
+	}
 	return (!side) ? (t->head + index)->key.type : (t->head + index)->value.type; 
 }
 
 
 
 //Return typenames
-const char *lt_rettypename( Table *t, int side, int index )
-{
+const char *lt_rettypename( Table *t, int side, int index ) {
 	if ( index < 0 || index > t->count ) 
 	{
 		t->error = ERR_LT_INVALID_INDEX; 
@@ -1806,18 +1503,15 @@ const char *lt_rettypename( Table *t, int side, int index )
 }
 
 
-const char *lt_typename (int type)
-{
+const char *lt_typename (int type) {
 	return ( type > -1 && type <= LITE_NOD ) ? lt_polymorph_type_names[ type ] : NULL;
 }
 
 
 //Move left or right within the hierarchy of tables
-int lt_move (Table *t, int dir) 
-{
+int lt_move (Table *t, int dir) {
 	//Out of space
-	if ( t->index > t->total ) 
-	{
+	if ( t->index > t->total ) {
 		t->error = ERR_LT_OUT_OF_SPACE;
 		return -1;
 	}
@@ -1828,8 +1522,7 @@ int lt_move (Table *t, int dir)
 	LiteValue *value = &curr->value;
 
 	//Left or right?	
-	if ( !dir )
-	{
+	if ( !dir ) {
 		//Set count of elements in this new table to actual count
 		LiteTable *T = &value->v.vtable;
 		value->type  = LITE_TBL;
@@ -1877,15 +1570,13 @@ int lt_move (Table *t, int dir)
 #ifndef SUPEREXTRA
 	lt_finalize( t );		
 #endif
-
 	return 1;
 }
 
 
 
 //Finalize adding to both sides of a table data structure
-void lt_finalize (Table *t)
-{
+void lt_finalize (Table *t) {
 	//if these are equal, don't increment both *t->rCount and t->count
 	( t->rCount == &t->count ) ? 0 : ( *t->rCount )++ ; 
 	t->count ++;
@@ -1895,8 +1586,7 @@ void lt_finalize (Table *t)
 
 
 //Hash each key
-void lt_lock (Table *t)
-{
+void lt_lock (Table *t) {
 	//Might not be able to reuse this...	
 	LiteKv *parent = NULL;
 	LiteValue *v   = NULL;
@@ -2035,58 +1725,87 @@ int lt_get_long_i (Table *t, unsigned char *find, int len)
 
 
 //Return LiteKv at certain index
-LiteValue *lt_retany (Table *t, int index)
-{
+LiteValue *lt_retany (Table *t, int index) {
 	return ( index <= -1 || index > t->count ) ? NULL : &(t->head + index)->value; 
 }
 
 
-int lt_exists (Table *t, int index)
-{
+int lt_exists (Table *t, int index) {
 	return ( index <= -1 || index > t->count );
 }
 
 
+//Return a LiteKv at a certain index
+LiteKv *lt_retkv (Table *t, int index) {
+	if ( index <= -1 || index > t->count ) {
+		t->error = ERR_LT_INVALID_INDEX;
+		return NULL;
+	}
+
+	return (t->head + index); 
+}
+
 
 //Return a LiteRecord matching a certain type at a certain index
-LiteRecord *lt_ret (Table *t, LiteType type, int index)
-{
-		if ( index <= -1 || index > t->count ) 
-		{
-			t->error = ERR_LT_INVALID_INDEX;
-			return (LiteRecord *)supernul; 
-		}
+LiteRecord *lt_ret (Table *t, LiteType type, int index) {
+	if ( index <= -1 || index > t->count ) {
+		t->error = ERR_LT_INVALID_INDEX;
+		return (LiteRecord *)supernul; 
+	}
 #if 0
 	}
-	else 
-	{
-		if ( index <= -1 || index < t->start || index > t->end )
-		{
+	else {
+		if ( index <= -1 || index < t->start || index > t->end ) {
 			t->error = ERR_LT_OUT_OF_SLICE;
 			return (LiteRecord *)supernul;
 		}	
 	}
 #endif	
 
-	if ( (t->head + index)->value.type != type ) 
+	if ( (t->head + index)->value.type != type ) { 
 		return (LiteRecord *)supernul; 
+	}
 
 	return &(t->head + index)->value.v; 
 }
 
 
+//Set the index to another one (absolutely)
+int lt_absset( Table *t, int index ) {
+	//Can't return less than 0
+	if ( index < 0 || index > t->count ) {
+		return 0;
+	}
 
-//Set the current index to another one
-int lt_set (Table *t, int index)
-{
-	return ( index <= -1 || index > t->count ) ? -1 : (t->index = index);
+	//Rewind by the current index then increment by the new index	
+	t->current -= t->index;
+	t->index = index;
+	t->current += t->index ;	
+	t->cptr = (t->head + t->index)->value.v.vtable.ptr;
+	return 1;
 }
 
 
+//Set the current index to another one
+int lt_set (Table *t, int index) {
+	int j = 0;	
+	if ( index < 0 )
+		j = (( t->index + index ) < 0 ) ? -1 : (t->index += index ); 
+	else {
+		j = (( t->index + index ) > t->count ) ? -1 : (t->index += index ); 
+	}
+
+	if ( j == -1 )
+		return 0;
+	else {
+		t->current += index;	
+		return 1;
+	}
+}
+
 
 //Reset a table index
-void lt_reset (Table *t)
-{
+void lt_reset (Table *t) {
 	t->start = 0;
 	t->end   = 0;
 	t->index = 0;
@@ -2095,13 +1814,16 @@ void lt_reset (Table *t)
 
 
 //Iterate through the indices of a table
-LiteKv *lt_next (Table *t)
-{
+LiteKv *lt_next (Table *t) {
 	LiteKv *curr = (t->index > t->count) ? NULL : t->head + t->index;
 	t->index++;
 	return curr;
 }
 
+
+LiteKv *lt_current (Table *t) {
+	return ( t->index > t->count ) ? NULL : t->head + t->index;
+}
 
 
 //Loop from another point...
@@ -2141,14 +1863,12 @@ LiteKv *lt_items_by_index (Table *t, int ind)
 
 
 //Find a table by hash and return until it has no more keys.
-LiteKv *lt_items_i (Table *t, uint8_t *src, int len)
-{
+LiteKv *lt_items_i (Table *t, uint8_t *src, int len) {
 	//Find a hash, and if it's a table... set some stuff
 	LiteKv *curr = NULL;
 
 	//Check for a hash table
-	if ( t->cptr == -1 )
-	{
+	if ( t->cptr == -1 ) {
 		int in;
 		if ( (in = lt_get_long_i ( t, src, len )) == -1 )
 			return NULL;
@@ -2161,15 +1881,15 @@ LiteKv *lt_items_i (Table *t, uint8_t *src, int len)
 	}
 
 	//
-	if (t->index > t->count) 
+	if (t->index > t->count) {
 		return NULL;
+	}
 
 	//Set reference
 	curr = t->head + t->index;
 
 	//Check the key name and see if it matches t->cptr, return null if so
-	if ( curr->key.type == LITE_TRM && curr->key.v.vptr == t->cptr ) 
-	{
+	if ( curr->key.type == LITE_TRM && curr->key.v.vptr == t->cptr ) {
 		t->index = 0;
 		t->cptr = -1;
 		return NULL;
@@ -2183,15 +1903,13 @@ LiteKv *lt_items_i (Table *t, uint8_t *src, int len)
 
 
 //Set a data source
-void lt_setsrc (Table *t, void *src)
-{
+void lt_setsrc (Table *t, void *src) {
 	t->src = src;
 }
 
 
 //Will set boundaries on a new table
-Table *lt_within_long( Table *st, uint8_t *src, int len )
-{
+Table *lt_within_long( Table *st, uint8_t *src, int len ) {
 #if 0
 	//You can allocate the string here if both start and from are null
 	if ( !t->start && !t->end )
@@ -2211,8 +1929,9 @@ Table *lt_within_long( Table *st, uint8_t *src, int len )
 	st->buflen = len;
 
 	//Search for a table	
-	if ( (a = lt_get_long_i( st, src, len )) == -1 || lt_vta( st, a ) != LITE_TBL )
+	if ( (a = lt_get_long_i( st, src, len )) == -1 || lt_vta( st, a ) != LITE_TBL ) {
 		return NULL;
+	}
 
 	//Set start and end, then return the table
 	st->start = a;
@@ -2221,19 +1940,17 @@ Table *lt_within_long( Table *st, uint8_t *src, int len )
 }
 
 
-void lt_unset (Table *t)
-{
-	if (t->buf) 
-	{
+void lt_unset (Table *t) {
+	if (t->buf) {
 		free( t->buf );
 		t->buf = NULL;
 	}
 }
 
+
 //Copy from start index to end index
 //A macro will handle copying tables (and it'd be even better to do it without duplication)
-Table *lt_copy (Table *dest, Table *src, int from, int to)
-{
+Table *lt_copy (Table *dest, Table *src, int from, int to, int weak) {
 	//Get a count of all elements
 	int index = 0;
 	int start = (from < 0 ) ? 0 : from;
@@ -2301,18 +2018,15 @@ Table *lt_copy (Table *dest, Table *src, int from, int to)
 
 
 //Get a key or value somewhere
-void lt_free (Table *t) 
-{	
+void lt_free (Table *t) {	
 	//Free any text keys
-	for ( int ii=0; ii < t->index; ii++ )
-	{
+	for ( int ii=0; ii < t->index; ii++ ) {
 		LiteKv *k = t->head + ii;
 		( k->key.type == LITE_TXT ) ? free( k->key.v.vchar ), k->key.v.vchar = NULL : 0;
 		( k->value.type == LITE_TXT ) ? free( k->value.v.vchar ), k->value.v.vchar = NULL : 0;
 	}
 
-	if ( t->mallocd )
-	{
+	if ( t->mallocd ) {
 		free( t->head );
 		t->head   = NULL;	
 		t->error  = 0;
@@ -2323,8 +2037,7 @@ void lt_free (Table *t)
 		t->mallocd= 0;
 	}
 
-	if ( t->srcmallocd /*t->src*/ )
-	{
+	if ( t->srcmallocd /*t->src*/ ) {
 		free( t->src );
 		t->src = NULL;
 	}
@@ -2342,46 +2055,115 @@ void lt_printt (Table *t)
 }
 
 
-#if 0
-//Dump a table
-void lt_dump (Table *t) 
-{
-	int level = 0;	
-	int ct = t->index;
+//Print a set of values at a particular index
+static void lt_printindex (LiteKv *tt, int showkey, int ind) {
+	int w = 0;
+	int maxlen = (showkey) ? 24576 : lt_buflen;
+  char b[maxlen]; 
+	memset(b, 0, maxlen);
+	struct { int t; LiteRecord *r; } items[2] = {
+		{ tt->key.type  , &tt->key.v    },
+		{ tt->value.type, &tt->value.v  } 
+	};
 
-	//Loop through each index
-	for (int i=0; i <= ct; i++) 
-	{
-		LiteType vt = (t->head + i)->value.type;
-		fprintf ( stderr, "[%-5d] %s", i, &"\t\t\t\t\t\t\t\t\t\t"[ 10 - level ]);
-		lt_printindex( t->head + i, level );
-		level += ( vt == LITE_NUL ) ? -1 : (vt == LITE_TBL) ? 1 : 0;
+	for ( int i=0; i<2; i++ ) {
+		LiteRecord *r = items[i].r; 
+		int t = items[i].t;
+		if ( i ) {
+			memcpy( &b[w], " -> ", 4 );
+			w += 4;
+			/*LITE_NODE is handled in printall*/
+			if (t == LITE_NON)
+				w += snprintf( &b[w], maxlen - w, "%s", "is uninitialized" );
+		#ifdef LITE_NUL
+			else if (t == LITE_NUL)
+				w += snprintf( &b[w], maxlen - w, "is terminator" );
+		#endif
+			else if (t == LITE_USR)
+				w += snprintf( &b[w], maxlen - w, "userdata [address: %p]", r->vusrdata );
+			else if (t == LITE_TBL) {
+				LiteTable *rt = &r->vtable;
+				w += snprintf( &b[w], maxlen - w, 
+					"table [address: %p, ptr: %ld, elements: %d]", (void *)rt, rt->ptr, rt->count );
+			}
+		}
+
+	//TODO: This just got ugly.  Combine the different situations better...
+	if ( !i && showkey ) { 
+		if ( t == LITE_TRM )
+			w += snprintf( &b[w], maxlen - w, "%ld", r->vptr );
+		else if ( t == LITE_NON || t == LITE_NUL )
+			w += snprintf( &b[w], maxlen - w, "(null)" );
+		else {
+			w += build_backwards( tt, (unsigned char *)b, maxlen );
+		}
 	}
-}
-#endif
+	else {
+		//I want to see the full key
+		if (t == LITE_FLT || t == LITE_INT)
+			w += snprintf( &b[w], maxlen - w, "%d", r->vint );
+		else if (t == LITE_FLT)
+			w += snprintf( &b[w], maxlen - w, "%f", r->vfloat );
+		else if (t == LITE_TXT)
+			w += snprintf( &b[w], maxlen - w, "%s", r->vchar );
+		else if (t == LITE_TRM)
+			w += snprintf( &b[w], maxlen - w, "%ld", r->vptr );
+		else if (t == LITE_BLB) {
+			LiteBlob *bb = &r->vblob;
+			if ( bb->size < 0 )
+				return;	
+			if ( bb->size > lt_maxbuf )
+				w += snprintf( &b[w], maxlen - w, "is blob (%d bytes)", bb->size);
+			else {
+				memcpy( &b[w], bb->blob, bb->size ); 
+				w += bb->size;
+			}
+		}
+	}
+	}
+
+	write( LT_DEVICE, b, w );
+	write( LT_DEVICE, "\n", 1 );
+}	
 
 
 //Dump all values in a table.
-int __lt_dump ( LiteKv *kv, int i, void *p )
-{
-	VPRINT( "kv at __lt_dump: %p", kv );
+static const char __lt_fmt[] =
+	"[%-5d] (%d) %s";
+static const char __lt_tabs[] = 
+	"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
+static const char __lt_spaces[] = 
+	"                                                  "
+	"                                                  "
+;
+ 
+
+//Dump a table (needs some flags for debugging) 
+int __lt_dump ( LiteKv *kv, int i, void *p ) {
 	LiteType vt = kv->value.type;
-	int *level = (int *)p;
-	fprintf ( stderr, "[%-5d] %s", i, &"\t\t\t\t\t\t\t\t\t\t"[ 10 - *level ]);
-	lt_printindex( kv, *level );
-	*level += ( vt == LITE_NUL ) ? -1 : (vt == LITE_TBL) ? 1 : 0;
+	LtInner *pp = (LtInner *)p; 
+	if ( pp->indextype ) {
+		char buf[ 128 ] = { 0 };
+		int l = snprintf( buf, sizeof(buf), __lt_fmt, i, pp->level, &__lt_spaces[100 - pp->level] );
+		write( LT_DEVICE, buf, l );
+	}
+	lt_printindex( kv, pp->dumptype, pp->level );
+	pp->level += (vt == LITE_NUL) ? -1 : (vt == LITE_TBL) ? 1 : 0;
 	return 1;
 }
 
 
-//Write a real simple function to iterate through everything
-//void lt_complex_exec (Table *t, int (*fp)( LiteType t, LiteValue *k, LiteValue *v, int i, void *p ) )
-int lt_exec (Table *t, void *p, int (*fp)( LiteKv *kv, int i, void *p ) )
-{
+//A complicated iterator
+int lt_exec_complex (Table *t, int start, int end, void *p, int (*fp)( LiteKv *kv, int i, void *p ) ) {
 	int level = 0;	
 
+	//Bounds violations should stop.
+	if ( start < 0 || start > t->count || end < 0 || end > t->count ) {
+		return 0;
+	}
+
 	//Loop through each index
-	for (int i=0, status=0; i <= t->index; i++) {
+	for (int i=start, status=0; i <= end; i++) {
 		//VPRINT( "kv at __lt_dump: %p", (t->head + i ));
 		if ( (status = fp( (t->head + i), i, p )) == 0 ) {
 			return 0;
@@ -2390,78 +2172,15 @@ int lt_exec (Table *t, void *p, int (*fp)( LiteKv *kv, int i, void *p ) )
 	return 1;
 }
 
-//Print a set of values at a particular index
-static void lt_printindex (LiteKv *tt, int ind)
-{
-	int         w = 0;
-  char b[lt_buflen]; 
-	memset(b, 0, lt_buflen);
-	struct { int t; LiteRecord *r; } items[2] = {
-		{ tt->key.type  , &tt->key.v    },
-		{ tt->value.type, &tt->value.v  } 
-	};
-
-	for ( int i=0; i<2; i++ ) 
-	{
-		LiteRecord *r = items[i].r; 
-		int t = items[i].t;
-		if ( i ) 
-		{
-			memcpy( &b[w], " -> ", 4 );
-			w += 4;
-			/*LITE_NODE is handled in printall*/
-			if (t == LITE_NON)
-				w += snprintf( &b[w], lt_buflen - w, "%s", "is uninitialized" );
-		#ifdef LITE_NUL
-			else if (t == LITE_NUL)
-				w += snprintf( &b[w], lt_buflen - w, "is terminator" );
-		#endif
-			else if (t == LITE_USR)
-				w += snprintf( &b[w], lt_buflen - w, "userdata [address: %p]", r->vusrdata );
-			else if (t == LITE_TBL) 
-			{
-				LiteTable *rt = &r->vtable;
-				w += snprintf( &b[w], lt_buflen - w, 
-					"table [address: %p, ptr: %ld, elements: %d]", (void *)rt, rt->ptr, rt->count );
-			}
-		}
-		if (t == LITE_FLT || t == LITE_INT)
-			w += snprintf( &b[w], lt_buflen - w, "%d", r->vint );
-		else if (t == LITE_FLT)
-			w += snprintf( &b[w], lt_buflen - w, "%f", r->vfloat );
-		else if (t == LITE_TXT)
-			w += snprintf( &b[w], lt_buflen - w, "%s", r->vchar );
-		else if (t == LITE_TRM)
-			w += snprintf( &b[w], lt_buflen - w, "%ld", r->vptr );
-		else if (t == LITE_BLB) 
-		{
-			LiteBlob *bb = &r->vblob;
-			if ( bb->size < 0 )
-				return;	
-			if ( bb->size > lt_maxbuf )
-				w += snprintf( &b[w], lt_buflen - w, "is blob (%d bytes)", bb->size);
-			else {
-				memcpy( &b[w], bb->blob, bb->size ); 
-				w += bb->size;
-			}
-		}
-	}
-
-	write(2, b, w);
-	write(2, "\n", 1);
-}	
-
 
 
 #ifdef DEBUG_H 
 //Get a key or value somewhere
-void lt_printall ( Table *t ) 
-{
+void lt_printall ( Table *t ) {
 	//Header
 	fprintf( stderr, fmt, "Index", "KType", "VType", "Value", "CombinedValue", "HashOf", "Hashes" );
 
-	for ( int ii=0; ii < t->index; ii++ )
-	{
+	for ( int ii=0; ii < t->index; ii++ ) {
 		LiteKv *k = t->head + ii;
 		LiteType kt;
 		int hash;	
@@ -2590,15 +2309,14 @@ fprintf(stderr, "mm->size: %d\n", mm->size);
 
 
 //Where exactly is a substr in memory
-int32_t memstrat (const void *a, const void *b, int32_t size) {
+int32_t memstrat (const void *a, const void *b, int32_t size)  {
 	_Bool stop=1;
 	int32_t ct=0;//, occ=0;
 	uint8_t *aa = (uint8_t *)a;
 	uint8_t *bb = (uint8_t *)b;
 	int len     = strlen((char *)b);
 	//while (stop = (ct < (size - len)) && memcmp(aa + ct, bb, len) != 0) ct++; 
-	while (stop) 
-	{
+	while (stop) {
 		while ((stop = (ct < (size - len))) && memcmp(aa + ct, bb, 1) != 0) ct++;
 		if (memcmp(aa + ct, bb, len) == 0)
 			return ct; 
@@ -4185,10 +3903,8 @@ _Bool socket_accept (Socket *sock, Socket *new) {
 	}
 
 	/* Accept a connection. */	
-	if ((new->fd = accept(sock->fd, NULL, NULL)) == -1) {
-		sock->err = errno;
-		return 0; 
-	}
+	if ((new->fd = accept(sock->fd, NULL, NULL)) == -1) 
+		return ((sock->err = errno) ? 0 : 0);
 		
 	/* Set socket description */
 	new->_class = 'd';
@@ -4414,10 +4130,6 @@ struct Cmd {
  ,{ "--html", cmdMan }
  ,{ "--markdown", cmdMan }
 };
-
-#define ERROUT(chr) \
-	fprintf( stderr, "%s: %s\n", chr, strerror(errno) ); \
-	return errno;
 
 int main( int argc, char *argv[] )
 {

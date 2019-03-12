@@ -330,6 +330,7 @@ exit( 0 );
 	char *datafile;
 	struct stat sb;
 	Table  routes, request, model;
+	Table *mm = NULL;
 	Loader ld[ 10 ], *l = NULL;
 	Render ren;
 	uint8_t *renbuf = NULL;
@@ -585,7 +586,8 @@ fprintf( stderr, "%s\n", "C table stuff is taking place." );
 
 	//Rewind Loader ptr and load each view's raw text
 	l = &ld[0];
-	lt_dump( &model );
+	mm = &model;
+	lt_dump( mm );
 
 	//Load each view into a single buffer (can be malloc'd uint8 for now)
 	while ( l->content ) {
@@ -642,8 +644,8 @@ fprintf( stderr, "%s\n", "C table stuff is taking place." );
 	http_print_request( h );
 	http_print_response( h );
 
-	fprintf( stderr, "RECVR @ http_run\n==================\n" );
-	print_recvr( r );
+	//fprintf( stderr, "RECVR @ http_run\n==================\n" );
+	//print_recvr( r );
 
 	r->stage = NW_AT_WRITE;
 	//free( renbuf );
@@ -723,7 +725,7 @@ int file_cmd( Option *opts, char *err, Passthru *pt ) {
 	lua_State *L = NULL;  
 	char *f = opt_get( opts, "--file" ).s;
 	struct stat sb;
-	Table t;
+	Table t, *tt=NULL;
 
 	if (!( L = luaL_newstate() ))
 		return ERRL( "L is not initialized..."  );
@@ -742,7 +744,8 @@ int file_cmd( Option *opts, char *err, Passthru *pt ) {
 	}
 
 	lua_to_table( L, 1, &t );
-	lt_dump( &t );
+	tt = &t;
+	lt_dump( tt );
 	return 1;
 }
 

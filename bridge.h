@@ -11,7 +11,7 @@
 #endif
 
 #define PRETTY_TABS( ct ) \
-	fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - ct ] );
+	fprintf( stderr, "%s", &"                    "[ 20 - ct ] );
 
 #if ( LUA_VERSION_NUM >= 503 )
 	//#error "Lua version is 5.3"
@@ -26,8 +26,7 @@
 	lua_setglobal( L, fn_name );
 
 
-typedef enum 
-{
+typedef enum {
 	CC_NONE, 
 	CC_MODEL, 
 	CC_VIEW, 
@@ -37,8 +36,7 @@ typedef enum
 } CCtype;
 
 
-typedef struct 
-{
+typedef struct {
 	CCtype type;      //model or view or something else...	
 	char *content;   //Most of the time it's a file, but it really should execute...
 #if 0
@@ -46,7 +44,6 @@ typedef struct
 #else
 	int index;       //This is an alternate method that 
        						 //does not use C to call Lua functions
-			
 #endif
 } Loader;
 

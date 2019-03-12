@@ -1,16 +1,95 @@
 /* ---------------------------------- * 
-tests.c
--------------
-
-There are a lot of tests that will ship 
-with hypno.  Right now, all I really need 
-to do is beat on the URLs.  There will be
-more later...
-
-- router
-- maybe filename scopes 
-------------------------------------- */
-#include "bridge.h"
+* router.c
+* -------------
+* 
+* hypno's router should work like this:
+*
+*		if the route is not found:
+*			/ =>
+*				if '*' or '/regex/' is available
+*					call it
+*				else if 'default' or some function named default
+*					call it	
+*				else
+*					throw 404
+*
+*			/abc => 
+*				if '*' or '/regex/' is available
+*					call it
+*				else
+*					throw 404
+*
+*			/abc/def =>
+*				if '*' or '/regex' is available
+*					call it
+*				else if 'levels before (abc in this case)' contains 'expects', '*', or '/regex/'
+*					call it
+*				else
+*					throw 404
+*
+*
+*	In English:
+*
+*	if match found
+*			now there's another data structure, use that...
+*		check type:
+*			table =
+*				if the url still has parameters, check for any other values 
+*					the problem is here, is that /check/:id could happen, where ID is required...  
+*					 but even then, expects can handle this... tell it that the parameter received should be something...
+*					continue
+*				if not, 
+*					check for 'expects' to validate values supplied
+*					check for 'model' and 'view' tables or values to evaluate
+*			string =
+*				return it
+*				would be incredibly useful to return the same named items... in model and app
+*			number = 
+*				return it
+*			funct  = 
+*				execute and return its result
+*			sql?   = 
+*				should reutrn formatted data, maybe specify the datatype... 
+*				just thinking crazy
+*
+*
+* Here's what Lua should expect:
+*
+* return {
+* 	routeName = [ <function>, <string>, <table> ],
+* 
+* 	if routeName points to a <table> 
+* 	then
+* 		any of the following are keys that have meaning:
+* 			*          = wildcard that accepts anything
+* 			/.../      = a regular expression that accepts anything
+* 			model      = <string>, <function> or <table> that defines a model
+* 			view       = <string>, <function> or <table> that defines a view 
+* 			expects    = <table> that defines what is allowed should the url STOP here
+* 								   (notice this means that any level deeper with a match will throw
+* 								    these rules out)
+* 			*file      = <string> that points to a binary file that should be served
+* 			[*301/302] = <string> that directs where a user should be redirected
+* 			*query     = <string> that points to a query
+* 			*queryfile = <string> that points to a file containing a query
+* 			
+* 			**NOTE: query and query file could use arguments and checking
+* 
+* 		other rules:
+* 			any name not matching a regex (like 'sally' for instance) will pull up 
+* 			the associated value if the URL contains a match.  So if:
+* 			<value>   = <string> 
+* 				The engine will return a string (or binary content, since the
+* 				engine deals with this particular string field as uint8_t)
+* 			<value>   = <function> 
+* 				The engine will execute the function and return the payload 
+* 			<value>   = <table>
+* 				The engine will search for other matches according to the above rules
+* 				at the next part of the URL.
+* 	fi			
+* }
+* ------------------------------------- */
+#include "../bridge.h"
 
 
 //Types of items
@@ -61,21 +140,26 @@ Test routes[] =
 
 
 
-
-
-
-//...
-
-
-//...
+//Deifne global stuff that I'll always use
+static char errmsg[2048] = { 0 };
+static const char filename[] = "tests/chains-data/a.lua";
+static Table t;
+static struct Run {
+	char  *filetype;
+	CCtype type;
+} Run[] = {
+	{ "model",  CC_MODEL }, 
+	{ "view" ,  CC_VIEW  }, 
+	{ "string" ,  CC_STR }, 
+	{ "function" ,  CC_FUNCT }, 
+};
 
 
 //ERR_TABLE_IS_EMPTY - A route has a table as a value, but no nothing (this could be an implied rule)
 //Could also just put nothing on the other side... although a blank table makes more sense... 
 int main ( int argc, char *argv[] )
 {
-	Table t;
-	char err[ 2048 ];
+	//Create a new state via Lua
 	lua_State *L = luaL_newstate(); 
 
 	//Check that Lua initialized here
@@ -87,28 +171,17 @@ int main ( int argc, char *argv[] )
 	}
 
 	//Load the file with Lua and convert results to Table
-	if ( !lua_load_file( L, "a.lua", err ) )
-		return err( 1, "everything is not working...\n" );
+	if ( !lua_load_file( L, filename, errmsg ) )
+		return err( 1, "Couldn't find filename: %s...\n", filename );
 
 	if ( !lt_init( &t, NULL, 666 ) )
-		return err( 2, "table did not initialize...\n" );
+		return err( 2, "Table did not initialize...\n" );
 			
 	if ( !lua_to_table( L, 2, &t ) )
-		return err( 3, "could not convert Lua table ...\n" );
+		return err( 3, "Could not convert data from %s Lua table.\n", filename );
 
 	//Dump the file	
 	lt_dump( &t );
-
-	//This is here.
-	static struct Run {
-		char  *filetype;
-		CCtype type;
-	} Run[] = {
-		{ "model",  CC_MODEL }, 
-		{ "view" ,  CC_VIEW  }, 
-		{ "string" ,  CC_STR }, 
-		{ "function" ,  CC_FUNCT }, 
-	};
 
 	//Loop through each Test
 	Test *tt = routes;

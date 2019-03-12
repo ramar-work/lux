@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Where is the rest of my changelog???
 
 
@@ -22,3 +23,12 @@ Sun Sep  9 00:37:08 EDT 2018
 	- However, some things did get done.  A good SSL client exists now and works with a regular https server (pcmag.com in this case.  and is defined within tlscli.c)
 
 	- 
+=======
+Thu, Jan 04, 2018 12:03:21 PM
+	- Checkpoint and merge.
+	- Moved all tests and test data into tests/.  All test data now sits in a folder prefixed by the name of the test (e.g. sql -> sql-test)
+	- There should never be more than 3 directories here (tests, example and vendor)
+	- Deleted all loose, orphaned tests and stream of thought text files.
+	- Reorganized 2016-general-election-summary.csv into a file that can be broken up by script and loaded into an SQL database.  Will complete the current commit.
+
+>>>>>>> 1045a0482fafd0853ef3a09db97a08fe241a96bc

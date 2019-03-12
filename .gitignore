@@ -1,6 +1,16 @@
+<<<<<<< HEAD
 # Track nothing and add by force
 *
 !Makefile
 !*.md
 !*.c
 !*.h
+=======
+*.o
+*.exe
+*.db
+*.test
+.*.swp
+.*.swo
+.*.swf
+>>>>>>> 1045a0482fafd0853ef3a09db97a08fe241a96bc

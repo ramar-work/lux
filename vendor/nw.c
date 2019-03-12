@@ -820,8 +820,6 @@ fprintf( stderr, "TIMEOUT CALC!!!\n" );
 
 			//Read what's on the socket
 			if (NW_CALL( r->client->revents & POLLRDNORM )) {
-stConn ++ ;
-niprintf( stConn );
 				r->stage = NW_AT_READ; 
 
 				//NOTE: It would be more consitent to set an error within the recvr

@@ -1,5 +1,17 @@
 #include "bridge.h"
 
+#ifdef LUA_53
+ #define lua_rotate( ... ) lua_rotate( __VA_ARGS__ )
+#else
+ #define lua_rotate( ... )
+#endif
+
+
+#define lua_loopstack( L ) \
+	fprintf ( stderr, "====> CURRENT STACK (AT %s:%s:%d) LOOKS LIKE: <=====\n", __FILE__, __func__, __LINE__ ); \
+	lua_loopstackvals( L ); getchar()
+
+
 char *CCtypes[] = {
 	[CC_NONE]  = "None",
 	[CC_MODEL] = "Model",     //Models are usually executed, and added to env 
@@ -10,28 +22,21 @@ char *CCtypes[] = {
 };
 
 
-
-
 //Loop through a table in memory
 void lua_loop ( lua_State *L ) {
 	int a = lua_gettop( L );
 	obprintf( stderr, "Looping through %d values.\n", a );
 
-	for ( int i=1; i <= a; i++ )
-	{
+	for ( int i=1; i <= a; i++ ) {
 		obprintf( stderr, "%-2d: %s\n", i, lua_typename( L, lua_type( L, i )) );
 		//lua_getindex(L, i );
 	}
 }
 
 
-
-
 //Print CC type
-char *printCCtype ( CCtype cc )
-{
-	switch (cc)
-	{
+char *printCCtype ( CCtype cc ) {
+	switch (cc) {
 		case CC_NONE:
 		case CC_MODEL: 
 		case CC_VIEW: 
@@ -46,10 +51,8 @@ char *printCCtype ( CCtype cc )
 
 
 //
-int lua_load_file( lua_State *L, const char *file, char **err  )
-{
-	if ( luaL_dofile( L, file ) != 0 )
-	{
+int lua_load_file( lua_State *L, const char *file, char **err  ) {
+	if ( luaL_dofile( L, file ) != 0 ) {
 		fprintf( stderr, "Error occurred!\n" );
 		//The entire stack needs to be cleared...
 		if ( lua_gettop( L ) > 0 ) {
@@ -61,10 +64,9 @@ int lua_load_file( lua_State *L, const char *file, char **err  )
 }
 
 
-int lua_load_file2( lua_State *L, Table *t, const char *file, char *err  )
-{
-	if ( luaL_dofile( L, file ) != 0 )
-	{
+//
+int lua_load_file2( lua_State *L, Table *t, const char *file, char *err ) {
+	if ( luaL_dofile( L, file ) != 0 ) {
 		fprintf( stderr, "Error occurred!\n" );
 		//The entire stack needs to be cleared...
 		if ( lua_gettop( L ) > 0 ) {
@@ -78,34 +80,29 @@ int lua_load_file2( lua_State *L, Table *t, const char *file, char *err  )
 
 
 //Convert Table to Lua table
-int table_to_lua (lua_State *L, int index, Table *tt)
-{
+int table_to_lua (lua_State *L, int index, Table *tt) {
 	int a = index;
 	LiteKv *kv = NULL;
 	lt_reset( tt );
 
-	while ( (kv = lt_next( tt )) )
-	{
+	while ( (kv = lt_next( tt )) ) {
 		struct { int t; LiteRecord *r; } items[2] = {
 			{ kv->key.type  , &kv->key.v    },
 			{ kv->value.type, &kv->value.v  } 
 		};
 
 		int t=0;
-		for ( int i=0; i<2; i++ )
-		{
+		for ( int i=0; i<2; i++ ) {
 			LiteRecord *r = items[i].r; 
 			t = items[i].t;
 			obprintf( stderr, "%s\n", ( i ) ? lt_typename( t ) : lt_typename( t ));
 
-			if ( i ) 
-			{
+			if ( i ) {
 				if (t == LITE_NUL)
 					;
 				else if (t == LITE_USR)
 					lua_pushstring( L, "usrdata received" ); //?
-				else if (t == LITE_TBL) 
-				{
+				else if (t == LITE_TBL) {
 					lua_newtable( L );
 					a += 2;
 				}
@@ -118,13 +115,11 @@ int table_to_lua (lua_State *L, int index, Table *tt)
 				lua_pushnumber( L, r->vfloat );				
 			else if (t == LITE_TXT)
 				lua_pushstring( L, r->vchar );
-			else if (t == LITE_TRM)
-			{
+			else if (t == LITE_TRM) {
 				a -= 2;	
 				break;
 			}
-			else if (t == LITE_BLB) 
-			{
+			else if (t == LITE_BLB) {
 				LiteBlob *bb = &r->vblob;
 				lua_pushlstring( L, (char *)bb->blob, bb->size );
 			}
@@ -142,15 +137,12 @@ int table_to_lua (lua_State *L, int index, Table *tt)
 
 
 //Convert Lua tables to regular tables
-int lua_to_table (lua_State *L, int index, Table *t )
-{
+int lua_to_table (lua_State *L, int index, Table *t ) {
 	static int sd;
 	lua_pushnil( L );
 	obprintf( stderr, "Current stack depth: %d\n", sd++ );
 
-	//
-	while ( lua_next( L, index ) != 0 ) 
-	{
+	while ( lua_next( L, index ) != 0 ) {
 		int kt, vt;
 		obprintf( stderr, "key, value: " );
 
@@ -180,8 +172,7 @@ int lua_to_table (lua_State *L, int index, Table *t )
 			lt_addintvalue( t, lua_tointeger( L, -1 ));
 		else if ( vt  == LUA_TSTRING )
 			lt_addtextvalue( t, (char *)lua_tostring( L, -1 ));
-		else if ( vt == LUA_TTABLE )
-		{
+		else if ( vt == LUA_TTABLE ) {
 			lt_descend( t );
 			obprintf( stderr, "Descending because value at %d is table...\n", -1 );
 			lua_loop( L );
@@ -191,8 +182,9 @@ int lua_to_table (lua_State *L, int index, Table *t )
 		}
 
 		obprintf( stderr, "popping last two values...\n" );
-		if ( vt == LUA_TNUMBER || vt == LUA_TSTRING )
-		lt_finalize( t );
+		if ( vt == LUA_TNUMBER || vt == LUA_TSTRING ) {
+			lt_finalize( t );
+		}
 		lua_pop(L, 1);
 	}
 
@@ -201,10 +193,20 @@ int lua_to_table (lua_State *L, int index, Table *t )
 }
 
 
-void lua_stackclear ( lua_State *L )
-{
+void lua_stackclear ( lua_State *L ) {
 	int top = lua_gettop( L );
 	lua_pop( L, top );
+}
+
+
+void lua_loopstackvals( lua_State *L ) {
+	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) {
+		int t = lua_type( L, pos );
+		const char *type = lua_typename( L, t );
+		fprintf( stderr, "[%3d] => ", pos );
+		fprintf( stderr, " %s\n", type );
+	}
+	fprintf( stderr, "\n" );
 }
 
 
@@ -214,18 +216,17 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 	lua_pushnil( L );
 	//fprintf( stderr, "*pos = %d\n", *pos );
 
-	while ( lua_next( L, *pos ) != 0 ) 
-	{
+	while ( lua_next( L, *pos ) != 0 ) {
 		//Fancy printing
 		//fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - *sd ] );
 		PRETTY_TABS( *sd );
 		fprintf( stderr, "[%3d:%2d] => ", *pos, *sd );
 
 		//Print both left and right side
-		for ( int i = -2; i < 0; i++ )
-		{
+		for ( int i = -2; i < 0; i++ ) {
 			int t = lua_type( L, i );
 			const char *type = lua_typename( L, t );
+
 			if ( t == LUA_TSTRING )
 				fprintf( stderr, "(%8s) %s", type, lua_tostring( L, i ));
 			else if ( t == LUA_TFUNCTION )
@@ -240,16 +241,26 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 				fprintf( stderr, "(%8s) %p", type, lua_touserdata( L, i ) );
 			else if ( t == LUA_TNIL ||  t == LUA_TNONE )
 				fprintf( stderr, "(%8s) %p", type, lua_topointer( L, i ) );
-			else if ( t == LUA_TTABLE ) 
-			{
+			else if ( t == LUA_TTABLE ) {
+			#if 1
 				fprintf( stderr, "(%8s) %p\n", type, lua_topointer( L, i ) );
 				(*sd) ++, (*pos) += 2;
 				lua_dumptable( L, pos, sd );
 				(*sd) --, (*pos) -= 2;
+			#else
+				fprintf( stderr, "(%8s) %p {\n", type, lua_topointer( L, i ) );
+				int diff = lua_gettop( L ) - *pos;
+
+				(*sd) ++, (*pos) += diff;
+				lua_dumptable( L, pos, sd );
+				(*sd) --, (*pos) -= diff;
+			#endif
 				PRETTY_TABS( *sd );
 				fprintf( stderr, "}" );
 			}
+
 			fprintf( stderr, "%s", ( i == -2 ) ? " -> " : "\n" );
+			//PRETTY_TABS( *sd );
 		}
 
 		lua_pop( L, 1 );
@@ -260,15 +271,13 @@ void lua_dumptable ( lua_State *L, int *pos, int *sd )
 
 
 
-void lua_stackdump ( lua_State *L )
-{
+void lua_stackdump ( lua_State *L ) {
 	//No top
 	if ( lua_gettop( L ) == 0 )
 		return;
 
 	//Loop again, but show the value of each key on the stack
-	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) 
-	{
+	for ( int pos = 1; pos <= lua_gettop( L ); pos++ ) {
 		int t = lua_type( L, pos );
 		const char *type = lua_typename( L, t );
 		fprintf( stderr, "[%3d] => ", pos );
@@ -287,8 +296,7 @@ void lua_stackdump ( lua_State *L )
 			fprintf( stderr, "(%8s) %p", type, lua_touserdata( L, pos ) );
 		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
 			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, pos ) );
-		else if ( t == LUA_TTABLE ) 
-		{
+		else if ( t == LUA_TTABLE ) {
 		#if 0
 			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, pos ) );
 		#else
@@ -304,39 +312,8 @@ void lua_stackdump ( lua_State *L )
 }
 
 
-
-
-//Lua dump....
-void lua_tdump (lua_State *L) 
-{
-	int level = 0;	
-	int ct = lua_gettop( L );
-
-	//get the count
-	//loop until you die... :D
-
-	//Loop through each index
-	for (int i=0; i <= ct; i++) 
-	{
-	// { a, b, c, d }
-	// { 0, 2342, { }, 332 }
-	// { a=b, b=c, c=f, d=e }
-		printf( "%d\n", i );
-		printf( "%s\n", lua_typename( L, lua_type( L, i )) );
-#if 0
-		LiteType vt = (t->head + i)->value.type;
-		fprintf ( stderr, "[%-5d] %s", i, &"\t\t\t\t\t\t\t\t\t\t"[ 10 - level ]);
-		lt_printindex( t->head + i, level );
-		level += ( vt == LITE_NUL ) ? -1 : (vt == LITE_TBL) ? 1 : 0;
-#endif
-	}
-}
-
-
-
 //Parse the current route according to what was in the table.
-Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable )
-{
+Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable ) {
 	//Define and declare
 	Loader *LL = l;
 	Table *http_r = &http->request.table;
@@ -426,7 +403,6 @@ exit(0);
 
 
 int load_and_run_files ( Loader *l ) { 
-	
 	return 1;
 }
 
@@ -434,8 +410,7 @@ int counter=0;
 
 
 //Callback
-int lua_callback(void *nu, int argc, char **argv, char **cn) 
-{
+int lua_callback(void *nu, int argc, char **argv, char **cn) {
 	lua_State *L = (lua_State *)nu;
 	int i;
 	lua_pushnumber(L, counter); // 4
@@ -456,15 +431,37 @@ int lua_callback(void *nu, int argc, char **argv, char **cn)
 
 
 //A Lua db insert function with binding...
-int lua_db_insert ( lua_State *L )
-{ 
+int lua_db_insert ( lua_State *L ) { 
 	return 0;
 }
 
 
+int lua_writetable( lua_State *L, int *pos, int ti ) {
+	lua_pushnil( L );
+	while ( lua_next( L, *pos ) != 0 ) {
+		//Set the current index
+		int t = lua_type( L, -2 );
+
+	#if 1
+		//Copy the index and rotate the top and bottom
+		lua_pushnil( L );
+		lua_copy( L, -3, lua_gettop( L ) );
+	//lua_stackdump( L );
+		lrotate( L, -2, -1 );
+	#else
+		//There must be a way to do this that will run on older Luas
+	#endif
+
+		//Now, setting the table works about the same as popping
+		lua_settable( L, ti );	
+		//lua_stackdump( L );
+	}
+	return 1;
+}
+
+
 //This is a Lua function
-int lua_db ( lua_State *L )
-{
+int lua_db ( lua_State *L ) {
 	//...
 	int rc;
 	int len = 0;
@@ -490,22 +487,21 @@ int lua_db ( lua_State *L )
 
 #if 1
 	//Using tables (and extra memory)
-	if ( !sq_init( &b ) || !sq_open( &b, filename ) ) 
-	{
+	if ( !sq_init( &b ) || !sq_open( &b, filename ) ) {
 		fprintf( stderr, "Error was: %d, %s\n", __LINE__, "unknown as of yet..." );
 		return 0; /*return an error to Lua*/
 	}
 
 	//Save the results to table
-	if ( !sq_lexec( &b, final_query, "db", NULL ) )
-	{
+	if ( !sq_save( &b, final_query, "db", NULL ) ) {
 		fprintf( stderr, "Error was: %d, %s\n", __LINE__, "unknown as of yet..." );
 		return 0; /*return an error to Lua*/
 	}
 
  #if 1
 	//Dump them
-	lt_dump( &b.kvt );
+	Table *x = &b.kvt;
+	lt_dump( x );
  #endif
 
 	//Clear the stack and add a table
@@ -516,8 +512,7 @@ int lua_db ( lua_State *L )
  #endif
 
 	//Put results in Lua
-	if ( !table_to_lua( L, 1, &b.kvt ) )
-	{
+	if ( !table_to_lua( L, 1, &b.kvt ) ) {
 		fprintf( stderr, "Failed to put table on stack...\n" );
 		return 0;
 	}
@@ -556,115 +551,13 @@ int lua_db ( lua_State *L )
 }
 
 
-
-
-int lua_writetable( lua_State *L, int *pos, int ti )
-{
-	lua_pushnil( L );
-	while ( lua_next( L, *pos ) != 0 ) 
-	{
-		//Set the current index
-		int t = lua_type( L, -2 );
-
-	#if 1
-		//Copy the index and rotate the top and bottom
-		lua_pushnil( L );
-		lua_copy( L, -3, lua_gettop( L ) );
-	//lua_stackdump( L );
-		lrotate( L, -2, -1 );
-	#else
-		//There must be a way to do this that will run on older Luas
-	#endif
-
-		//Now, setting the table works about the same as popping
-		lua_settable( L, ti );	
-		//lua_stackdump( L );
-	}
-	return 1;
-}
-
-
-
-#if 0
-int lua_stacktest( lua_State *L ) 
-{
-	//Stack Test
-	//==========
-	//Check that the lua_stackdump function works like it should.  Most of the
-	//implementations that are easily found online don't really show as much
-	//information as I would like.
-	#define MIST(a) lua_stackdump(a); getchar();
-
-	//Clear the stack
-	fprintf( stderr, "Clearing the stack...\n" );
-	lua_settop( L, 0 );
-	MIST( L );
-
-	//Add a bunch of random garbage that's not a table and see how it works...
-	fprintf( stderr, "Adding test rows...\n" );
-	lua_pushstring( L, "weedeating" );
-	lua_pushnumber( L, 1321231 );
-	lua_pushstring( L, "michael jackson" );
-	lua_pushstring( L, "roblox and come" );
-	lua_pushnumber( L, 12213 );
-	MIST( L );
-
-	//Add a new table and add three key-value pairs to it
-	fprintf( stderr, "Adding new table containing three key-value pairs.\n" );
-	lua_newtable( L ); 
-	lua_pushstring( L, "singer" );
-	lua_pushstring( L, "bon jovi" );
-	lua_settable( L, 6 );	
-	lua_pushstring( L, "color" );
-	lua_pushstring( L, "blue" );
-	lua_settable( L, 6 );	
-	lua_pushinteger( L, 77 );
-	lua_pushstring( L, "randomly high index" );
-	lua_settable( L, 6 );	
-	MIST( L );
-
-	//Nested table
-	fprintf( stderr, "Adding new table containing two key-value pairs and one numeric key-value pair.\n" );
-	lua_pushstring( L, "jazz" ); //The new table will have this as a key name
-	lua_newtable( L ); //8
-	lua_pushstring( L, "singer" );
-	lua_pushstring( L, "bruce springsteen" );
-	lua_settable( L, 8 );	
-	lua_pushstring( L, "color" );
-	lua_pushstring( L, "orange" );
-	lua_settable( L, 8 );	
-	lua_pushinteger( L, 999 );
-	lua_pushstring( L, "randomly high index" );
-	lua_settable( L, 8 );	
-	MIST( L );
-
-	//again
-	fprintf( stderr, "Moving newly created table to table at index 6.\n" );
-	lua_settable( L, 6 );	
-	MIST( L );
-	MIST( L );
-	MIST( L );
-	MIST( L );
-	MIST( L );
-
-	//A regular string to round things off
-	fprintf( stderr, "Adding a regular string to table to test switching value types.\n" );
-	lua_pushstring( L, "You workin' again, John?" );
-	MIST( L );
-
-	//
-	fprintf( stderr, "Test is completed." );
-	exit( 0 );
-}
-#endif
-
-int lua_aggregate (lua_State *L)
-{
+int lua_aggregate (lua_State *L) {
 	//Check that the stack has something on it
 	if ( lua_gettop( L ) == 0 )
 		return 0;
 
 	//Add a table
+#if 1
 	lua_newtable(L);
 	const int tp = lua_gettop( L ); //The top
 	int pos = tp - 1; //The index on the stack I'm at
@@ -686,6 +579,21 @@ int lua_aggregate (lua_State *L)
 		lua_pushnumber( L, ti++ );
 
 		//Write the value into table...
+#else
+	lua_newtable( L );
+
+	//Get the index of the new table
+	int tp = lua_gettop( L );
+	int ti  = 1;
+
+	//Loop again, but show the value of each key on the stack
+	for ( int pos = 1; pos < tp; tp-- /*pos++*/ ) 
+	{
+		int t = lua_type( L, pos );
+		const char *type = lua_typename( L, t );
+		lua_pushnumber( L, ti++ );
+#endif
+
 		if ( t == LUA_TSTRING )
 			lua_pushstring( L, lua_tostring( L, pos ) );	
 		else if ( t == LUA_TFUNCTION )
@@ -694,6 +602,7 @@ int lua_aggregate (lua_State *L)
 			lua_pushnumber( L, lua_tonumber( L, pos ) );
 		else if ( t == LUA_TBOOLEAN)
 			lua_pushboolean( L, lua_toboolean( L, pos ) );
+#if 1
 		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA ) {
 			void *p = lua_touserdata( L, pos );
 			lua_pushlightuserdata( L, p );
@@ -719,22 +628,33 @@ int lua_aggregate (lua_State *L)
 	}
 
 	//Remove all previous elements?
-	for ( int pos = tp - 1 ; pos > 0 ; pos-- )
-		lua_remove( L, pos );
+	for ( int pos = tp - 1 ; pos > 0 ; pos-- ) {
+		//lua_remove( L, pos );
+	}
 
 	//Always return one table...
-	//fprintf( stderr, "Aggregated table looks like:\n" );
+	//fprintf( stderr, "Aggregated table looks like:\n" )p
+
 	//lua_stackdump( L );
+#else
+		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
+			lua_pushnil( L );
+		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA )
+			lua_pushlightuserdata( L, lua_touserdata( L, pos ));
+		else if ( t == LUA_TTABLE ) 
+		{
+			lua_pushnil( L );
+			lua_copy( L, pos, lua_gettop( L ) ); 
+		}
+
+		//set the new table
+		lua_settable( L, tp );	
+		lua_remove( L, pos );
+	}
+#endif
 	return 1;
 }
 
 
 //Table of Lua functions
 int abc ( lua_State *L ) { fprintf( stderr, "chicken" ); return 0; } 
-
-
-/*
-
-[1] { }
-
-*/

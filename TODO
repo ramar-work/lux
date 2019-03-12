@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 hypno's checklist
 -----------------
 
@@ -160,177 +161,16 @@ x rendering works (but may have little issues here and there)
 - if I had to get a test run of this done, how would I do it?
 	do I still care about this?
 
-
-
-set a goal
-==========
-
-
-the good news:
-	a Loader structure exists now and can be mocked to test what you want
-	{ <file>, CC_MODEL }
-
-to make returns work the right way?
-	write some Lua code and return it (do not handle functions yet)
-	check that conversions work	
-
-
-
-HTML
-	GET (write dump to screen)
-	POST (write dump to screen)
-	crashes are incredibly important to check for...
-
-
-shit to do
-==========
-- pack response still fails
-x		but it doesn't seem to be failing now
-
--	write the rest of the loader functions
-x		string
-x		model evaluation
-		function - where does everything go
-		view - skip this, useless without working rendering
-		query - skip this too, useless without db drivers
-
-
-- write the rest of the router functionality
-		if the route is not found:
-			/ =>
-				if '*' or '/regex/' is available
-					call it
-				else if 'default' or some function named default
-					call it	
-				else
-					throw 404
-
-			/abc => 
-				if '*' or '/regex/' is available
-					call it
-				else
-					throw 404
-
-			/abc/def =>
-				if '*' or '/regex' is available
-					call it
-				else if 'levels before (abc in this case)' contains 'expects', '*', or '/regex/'
-					call it
-				else
-					throw 404
-
-
-
-- rendering
-		I may have to add new hashes and use fpointers
-		basic find and replace works (but needs more testing)
-		script execution should also work but will take some modification
-			fail/throw exception when something doesn't work
-	
-- database drivers 
-		SQlite first
-		Postgres and MySQL second
-
-- this should be it... after this, it's just writing code...
-
-
-sigh...
 =======
-- people want to work with decent people...
-		just choose...
+...
+>>>>>>> 1045a0482fafd0853ef3a09db97a08fe241a96bc
 
-x loader seems to work with 'falafel'
+- render needs fixing (pretty hard and I'm low on brain power today...)
 
-x remember: BIG hashes (until I get a chance to rewrite this)
-now, using the Loader structure, it should be pretty easy to write the rest of this...
--	goes in the http func
-- after writing the top sequence
-- try running this thing for real
-- does it work?  does it crash?
-
-
-
-
-keep me handy
-=============
-	- handle a socket
-		-s, -k = start, kill a server via hypno
-		open it 
-		receive data from it
-		see what came parsed
-		send data through it
-		close it
-
-	- database drivers:
-		-t [ mysql, sqlite3, postgresql, etc ] = test database drivers via hypno-test
-		sqlite3
-		mysql
-		postgresql
-		maybe one of the nosqls depending on need
-
-	- routing
-		-u <file> = test a router setup via hypno (no json)
-		interpret the routes in a file as they relate to code
-
-	- templating
-		-f <file> = test templates with data and files, 
-		-d {} or "select * from etc;" =  you'll need some sort of lua data 
-		be able to do raw replacements
-		be able to do scripting in the language (use the language)
-		
-	- tooling
-		this can be done from c too... no reason not to, but it can always be removed
-		-c <dir> ...
-		or
-		--create-from <file> 
-		shell script for now... is fine....
-		can't move quickly w/o it
-		create new directories and route structures
-		remove directories
-		possibly view what's in those directories
-
-	- handle the request / response chain
-		obvs, there's nothing here...
-		give the user some variables to choose from
-		be able to set things that the user should be able to set
-		after parsing, basic routes are always needed:
-		/dump
-		/debug
-		/etc...
-
-	- run unit tests
-		-t = run unit tests via hypno...	
-
-
-
-router
-======
-x	break url,
-x	check each portion for a match in the table
-x		*use strcmbd to append new url poritions to the buffer ( x, x.y, x.y.z, etc... )
-
-	since there is one linear data structure, the same thing can always run...
-
-
+	debug the write error (it's so far a bit random)	
+	add $ syntax (for pulling $key and $value)
+	add ! syntax (for executing code)
 	
-	if match found
-			now there's another data structure, use that...
-		check type:
-			table =
-				if the url still has parameters, check for any other values 
-					the problem is here, is that /check/:id could happen, where ID is required...  
-					 but even then, expects can handle this... tell it that the parameter received should be something...
-					continue
-				if not, 
-					check for 'expects' to validate values supplied
-					check for 'model' and 'view' tables or values to evaluate
-			string =
-				return it
-				would be incredibly useful to return the same named items... in model and app
-			number = 
-				return it
-			funct  = 
-				execute and return its result
-			sql?   = 
-				should reutrn formatted data, maybe specify the datatype... 
-				just thinking crazy
+
+-
+ 

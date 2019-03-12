@@ -1,7 +1,9 @@
-/*
+/* ------------------------------------------- * 
  * single.h
- * --------
- *
+ * ========
+ * 
+ * TODO
+ * ----
  *  This library has gotten big.  It handles most basic utilities. 
  *  Let's start with errors.
  *
@@ -32,8 +34,8 @@
  *  Line numbers can also be compiled in and out when bugs are tricky.  
  *  Admittedly, this is mostly for my own purposes, but it can be useful outside of testing.
  *  Use -DERRLNO_H to enable line number and function macros as part of error messages.
- *
- * */
+ * 
+ * ------------------------------------------- */
 //Start with includes, not all modules need all headers
 #ifndef _WIN32
  #define _POSIX_C_SOURCE 200809L
@@ -137,28 +139,28 @@
 #define szprintf(k) \
 	fprintf(stderr, "Size of %-22s: %ld\n", #k, sizeof(k));
 
+//TODO: There isn't a great way to solve the vararg problem.  
+//I've pasted a test program below to illustrate how
+//difficult it can get to do this right.
+#if 0
+#include <stdio.h>
+
+#define VA(...) \
+	fprintf( stderr, "va args is '%s' long\n", ##__VA_ARGS__ ) 
+
+int main (int argc, char *argv[] ) {
+	//how long is va args here?
+	VA( "aasdfsadf", "cbcdfef" );
+	//how about here?
+	VA( " " );
+	//and here?
+	VA( NULL );
+	//how about here?
+	VA( );
+}
+#endif
+
 #ifndef ERR_H
-	//TODO: There isn't a great way to solve the vararg problem.  
-	//I've pasted a test program below to illustrate how
-	//difficult it can get to do this right.
-	#if 0
-			#include <stdio.h>
-
-			#define VA(...) \
-				fprintf( stderr, "va args is '%s' long\n", ##__VA_ARGS__ ) 
-
-			int main (int argc, char *argv[] ) {
-				//how long is va args here?
-				VA( "aasdfsadf", "cbcdfef" );
-				//how about here?
-				VA( " " );
-				//and here?
-				VA( NULL );
-				//how about here?
-				VA( );
-			}
-	#endif
-
 	//TODO: the option to add \n should be somewhere too
  #ifndef ERRV_H
 	#define ERRV_LENGTH 2048
@@ -200,12 +202,15 @@
 		( fprintf(stderr, "%s", PROGRAM_NAME) ? 0 : 0 ) || \
 		( fprintf(stderr, "%s\n", __SingleLibErrors[ c ] ) ? n : n ) \
 	)
-#if 0
+ #if 0
   #define err(n, ...) (( fprintf(stderr, __VA_ARGS__) ? 0 : 0 ) || fprintf( stderr, "\n" ) ? n : n)
   #define serr(n, s, ...) ((s->error = n ) ? 0 : 0 ) || ( snprintf(s->errmsg, ERRV_LENGTH - 1, __SingleLibErrors[ n ], __VA_ARGS__ ) ? n : n ) 
   #define perr(n, c) ( fprintf(stderr, "%s", PROGRAM_NAME) ? 0 : 0 ) || ( fprintf(stderr, "%s\n", __SingleLibErrors[ c ] ) ? n : n )
-#endif
  #endif
+ #endif
+#else
+	#define serr(n, s, ...) n
+	#define perr(n, c)
 #endif
 
 #ifdef DEBUG_H
@@ -267,8 +272,29 @@
 #ifndef TAB_H
  #define LT_POLYMORPH_BUFLEN 2048
  #define LT_MAX_HASH 7 
+ #ifndef LT_DEVICE
+  #define LT_DEVICE 2
+ #endif
+#if 0
+ #define lt_advance(t, pos) \
+	lt_set( t, t->index + pos, 0 ) 
+ #define lt_rewind(t, pos) \
+	lt_set( t, t->index - pos, 0 )
+#endif
+ #define lt_advance(t, pos) \
+	lt_set( t, pos ) 
+ #define lt_rewind(t, pos) \
+	lt_set( t, pos )
+ #define lt_exec(t, a, b) \
+	lt_exec_complex( t, 0, t->index, a, b )
  #define lt_dump(t) \
-	lt_exec( t, &__lt_int, __lt_dump )
+	lt_exec( t, &__ltHistoric, __lt_dump )
+ #define lt_kdump(t) \
+	lt_exec( t, &__ltComplex, __lt_dump )
+//	lt_exec( t, &__lt_int, __lt_dump )
+ #define lt_sdump(t) \
+	lt_exec( t, &__ltSimple, __lt_dump )
+//	lt_exec( t, &__lt_int, __lt_dump )
  #define lt_blob_at( t, i ) \
  	lt_ret( t, LITE_BLB, i )->vblob
  #define lt_blobdata_at( t, i ) \
@@ -445,6 +471,9 @@
 		r->markers = raw; \
 		memset( &r->markers[ (follow - 1)], 0, sizeof(Mark) ); \
 		ct = &r->markers[ (follow - 1) ]; \
+		ct->index = -1; \
+		ct->indexArray = NULL; \
+		ct->parent = parentMark; \
 	}
 #endif
 
@@ -913,11 +942,15 @@ typedef struct LiteTable LiteTable;
 typedef struct LiteKv LiteKv;
 typedef union  LiteRecord LiteRecord;
 //typedef struct LiteNode LiteNode;
-
+typedef struct { 
+	enum { LT_DUMP_SHORT, LT_DUMP_LONG } dumptype; 
+	enum { LT_CONDENSED, LT_VERBOSE } indextype;
+	const char *customfmt;
+	int level; 
+} LtInner;
 
 //Table for table values
-typedef enum 
-{
+typedef enum {
   LITE_NON = 0, //Uninitialized values
   LITE_INT,     //Integer
   LITE_FLT,     //FLoat
@@ -931,16 +964,14 @@ typedef enum
 } LiteType;
 
 
-struct LiteTable 
-{
+struct LiteTable {
   uint32_t  count;
   long      ptr;
   LiteTable *parent;
 };
 
 
-typedef struct 
-{
+typedef struct {
   unsigned int  total  ,     //Size allocated (the bound)
                 modulo ,     //Optimal modulus value for hashing
                 index  ,     //Index to current element
@@ -992,15 +1023,13 @@ union LiteRecord
 };
 
 
-struct LiteValue 
-{
+struct LiteValue {
   LiteType    type;
   LiteRecord  v;
 };
 
 
-struct LiteKv 
-{
+struct LiteKv {
   int hash[LT_MAX_HASH];
   LiteKv *parent;  
   LiteValue key; 
@@ -1019,8 +1048,7 @@ struct Value {
 };
 
 typedef struct Option Option;
-struct Option
-{
+struct Option {
 	const char  *sht,
               *lng,
 	            *description;
@@ -1043,19 +1071,37 @@ struct Option
 #ifndef RENDER_H
 enum
 { /*...*/
-	RAW = 0,
-	NEGLOOP,
-	POSLOOP,
-	ENDLOOP,
-	STUB,
-	DIRECT
+	R_RAW = 0,
+	R_NLOOP,
+	R_PLOOP,
+	R_ELOOP,
+	R_STUB,
+	R_DIRECT,
+	R_KLOOP
 };
 
-
-typedef struct
+typedef struct Mark
 { 
-  uint8_t *blob, *parent;
-  int      size, action, psize, type, index;
+#if 0
+  uint8_t *blob; 
+	uint8_t *parent;
+	struct Mark *parent_t;
+  signed int      size, index, *ix;
+	short    action, type, psize, loopcount;
+	//,action,psize ,type
+#else
+	//32 bytes ( 8, 8, 4, 4, 8 )
+	signed int   size;
+	signed int   index;
+	short  int   action;
+	short  int   type;
+	signed int  *indexArray;
+	//16 bytes
+  uint8_t     *blob; 
+	struct Mark *parent;
+	//4 bytes, (but I think we waste 4)
+	short  int   loopcount;
+#endif
 } Mark;  
 
 typedef struct
@@ -1071,8 +1117,10 @@ typedef struct
   Mark    *markers;	
   Table   *renderers;  //This thing should handle different rendering functs 
   Buffer   dest;
-  
   Parser  *p;
+	//struct parent { uint8_t *src; int size; } parent[10]; 
+	char *psrc;
+	int psize;
   char     buf[RENDER_MAX_BUF_SIZE];
  #ifndef ERR_H
   int error;
@@ -1085,6 +1133,7 @@ typedef struct
  #endif
 } Render;
 #endif
+
 
 #ifndef SQROOGE_H
 enum {
@@ -1467,25 +1516,28 @@ void pr_print ( Parser *p );
 
 
 #ifndef TAB_H
-LiteType lt_add (Table *, int, LiteType, int, float, char *,
-  unsigned char *, unsigned int , void *, Table *, char *);
+LiteType lt_add (Table *, int, LiteType, int, float, char *, unsigned char *, unsigned int , void *, Table *, char *);
 Table *lt_init (Table *, LiteKv *, int) ;
 void lt_printall ( Table *t );
 void lt_finalize (Table *t) ;
 int __lt_dump ( LiteKv *kv, int i, void *p );
-unsigned int __lt_int;
-//void lt_dump (Table *t) ;
-//void lt_complex_exec (Table *t, int (*fp)( LiteType t, LiteValue *k, LiteValue *v, void *p ) );
-int lt_exec (Table *t, void *p, int (*fp)( LiteKv *kv, int i, void *p ) );
+LtInner __ltComplex; 
+LtInner __ltHistoric; 
+LtInner __ltSimple; 
+int lt_exec_complex (Table *t, int start, int end, void *p, int (*fp)( LiteKv *kv, int i, void *p ) );
 int lt_move(Table *t, int dir) ;
-static void lt_printindex (LiteKv *tt, int ind);
+LiteKv *lt_retkv (Table *t, int index);
 LiteType lt_rettype( Table *t, int side, int index );
 const char *lt_rettypename( Table *t, int side, int index );
 void lt_lock (Table *t); 
 int lt_get_long_i (Table *t, unsigned char *find, int len);
+unsigned char *lt_get_full_key ( Table *t, int hash, unsigned char *buf, int bs );
 LiteKv *lt_next (Table *t);
+LiteKv *lt_current (Table *t);
 void lt_reset (Table *t);
 int lt_set (Table *t, int index);
+int lt_absset( Table *t, int index ) ;
+int lt_get_raw (Table *t, int index);
 LiteValue *lt_retany (Table *t, int index);
 LiteRecord *lt_ret (Table *t, LiteType type, int index);
 const char *lt_strerror (Table *t);

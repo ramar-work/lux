@@ -3,8 +3,8 @@ testrender.c
 
 Test out rendering...
  * --------------------------------------------------- */
-#include "vendor/single.h"
-#include "bridge.h"
+#include "../vendor/single.h"
+#include "../bridge.h"
 
 const char *files[] = {
 	"african", 
@@ -16,28 +16,30 @@ const char *files[] = {
 };
 
 
-int main ( int argc, char *argv[] ) {
-
+int main (int argc, char *argv[])
+{
 	lua_State *L = luaL_newstate();
 	char err[ 2048 ] = { 0 };
 
 	//A good test would be to modify this to where either files*[] can be run or a command line specified file.
 
-	for ( int i=0; i < sizeof(files)/sizeof(char *); i++ ) {
+	for ( int i=0; i < sizeof(files)/sizeof(char *); i++ )
+	{
 		//Filename
 		Render R;
 		Table t; 
 		int fd = 0;
 		int br = 0;
 		char ren[ 10000 ] = { 0 };
-		char *m = strcmbd( "/", "tests/render", files[i], files[i], "lua" );
-		char *v = strcmbd( "/", "tests/render", files[i], files[i], "tpl" );
+		char *m = strcmbd( "/", "tests/render-data", files[i], files[i], "lua" );
+		char *v = strcmbd( "/", "tests/render-data", files[i], files[i], "tpl" );
 		m[ strlen( m ) - 4 ] = '.';
 		v[ strlen( v ) - 4 ] = '.';
 
 		//Choose a file to load
 		fprintf( stderr, "Loading model file %s\n", m );
-		if ( !lua_load_file( L, m, err ) ) {
+		if ( !lua_load_file( L, m, err ) )
+		{
 			fprintf( stderr, "%s\n", err );
 			goto cleanit;
 		}
@@ -45,13 +47,14 @@ int main ( int argc, char *argv[] ) {
 		//Convert Lua to Table
 		lt_init( &t, NULL, 1024 );
 		lua_stackdump( L );
-		if ( !lua_to_table( L, 1, &t ) ) {
+		if ( !lua_to_table( L, 1, &t ) )
+		{
 			fprintf( stderr, "%s\n", err );
 			goto cleanit;
 		}
 
 		//Show the table after conversion from Lua
-		if ( 1 ) 
+		if ( 1 )
 			lt_dump( &t );
 		
 		//Prepare the rendering engine
