@@ -29,45 +29,6 @@ cli: test-build-$(OS)
 cli: 	
 	@printf ''>/dev/null
 
-#Objects
-#.c.o:
-#	@echo $(CC) $(CFLAGS) -c $<
-#	@$(CC) $(CFLAGS) -c $<
-
-#
-ssl:
-	./hypno --no-daemon --start --port 443 --dir $(HOME)/prj/hypno-wwwroot
-
-vchim:
-	valgrind ./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/prj/hypno-wwwroot
-
-chim:
-	./hypno --no-daemon --start --port $(PORT) --dir $(HOME)/prj/hypno-wwwroot
-
-# This tests how hypno starts with a certain set of criteria.
-goku:
-	./hypno --no-daemon --start --port $(PORT) 
-
-# This tests hypno and logs to a file named baby.log
-baby:
-	./hypno --no-daemon --start --port $(PORT) 2>baby.log
-
-# This is a test request to use with Curl or Wget	
-gohan:
-	wget -qO /tmp/index.html http://localhost:$(PORT)/multi
-
-# This is a test request using a hostname to test hypno's virtual hosting capability
-khan:
-	@test `grep -c khan.org /etc/hosts` -gt 0 && wget -O /tmp/index.html http://khan.org:$(PORT)/multi || echo "khan.org not found in /etc/hosts.  Run 'make hosts' to add it and others."
-
-# This is a test request to use with Curl or Wget	
-gotenks:
-	wget -O /tmp/index.html http://localhost:$(PORT)
-
-# This is a test request that grabs files full of errors
-errors:
-	@test `grep -c errors.com /etc/hosts` -gt 0 && wget -O /tmp/index.html http://errors.com:$(PORT)/failure || echo "errors.com not found in /etc/hosts.  Run 'make hosts' to add it and others."
-
 # Add and test two localhost names
 add-hosts:
 	@printf "127.0.0.1\tkhan.org #added by hypno\n" >> /etc/hosts
@@ -81,41 +42,6 @@ add-hosts:
 remove-hosts:
 	@sed -i '/#added by hypno/d' /etc/hosts
 
-# A top-level target that builds everything
-top:
-	make router; \
-	make chains; \
-	make render; \
-	make sql; \
-	make main
-
-# Router test program
-router: RICKROSS=testrouter
-router: test-build-$(OS)
-router: 	
-	@printf ''>/dev/null
-
-
-# Chain test program
-chains: RICKROSS=testchains
-chains: test-build-$(OS)
-chains: 
-	@printf ''>/dev/null
-
-
-# SQL test program
-sql: RICKROSS=testsql
-sql: test-build-$(OS)
-sql: 
-	@printf ''>/dev/null
-
-
-# Render test program
-render: RICKROSS=testrender
-render: test-build-$(OS)
-render: 
-	@printf ''>/dev/null
-
 # Make an SSL Client
 tlscli:
 	$(CC) -DSQROOGE_H $(CFLAGS) -o cx vendor/single.c tlscli.c -lgnutls
@@ -124,11 +50,9 @@ tlscli:
 tlssvr:
 	$(CC) -DSQROOGE_H $(CFLAGS) -o sx vendor/single.c tlssvr.c -lgnutls
 
-
 # Build a client with axtls
 axtlscli:
 	$(CC) -DSQROOGE_H $(CFLAGS) -o cxax vendor/single.c tlscli-axtls.c -laxtls
-
 
 # All test build programs use this recipe
 # But notice that a version exists for different operating systems. 

@@ -31,8 +31,21 @@
  #error 'No hostname defined.'
 #endif
 
+
+Option opts[] = {
+	{ "-s", "--site", "desc of site option", 's' }
+	{ "-u", "--urlpath", "the url path", 's' }
+ ,{ "-h", "--help", "Show help" }
+ ,{ .sentinel = 1 }
+};
+
  
 int main (int argc, char *argv[]) {
+
+	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
+
+	char *site = opt_get( opts, "--site" ).s;	
+	char *path = opt_get( opts, "--urlpath" ).s;	
 
 	int err, ret, sd, ii, type, len;
 	unsigned int status;
@@ -48,8 +61,8 @@ int main (int argc, char *argv[]) {
 		"Host: %s\r\n\r\n"
 	;
 
-	nsprintf( HOSTNAME );
-	nsprintf( LOCATION );
+	//nsprintf( HOSTNAME );
+	//nsprintf( LOCATION );
 
 	if ( RUN( !gnutls_check_version("3.4.6") ) ) { 
 		errexit( 0, "GnuTLS 3.4.6 or later is required for this example." );	
