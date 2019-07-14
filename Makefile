@@ -14,14 +14,15 @@ INCLUDE_DIR=-I/usr/include/lua5.3
 LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 
 # Not sure why these don't always work...
-SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c bridge.c
+#SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c socketmgr.c bridge.c 
+SRC = vendor/single.c vendor/sqlite3.c socketmgr.c bridge.c 
 OBJ = ${SRC:.c=.o}
 
 # A main target, that will most likely result in a binary
 main: RICKROSS=main
 main: test-build-$(OS)
 main: 
-	mv $(RICKROSS) hypno
+	mv $(RICKROSS) bin/hypno
 
 # CLI
 cli: RICKROSS=$(NAME)b

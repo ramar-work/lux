@@ -41,6 +41,7 @@
 //This define should be a bit easier to use than fully calling http_err
 #define ERR_500(...) http_err( r, h, 500, __VA_ARGS__ ) 
 #define ERR_404(...) http_err( r, h, 404, __VA_ARGS__ ) 
+#define ERR_200(...) http_err( r, h, 200, __VA_ARGS__ ) 
 
 //???
 char default_dirname[] = DIRNAME_DEFAULT;
@@ -210,15 +211,26 @@ int hssent = 0;
 #include "tests/char-char.c"
 static uint8_t *tccf = NULL;
 static int tccflen = 0, tccfpos = 0, fd2 = 0;
-
+//Let's create a data member that contains info on differeent parts of this process
+//I can never tell.
+//Or at the very least, one function that can tell me what everything else looks like.
+void whathappened ( Recvr *r, HTTP *h ) {
+	//what's in http?
+	//what's in HTTP_Request?
+	//what's in HTTP_Response?
+	print_recvr( r ); 
+	http_print_request( h ); 
+	http_print_response( h ); 
+}
 //This is what handles streaming in case it's needed.
 _Bool http_send (Recvr *r, void *p, char *e) {
+	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "about to send message over wire." );
 	HTTP *h = (HTTP *)r->userdata;
 	HttpStreamer *hs = NULL;
+	whathappened( r, h );
 
-	if ( *r->bypass == 0 ) {
+	if ( *r->bypass == 0 )
 		r->stage = NW_COMPLETED;	
-	}	
 	else {
 		if ( !(hs = (HttpStreamer *)h->userdata) ) {
 			return ERR_500( "Issues with HttpStreamer structure." );	
@@ -273,8 +285,103 @@ _Bool http_send (Recvr *r, void *p, char *e) {
 			return 1;
 		}
 	}
+	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "should have sent message over wire." );
 	return 1;
 } 
+
+
+
+//Kill the server
+int kill_cmd( Option *opts, char *err, Passthru *pt ) {
+#ifdef WIN32
+ #error "Kill (as written here anyway) does not work on Windows."
+#endif
+	pid_t pid;
+	int fd, len;
+	struct stat sb;
+	char buf[64] = {0};
+
+	//For right now, we can just naively assume that the server has not started yet.
+	if ( stat(pidfile, &sb) == -1 )	
+		return ERRL( "Could not locate server process: %s", strerror(errno)  );
+	
+	//Make sure size isn't bigger than buffer
+	if ( sb.st_size >= sizeof(buf) )
+		return ERRL( "Error initializing process id."  );
+ 
+	//Get the pid otherwise
+	if ((fd = open( pidfile, O_RDONLY )) == -1 || (len = read( fd, buf, sb.st_size )) == -1) { 
+		close( fd );
+		return ERRL( "Cannot access my PID file; %s", strerror(errno)  );
+	}
+
+	//More checking...
+	close( fd );
+	for (int i=0; i<len; i++) {
+		if ( !isdigit(buf[i]) ) {
+			return ERRL( "PID is not a number."  );
+		}
+	}
+
+	//Close the process
+	pid = atoi( buf );
+	if ( kill(pid, SIGTERM) == -1 )
+		return ERRL( "Failed to kill server process: %s", strerror( errno )  );
+
+	return 1;
+}
+
+
+//Load a different data.lua file from main()
+int file_cmd( Option *opts, char *err, Passthru *pt ) {
+	lua_State *L = NULL;  
+	char *f = opt_get( opts, "--file" ).s;
+	struct stat sb;
+	Table t;
+
+	if (!( L = luaL_newstate() ))
+		return ERRL( "L is not initialized..."  );
+
+	if ( stat( f, &sb ) == -1 )
+		return ERRL( "File %s inaccessbile. %s", f, strerror( errno ) );
+	
+	if ( !lt_init( &t, NULL, 127 ) ) 
+		return ERRL( "Couldn't initialize table for file reading."  );
+
+	if ( !lua_load_file( L, f, &err ) ) {
+		//TODO: Why does ERRL( str, f, err ) throw a compiler error? 
+		char err2[4096] = { 0 };
+		snprintf( err2, 4095, "%s", err );
+		return ERRL( "Couldn't run file %s.  Error: %s", f, err2 );
+	}
+
+	lua_to_table( L, 1, &t );
+	lt_dump( &t );
+	return 1;
+}
+
+
+//Runs at every invocation
+int http_pre ( Recvr *r, void *ud, char *err ) {
+	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "about to open connection." );
+
+	//Still may have to negotiate when to initiailize SSL and when not...
+	
+
+	//Also may need some hook functions to determine who's cert to use and where traffic is intended to go... BOY!
+
+
+		
+	return 1;
+}
+
+//Runs at every invocation
+int http_post ( Recvr *r, void *ud, char *err ) {
+	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "about to close connection." );
+	return 1;
+}
+
+
 
 
 
@@ -526,11 +633,15 @@ exit( 0 );
 			mfile[ strlen(mfile) - 4 ] = '.';
 			fprintf( stderr, "Attempting to load: %s\n", mfile );
 
-			if ( stat( mfile, &sb ) == -1 )
-				return ERR_500("Couldn't find model file: %s.", mfile );
+			return ERR_500("Life is grand, but there was a 500 error: %s.", mfile );
 
-			if ( luaL_dofile( L, mfile ) )
+			if ( stat( mfile, &sb ) == -1 ) {
+				return ERR_500("Couldn't find model file: %s.", mfile );
+			}
+
+			if ( luaL_dofile( L, mfile ) ) {
 				return ERR_500("Could not load Lua file: %s. %s\n", mfile, lua_tostring(L, -1));
+			}
 		}
 		l++;
 	}
@@ -608,122 +719,6 @@ exit( 0 );
 
 	r->stage = NW_AT_WRITE;
 	//free( renbuf );
-	return 1;
-}
-
-
-//Options
-Option opts[] = {
-	{ "-s", "--start"    , "Start a server." },
-	{ "-k", "--kill",      "Kill a running server." },
-#if 0
-	{ "-c", "--create",    "Create a new directory for hypno site.",'s' },	
-	{ "-l", "--list",      "List all hypno sites on the system.",'s' },	
-	//...
-	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
-	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },	
-	//I'm just thinking out loud here.
-	{ "-u", "--user",      "Choose who to run as.",'s' },
-	{ "-m", "--mode",      "Choose how server should evaluate hostnames.",'s' },
-	{ NULL, "--chroot-dir","Choose a directory to change root to.",     's' },
-#endif
-	{ "-d", "--dir",       "Serve just one specific directory.",'s' },
-	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
-	{ "-m", "--max-conn",  "How many connections to enable at a time.", 'n' },
-	{ "-n", "--no-daemon", "Do not daemonize the server when starting."  },
-	{ "-p", "--port"    ,  "Choose port to start server on."          , 'n' },
-
-	{ .sentinel = 1 }
-};
-
-
-//Kill the server
-int kill_cmd( Option *opts, char *err, Passthru *pt ) {
-#ifdef WIN32
- #error "Kill (as written here anyway) does not work on Windows."
-#endif
-	pid_t pid;
-	int fd, len;
-	struct stat sb;
-	char buf[64] = {0};
-
-	//For right now, we can just naively assume that the server has not started yet.
-	if ( stat(pidfile, &sb) == -1 )	
-		return ERRL( "Could not locate server process: %s", strerror(errno)  );
-	
-	//Make sure size isn't bigger than buffer
-	if ( sb.st_size >= sizeof(buf) )
-		return ERRL( "Error initializing process id."  );
- 
-	//Get the pid otherwise
-	if ((fd = open( pidfile, O_RDONLY )) == -1 || (len = read( fd, buf, sb.st_size )) == -1) { 
-		close( fd );
-		return ERRL( "Cannot access my PID file; %s", strerror(errno)  );
-	}
-
-	//More checking...
-	close( fd );
-	for (int i=0; i<len; i++) {
-		if ( !isdigit(buf[i]) ) {
-			return ERRL( "PID is not a number."  );
-		}
-	}
-
-	//Close the process
-	pid = atoi( buf );
-	if ( kill(pid, SIGTERM) == -1 )
-		return ERRL( "Failed to kill server process: %s", strerror( errno )  );
-
-	return 1;
-}
-
-
-//Load a different data.lua file from main()
-int file_cmd( Option *opts, char *err, Passthru *pt ) {
-	lua_State *L = NULL;  
-	char *f = opt_get( opts, "--file" ).s;
-	struct stat sb;
-	Table t;
-
-	if (!( L = luaL_newstate() ))
-		return ERRL( "L is not initialized..."  );
-
-	if ( stat( f, &sb ) == -1 )
-		return ERRL( "File %s inaccessbile. %s", f, strerror( errno ) );
-	
-	if ( !lt_init( &t, NULL, 127 ) ) 
-		return ERRL( "Couldn't initialize table for file reading."  );
-
-	if ( !lua_load_file( L, f, &err ) ) {
-		//TODO: Why does ERRL( str, f, err ) throw a compiler error? 
-		char err2[4096] = { 0 };
-		snprintf( err2, 4095, "%s", err );
-		return ERRL( "Couldn't run file %s.  Error: %s", f, err2 );
-	}
-
-	lua_to_table( L, 1, &t );
-	lt_dump( &t );
-	return 1;
-}
-
-
-//Runs at every invocation
-int http_pre ( Recvr *r, void *ud, char *err ) {
-	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "ran something." );
-
-	//Still may have to negotiate when to initiailize SSL and when not...
-	
-
-	//Also may need some hook functions to determine who's cert to use and where traffic is intended to go... BOY!
-
-
-		
-	return 1;
-}
-
-//Runs at every invocation
-int http_post ( Recvr *r, void *ud, char *err ) {
-	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "ran something." );
 	return 1;
 }
 
@@ -813,6 +808,31 @@ struct Cmd
  ,{ "--file"     , file_cmd  }
  ,{ "--start"    , start_cmd }
  ,{ NULL         , NULL      }
+};
+
+
+//Options
+Option opts[] = {
+	{ "-s", "--start"    , "Start a server." },
+	{ "-k", "--kill",      "Kill a running server." },
+#if 0
+	{ "-c", "--create",    "Create a new directory for hypno site.",'s' },	
+	{ "-l", "--list",      "List all hypno sites on the system.",'s' },	
+	//...
+	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
+	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },	
+	//I'm just thinking out loud here.
+	{ "-u", "--user",      "Choose who to run as.",'s' },
+	{ "-m", "--mode",      "Choose how server should evaluate hostnames.",'s' },
+	{ NULL, "--chroot-dir","Choose a directory to change root to.",     's' },
+#endif
+	{ "-d", "--dir",       "Serve just one specific directory.",'s' },
+	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
+	{ "-m", "--max-conn",  "How many connections to enable at a time.", 'n' },
+	{ "-n", "--no-daemon", "Do not daemonize the server when starting."  },
+	{ "-p", "--port"    ,  "Choose port to start server on."          , 'n' },
+
+	{ .sentinel = 1 }
 };
 
 
