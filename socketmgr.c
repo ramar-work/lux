@@ -1,6 +1,11 @@
 /*let's try this again.  It seems never to work like it should...
 */
 #include "vendor/single.h"
+struct HTTPRecord {
+	const char *field; 
+	uint8_t *value; 
+	int size; 
+};
 
 struct HTTPBody {
 	int clen;  //content length
@@ -238,20 +243,60 @@ int msg_get_content_length (uint8_t *msg, int len) {
 }
 
 
-//Extract value (a simpler code that can be used to grab values)
-char *msg_get_value ( const char *value, const char *end, uint8_t *msg, int len ) {
-	int bStart=0, bEnd=0;
-	char *bContent = NULL;
-	//Ugly boundary extraction
-	if ( (bStart = memstrat( msg, "boundary=", len )) > -1) {
-		bStart += 9;
-		msg += bStart;
-		bEnd = memchrat( msg, '\r', len - bStart); 
-		bEnd = (bEnd > -1) ? bEnd : len - bStart; 
-		bContent = malloc( bEnd + 1 );
-		memset( bContent, 0, bEnd + 1 );	
-		memcpy( bContent, msg, bEnd );
+//Safely convert numeric buffers...
+int safeatoi( const char *value ) {
+	//Copy to string
+	char lc[ 128 ];
+	memset( lc, 0, sizeof( lc ) );
+	memcpy( lc, value, strlen( value ) );
+
+	//Make sure that content-length numeric
+	for ( int i=0; i < strlen(lc); i++ )  {
+		if ( (int)lc[i] < 48 || (int)lc[i] > 57 ) {
+			return 0;
+		}
 	}
+
+	return atoi( lc );
+}
+
+
+//Extract value (a simpler code that can be used to grab values)
+char *msg_get_value ( const char *value, const char *chrs, uint8_t *msg, int len ) {
+	int start=0, end=0;
+	char *bContent = NULL;
+
+	if ((start = memstrat( msg, value, len )) > -1) {
+		start += strlen( value );
+		msg += start;
+
+		//If chrs is more than one character, accept only the earliest match
+		int pend = -1;
+		while ( *chrs ) {
+			end = memchrat( msg, *chrs, len - start );
+			if ( end > -1 && pend > -1 && pend < end ) {
+				end = pend;	
+			}
+			pend = end;
+			chrs++;	
+		}
+
+		//Set 'end' if not already...	
+		if ( end == -1 && pend == -1 ) {
+			end = len - start; 
+		}
+
+		//Prepare for edge cases...
+		if ((bContent = malloc( end + 1 )) == NULL ) {
+			return ""; 
+		}
+
+		//Prepare the raw buffer..
+		memset( bContent, 0, end + 1 );	
+		memcpy( bContent, msg, end );
+	}
+
+	return bContent;
 }
 
 
@@ -263,6 +308,7 @@ char *msg_get_boundary ( uint8_t *msg, int len ) {
 	if ( (bStart = memstrat( msg, "boundary=", len )) > -1) {
 		bStart += 9;
 		msg += bStart;
+		//Find one or the other...
 		bEnd = memchrat( msg, '\r', len - bStart); 
 		bEnd = (bEnd > -1) ? bEnd : len - bStart; 
 		bContent = malloc( bEnd + 1 );
@@ -620,74 +666,59 @@ int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 	int try = 0;
 
 	while ( 1 ) { 
-	if (( sent = send( fd, &rs->msg[ pos ], total, MSG_DONTWAIT )) == -1 ) {
-		if ( errno == EBADF )
-			0; //TODO: Can't close a most-likely closed socket.  What do you do?
-		else if ( errno == ECONNREFUSED )
-			close(fd);
-		else if ( errno == EFAULT )
-			close(fd);
-		else if ( errno == EINTR )
-			close(fd);
-		else if ( errno == EINVAL )
-			close(fd);
-		else if ( errno == ENOMEM )
-			close(fd);
-		else if ( errno == ENOTCONN )
-			close(fd);
-		else if ( errno == ENOTSOCK )
-			close(fd);
-		else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
-			if ( ++try == 2 ) {
+		if (( sent = send( fd, &rs->msg[ pos ], total, MSG_DONTWAIT )) == -1 ) {
+			if ( errno == EBADF )
+				0; //TODO: Can't close a most-likely closed socket.  What do you do?
+			else if ( errno == ECONNREFUSED )
+				close(fd);
+			else if ( errno == EFAULT )
+				close(fd);
+			else if ( errno == EINTR )
+				close(fd);
+			else if ( errno == EINVAL )
+				close(fd);
+			else if ( errno == ENOMEM )
+				close(fd);
+			else if ( errno == ENOTCONN )
+				close(fd);
+			else if ( errno == ENOTSOCK )
+				close(fd);
+			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				if ( ++try == 2 ) {
+				 #ifdef HTTP_VERBOSE
+					fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
+				 #endif
+					fprintf(stderr, "rs->mlen: %d\n", rs->mlen );
+					//rq->msg = buf;
+					break;
+				}
 			 #ifdef HTTP_VERBOSE
-				fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
+				fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
 			 #endif
-				fprintf(stderr, "rs->mlen: %d\n", rs->mlen );
-				//rq->msg = buf;
-				break;
 			}
-		 #ifdef HTTP_VERBOSE
-			fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
-		 #endif
+			else {
+				//this would just be some uncaught condition...
+			}
+		}
+		else if ( sent == 0 ) {
+
 		}
 		else {
-			//this would just be some uncaught condition...
+			//continue resending...
+			pos += sent;
+			total -= sent;	
 		}
-	}
-	else if ( sent == 0 ) {
-
-	}
-	else {
-		//continue resending...
-		pos += sent;
-		total -= sent;	
-	}
 	}
 	return 0;
 }
 
+
 int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
-	
 	//...
 	unsigned char *buf = malloc( 1 );
 	int mult = 0;
 	int try=0;
 	const int size = 32767;
-
-#if 0
-	//I may need to zero everything here...
-	rq->mlen = 0;
-	rq->clen = 0;
-	rq->hlen = 0;
-	rq->status = 0;
-	rq->stext = NULL;
-	rq->ctype = NULL;
-	rq->method = NULL;
-	rq->path = NULL; 
-	rq->protocol = NULL;
-	rq->host = NULL;
-	rq->boundary = NULL;
-#endif
 
 	//Read first
 	while ( 1 ) {
@@ -769,80 +800,97 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 		write( 2, rq->msg, rq->mlen );
 	}
 
-#if 0
-	//Let's just make this an echo server.  Because it's hard to get right.
-	char echomsg[] = ""
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: 11\r\n"
-		"Content-Type: text/html\r\n\r\n"
-		"Gotbobross!";
-	unsigned char ebuf[ 100000 ];
-	memset( ebuf, 0, sizeof(ebuf));
-	snprintf( (char *)ebuf, rq->mlen, echomsg, strlen(echomsg) - 4, buf );
-	//write(2,ebuf,strlen((char*)ebuf)); exit(0);
-	rs->mlen = strlen( (char *)ebuf );	
-	rs->msg = malloc( rs->mlen );
-	memset( rs->msg, 0, rs->mlen );
-	memcpy( rs->msg, ebuf, rs->mlen );	
-#else
+	//Prepare the rest of the request
 	char *header = (char *)rq->msg;
-	int flLen = memchrat( rq->msg, '\n', rq->mlen ) - 1;
+	int pLen = memchrat( rq->msg, '\n', rq->mlen ) - 1;
+	const int flLen = pLen + strlen( "\r\n" );
 	int hdLen = memstrat( rq->msg, "\r\n\r\n", rq->mlen );
 
-	rq->method = get_lstr( &header, ' ', &flLen );
-	rq->path = get_lstr( &header, ' ', &flLen );
-	rq->protocol = get_lstr( &header, ' ', &flLen ); 
+	rq->method = get_lstr( &header, ' ', &pLen );
+	rq->path = get_lstr( &header, ' ', &pLen );
+	rq->protocol = get_lstr( &header, ' ', &pLen ); 
+	rq->hlen = hdLen; 
+	rq->host = msg_get_value( "Host: ", "\r", rq->msg, hdLen );
 
 	//The protocol parsing can happen here...
-	//if ( memstrat( rq->msg, "GET", rq->mlen ) > -1 ) {
-	if ( strcmp( rq->method, "GET" ) == 0 ) {
-	 //#ifdef HTTP_VERBOSE
-		fprintf(stderr, "Got GET\n" );
-	 //#endif
-	}
+	if ( strcmp( rq->method, "HEAD" ) == 0 )
+		;
+	else if ( strcmp( rq->method, "GET" ) == 0 )
+		;
 	else if ( strcmp( rq->method, "POST" ) == 0 ) {
-	//else if ( memstrat( rq->msg, "POST", rq->mlen ) > -1 ) {
-	 //#ifdef HTTP_VERBOSE
-		//fprintf(stderr, "POST received %d bytes.\n", rq->recvd);
-	 //#endif
-
-	 #if 1
-		//this can be -1
-		rq->hlen = hdLen; 
-		rq->clen = msg_get_content_length( rq->msg, hdLen );
-		rq->boundary = msg_get_boundary( rq->msg, hdLen );
-		//if rq->mlen and rq->hlen + 4 are the same, I need to keep going...
+		rq->clen = safeatoi( msg_get_value( "Content-Length: ", "\r", rq->msg, hdLen ) );
+		rq->ctype = msg_get_value( "Content-Type: ", "\r;", rq->msg, hdLen );
+		rq->boundary = msg_get_value( "boundary=", "\r", rq->msg, hdLen );
 		//rq->mlen = hdLen; 
-	 #else
-		//Parse the line
-		if ( !strlen( request->path ) && !http_parse_first_line(h, r->request, r->recvd) )
-			return 0;
-
-		//Get content-length (and reject if it's not there)
-		if ( !request->clen && !http_get_content_length(h, r->request, r->recvd) )
-			return 0;
-
-		//Get the distance to the end of the headers
-		if ( !request->hlen && !http_get_header_length(h, r->request, r->recvd) )
-			return 0;
-
-		//Get the message body length. 
-		if ( !http_get_message_length(h, r->request, r->recvd) )
-			return 0; /*We need to try reading again*/
-
-		//Get the distance to the end of the headers
-		if ( !http_get_boundary(h, r->request, r->recvd) )
-			return 0;
-	 #endif
+		//If clen is -1, ... hmmm.  At some point, I still need to do the rest of the work. 
 	}
 
 	if ( 1 )  {
 		print_httpbody( rq );	
 	}
-#endif
-close(fd);
 
-	//msg_get_remaining( rq, rq->msg, rq->mlen );
+	//Define records for each type here...
+	struct HTTPRecord **url=NULL, **headers=NULL, **body=NULL;
+	Mem set;
+	memset( &set, 0, sizeof( Mem ) );
+	#if 0
+	//TODO? Borrow REALLOC from baht and get this to work nicely...
+	*url = malloc( sizeof( struct HTTPRecord ) );
+	*headers = malloc( sizeof( struct HTTPRecord ) );
+	*body = malloc( sizeof( struct HTTPRecord ) );
+	#endif
+
+	//Always process the URL
+	if ( strlen( rq->path ) > 1 ) {
+		//Is this a bug?
+		while ( strwalk( &set, rq->path, "/?=\0" ) ) {
+			fprintf( stderr, "A part of the path: " );
+			write( 2, &rq->path[ set.pos ], set.size + 1 );
+			fprintf( stderr, "\n" );
+			//REALLOC( url, ... );
+		}
+	}
+
+	//Always process the headers
+	memset( &set, 0, sizeof( Mem ) );
+	uint8_t *h = &rq->msg[ flLen - 1 ];
+	while ( memwalk( &set, h, (uint8_t *)"\r:", rq->hlen, 2 ) ) {
+		//Hmm, this one needs to work a bit differently.
+		//Break on newline, but extract the FIRST ':', the simple parse won't do.
+		if ( h[set.pos - 1] == '\r') {  
+			fprintf( stderr, "A header: " );
+			write( 2, &h[ set.pos ], set.size + 1 );
+			fprintf( stderr, "\n" );
+		}
+		if ( h[set.pos - 1] == ':' && h[set.pos] == ' ' ) {
+			fprintf( stderr, "A header: " );
+			write( 2, &h[ set.pos ], set.size + 1 );
+			fprintf( stderr, "\n" );
+		}
+		//terminate here... or just shorten the hlen by 4 here...
+		//if ( memcmp( &h[ set.pos ], "\n\r\n", set.size ) == 0 ) ; 
+		//REALLOC( url, ... );
+	}
+
+#if 0
+	//Always process the body 
+	memset( &set, 0, sizeof( Mem ) );
+	if ( strcmp( "POST", rq->method ) ) {
+		if ( strcmp( rq->ctype, "application/x-www-urlencoded" ) == 0 ) {
+			while ( memwalk( &set, (uint8_t *)rq->msg, (uint8_t *)"\r:=&", rq->clen, 4 ) ) {
+				//REALLOC( url, ... );
+			}
+		}
+		else {
+			while ( memwalk( &set, (uint8_t *)rq->msg, (uint8_t *)"\r:=;", rq->clen, 4 ) ) {
+				//REALLOC( url, ... );
+			}
+		}
+	}
+#endif
+
+	//for testing, this should stay here...
+	close(fd);
 	return 0;
 }
 
