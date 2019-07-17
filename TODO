@@ -1,115 +1,21 @@
+can't lie, I kind of like working on this project...
+	- convert http functions to be able to return char*s and integers
+	- add the xfer-encoding chunked loop to h_read 
+	- make sure binary bypasses everything and just sends something back
+	- test with a solid number of connections (250-500 is cool)
+	- remove dependency on single.[ch]
+	- pack responses
+	- add wwwroot to the thing
+	- does Lua still have to be used? (I don't mind, but it's hard)
+	- if so, router and regex need to get finished up
+	- write mvc renderer thing
+	- fix bug in sq_save... (I mentioned it, I don't know where or what it is - zero results dies badly)
+	- fix bug in render
+	- and can I do all this before Wednesday evening at 5?
+	- lots of other stuff to write too...
+	- debug stacks and whatnot...
 
-
-right now, nothing happens.  why?
-
-
-- either way, a message should always come back
-- no message comes back... ew
-
-- is there a way to print out the following things?
-	Recvr
-	HTTP_Request, Respnose
-	Buffer
-
-- it still crashes too...
-
-
-- how many total lines?:
-	883 for hypno
-	~800 for http
-	~900 for nw (this doesn't work very well..., maybe accept  + fork() is better?)
-
-
-
-
-
-
-
-
-???
----
-
-document all your work on youtube or something...
-
-- so many probs, and so many issues that may never get solved...
-
-
-???
-	all i needed now was tls??? can't be...	
-	add fp's to nw_write(...) and nw_read(...)
-
-
-opening and closing things...
-	can't remember how multiple threads handle things
-	as long as they aren't literally reading the same thing it should be fine
-	multiple handles can be the same on each file
-
-	allocate the HttpStreamer object and modify http.c to contain this.  This stuff should really be in the library...
-
-	you might want to skip the embedded file check, but it's a good test to have either way...
-
-	once that's done try these:
-		Cincinnati-skyline-from-kentucky-shore-night.jpg
-		morewindows.jpg
-		mrdr404.jpg
-		op-blue.png
-		road.jpg
-		room.jpg
-		room2.jpg
-		sign.jpg
-		sisfrac.jpg
-		walkway.jpg
-		water.jpg
-		weiner.jpg
-		windows.jpg
-		windows.new.jpg
-
-
-the best way to handle static files is preparing a header (and only a header)
-then either passing a pointer to an open file handle or opening it from http_send and passing stuff
-
-	- need a bf_delete? (not really, but it makes it easy to modify that structure)
-
-	- find slots (or modify Recvr to include slots) for a file handle and progress tracker
-
-	- appending to r->response via bf_append should allow files to send off w/o trouble
-
-	- pseudocode:
-
-		const int bufsize = 200;
-		if ( r->filepos == 0 )
-			return ( r->stage = NW_COMPLETED );
-		else {
-			filepos	= r->filepos;
-			*fileref = r->file;
-			snprintf( buf, sizeof(buf), "%d\r\n", bufsize );
-			bf_append( r->response, buf, strlen(buf) ); 
-			bf_append( r->response, fileref, bufsize );
-			*fileref += bufsize;
-			r->stage = NW_AT_WRITE;
-			return 1; 
-		}
-
-	- this seems easy, but will probably involve something weird...
-		
-	- TLS is easier to modify.  Change signature of nw_write and nw_read to use ( Selector *, Recvr * ) - Then the write and read functions can be thrown in w/o touching the Recvr again...
-
-
-
-hypnob:
-	- first run: 
-	x	create a folder at ~/.hypno
-	x	create a database
-	x	create the first table (or the others)
-	x	fail on empty list
-	x	fail on blank --create
-		show all list items without crashing
-	x	create a site folder successfully
-		load and serve one directory
-		load and serve from a bunch of directories
-
-
-hypno:
+tests:
 	-	write a test suite that can throw GET x <1M
 	-	write a test suite that can throw POST x <1M
 	-	write a test suite that tests route parsing
@@ -119,73 +25,16 @@ hypno:
 	- to make things safe, use a fork(), then kill that...
 
 
-today
-=====
-- checklist of all elements
-		model.(*) - the "sum" of all the model files
-		http.(*)
+script functions:
+	-	model.(*) - the "sum" of all the model files
+	-	http.(*)
 			cookie.(*) - All cookie info
 			session.(*) - Dunno where this goes yet
 			request.(*) - All request data
 			response.(*) - All response data
 			header.(*) - All header data	
-		db.(*)   - DB access crap
+	-	db.(*)   - DB access crap
 
-- node works better and doesn't require this...
-
-x dumping works
-
-x rendering works (but may have little issues here and there)
-
-- there is a healthy bug in single:sq_save
-	zero results crash 
-		(b/c the code keeps going and trying to make a table even though there is nothing there...)
-
-- also single:sq_save needs to use the result count for initializing lt_init
-		1024 is never going to be the answer in all cases...
-
-? write a function to put all the stack stuff in one table
-		multiple nested tables does not work without crashing... 
-		the bug is in the same place more than likely...
-
-- write another function putting model eval and rendering in one place
-
-- when that's done, rendering needs to work
-		as long as tables are working, there should be little issue here
-
-- then when that's done, you MIGHT be able to do work...
-		...
-
-
-- if I had to get a test run of this done, how would I do it?
-	do I still care about this?
-
-
-
-set a goal
-==========
-
-
-the good news:
-	a Loader structure exists now and can be mocked to test what you want
-	{ <file>, CC_MODEL }
-
-to make returns work the right way?
-	write some Lua code and return it (do not handle functions yet)
-	check that conversions work	
-
-
-
-HTML
-	GET (write dump to screen)
-	POST (write dump to screen)
-	crashes are incredibly important to check for...
-
-
-shit to do
-==========
-- pack response still fails
-x		but it doesn't seem to be failing now
 
 -	write the rest of the loader functions
 x		string
@@ -220,7 +69,6 @@ x		model evaluation
 					throw 404
 
 
-
 - rendering
 		I may have to add new hashes and use fpointers
 		basic find and replace works (but needs more testing)
@@ -231,106 +79,4 @@ x		model evaluation
 		SQlite first
 		Postgres and MySQL second
 
-- this should be it... after this, it's just writing code...
 
-
-sigh...
-=======
-- people want to work with decent people...
-		just choose...
-
-x loader seems to work with 'falafel'
-
-x remember: BIG hashes (until I get a chance to rewrite this)
-now, using the Loader structure, it should be pretty easy to write the rest of this...
--	goes in the http func
-- after writing the top sequence
-- try running this thing for real
-- does it work?  does it crash?
-
-
-
-
-keep me handy
-=============
-	- handle a socket
-		-s, -k = start, kill a server via hypno
-		open it 
-		receive data from it
-		see what came parsed
-		send data through it
-		close it
-
-	- database drivers:
-		-t [ mysql, sqlite3, postgresql, etc ] = test database drivers via hypno-test
-		sqlite3
-		mysql
-		postgresql
-		maybe one of the nosqls depending on need
-
-	- routing
-		-u <file> = test a router setup via hypno (no json)
-		interpret the routes in a file as they relate to code
-
-	- templating
-		-f <file> = test templates with data and files, 
-		-d {} or "select * from etc;" =  you'll need some sort of lua data 
-		be able to do raw replacements
-		be able to do scripting in the language (use the language)
-		
-	- tooling
-		this can be done from c too... no reason not to, but it can always be removed
-		-c <dir> ...
-		or
-		--create-from <file> 
-		shell script for now... is fine....
-		can't move quickly w/o it
-		create new directories and route structures
-		remove directories
-		possibly view what's in those directories
-
-	- handle the request / response chain
-		obvs, there's nothing here...
-		give the user some variables to choose from
-		be able to set things that the user should be able to set
-		after parsing, basic routes are always needed:
-		/dump
-		/debug
-		/etc...
-
-	- run unit tests
-		-t = run unit tests via hypno...	
-
-
-
-router
-======
-x	break url,
-x	check each portion for a match in the table
-x		*use strcmbd to append new url poritions to the buffer ( x, x.y, x.y.z, etc... )
-
-	since there is one linear data structure, the same thing can always run...
-
-
-	
-	if match found
-			now there's another data structure, use that...
-		check type:
-			table =
-				if the url still has parameters, check for any other values 
-					the problem is here, is that /check/:id could happen, where ID is required...  
-					 but even then, expects can handle this... tell it that the parameter received should be something...
-					continue
-				if not, 
-					check for 'expects' to validate values supplied
-					check for 'model' and 'view' tables or values to evaluate
-			string =
-				return it
-				would be incredibly useful to return the same named items... in model and app
-			number = 
-				return it
-			funct  = 
-				execute and return its result
-			sql?   = 
-				should reutrn formatted data, maybe specify the datatype... 
-				just thinking crazy

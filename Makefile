@@ -15,17 +15,24 @@ LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 
 # Not sure why these don't always work...
 #SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c socketmgr.c bridge.c 
-SRC = vendor/single.c vendor/sqlite3.c socketmgr.c bridge.c 
+SRC = vendor/single.c vendor/sqlite3.c socketmgr.c #bridge.c 
 OBJ = ${SRC:.c=.o}
+
+
+# Unfortunately, I'm still working on this...
+a:
+	$(CC) -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c
+	$(CC) -DSQROOGE_H -o bin/th test.c vendor/single.c
 
 # A main target, that will most likely result in a binary
 main: RICKROSS=main
 main: test-build-$(OS)
 main: 
 	mv $(RICKROSS) bin/hypno
+	$(CC) -o th test.c && mv th bin/
 
 # CLI
-cli: RICKROSS=$(NAME)b
+cli: RICKROSS=cli
 cli: test-build-$(OS)
 cli: 	
 	@printf ''>/dev/null
@@ -75,11 +82,11 @@ test-build-CYGWIN:
 # $(shell pkg-config --cflags lua5.3)
 test-build-Linux: $(OBJ) 
 test-build-Linux:
-	@echo $(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm 
-	@$(CC) $(CFLAGS) $(OBJ) $(RICKROSS).c -o $(RICKROSS) -llua -ldl -lpthread -lm
+	@echo $(CC) $(CFLAGS) $(OBJ) -o $(RICKROSS) -llua -ldl -lpthread -lm 
+	@$(CC) $(CFLAGS) $(OBJ) -o $(RICKROSS) -llua -ldl -lpthread -lm
 
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) hypnob testrouter testchains testsql testrender
+	-@rm $(NAME) cli testrouter testchains testsql testrender
 	-@find . | egrep '\.o$$' | grep -v sqlite | xargs rm

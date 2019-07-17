@@ -383,8 +383,6 @@ int http_post ( Recvr *r, void *ud, char *err ) {
 
 
 
-
-
 //This is the single-threaded HTTP run function
 _Bool http_run ( Recvr *r, void *p, char *err ) { 
  #ifdef INCLUDE_TIMING_INFO_H
