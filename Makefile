@@ -21,8 +21,8 @@ OBJ = ${SRC:.c=.o}
 
 # Unfortunately, I'm still working on this...
 a:
-	$(CC) -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c
-	$(CC) -DSQROOGE_H -o bin/th test.c vendor/single.c
+	$(CC) $(CFLAGS) -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c
+	$(CC) $(CFLAGS) -DSQROOGE_H -o bin/th test.c vendor/single.c
 
 # A main target, that will most likely result in a binary
 main: RICKROSS=main

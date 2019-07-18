@@ -1,8 +1,19 @@
 /*let's try this again.  It seems never to work like it should...
 */
 #include "vendor/single.h"
+
+#define ADD_ELEMENT( ptr, ptrListSize, eSize, element ) \
+	if ( ptr ) \
+		ptr = realloc( ptr, sizeof( eSize ) * ( ptrListSize + 1 ) ); \
+	else { \
+		ptr = malloc( sizeof( eSize ) ); \
+	} \
+	*(&ptr[ ptrListSize ]) = element; \
+	ptrListSize++;
+
 struct HTTPRecord {
 	const char *field; 
+	const char *metadata; 
 	uint8_t *value; 
 	int size; 
 };
@@ -12,8 +23,8 @@ struct HTTPBody {
 	int mlen;  //message length (length of the entire received message)
 	int	hlen;  //header length
 	int status; //what was this?
-	char      *stext; //status text ptr
-	char      *ctype; //content type ptr
+	char *stext; //status text ptr
+	char *ctype; //content type ptr
 #if 0	
 	char      method[HTTP_METHOD_MAX];  //one of 7 methods
 	char      protocol[HTTP_PROTO_MAX]; //
@@ -21,17 +32,17 @@ struct HTTPBody {
 	char      host[1024];               //safe bet for host length
 	char      boundary[128];            //The boundary
 #else
-	char      *method;
-	char      *protocol;
-	char      *path;
-	char      *host;
-	char      *boundary;
+	char *method;
+	char *protocol;
+	char *path;
+	char *host;
+	char *boundary;
 #endif
- 	uint8_t   *msg;
+ 	uint8_t *msg;
 
 	//Simple data structures.  like headers on both sides...
 	//Can't think if you need hash tables or not...
-	Table     table;
+	Table table;
 	//char **headers;
 };
 
@@ -609,13 +620,27 @@ void whatsockerr( int e ) {
 }
 
 
+//list out all rows in an HTTPRecord array
+void print_httprecords ( struct HTTPRecord **r ) {
+	while ( *r ) {
+		fprintf( stderr, "'%s' -> ", (*r)->field );
+		//fprintf( stderr, "%s\n", (*r)->field );
+		write( 2, "'", 1 );
+		write( 2, (*r)->value, (*r)->size );
+		write( 2, "'\n", 2 );
+		r++;
+	}
+}
+
+
+//list out everything in an HTTPBody
 void print_httpbody ( struct HTTPBody *r ) {
 	fprintf( stderr, "r->mlen: %d\n", r->mlen );
 	fprintf( stderr, "r->clen: %d\n", r->clen );
 	fprintf( stderr, "r->hlen: %d\n", r->hlen );
 	fprintf( stderr, "r->status: %d\n", r->status );
-	fprintf( stderr, "r->stext: %d\n", r->stext );
-	fprintf( stderr, "r->ctype: %d\n", r->ctype );
+	fprintf( stderr, "r->stext: %s\n", r->stext );
+	fprintf( stderr, "r->ctype: %s\n", r->ctype );
 	fprintf( stderr, "r->method: %s\n", r->method );
 	fprintf( stderr, "r->path: %s\n", r->path );
 	fprintf( stderr, "r->protocol: %s\n", r->protocol );
@@ -831,60 +856,144 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 	//Define records for each type here...
 	struct HTTPRecord **url=NULL, **headers=NULL, **body=NULL;
+	int len = 0;
 	Mem set;
 	memset( &set, 0, sizeof( Mem ) );
-	#if 0
-	//TODO? Borrow REALLOC from baht and get this to work nicely...
-	*url = malloc( sizeof( struct HTTPRecord ) );
-	*headers = malloc( sizeof( struct HTTPRecord ) );
-	*body = malloc( sizeof( struct HTTPRecord ) );
-	#endif
 
 	//Always process the URL
 	if ( strlen( rq->path ) > 1 ) {
-		//Is this a bug?
-		while ( strwalk( &set, rq->path, "/?=\0" ) ) {
-			fprintf( stderr, "A part of the path: " );
-			write( 2, &rq->path[ set.pos ], set.size + 1 );
-			fprintf( stderr, "\n" );
-			//REALLOC( url, ... );
+		int index = 0;
+		while ( strwalk( &set, rq->path, "?&" ) ) {
+			uint8_t *t = (uint8_t *)&rq->path[ set.pos ];
+			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
+			memset( b, 0, sizeof( struct HTTPRecord ) );
+			int at = memchrat( t, '=', set.size );
+			if ( !b || at == -1 || !set.size ) 
+				;
+			else {
+				char *k = malloc( at );
+				memset( k, 0, at );
+				memcpy( k, t, at );
+				b->field = k;
+				at += 1, t += at, set.size -= at;
+				b->value = t;
+				b->size = set.size;
+				ADD_ELEMENT( url, len, struct HTTPRecord, b );
+			}
 		}
+		ADD_ELEMENT( url, len, struct HTTPRecord, NULL );
+	}
+
+	if ( 1 ) {
+		fprintf(stderr,"URL received was:\n" );
+		print_httprecords( url );
 	}
 
 	//Always process the headers
 	memset( &set, 0, sizeof( Mem ) );
+	len = 0;
 	uint8_t *h = &rq->msg[ flLen - 1 ];
-	while ( memwalk( &set, h, (uint8_t *)"\r:", rq->hlen, 2 ) ) {
-		//Hmm, this one needs to work a bit differently.
-		//Break on newline, but extract the FIRST ':', the simple parse won't do.
-		if ( h[set.pos - 1] == '\r') {  
-			fprintf( stderr, "A header: " );
-			write( 2, &h[ set.pos ], set.size + 1 );
-			fprintf( stderr, "\n" );
+	while ( memwalk( &set, h, (uint8_t *)"\r", rq->hlen, 1 ) ) {
+		//Break on newline, and extract the _first_ ':'
+		uint8_t *t = &h[ set.pos - 1 ];
+		if ( *t == '\r' ) {  
+			int at = memchrat( ++t, ':', set.size );
+			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
+			memset( b, 0, sizeof( struct HTTPRecord ) );
+			if ( !b || at == -1 || at > 127 )
+				;
+			else {
+				char *k = malloc( at );
+				memset( k, 0, at );
+				memcpy( k, t, at );
+				b->field = k;
+				at += 2 /*NOTE: ': ' is two chars*/, t += at, set.size -= at;
+				b->value = t; //(uint8_t *)&rq->path[ set.pos ];
+				b->size = set.size;
+				ADD_ELEMENT( headers, len, struct HTTPRecord, b );
+			}
 		}
-		if ( h[set.pos - 1] == ':' && h[set.pos] == ' ' ) {
-			fprintf( stderr, "A header: " );
-			write( 2, &h[ set.pos ], set.size + 1 );
-			fprintf( stderr, "\n" );
-		}
-		//terminate here... or just shorten the hlen by 4 here...
-		//if ( memcmp( &h[ set.pos ], "\n\r\n", set.size ) == 0 ) ; 
-		//REALLOC( url, ... );
+	}
+	ADD_ELEMENT( headers, len, struct HTTPRecord, NULL );
+
+	if ( 1 ) {
+		fprintf(stderr,"Headers received were:\n" );
+		print_httprecords( headers );
 	}
 
-#if 0
+#error "POST crashes.  Don't know why yet."
+
+#if 1
 	//Always process the body 
 	memset( &set, 0, sizeof( Mem ) );
-	if ( strcmp( "POST", rq->method ) ) {
-		if ( strcmp( rq->ctype, "application/x-www-urlencoded" ) == 0 ) {
-			while ( memwalk( &set, (uint8_t *)rq->msg, (uint8_t *)"\r:=&", rq->clen, 4 ) ) {
-				//REALLOC( url, ... );
+	len = 0;
+	uint8_t *p = &rq->msg[ rq->hlen ] + strlen( "\r\n\r\n" );
+	
+	fprintf( stderr, "\nSTART OF POST REQUEST\n" );
+	write( 2, p, rq->mlen - rq->hlen ); 
+	fprintf( stderr, "\nEND OF POST REQUEST\n" );
+
+	//TODO: If this is a xfer-encoding chunked msg, rq->clen needs to get filled in when done.
+	if ( strcmp( "POST", rq->method ) == 0 ) {
+		char *c = strcmp( rq->ctype, "application/x-www-urlencoded" ) == 0 ? "\r:=&" : "\r:=;";
+		struct HTTPRecord *b = NULL;
+		fprintf( stderr, "\nSTART OF POST REQUEST\n" );
+		write( 2, p, rq->mlen - rq->hlen ); 
+		fprintf( stderr, "\nEND OF POST REQUEST\n" );
+		int name=0;
+		int value=0;
+
+		while ( memwalk( &set, p, (uint8_t *)c, rq->clen, strlen(c) ) ) {
+			//REALLOC( url, ... );
+			//Check for a boundary first?
+			uint8_t *t = &p[ set.pos ];
+			if ( *t == '-' && set.size >= strlen(rq->boundary) && memcmp( rq->boundary, t, set.size ) ) {
+				//fprintf( stderr, "got boundary allocating entry...\n" );
+				//r = malloc( sizeof( struct HTTPRecord ) );
+				//ADD_ELEMENT( headers, len, struct HTTPRecord, r );
+				;
 			}
+			if ( *t == 'n' && set.size >= strlen( "name" ) && memcmp( "name", t, set.size ) ) {
+				fprintf( stderr, "got name field...\n" );
+				name = 1;
+			}
+
+			else if ( p[ set.pos - 1 ] == '=' && name == 1 ) {
+				fprintf( stderr, "copying name field...\n" );
+				b = malloc( sizeof( struct HTTPRecord ) );
+				memset( b, 0, sizeof( struct HTTPRecord ) ); 
+				char *k = malloc( set.size );
+				memset( k, 0, set.size );
+				memcpy( k, t, set.size );
+				b->field = k;
+				name = 0;
+			}
+			
+			//"\r\n\r\n"
+			else if ( p[ set.pos - 1 ] == '\r' && *t == '\n' && !value ) {
+				fprintf( stderr, "setting value bit...\n" );
+				value = 1;
+			}
+			//"\r\n$CONTENT"
+			else if ( p[ set.pos - 1 ] == '\r' && *t == '\n' && value == 1 ) {
+				fprintf( stderr, "copying value...\n" );
+				t += 1;
+				b->value = t;
+				b->size = set.size - 1;
+				ADD_ELEMENT( body, len, struct HTTPRecord, b );
+				value = 0;
+				b = NULL;
+			}
+			#if 0
+			fprintf( stderr, "Post Value => " );
+			write( 2, t, set.size );
+			fprintf( stderr, "\n" );
+			#endif
 		}
-		else {
-			while ( memwalk( &set, (uint8_t *)rq->msg, (uint8_t *)"\r:=;", rq->clen, 4 ) ) {
-				//REALLOC( url, ... );
-			}
+		ADD_ELEMENT( body, len, struct HTTPRecord, NULL );
+		if ( 1 ) {
+			fprintf( stderr, "BODY got:\n" );
+			print_httprecords( body );
 		}
 	}
 #endif
