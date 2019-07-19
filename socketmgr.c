@@ -377,223 +377,6 @@ unsigned char *httptrim (uint8_t *msg, const char *trim, int len, int *nlen) {
 }
 
 
-#if 0
-//Create the rest of the request (then send it on)
-int msg_get_remaining (struct HTTPBody *r, uint8_t *msg, int len) {
-	//Define
-	//HTTP_Request *r = &h->request;
-	LiteBlob *host = NULL;
-	int runner = 0;
-#if 1
-	struct HS { 
-		char *name, a, s; 
-		Parser p; 
-		/*LiteKv *kv;*/ 
-		uint8_t *msg; 
-		int ml, type, inc; 
-	} hs[] = 
-	{
-		//URL
-		{ "URL",'u', 0  ,{ .words = {{"/"}, {"?"}, {"\0"}, {NULL}} },
-			/*r->URL,*/ (uint8_t *)r->path, strlen(r->path), 1, 0 },
-		//Headers
-		{ "headers",'h','\n',{ .words = {{"\r\n"}, {":"}, {"="}, {";"}, {NULL}} },
-			/*r->headers, */  msg, r->hlen    , 1, 1 },
-		/*GET*/
-		{ "GET",'g','?' ,{ .words = {{"?"}, {"&"}, {"="}, {NULL}} },
-			/*r->GET,*/ (uint8_t *)r->path, strlen(r->path), 1, 1 },
-		/*MPP*/
-		{ "POST",'m', 0  ,{ .words = {{r->boundary},{"\r\n\r\n"},{"\r\n"},{":"},{"="},{";"},{NULL}} },
-			/*r->body,*/ &msg[r->hlen + 4], r->clen        , 1, 0 },
-		/*APP*/
-		{ "POST",'a', 0  ,{ .words = {{"\r\n"}, {":"},{"="},{"&"},{NULL}} },
-			/*r->body,*/ &msg[r->hlen + 4], r->clen        , 1 }
-	};
-
-	//Initialize here
-	lt_init( &r->table, NULL, 1027 );
-
-	//...
-	if ( memcmp( "HEAD", r->method, 4 ) == 0 )
-		runner = 1;
-	else if ( memcmp( "GET", r->method, 3 ) == 0 )
-		runner = memchr( r->path, '?', strlen(r->path) ) ? 3 : 2;
-	else if ( memcmp( "POST", r->method, 4 ) == 0 || memcmp( "PUT", r->method, 3 ) == 0 ) {
-		runner = memchr( r->path, '?', strlen(r->path) ) ? 3 : 2;
-		hs[ runner++ ] = hs [ (*r->boundary) ? 3 : 4 ];
-	}
-
-
-	//...
-	for (int i=0; i < runner; i++) {
-		unsigned char *blob = NULL;
-		struct HS *h = &hs[ i ];	
-		Parser *ps   = &h->p;
-		int bw       = 0;
-		int ii       = 0;
-		int jj       = 0;
-		int kk       = 0;
-		int root     = 0;
-		int colon    = 0;
-		int cstart   = 0,
-			  cend     = 0;
-
-		//Add a new key
-		lt_addblobkey( &r->table, (unsigned char *)h->name, strlen(h->name));
-		lt_descend( &r->table );
-
-		//Find the starting character.
-		if ( h->s ) {
-			if ((ii = memchrat(h->msg, h->s, h->ml)) == -1) continue;
-			h->msg = memchr(h->msg, h->s, h->ml);
-			h->ml -= ii;
-		}
-
-		h->msg += h->inc;
-		pr_prepare( ps );
-
-		while ( pr_next( ps, h->msg, h->ml ) ) {
-			int adjust=0;
-			if ( ps->word == NULL ) {
-				//unsigned char *blob = NULL;//httpvtrim( &h->msg[ ps->prev - 1 ], ps->size, &adjust );
-				if ( strcmp("URL", h->name) == 0 ) {
-					lt_addintkey( &r->table, ++bw );
-					if ( h->msg[ ps->prev - 1 ] == '?' ) break;
-					blob = httpvtrim( &h->msg[ ps->prev - 1 ], ps->size + 1, &adjust );
-				}
-				else {
-					blob = httpvtrim( &h->msg[ ps->prev ], ps->size, &adjust );
-				}
-				lt_addblobvalue( &r->table, blob, adjust );
-				lt_finalize( &r->table );
-				break;
-			}
-			else if ( *ps->word == '-' ) {
-				bw = 1; //Find http boundary
-				unsigned char *ret = NULL;
-				if ((ii = memstrat( &h->msg[ ps->prev ], "; name=", h->ml - ps->prev )) == -1)
-					continue;
-				int begin = ii + strlen("; name=") + ps->prev;
-				int jj = memstrat( &h->msg[ begin ], "\r", h->ml - begin );
-				int kk = memstrat( &h->msg[ begin ], ";", h->ml - begin );
-				static const char whitespace[]     = "\t\r\n\" ";
-				
-				if ( jj == -1 && kk == -1 )
-					continue;
-				if ( jj == -1 )
-					ret = httptrim( &h->msg[ begin ], whitespace, kk, &adjust );
-				else if (kk == -1)
-					ret = httptrim( &h->msg[ begin ], whitespace, jj, &adjust );
-				else {
-					ret = httptrim( &h->msg[ begin ], whitespace, (jj < kk) ? jj : kk, &adjust );
-				}
-				lt_addblobkey( &r->table, ret, adjust );
-				lt_descend( &r->table );
-			}
-			else if ( *ps->word == '/' ) { /*memcmp( "/", w, 1 ) == 0 )*/
-				//root is ALWAYS first...
-				if ( !root ) {
-					lt_addintkey( &r->table, bw );
-					lt_addblobvalue( &r->table, (uint8_t *)"/", 1 );
-					lt_finalize( &r->table );
-					root = 1;
-					if (h->ml == 1)
-						break;
-					else {
-						continue;
-					}
-				}
-
-				lt_addintkey( &r->table, ++bw );
-				lt_addblobvalue( &r->table, &h->msg[ ps->prev - 1 ], ps->size + 1 );
-				lt_finalize( &r->table );
-			}
-			else if ( *ps->word == '?' ) { /*memcmp( "?", w, 1 ) == 0 ) {*/
-				lt_addintkey( &r->table, ++bw );
-				lt_addblobvalue( &r->table, &h->msg[ ps->prev - 1 ], ps->size + 1 );
-				lt_finalize( &r->table ); 
-			}	
-			else if ( memchr( ":=", *ps->word, 2 ) ) {
-				if ( h->a == 'h' ) {
-					if ( colon ) continue;
-					else { 
-						colon = 1;
-						cstart = ps->next;
-					}
-					blob = httpvtrim( &h->msg[ ps->prev ], ps->size, &adjust ); 
-					lt_addblobkey( &r->table, blob, adjust );
-					//write( 2, blob, adjust ); write( 2, " => ", 4 );
-				}
-				else {
-					blob = httpvtrim( &h->msg[ ps->prev ], ps->size, &adjust ); 
-					lt_addblobkey( &r->table, blob, adjust );
-				}
-			}
-			else if ( memchr( ";\r&", *ps->word, 3 ) ) {
-				//unsigned char *blob = NULL;
-				if (bw) {
-					bw=0;  
-					continue; 
-				}
-
-				//Unset the colon
-				if ( h->a == 'h' ) {
-					if ( *ps->word == '\r' && colon ) {	
-						colon = 0;
-						//write( 2, &h->msg[cstart], ps->next - cstart  );
-						blob = httpvtrim( &h->msg[ cstart ], ps->next - cstart, &adjust ); 
-					}
-					else if ( *ps->word == ';' && colon ) {
-						continue;
-					} 
-				} 
-				else {
-					blob = httpvtrim( &h->msg[ ps->prev ], ps->size, &adjust ); 
-				}
-
-				//Value fudging... cuz Multipart post is the stupidest protocol ever written
-				lt_addblobvalue( &r->table, blob, adjust ); 
-				lt_finalize( &r->table );
-
-				//Handle multipart values...
-				if ( memcmp( "\r\n\r\n", ps->word, 4 ) == 0 ) {
-					SHOWDATA( "%d, %s\n", ps->next, r->boundary );
-					int aa = memstrat( &h->msg[ ps->next ], r->boundary, h->ml - ps->next ); 
-					if ( aa == -1 )
-						continue;	
-					aa -= 2;
-					lt_addblobkey (&r->table, (uint8_t *)content_string, strlen(content_string)); 
-					lt_addblobvalue( &r->table, &h->msg[ ps->next ], aa - 2);
-					lt_finalize(&r->table);
-					lt_ascend(&r->table);
-					ps->next += aa;
-				}
-			}
-		}
-
-		lt_ascend( &r->table );
-	}
-
-	lt_lock( &r->table );
-#if 0
-	//TODO: This should affect the hostname field
-	//Now extract the hostname and save it to a buffer
-	if ( !(host = &lt_blob( &r->table, "headers.Host" ))->size )
-		h->host = NULL;
- 	else {
-		int p=0;
-		int pos = (( p = memchrat( host->blob, ':', host->size )) == -1) ? host->size : p;
-		h->host = malloc( pos + 1 );
-		memset( h->host, 0, pos + 1 ); 
-		memcpy( h->host, host->blob, pos );
-		h->host[ pos ] = '\0';		
-	}
-#endif
-#endif
-	return 1;
-}
-#endif
-
 //pre
 int http_pre( ) {
 	return 0;
@@ -635,17 +418,17 @@ void print_httprecords ( struct HTTPRecord **r ) {
 
 //list out everything in an HTTPBody
 void print_httpbody ( struct HTTPBody *r ) {
-	fprintf( stderr, "r->mlen: %d\n", r->mlen );
-	fprintf( stderr, "r->clen: %d\n", r->clen );
-	fprintf( stderr, "r->hlen: %d\n", r->hlen );
-	fprintf( stderr, "r->status: %d\n", r->status );
-	fprintf( stderr, "r->stext: %s\n", r->stext );
-	fprintf( stderr, "r->ctype: %s\n", r->ctype );
-	fprintf( stderr, "r->method: %s\n", r->method );
-	fprintf( stderr, "r->path: %s\n", r->path );
-	fprintf( stderr, "r->protocol: %s\n", r->protocol );
-	fprintf( stderr, "r->host: %s\n", r->host );
-	fprintf( stderr, "r->boundary: %s\n", r->boundary );
+	fprintf( stderr, "r->mlen: '%d'\n", r->mlen );
+	fprintf( stderr, "r->clen: '%d'\n", r->clen );
+	fprintf( stderr, "r->hlen: '%d'\n", r->hlen );
+	fprintf( stderr, "r->status: '%d'\n", r->status );
+	fprintf( stderr, "r->stext: '%s'\n", r->stext );
+	fprintf( stderr, "r->ctype: '%s'\n", r->ctype );
+	fprintf( stderr, "r->method: '%s'\n", r->method );
+	fprintf( stderr, "r->path: '%s'\n", r->path );
+	fprintf( stderr, "r->protocol: '%s'\n", r->protocol );
+	fprintf( stderr, "r->host: '%s'\n", r->host );
+	fprintf( stderr, "r->boundary: '%s'\n", r->boundary );
 }
 
 
@@ -866,7 +649,7 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 		;
 	else if ( strcmp( rq->method, "POST" ) == 0 ) {
 		rq->clen = safeatoi( msg_get_value( "Content-Length: ", "\r", rq->msg, hdLen ) );
-		rq->ctype = msg_get_value( "Content-Type: ", "\r;", rq->msg, hdLen );
+		rq->ctype = msg_get_value( "Content-Type: ", ";\r", rq->msg, hdLen );
 		rq->boundary = msg_get_value( "boundary=", "\r", rq->msg, hdLen );
 		//rq->mlen = hdLen; 
 		//If clen is -1, ... hmmm.  At some point, I still need to do the rest of the work. 
@@ -954,57 +737,81 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 	
 	//TODO: If this is a xfer-encoding chunked msg, rq->clen needs to get filled in when done.
 	if ( strcmp( "POST", rq->method ) == 0 ) {
-		char *c = strcmp( rq->ctype, "application/x-www-urlencoded" ) == 0 ? "\r:=&" : "\r:=;";
 		struct HTTPRecord *b = NULL;
 		#if 0
 		fprintf( stderr, "\nSTART OF POST REQUEST\n" );
 		write( 2, "'", 1 ); 
 		write( 2, p, rq->mlen - rq->hlen ); 
 		fprintf( stderr, "\nEND OF POST REQUEST\n" );
+close(fd);
+_exit(0);
 		#endif
 		//TODO: Bitmasking is 1% more efficient, go for it.
 		int name=0;
 		int value=0;
 		int index=0;
 
-		while ( memwalk( &set, p, (uint8_t *)c, rq->clen, strlen(c) ) ) {
-			//TODO: If we're being technical, set.pos - 1 can point to a negative index.  
-			//However, as long as headers were sent (and 99.99999999% of the time they will be)
-			//this negative index will point to valid allocated memory...
-			uint8_t *m = &p[ set.pos - 1 ];  
-			if ( memcmp( m, "; name=", 7 ) == 0 ) { 
-				//fprintf( stderr, "got name field... pass %d\n", ++index );
-				name = 1;
+		//url encoded is a little bit different.  no real reason to use the same code...
+		if ( strcmp( rq->ctype, "application/x-www-form-urlencoded" ) == 0 ) {
+			//NOTE: clen is up by two to assist our little tokenizer...
+			while ( memwalk( &set, p, (uint8_t *)"\n=&", rq->clen + 2, 3 ) ) {
+				uint8_t *m = &p[ set.pos - 1 ];  
+				if ( *m == '\n' || *m == '&' ) {
+					b = malloc( sizeof( struct HTTPRecord ) );
+					memset( b, 0, sizeof( struct HTTPRecord ) ); 
+					char *k = malloc( set.size );
+					memset( k, 0, set.size );
+					memcpy( k, ++m, set.size );
+					b->field = k; 
+				}
+				else if ( *m == '=' ) {
+					b->value = ++m;
+					b->size = set.size;
+					ADD_ELEMENT( body, len, struct HTTPRecord, b );
+					b = NULL;
+				}
 			}
-			//"\r\n\r\n"
-			else if ( memcmp( m, "\r\n\r\n", 4 ) == 0 && !value ) {
-				//fprintf( stderr, "setting value bit... pass %d\n", ++index );
-				value = 1;
-			}
-			else if ( memcmp( m, "\r\n-", 3 ) == 0 && !value ) {
-				//fprintf( stderr, "got a boundary... pass %d\n", ++index );
-				b = malloc( sizeof( struct HTTPRecord ) );
-				memset( b, 0, sizeof( struct HTTPRecord ) ); 
-			}
-			else if ( memcmp( m, "\r\n", 2 ) == 0 && value == 1 ) {
-				//fprintf( stderr, "copying value...  pass %d\n", ++index );
-				m += 2;
-				b->value = m;//++t;
-				b->size = set.size - 1;
-				ADD_ELEMENT( body, len, struct HTTPRecord, b );
-				value = 0;
-				b = NULL;
-			}
-			else if ( *m == '=' && name == 1 ) {
-				//fprintf( stderr, "copying name field... pass %d\n", ++index );
-				int size = *(m + 1) == '"' ? set.size - 2 : set.size;
-				int ptrinc = *(m + 1) == '"' ? 2 : 1;
-				char *k = malloc( set.size );
-				m += ptrinc;	
-				memset( k, 0, set.size );
-				memcpy( k, m, size );
-				b->field = k;
-				name = 0;
+		}
+		else {
+			while ( memwalk( &set, p, (uint8_t *)"\r:=;", rq->clen, 4 ) ) {
+				//TODO: If we're being technical, set.pos - 1 can point to a negative index.  
+				//However, as long as headers were sent (and 99.99999999% of the time they will be)
+				//this negative index will point to valid allocated memory...
+				uint8_t *m = &p[ set.pos - 1 ];  
+				if ( memcmp( m, "; name=", 7 ) == 0 ) { 
+					//fprintf( stderr, "got name field... pass %d\n", ++index );
+					name = 1;
+				}
+				//"\r\n\r\n"
+				else if ( memcmp( m, "\r\n\r\n", 4 ) == 0 && !value ) {
+					//fprintf( stderr, "setting value bit... pass %d\n", ++index );
+					value = 1;
+				}
+				else if ( memcmp( m, "\r\n-", 3 ) == 0 && !value ) {
+					//fprintf( stderr, "got a boundary... pass %d\n", ++index );
+					b = malloc( sizeof( struct HTTPRecord ) );
+					memset( b, 0, sizeof( struct HTTPRecord ) ); 
+				}
+				else if ( memcmp( m, "\r\n", 2 ) == 0 && value == 1 ) {
+					//fprintf( stderr, "copying value...  pass %d\n", ++index );
+					m += 2;
+					b->value = m;//++t;
+					b->size = set.size - 1;
+					ADD_ELEMENT( body, len, struct HTTPRecord, b );
+					value = 0;
+					b = NULL;
+				}
+				else if ( *m == '=' && name == 1 ) {
+					//fprintf( stderr, "copying name field... pass %d\n", ++index );
+					int size = *(m + 1) == '"' ? set.size - 2 : set.size;
+					int ptrinc = *(m + 1) == '"' ? 2 : 1;
+					char *k = malloc( set.size );
+					m += ptrinc;	
+					memset( k, 0, set.size );
+					memcpy( k, m, size );
+					b->field = k;
+					name = 0;
+				}
 			}
 		}
 		ADD_ELEMENT( body, len, struct HTTPRecord, NULL );
