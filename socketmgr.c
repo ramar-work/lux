@@ -1,5 +1,4 @@
-/*let's try this again.  It seems never to work like it should...
-*/
+/*let's try this again.  It seems never to work like it should...*/
 #include "vendor/single.h"
 
 #define ADD_ELEMENT( ptr, ptrListSize, eSize, element ) \
@@ -18,6 +17,7 @@ struct HTTPRecord {
 	int size; 
 };
 
+
 struct HTTPBody {
 	int clen;  //content length
 	int mlen;  //message length (length of the entire received message)
@@ -25,27 +25,13 @@ struct HTTPBody {
 	int status; //what was this?
 	char *stext; //status text ptr
 	char *ctype; //content type ptr
-#if 0	
-	char      method[HTTP_METHOD_MAX];  //one of 7 methods
-	char      protocol[HTTP_PROTO_MAX]; //
-	char      path[HTTP_URL_MAX];       //The requested path
-	char      host[1024];               //safe bet for host length
-	char      boundary[128];            //The boundary
-#else
 	char *method;
 	char *protocol;
 	char *path;
 	char *host;
 	char *boundary;
-#endif
  	uint8_t *msg;
-
-	//Simple data structures.  like headers on both sides...
-	//Can't think if you need hash tables or not...
-	Table table;
-	//char **headers;
 };
-
 
 
 struct sockAbstr {
@@ -66,7 +52,7 @@ struct sockAbstr {
 };
 
 
-/*???*/
+#if 0
 struct Loop {
 //	Type type;	//what other type would there be?
 	struct pollfd   *client;  //Pointer to currently being served client
@@ -78,8 +64,7 @@ struct Loop {
 	//struct timespec start, end;
 	int      connNo; 
 };
-
-
+#endif
 
 
 typedef enum {
@@ -164,10 +149,6 @@ static const char *http_status[] = {
 };
 
 
-//TODO: I want no static global variables anywhere
-static const char content_string[] = "content";
-
-
 //Get space between
 char *get_lstr( char **str, char chr, int *lt ) {
 	//find string, clone string and increment ptr
@@ -189,68 +170,6 @@ char *get_lstr( char **str, char chr, int *lt ) {
 	}
 
 	return rr;
-}
-
-
-
-#define REMOVE_ME
-#ifdef REMOVE_ME 
-//Get the method, version and location
-int msg_parse_first_line (struct HTTPBody *h, uint8_t *msg, int len) {
-	char *a[] = { h->method, h->path, h->protocol };
-	//Define stuff
-	Parser p = { .words={{" "},{"\r"},{NULL}} }; 
-	pr_prepare( &p );
-	int tlen = 0;
-#if 0
-
-	if ((tlen = memchrat( &msg[0], '\n', len )) == -1)
-		return 0;  //This was a fail...  specify the error somewhere....
-
-#endif
-	for ( int i=0; i<3 && pr_next( &p, &msg[0], tlen + 1 ); i++ ) {
-	#if 0
-		memset( tt[i].ptr, 0, tt[i].maxlen );
-		if ( p.size + 1 > tt[i].maxlen ) {
-			return 0; //Also was a fail, specify error...
-		}
-		memcpy( tt[i].ptr, &msg[ p.prev ], p.size );
-		tt[i].ptr[ p.size ] = '\0';	
-	#else
-		memcpy(	(a[i] = malloc( p.size + 1 )), &msg[ p.prev ], p.size );
-		a[i][p.size] = '\0';
-	#endif
-	}
-
-	return 1;
-}
-#endif
-
-
-//Set the content length
-int msg_get_content_length (uint8_t *msg, int len) {
-	int a, b;
-	char lc[ 128 ];
-	if ((a = memstrat( msg, "Content-Length", len )) > -1) {
-		//Catch any misses...
-		msg += 16;
-		if ((b = memchrat( msg, '\r', len - a )) > 127 || b == -1 ) return 0; 
-
-		//Copy to string
-		memset( lc, 0, b );
-		memcpy( lc, msg, b );//&msg[a], b ); //lc[ b ] = '\0';
-
-		//Make sure that content-length numeric
-		for ( int i=0; i < strlen(lc); i++ )  {
-			if ( (int)lc[i] < 48 || (int)lc[i] > 57 ) {
-				return 0;
-			}
-		}
-
-		//Set the content-length
-		return atoi( lc );
-	}
-	return 0;
 }
 
 
@@ -328,27 +247,6 @@ char *msg_get_boundary ( uint8_t *msg, int len ) {
 	}
 	return bContent; 
 }
-
-
-//Get the distance from the headers on
-int msg_get_header_length (struct HTTPBody *h, uint8_t *msg, int32_t len) {
-	//return ((h->hlen = memstrat(msg, "\r\n\r\n", len)) == -1) ? 0 : 1;
-return 0;
-}
-
-
-
-//Figure out the message length
-int msg_get_message_length (struct HTTPBody *h, uint8_t *msg, int32_t len) {
-	//if these are equal, then we haven't gotten the full thing yet...
-#if 0
-	if ( h->hlen + 4 == len )
-		return 0;
-	r->mlen = len - (r->hlen + 4);	
-#endif
-	return 1;	
-}
-
 
 
 //Trim whitespace
@@ -743,8 +641,6 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 		write( 2, "'", 1 ); 
 		write( 2, p, rq->mlen - rq->hlen ); 
 		fprintf( stderr, "\nEND OF POST REQUEST\n" );
-close(fd);
-_exit(0);
 		#endif
 		//TODO: Bitmasking is 1% more efficient, go for it.
 		int name=0;
@@ -875,9 +771,6 @@ struct senderrecvr {
 ,	{ NULL }
 };
 
-
-
-#if 1
 
 
 int main (int argc, char *argv[]) {
@@ -1132,4 +1025,3 @@ int main (int argc, char *argv[]) {
 	return 0;
 }
 
-#endif
