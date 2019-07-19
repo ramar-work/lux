@@ -6,7 +6,7 @@
 
 const char *cmds[] = {
 	//Simple GETs
-	"curl --form name=John --form shoesize=11 http://localhost:2000?yes=bounce&twelve=kittens"
+	"curl -i --form name=John --form shoesize=11 http://localhost:2000?yes=bounce&twelve=kittens"
 //, "wget http://localhost:2000"
 //, "chromium http://localhost:2000"
 

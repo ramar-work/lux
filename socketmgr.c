@@ -377,7 +377,7 @@ unsigned char *httptrim (uint8_t *msg, const char *trim, int len, int *nlen) {
 }
 
 
-
+#if 0
 //Create the rest of the request (then send it on)
 int msg_get_remaining (struct HTTPBody *r, uint8_t *msg, int len) {
 	//Define
@@ -592,7 +592,7 @@ int msg_get_remaining (struct HTTPBody *r, uint8_t *msg, int len) {
 #endif
 	return 1;
 }
-
+#endif
 
 //pre
 int http_pre( ) {
@@ -683,6 +683,28 @@ int t_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 }
 
 
+//Any processing can be done in the middle.  Since we're in another "thread" anyway
+int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
+	const char http_200[] = ""
+		"HTTP/1.1 200 OK\r\n"
+		"Content-Length: 11\r\n"
+		"Content-Type: text/html\r\n\r\n"
+		"<h2>Ok</h2>";
+	fprintf( stderr, "REQUEST IS:\n" );
+	print_httpbody( rq );
+	fprintf( stderr, "RESPONSE IS:\n" );
+	print_httpbody( rs );
+	if ( write( fd, http_200, strlen(http_200)) == -1 ) {
+		fprintf(stderr, "Couldn't write all of message..." );
+		close(fd);
+		return 0;
+	}
+
+	return 0;
+}
+
+
+//Write
 int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 	//if ( 1 ) write( 2, rq->msg, rq->mlen );
 	int sent = 0;
@@ -897,18 +919,21 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 		//Break on newline, and extract the _first_ ':'
 		uint8_t *t = &h[ set.pos - 1 ];
 		if ( *t == '\r' ) {  
-			int at = memchrat( ++t, ':', set.size );
+			int at = memchrat( t, ':', set.size );
 			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
 			memset( b, 0, sizeof( struct HTTPRecord ) );
 			if ( !b || at == -1 || at > 127 )
 				;
 			else {
+				at -= 2;
+				t += 2;
 				char *k = malloc( at );
 				memset( k, 0, at );
 				memcpy( k, t, at );
 				b->field = k;
-				at += 2 /*NOTE: ': ' is two chars*/, t += at, set.size -= at;
-				b->value = t; //(uint8_t *)&rq->path[ set.pos ];
+				at += 2;  //Increment to get past ': ' 
+				t += at, set.size -= at;
+				b->value = t;
 				b->size = set.size;
 				ADD_ELEMENT( headers, len, struct HTTPRecord, b );
 			}
@@ -921,85 +946,78 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 		print_httprecords( headers );
 	}
 
-#error "POST crashes.  Don't know why yet."
-
-#if 1
 	//Always process the body 
 	memset( &set, 0, sizeof( Mem ) );
 	len = 0;
-	uint8_t *p = &rq->msg[ rq->hlen ] + strlen( "\r\n\r\n" );
+	uint8_t *p = &rq->msg[ rq->hlen + strlen( "\r\n" ) ];
+	int plen = rq->mlen - rq->hlen;
 	
-	fprintf( stderr, "\nSTART OF POST REQUEST\n" );
-	write( 2, p, rq->mlen - rq->hlen ); 
-	fprintf( stderr, "\nEND OF POST REQUEST\n" );
-
 	//TODO: If this is a xfer-encoding chunked msg, rq->clen needs to get filled in when done.
 	if ( strcmp( "POST", rq->method ) == 0 ) {
 		char *c = strcmp( rq->ctype, "application/x-www-urlencoded" ) == 0 ? "\r:=&" : "\r:=;";
 		struct HTTPRecord *b = NULL;
+		#if 0
 		fprintf( stderr, "\nSTART OF POST REQUEST\n" );
+		write( 2, "'", 1 ); 
 		write( 2, p, rq->mlen - rq->hlen ); 
 		fprintf( stderr, "\nEND OF POST REQUEST\n" );
+		#endif
+		//TODO: Bitmasking is 1% more efficient, go for it.
 		int name=0;
 		int value=0;
+		int index=0;
 
 		while ( memwalk( &set, p, (uint8_t *)c, rq->clen, strlen(c) ) ) {
-			//REALLOC( url, ... );
-			//Check for a boundary first?
-			uint8_t *t = &p[ set.pos ];
-			if ( *t == '-' && set.size >= strlen(rq->boundary) && memcmp( rq->boundary, t, set.size ) ) {
-				//fprintf( stderr, "got boundary allocating entry...\n" );
-				//r = malloc( sizeof( struct HTTPRecord ) );
-				//ADD_ELEMENT( headers, len, struct HTTPRecord, r );
-				;
-			}
-			if ( *t == 'n' && set.size >= strlen( "name" ) && memcmp( "name", t, set.size ) ) {
-				fprintf( stderr, "got name field...\n" );
+			//TODO: If we're being technical, set.pos - 1 can point to a negative index.  
+			//However, as long as headers were sent (and 99.99999999% of the time they will be)
+			//this negative index will point to valid allocated memory...
+			uint8_t *m = &p[ set.pos - 1 ];  
+			if ( memcmp( m, "; name=", 7 ) == 0 ) { 
+				//fprintf( stderr, "got name field... pass %d\n", ++index );
 				name = 1;
 			}
-
-			else if ( p[ set.pos - 1 ] == '=' && name == 1 ) {
-				fprintf( stderr, "copying name field...\n" );
-				b = malloc( sizeof( struct HTTPRecord ) );
-				memset( b, 0, sizeof( struct HTTPRecord ) ); 
-				char *k = malloc( set.size );
-				memset( k, 0, set.size );
-				memcpy( k, t, set.size );
-				b->field = k;
-				name = 0;
-			}
-			
 			//"\r\n\r\n"
-			else if ( p[ set.pos - 1 ] == '\r' && *t == '\n' && !value ) {
-				fprintf( stderr, "setting value bit...\n" );
+			else if ( memcmp( m, "\r\n\r\n", 4 ) == 0 && !value ) {
+				//fprintf( stderr, "setting value bit... pass %d\n", ++index );
 				value = 1;
 			}
-			//"\r\n$CONTENT"
-			else if ( p[ set.pos - 1 ] == '\r' && *t == '\n' && value == 1 ) {
-				fprintf( stderr, "copying value...\n" );
-				t += 1;
-				b->value = t;
+			else if ( memcmp( m, "\r\n-", 3 ) == 0 && !value ) {
+				//fprintf( stderr, "got a boundary... pass %d\n", ++index );
+				b = malloc( sizeof( struct HTTPRecord ) );
+				memset( b, 0, sizeof( struct HTTPRecord ) ); 
+			}
+			else if ( memcmp( m, "\r\n", 2 ) == 0 && value == 1 ) {
+				//fprintf( stderr, "copying value...  pass %d\n", ++index );
+				m += 2;
+				b->value = m;//++t;
 				b->size = set.size - 1;
 				ADD_ELEMENT( body, len, struct HTTPRecord, b );
 				value = 0;
 				b = NULL;
 			}
-			#if 0
-			fprintf( stderr, "Post Value => " );
-			write( 2, t, set.size );
-			fprintf( stderr, "\n" );
-			#endif
+			else if ( *m == '=' && name == 1 ) {
+				//fprintf( stderr, "copying name field... pass %d\n", ++index );
+				int size = *(m + 1) == '"' ? set.size - 2 : set.size;
+				int ptrinc = *(m + 1) == '"' ? 2 : 1;
+				char *k = malloc( set.size );
+				m += ptrinc;	
+				memset( k, 0, set.size );
+				memcpy( k, m, size );
+				b->field = k;
+				name = 0;
+			}
 		}
 		ADD_ELEMENT( body, len, struct HTTPRecord, NULL );
+		//This MAY help in handling malformed messages...
+		if ( b && (!b->field || !b->value) ) free( b );
 		if ( 1 ) {
 			fprintf( stderr, "BODY got:\n" );
 			print_httprecords( body );
 		}
 	}
-#endif
 
 	//for testing, this should stay here...
-	close(fd);
+	//close(fd);
 	return 0;
 }
 
@@ -1040,12 +1058,13 @@ int ssl_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 struct senderrecvr { 
 	int (*read)( int, struct HTTPBody *, struct HTTPBody * );
+	int (*proc)( int, struct HTTPBody *, struct HTTPBody * ); 
 	int (*write)( int, struct HTTPBody *, struct HTTPBody * ); 
 	int (*pre)( int, struct HTTPBody *, struct HTTPBody * );
 	int (*post)( int, struct HTTPBody *, struct HTTPBody * ); 
 } sr[] = {
-	{ h_read, h_write, http_pre, http_post }
-, { t_read, t_write, http_pre, http_post }
+	{ h_read, h_proc, h_write, http_pre, http_post }
+, { t_read, NULL, t_write, http_pre, http_post }
 ,	{ NULL }
 };
 
@@ -1263,30 +1282,36 @@ int main (int argc, char *argv[]) {
 			fprintf(stderr, "in parent...\n" );
 		}
 		else if ( cpid ) {
+			//TODO: Somewhere in here, a signal needs to run that allows this thing to die.
+			//TODO: Handle read and write errno cases (or at least program a response here. handling is elsewhere)
+			//TODO: Proc... hmmm... not even sure how to approach this yet
+
 			//All the processing occurs here.
 			struct HTTPBody rq, rs;	
 			struct senderrecvr *f = &sr[ 0 ]; 
 			memset( &rq, 0, sizeof( struct HTTPBody ) );
 			memset( &rs, 0, sizeof( struct HTTPBody ) );
 
-			//TODO: Somewhere in here, a signal needs to run that allows this thing to die.
-			//...
-
 			//Read the message	
 			if (( status = f->read( fd, &rq, &rs )) == -1 ) {
-				//TODO: Besides handling errors, a lot of what comes out here will define
 				//what to do with the response...
 			}
 
+			//Generate a new message	
+			if ( f->proc && ( status = f->proc( fd, &rq, &rs )) == -1 ) {
+				//...
+			}
+			
+#if 0	
 			//Write a new message	
 			if (( status = f->write( fd, &rq, &rs )) == -1 ) {
 				//...
 			}
-				
+#endif		
 			if ( close( fd ) == -1 ) {
 				fprintf( stderr, "Couldn't close child socket. %s\n", strerror(errno) );
 				return 0;
-			}	
+			}
 		}
 
 	}
