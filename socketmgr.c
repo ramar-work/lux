@@ -32,6 +32,11 @@ struct HTTPBody {
 	char *host;
 	char *boundary;
  	uint8_t *msg;
+#if 1
+	struct HTTPRecord **url;
+	struct HTTPRecord **headers;
+	struct HTTPRecord **body;
+#endif
 };
 
 
@@ -312,6 +317,7 @@ void whatsockerr( int e ) {
 
 //list out all rows in an HTTPRecord array
 void print_httprecords ( struct HTTPRecord **r ) {
+	if ( *r == NULL ) return;
 	while ( *r ) {
 		fprintf( stderr, "'%s' -> ", (*r)->field );
 		//fprintf( stderr, "%s\n", (*r)->field );
@@ -325,6 +331,7 @@ void print_httprecords ( struct HTTPRecord **r ) {
 
 //list out everything in an HTTPBody
 void print_httpbody ( struct HTTPBody *r ) {
+	if ( r == NULL ) return;
 	fprintf( stderr, "r->mlen: '%d'\n", r->mlen );
 	fprintf( stderr, "r->clen: '%d'\n", r->clen );
 	fprintf( stderr, "r->hlen: '%d'\n", r->hlen );
@@ -552,18 +559,18 @@ int swrite_to_socket ( int fd, uint8_t *b ) {
 }
 
 
-int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
-	//...
-	unsigned char *buf = malloc( 1 );
+int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 
 	//Read all the data from a socket.
 #if 0
+	unsigned char *buf = malloc( 1 );
 	int rdFromSock = read_from_socket( fd, &buf, NULL );
 
 fprintf( stderr, "rdFromSock: %d\n", rdFromSock );
 write( 2, buf, rdFromSock ); 
 exit( 0 );
 #else
+	unsigned char *buf = malloc( 1 );
 	int mult = 0;
 	int try=0;
 	const int size = 32767;	
@@ -575,14 +582,40 @@ exit( 0 );
 		unsigned char buf2[ size ]; 
 		memset( buf2, 0, size );
 
+		//Read functions...
+		if ( !sess )
+			rd = recv( fd, buf2, size, MSG_DONTWAIT );
+		else {
+			gnutls_session_t *ss = (gnutls_session_t *)sess;
+			rd = gnutls_record_recv( *ss, buf2, size );
+			if ( rd > 0 ) 
+				fprintf(stderr, "SSL might be fine... got %d from gnutls_record_recv\n", rd );
+			else if ( rd == GNUTLS_E_REHANDSHAKE ) {
+				fprintf(stderr, "SSL got handshake reauth request..." );
+				//TODO: There should be a seperate function that handles this.
+				//It's a fail for now...	
+				return 0;
+			}
+			else if ( rd == GNUTLS_E_INTERRUPTED || rd == GNUTLS_E_AGAIN ) {
+				fprintf(stderr, "SSL was interrupted...  Try request again...\n" );
+				continue;
+			}
+			else {
+				fprintf(stderr, "SSL got error code: %d, meaning '%s'.\n", rd, gnutls_strerror( rd ) );
+				continue;
+			}
+		}
+
 		//read into new buffer
-		//if (( rd = read( fd, &buf[ rq->mlen ], size )) == -1 ) {
 		//TODO: Yay!  This works great on Arch!  But let's see what about Win, OSX and BSD
-		if (( rd = recv( fd, buf2, size, MSG_DONTWAIT )) == -1 ) {
+		if ( rd == -1 ) {
 			//A subsequent call will tell us a lot...
 			fprintf(stderr, "Couldn't read all of message..." );
-			//whatsockerr(errno);
-			if ( errno == EBADF )
+			whatsockerr( errno );
+			if ( 0 )
+				0;
+			//ssl stuff has to go first...
+			else if ( errno == EBADF )
 				0; //TODO: Can't close a most-likely closed socket.  What do you do?
 			else if ( errno == ECONNREFUSED )
 				close(fd);
@@ -621,6 +654,16 @@ exit( 0 );
 			rq->msg = buf;
 			break;
 		}
+#if 0
+		else if ( rd == GNUTLS_E_REHANDSHAKE ) {
+			fprintf(stderr, "SSL got handshake reauth request..." );
+			continue;
+		}
+		else if ( rd == GNUTLS_E_INTERRUPTED || rd == GNUTLS_E_AGAIN ) {
+			fprintf(stderr, "SSL was interrupted...  Try request again...\n" );
+			continue;
+		}
+#endif
 		else {
 			//realloc manually and read
 			if ((buf = realloc( buf, bfsize )) == NULL ) {
@@ -631,6 +674,8 @@ exit( 0 );
 
 			//Copy new data and increment bytes read
 			memset( &buf[ bfsize - size ], 0, size ); 
+			fprintf(stderr, "buf: %p\n", buf );
+			fprintf(stderr, "buf2: %p\n", buf2 );
 			fprintf(stderr, "pos: %d\n", bfsize - size );
 			memcpy( &buf[ bfsize - size ], buf2, rd ); 
 			rq->mlen += rd;
@@ -679,7 +724,7 @@ exit( 0 );
 	}
 
 	//Define records for each type here...
-	struct HTTPRecord **url=NULL, **headers=NULL, **body=NULL;
+	//struct HTTPRecord **url=NULL, **headers=NULL, **body=NULL;
 	int len = 0;
 	Mem set;
 	memset( &set, 0, sizeof( Mem ) );
@@ -702,14 +747,14 @@ exit( 0 );
 				at += 1, t += at, set.size -= at;
 				b->value = t;
 				b->size = set.size;
-				ADD_ELEMENT( url, len, struct HTTPRecord, b );
+				ADD_ELEMENT( rq->url, len, struct HTTPRecord, b );
 			}
 		}
-		ADD_ELEMENT( url, len, struct HTTPRecord, NULL );
+		ADD_ELEMENT( rq->url, len, struct HTTPRecord, NULL );
 
 		if ( 1 ) {
 			fprintf(stderr,"URL received was:\n" );
-			print_httprecords( url );
+			print_httprecords( rq->url );
 		}
 	}
 
@@ -738,15 +783,15 @@ exit( 0 );
 				t += at, set.size -= at;
 				b->value = t;
 				b->size = set.size;
-				ADD_ELEMENT( headers, len, struct HTTPRecord, b );
+				ADD_ELEMENT( rq->headers, len, struct HTTPRecord, b );
 			}
 		}
 	}
-	ADD_ELEMENT( headers, len, struct HTTPRecord, NULL );
+	ADD_ELEMENT( rq->headers, len, struct HTTPRecord, NULL );
 
 	if ( 1 ) {
 		fprintf(stderr,"Headers received were:\n" );
-		print_httprecords( headers );
+		print_httprecords( rq->headers );
 	}
 
 	//Always process the body 
@@ -785,7 +830,7 @@ exit( 0 );
 				else if ( *m == '=' ) {
 					b->value = ++m;
 					b->size = set.size;
-					ADD_ELEMENT( body, len, struct HTTPRecord, b );
+					ADD_ELEMENT( rq->body, len, struct HTTPRecord, b );
 					b = NULL;
 				}
 			}
@@ -815,7 +860,7 @@ exit( 0 );
 					m += 2;
 					b->value = m;//++t;
 					b->size = set.size - 1;
-					ADD_ELEMENT( body, len, struct HTTPRecord, b );
+					ADD_ELEMENT( rq->body, len, struct HTTPRecord, b );
 					value = 0;
 					b = NULL;
 				}
@@ -832,12 +877,12 @@ exit( 0 );
 				}
 			}
 		}
-		ADD_ELEMENT( body, len, struct HTTPRecord, NULL );
+		ADD_ELEMENT( rq->body, len, struct HTTPRecord, NULL );
 		//This MAY help in handling malformed messages...
 		if ( b && (!b->field || !b->value) ) free( b );
 		if ( 1 ) {
 			fprintf( stderr, "BODY got:\n" );
-			print_httprecords( body );
+			print_httprecords( rq->body );
 		}
 	}
 
@@ -898,7 +943,6 @@ struct senderrecvr {
 
 
 int main (int argc, char *argv[]) {
-
 	struct values {
 		int port;
 		int ssl;
@@ -1144,7 +1188,7 @@ int main (int argc, char *argv[]) {
 			//TODO: Handle read and write errno cases 
 			#if 1
 			//SSL again
-			gnutls_session_t session;
+			gnutls_session_t session, *sptr = NULL;
 			if ( values.ssl ) {
 				gnutls_init( &session, GNUTLS_SERVER );
 				gnutls_priority_set( session, priority_cache );
@@ -1168,42 +1212,34 @@ int main (int argc, char *argv[]) {
 					continue;
 				}
 				fprintf( stderr, "%s\n", "SSL handshake successful." );
+				sptr = &session;
 			}
 			#endif
 
 			//All the processing occurs here.
 			struct HTTPBody rq = { 0 }; 
 			struct HTTPBody rs = { 0 };
-
+			struct senderrecvr *f = &sr[ 0 ]; 
+#if 0
 			//TODO: This doesn't seem quite optimal, but I'm doing it.
 			struct SSLContext ssl = {
 				.read = gnutls_record_recv
 			, .write = gnutls_record_send
 			, .data = (void *)&rq
 			}; 
-
-			//This is the only part that needs to change if protocol changes
-			//TODO: Same with http support, I could use a way to modify the read & write ptrs from here 
-			struct senderrecvr *f = &sr[ 0 ]; 
-			//Non-HTTPS reads and writes
-			//f->readf = read;
-			//f->writef = write;
-			//HTTPS reads and writes
-			//f->readf = gnutls_record_recv;
-			//f->writef = gnutls_record_send;
-			
+#endif
 			//Read the message	
-			if (( status = f->read( fd, &rq, &rs, &ssl )) == -1 ) {
+			if (( status = f->read( fd, &rq, &rs, sptr )) == -1 ) {
 				//what to do with the response...
 			}
 
 			//Generate a new message	
-			if ( f->proc && ( status = f->proc( fd, &rq, &rs, &ssl )) == -1 ) {
+			if ( f->proc && ( status = f->proc( fd, &rq, &rs, NULL )) == -1 ) {
 				//...
 			}
 			
 			//Write a new message	
-			if (( status = f->write( fd, &rq, &rs, &ssl )) == -1 ) {
+			if (( status = f->write( fd, &rq, &rs, &session )) == -1 ) {
 				//...
 			}
 

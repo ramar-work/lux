@@ -78,7 +78,16 @@ int main (int argc, char *argv[]) {
 	int index = 0;
 	char **cmd = (char **)cmds;	
 
-#if 0
+#if 1
+	//get rid of the folder if there was one...
+	FILE *n = popen( "rm -rf /tmp/hypnotests", "r" );
+	if ( !n ) 
+		fprintf( stderr, "Couldn't remove %s: '%s'\n", testdir, strerror(errno) );
+	else {
+		//wait( n )
+		pclose( n );
+	}
+
 	//mkdir a test directory of some sort
 	if ( mkdir( testdir, S_IRWXU ) == -1 ) {
 		fprintf( stderr, "mkdir error: %s\n", strerror (errno) );
