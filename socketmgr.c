@@ -11,6 +11,7 @@
 	*(&ptr[ ptrListSize ]) = element; \
 	ptrListSize++;
 
+
 struct HTTPRecord {
 	const char *field; 
 	const char *metadata; 
@@ -24,7 +25,6 @@ struct HTTPBody {
 	int mlen;  //message length (length of the entire received message)
 	int	hlen;  //header length
 	int status; //what was this?
-	char *stext; //status text ptr
 	char *ctype; //content type ptr
 	char *method;
 	char *protocol;
@@ -34,6 +34,13 @@ struct HTTPBody {
  	uint8_t *msg;
 };
 
+
+struct SSLContext {
+	void *read;	
+	void *write;	
+	void *data;
+	int *fd;
+};
 
 struct sockAbstr {
 	int addrsize;
@@ -230,7 +237,7 @@ char *msg_get_value ( const char *value, const char *chrs, uint8_t *msg, int len
 	return bContent;
 }
 
-
+#if 0
 //Get boundary
 char *msg_get_boundary ( uint8_t *msg, int len ) {
 	int bStart=0, bEnd=0;
@@ -248,6 +255,7 @@ char *msg_get_boundary ( uint8_t *msg, int len ) {
 	}
 	return bContent; 
 }
+#endif
 
 
 //Trim whitespace
@@ -321,7 +329,6 @@ void print_httpbody ( struct HTTPBody *r ) {
 	fprintf( stderr, "r->clen: '%d'\n", r->clen );
 	fprintf( stderr, "r->hlen: '%d'\n", r->hlen );
 	fprintf( stderr, "r->status: '%d'\n", r->status );
-	fprintf( stderr, "r->stext: '%s'\n", r->stext );
 	fprintf( stderr, "r->ctype: '%s'\n", r->ctype );
 	fprintf( stderr, "r->method: '%s'\n", r->method );
 	fprintf( stderr, "r->path: '%s'\n", r->path );
@@ -332,7 +339,7 @@ void print_httpbody ( struct HTTPBody *r ) {
 
 
 //send (sends a message, may take many times)
-int t_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
+int t_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	//write (write all the data in one call if you fork like this) 
 	const char http_200[] = ""
 		"HTTP/1.1 200 OK\r\n"
@@ -350,7 +357,7 @@ int t_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 
 //read (reads a message)
-int t_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
+int t_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	//read (read all the data in one call if you fork like this)
 	const int size = 100000;
 	unsigned char *rqb = malloc( size );
@@ -366,7 +373,7 @@ int t_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 
 //Any processing can be done in the middle.  Since we're in another "thread" anyway
-int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
+int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	const char http_200[] = ""
 		"HTTP/1.1 200 OK\r\n"
 		"Content-Length: 11\r\n"
@@ -387,7 +394,7 @@ int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 
 //Write
-int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
+int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	//if ( 1 ) write( 2, rq->msg, rq->mlen );
 	int sent = 0;
 	int total = rs->mlen;
@@ -442,13 +449,117 @@ int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 }
 
 
-int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
-	//...
-	unsigned char *buf = malloc( 1 );
+
+//Return the total bytes read.
+int read_from_socket ( int fd, uint8_t **b, void (*readMore)(int *, void *) ) {
+	return 0;
 	int mult = 0;
 	int try=0;
-	const int size = 32767;
+	int mlen = 0;
+	const int size = 32767;	
+	uint8_t *buf = *b;
 
+	//Read first
+	while ( 1 ) {
+		int rd=0;
+		int bfsize = size * (++mult); 
+		unsigned char buf2[ size ]; 
+		memset( buf2, 0, size );
+
+		//read into new buffer
+		//if (( rd = read( fd, &buf[ rq->mlen ], size )) == -1 ) {
+		//TODO: Yay!  This works great on Arch!  But let's see what about Win, OSX and BSD
+		if (( rd = recv( fd, buf2, size, MSG_DONTWAIT )) == -1 ) {
+			//A subsequent call will tell us a lot...
+			fprintf(stderr, "Couldn't read all of message..." );
+			//whatsockerr(errno);
+			if ( errno == EBADF )
+				0; //TODO: Can't close a most-likely closed socket.  What do you do?
+			else if ( errno == ECONNREFUSED )
+				close(fd);
+			else if ( errno == EFAULT )
+				close(fd);
+			else if ( errno == EINTR )
+				close(fd);
+			else if ( errno == EINVAL )
+				close(fd);
+			else if ( errno == ENOMEM )
+				close(fd);
+			else if ( errno == ENOTCONN )
+				close(fd);
+			else if ( errno == ENOTSOCK )
+				close(fd);
+			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				if ( ++try == 2 ) {
+				 #ifdef HTTP_VERBOSE
+					fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
+				 #endif
+					fprintf(stderr, "mlen: %d\n", mlen );
+					//fprintf(stderr, "%p\n", buf );
+					//rq->msg = buf;
+					break;
+			}
+			 #ifdef HTTP_VERBOSE
+				fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
+			 #endif
+			}
+			else {
+				//this would just be some uncaught condition...
+				fprintf(stderr, "Uncaught condition at read!\n" );
+				return 0;
+			}
+		}
+		else if ( rd == 0 ) {
+			//will a zero ALWAYS be returned?
+			//rq->msg = buf;
+			break;
+		}
+		else {
+			//realloc manually and read
+			if (( b = realloc( b, bfsize )) == NULL ) {
+				fprintf(stderr, "Couldn't allocate buffer..." );
+				close(fd);
+				return 0;
+			}
+
+			//Copy new data and increment bytes read
+			memset( &b[ bfsize - size ], 0, size ); 
+			fprintf(stderr, "pos: %d\n", bfsize - size );
+			memcpy( &b[ bfsize - size ], buf2, rd ); 
+			mlen += rd;
+			//rq->msg = buf; //TODO: You keep resetting this, only needs to be done once...
+
+			//show read progress and data received, etc.
+			if ( 1 ) {
+				fprintf( stderr, "Recvd %d bytes on fd %d\n", rd, fd ); 
+			}
+		}
+	}
+
+	return mlen;
+}
+
+int write_to_socket ( int fd, uint8_t *b ) {
+	return 0;
+}
+
+int sread_from_socket ( int fd, uint8_t *b ) {
+	return 0;
+}
+
+int swrite_to_socket ( int fd, uint8_t *b ) {
+	return 0;
+}
+
+
+int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+	//...
+	unsigned char *buf = malloc( 1 );
+
+	//Read all the data from a socket.
+#if 1
+	read_from_socket( fd, &buf, NULL );
+#else
 	//Read first
 	while ( 1 ) {
 		int rd=0;
@@ -523,6 +634,7 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 			}
 		}
 	}
+#endif
 
 	//Show what I received so far...
 	if ( 1 ) {
@@ -761,11 +873,13 @@ int ssl_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 
 struct senderrecvr { 
-	int (*read)( int, struct HTTPBody *, struct HTTPBody * );
-	int (*proc)( int, struct HTTPBody *, struct HTTPBody * ); 
-	int (*write)( int, struct HTTPBody *, struct HTTPBody * ); 
-	int (*pre)( int, struct HTTPBody *, struct HTTPBody * );
-	int (*post)( int, struct HTTPBody *, struct HTTPBody * ); 
+	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
+	int (*proc)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	int (*write)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	int (*pre)( int, struct HTTPBody *, struct HTTPBody *, void * );
+	int (*post)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	void *readf;
+	void *writef;
 } sr[] = {
 	{ h_read, h_proc, h_write, http_pre, http_post }
 , { t_read, NULL, t_write, http_pre, http_post }
@@ -909,21 +1023,32 @@ int main (int argc, char *argv[]) {
 
 	//Handle SSL here
 	#if 1 
-	gnutls_certificate_credentials_t x509_cred;
+	gnutls_certificate_credentials_t x509_cred = NULL;
   gnutls_priority_t priority_cache;
-  gnutls_session_t session;
 	const char *cafile, *crlfile, *certfile, *keyfile;
 	#if 0
 	cafile = 
 	crlfile = 
+	#endif
+	#if 0
+	//These should always be loaded, and there will almost always be a series
 	certfile = 
 	keyfile = 
+	#else
+#define MPATH "/home/ramar/prj/hypno/certs/collinsdesign.net"
+	//Hardcode these for now.
+	certfile = MPATH "/collinsdesign_net.crt";
+	keyfile = MPATH "/server.key";
 	#endif
+	//Obviously, this is great for debugging TLS errors...
+	//gnutls_global_set_log_function( tls_log_func );
 	gnutls_global_init();
 	gnutls_certificate_allocate_credentials( &x509_cred );
 	//find the certificate authority to use
-	gnutls_certificate_set_x509_trust_file( x509_cred, cafile, GNUTLS_X509_FMT_PEM );
-	gnutls_certificate_set_x509_crl_file( x509_cred, crlfile, GNUTLS_X509_FMT_PEM );
+	//gnutls_certificate_set_x509_trust_file( x509_cred, cafile, GNUTLS_X509_FMT_PEM );
+	//is this for password-protected cert files? I'm so lost...
+	//gnutls_certificate_set_x509_crl_file( x509_cred, crlfile, GNUTLS_X509_FMT_PEM );
+	//this ought to work with server.key and certfile
 	gnutls_certificate_set_x509_key_file( x509_cred, certfile, keyfile, GNUTLS_X509_FMT_PEM );
 	//gnutls_certificate_set_ocsp_status_request( x509_cred, OCSP_STATUS_FiLE, 0 );
 	gnutls_priority_init( &priority_cache, NULL, NULL );
@@ -1007,57 +1132,72 @@ int main (int argc, char *argv[]) {
 		}
 		else if ( cpid ) {
 			//TODO: Somewhere in here, a signal needs to run that allows this thing to die.
-			//TODO: Handle read and write errno cases (or at least program a response here. handling is elsewhere)
-			//TODO: Proc... hmmm... not even sure how to approach this yet
-
-
+			//TODO: Handle read and write errno cases 
+			#if 1
 			//SSL again
-			#if 0
-			gnutls_init( &session, GNUTLS_SERVER );
-			gnutls_priority_set( session, priority_cache );
-			gnutls_credentials_set( session, GNUTLS_CRD_CERTIFICATE, x509_cred );
-			gnutls_certificate_server_set_request( session, GNUTLS_CERT_IGNORE ); 
-			gnutls_handshake_set_timeout( session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT ); 
-			gnutls_transport_set_int( session, fd );
-			//Do the handshake here
-			int success = 0;
-			if ( success < 0 ) {
-				close( fd );
-				gnutls_deinit( session );
-				//This should be a simple message saying handshake has failed.
-				//If this is a running server, where does that message go?
-				continue;
+			gnutls_session_t session;
+			if ( values.ssl ) {
+				gnutls_init( &session, GNUTLS_SERVER );
+				gnutls_priority_set( session, priority_cache );
+				gnutls_credentials_set( session, GNUTLS_CRD_CERTIFICATE, x509_cred );
+				//NOTE: I need to do this b/c clients aren't expected to send a certificate with their request
+				gnutls_certificate_server_set_request( session, GNUTLS_CERT_IGNORE ); 
+				gnutls_handshake_set_timeout( session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT ); 
+				//Bind the current file descriptor to GnuTLS instance.
+				gnutls_transport_set_int( session, fd );
+				//Do the handshake here
+				//TODO: I write nothing that looks like this, please refactor it...
+				int success = 0;
+				do {
+					success = gnutls_handshake( session );
+				} while ( success == GNUTLS_E_AGAIN || success == GNUTLS_E_INTERRUPTED );	
+				if ( success < 0 ) {
+					close( fd );
+					gnutls_deinit( session );
+					//TODO: Log all handshake failures.  Still don't know where.
+					fprintf( stderr, "%s\n", "SSL handshake failed." );
+					continue;
+				}
+				fprintf( stderr, "%s\n", "SSL handshake successful." );
 			}
-			fpirntf( stderr, "Handshake is complete." );
 			#endif
 
 			//All the processing occurs here.
-			struct HTTPBody rq, rs;	
-			memset( &rq, 0, sizeof( struct HTTPBody ) );
-			memset( &rs, 0, sizeof( struct HTTPBody ) );
+			struct HTTPBody rq = { 0 }; 
+			struct HTTPBody rs = { 0 };
+
+			//TODO: This doesn't seem quite optimal, but I'm doing it.
+			struct SSLContext ssl = {
+				.read = gnutls_record_recv
+			, .write = gnutls_record_send
+			, .data = (void *)&rq
+			}; 
+
 			//This is the only part that needs to change if protocol changes
 			//TODO: Same with http support, I could use a way to modify the read & write ptrs from here 
 			struct senderrecvr *f = &sr[ 0 ]; 
-			//Try:?
-			//f->read = gnutls_record_recv;
-			//f->write = gnutls_record_send;
+			//Non-HTTPS reads and writes
+			//f->readf = read;
+			//f->writef = write;
+			//HTTPS reads and writes
+			//f->readf = gnutls_record_recv;
+			//f->writef = gnutls_record_send;
 			
 			//Read the message	
-			if (( status = f->read( fd, &rq, &rs )) == -1 ) {
+			if (( status = f->read( fd, &rq, &rs, &ssl )) == -1 ) {
 				//what to do with the response...
 			}
 
 			//Generate a new message	
-			if ( f->proc && ( status = f->proc( fd, &rq, &rs )) == -1 ) {
+			if ( f->proc && ( status = f->proc( fd, &rq, &rs, &ssl )) == -1 ) {
 				//...
 			}
 			
-#if 0	
 			//Write a new message	
-			if (( status = f->write( fd, &rq, &rs )) == -1 ) {
+			if (( status = f->write( fd, &rq, &rs, &ssl )) == -1 ) {
 				//...
 			}
-#endif		
+
 			if ( close( fd ) == -1 ) {
 				fprintf( stderr, "Couldn't close child socket. %s\n", strerror(errno) );
 				return 0;
