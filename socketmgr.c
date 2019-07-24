@@ -457,7 +457,7 @@ int read_from_socket ( int fd, uint8_t **b, void (*readMore)(int *, void *) ) {
 	int try=0;
 	int mlen = 0;
 	const int size = 32767;	
-	uint8_t *buf = *b;
+	uint8_t *buf = malloc( 1 );
 
 	//Read first
 	while ( 1 ) {
@@ -557,9 +557,17 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	unsigned char *buf = malloc( 1 );
 
 	//Read all the data from a socket.
-#if 1
-	read_from_socket( fd, &buf, NULL );
+#if 0
+	int rdFromSock = read_from_socket( fd, &buf, NULL );
+
+fprintf( stderr, "rdFromSock: %d\n", rdFromSock );
+write( 2, buf, rdFromSock ); 
+exit( 0 );
 #else
+	int mult = 0;
+	int try=0;
+	const int size = 32767;	
+
 	//Read first
 	while ( 1 ) {
 		int rd=0;
@@ -698,12 +706,13 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 			}
 		}
 		ADD_ELEMENT( url, len, struct HTTPRecord, NULL );
+
+		if ( 1 ) {
+			fprintf(stderr,"URL received was:\n" );
+			print_httprecords( url );
+		}
 	}
 
-	if ( 1 ) {
-		fprintf(stderr,"URL received was:\n" );
-		print_httprecords( url );
-	}
 
 	//Always process the headers
 	memset( &set, 0, sizeof( Mem ) );
