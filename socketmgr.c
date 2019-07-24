@@ -1,5 +1,6 @@
 /*let's try this again.  It seems never to work like it should...*/
 #include "vendor/single.h"
+#include <gnutls/gnutls.h>
 
 #define ADD_ELEMENT( ptr, ptrListSize, eSize, element ) \
 	if ( ptr ) \
@@ -906,6 +907,28 @@ int main (int argc, char *argv[]) {
 	//Mark open flag.
 	su.opened = 1;
 
+	//Handle SSL here
+	#if 1 
+	gnutls_certificate_credentials_t x509_cred;
+  gnutls_priority_t priority_cache;
+  gnutls_session_t session;
+	const char *cafile, *crlfile, *certfile, *keyfile;
+	#if 0
+	cafile = 
+	crlfile = 
+	certfile = 
+	keyfile = 
+	#endif
+	gnutls_global_init();
+	gnutls_certificate_allocate_credentials( &x509_cred );
+	//find the certificate authority to use
+	gnutls_certificate_set_x509_trust_file( x509_cred, cafile, GNUTLS_X509_FMT_PEM );
+	gnutls_certificate_set_x509_crl_file( x509_cred, crlfile, GNUTLS_X509_FMT_PEM );
+	gnutls_certificate_set_x509_key_file( x509_cred, certfile, keyfile, GNUTLS_X509_FMT_PEM );
+	//gnutls_certificate_set_ocsp_status_request( x509_cred, OCSP_STATUS_FiLE, 0 );
+	gnutls_priority_init( &priority_cache, NULL, NULL );
+	#endif
+
 	//If I could open a socket and listen successfully, then write the PID
 	#if 0
 	if ( values.fork ) {
@@ -938,6 +961,7 @@ int main (int argc, char *argv[]) {
 		}
 	}
 	#endif
+
 
 	//Let's start the accept loop here...
 	for ( ;; ) {
@@ -986,12 +1010,38 @@ int main (int argc, char *argv[]) {
 			//TODO: Handle read and write errno cases (or at least program a response here. handling is elsewhere)
 			//TODO: Proc... hmmm... not even sure how to approach this yet
 
+
+			//SSL again
+			#if 0
+			gnutls_init( &session, GNUTLS_SERVER );
+			gnutls_priority_set( session, priority_cache );
+			gnutls_credentials_set( session, GNUTLS_CRD_CERTIFICATE, x509_cred );
+			gnutls_certificate_server_set_request( session, GNUTLS_CERT_IGNORE ); 
+			gnutls_handshake_set_timeout( session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT ); 
+			gnutls_transport_set_int( session, fd );
+			//Do the handshake here
+			int success = 0;
+			if ( success < 0 ) {
+				close( fd );
+				gnutls_deinit( session );
+				//This should be a simple message saying handshake has failed.
+				//If this is a running server, where does that message go?
+				continue;
+			}
+			fpirntf( stderr, "Handshake is complete." );
+			#endif
+
 			//All the processing occurs here.
 			struct HTTPBody rq, rs;	
-			struct senderrecvr *f = &sr[ 0 ]; 
 			memset( &rq, 0, sizeof( struct HTTPBody ) );
 			memset( &rs, 0, sizeof( struct HTTPBody ) );
-
+			//This is the only part that needs to change if protocol changes
+			//TODO: Same with http support, I could use a way to modify the read & write ptrs from here 
+			struct senderrecvr *f = &sr[ 0 ]; 
+			//Try:?
+			//f->read = gnutls_record_recv;
+			//f->write = gnutls_record_send;
+			
 			//Read the message	
 			if (( status = f->read( fd, &rq, &rs )) == -1 ) {
 				//what to do with the response...
