@@ -16,7 +16,7 @@ Hypno can create its own application directories like other big frameworks.
 It's usage is something like this:
 
 Flags                 | Function
-----------------      | -------------------------------------
+-----                 | --------
 -c, --create [dir]    | Create a new application directory here.
 -e, --eat [url]       | Feed this a certain URL and see how it evaluates.
 -l, --list            | List all sites and their statuses.

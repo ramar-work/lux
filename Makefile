@@ -29,7 +29,7 @@ main: RICKROSS=main
 main: test-build-$(OS)
 main: 
 	mv $(RICKROSS) bin/hypno
-	$(CC) -o th test.c && mv th bin/
+	$(CC) $(CFLAGS) -lgnutls -DSQROOGE_H -o th test.c vendor/single.c && mv th bin/
 
 # CLI
 cli: RICKROSS=cli

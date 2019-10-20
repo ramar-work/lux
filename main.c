@@ -413,7 +413,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 	int renbuflen = 0;
 
 	//Anything that should be set or initialized is here
-	Passthru *ag = (Passthru *)p;
+	Passthru *pt = (Passthru *)p;
 	HTTP *h = (HTTP *)r->userdata;
 	HTTP_Request *req = &h->request;
 	lua_State *L = luaL_newstate(); 
@@ -430,29 +430,29 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 		return ERR_500("Error processing request." );
 
 	//Try to open the web root
-	if ( !( ag->ds = opendir( ag->webroot ) ) )
+	if ( !( pt->ds = opendir( pt->webroot ) ) )
 		return ERR_500("Couldn't access web root: %s.", strerror(errno) );
 
 #if 0
 	//If the webroot is the web application directory, set things accordingly
-	if ( ag->singleDir ) {
+	if ( pt->singleDir ) {
 		//Make a fully qualified path from the filename
-		char *fd = strcmbd( "/", ag->webroot, ag->de->d_name );
+		char *fd = strcmbd( "/", pt->webroot, pt->de->d_name );
 
 		//Check the name of the folder and see if the hostname matches
 		if ( S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode)) ) {
-			if ( strcmp( ag->de->d_name, h->hostname ) == 0 ) {
-				ag->activeDir = fd;
+			if ( strcmp( pt->de->d_name, h->hostname ) == 0 ) {
+				pt->activeDir = fd;
 			}	
 		}
 	}
 	else {
 	}
 #endif
-	//fprintf( stderr, "Directory '%s' contains:\n", ag->webroot );
-	while ( (ag->de = readdir( ag->ds )) ) {
+	//fprintf( stderr, "Directory '%s' contains:\n", pt->webroot );
+	while ( (pt->de = readdir( pt->ds )) ) {
 		//Make a fully qualified path from the filename
-		char *fd = strcmbd( "/", ag->webroot, ag->de->d_name );
+		char *fd = strcmbd( "/", pt->webroot, pt->de->d_name );
 
 		//Check that the child inode is accessible
 		if ( lstat( fd, &sb ) == -1 )
@@ -460,8 +460,8 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 
 		//Check the name of the folder and see if the hostname matches
 		if ( S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode)) ) {
-			if ( strcmp( ag->de->d_name, h->hostname ) == 0 ) {
-				ag->activeDir = fd;
+			if ( strcmp( pt->de->d_name, h->hostname ) == 0 ) {
+				pt->activeDir = fd;
 				break;
 			}	
 		}
@@ -469,7 +469,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 	}
 
 	//Default responses get handled here 
-	if ( !ag->activeDir ) {
+	if ( !pt->activeDir ) {
 		return ERR_404( "No site matching hostname '%s' found.", h->hostname );
 	}
 
@@ -490,7 +490,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 			//Check for the path name relative to the currently chosen directory
 			HttpStreamer *hs = malloc( sizeof( HttpStreamer ) );
 			memset( hs, 0, sizeof(HttpStreamer) );
-			hs->filename = strcmbd( "/", ag->activeDir, &h->request.path[ 1 ] );
+			hs->filename = strcmbd( "/", pt->activeDir, &h->request.path[ 1 ] );
 			hs->fd = 0;
 			hs->size = 0;
 			hs->bufsize = 1028;
@@ -532,7 +532,7 @@ _Bool http_run ( Recvr *r, void *p, char *err ) {
 	lua_newtable( L );
 
 	//Read the data file for whatever "site" is gonna be run.
-	if ( !(datafile = strcmbd( "/", ag->activeDir, DATAFILE_NAME )) ) {
+	if ( !(datafile = strcmbd( "/", pt->activeDir, DATAFILE_NAME )) ) {
 		return ERR_500("Low mem" );
 	}
 
@@ -627,7 +627,7 @@ exit( 0 );
 		//Load each model file (which is just running via Lua)
 		if ( l->type == CC_MODEL ) { 
 			//Somehow have to get the root directory of the site in question...
-			char *mfile = strcmbd( "/", ag->activeDir, "models", l->content, "lua" );
+			char *mfile = strcmbd( "/", pt->activeDir, "models", l->content, "lua" );
 			mfile[ strlen(mfile) - 4 ] = '.';
 			fprintf( stderr, "Attempting to load: %s\n", mfile );
 
@@ -668,7 +668,7 @@ exit( 0 );
 	while ( l->content ) {
 		if ( l->type == CC_VIEW ) {
 			//Somehow have to get the root directory of the site in question...
-			char *vfile = strcmbd( "/", ag->activeDir, "views", l->content, "html" );
+			char *vfile = strcmbd( "/", pt->activeDir, "views", l->content, "html" );
 			int fd = 0, bt = 0;
 			vfile[ strlen(vfile) - 5 ] = '.';
 
@@ -845,8 +845,10 @@ int main (int argc, char *argv[])
 	memset( pt, 0, sizeof(Passthru) );
 
 	//Set things
-	if ( !opt_set( opts, "--dir" ) )
-		pt->singleDir = 1, pt->webroot = default_dirname;
+	if ( !opt_set( opts, "--dir" ) ) {
+		pt->singleDir = 1; 
+		pt->webroot = default_dirname;
+	}
 	else {
 		//check that dir exists and can be touched
 		struct stat check;

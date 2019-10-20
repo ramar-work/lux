@@ -1,7 +1,25 @@
-//test.c
+/*
+test.c
+======
 
-//Using your own client to test web servers is stupid.  
-//Invoke curl, wget and chromium to test that things work as they should.
+This script is used to test out our new web server against a couple of 
+different browsers.  They all act a little bit differently.  Need to 
+always be able to invoke a bunch of stuff.  
+
+Would this be easier in the shell?  Since I have to use popen anyway?
+
+- consider using an actual thinkpad again or a dell (the keyboard is the concern)
+- to make this fake pipe thing work, you'll need to break up the process invocation process 	
+	I think its:
+		fork
+		open
+		read
+		close
+		die
+-
+
+*/
+
 #include "vendor/single.h"
 
 const char *cmds[] = {
@@ -84,7 +102,6 @@ int main (int argc, char *argv[]) {
 	if ( !n ) 
 		fprintf( stderr, "Couldn't remove %s: '%s'\n", testdir, strerror(errno) );
 	else {
-		//wait( n )
 		pclose( n );
 	}
 
@@ -95,6 +112,9 @@ int main (int argc, char *argv[]) {
 	}
 #endif
 
+
+#if 0
+#else
 	while ( *cmd ) {
 		//clone the command, add your own redirect rules
 		char newcmd[ 1024 ];
@@ -135,6 +155,7 @@ int main (int argc, char *argv[]) {
 	#endif	
 		cmd++;
 	}
+#endif
 	
 	return 0;
 }	

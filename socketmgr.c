@@ -47,6 +47,7 @@ struct SSLContext {
 	int *fd;
 };
 
+
 struct sockAbstr {
 	int addrsize;
 	int buffersize;
@@ -242,26 +243,6 @@ char *msg_get_value ( const char *value, const char *chrs, uint8_t *msg, int len
 	return bContent;
 }
 
-#if 0
-//Get boundary
-char *msg_get_boundary ( uint8_t *msg, int len ) {
-	int bStart=0, bEnd=0;
-	char *bContent = NULL;
-	//Ugly boundary extraction
-	if ( (bStart = memstrat( msg, "boundary=", len )) > -1) {
-		bStart += 9;
-		msg += bStart;
-		//Find one or the other...
-		bEnd = memchrat( msg, '\r', len - bStart); 
-		bEnd = (bEnd > -1) ? bEnd : len - bStart; 
-		bContent = malloc( bEnd + 1 );
-		memset( bContent, 0, bEnd + 1 );	
-		memcpy( bContent, msg, bEnd );
-	}
-	return bContent; 
-}
-#endif
-
 
 //Trim whitespace
 unsigned char *httpvtrim (uint8_t *msg, int len, int *nlen) {
@@ -286,18 +267,6 @@ unsigned char *httptrim (uint8_t *msg, const char *trim, int len, int *nlen) {
 	while ( memchr(trim, *m, 4) && nl-- ) m++;
 	*nlen = nl;
 	return m;
-}
-
-
-//pre
-int http_pre( ) {
-	return 0;
-}
-
-
-//post (these are for ssl teardown and creation)
-int http_post( ) {
-	return 0;
 }
 
 
@@ -935,8 +904,8 @@ struct senderrecvr {
 	void *readf;
 	void *writef;
 } sr[] = {
-	{ h_read, h_proc, h_write, http_pre, http_post }
-, { t_read, NULL, t_write, http_pre, http_post }
+	{ h_read, h_proc, h_write }
+, { t_read, NULL, t_write  }
 ,	{ NULL }
 };
 
