@@ -149,6 +149,9 @@ EOF
 fi
 
 
+
+
+
 # Update the port 
 test -f /tmp/urlcmds && rm -f /tmp/urlcmds
 sed "s;@@PORT@@;$PORT;" $URLFILE > /tmp/urlcmds 
@@ -158,22 +161,76 @@ sed "s;@@PORT@@;$PORT;" $URLFILE > /tmp/urlcmds
 xclient() {
 	# This is here so that servers can be randomized in the future.
 	THE_SERVER=$SERVER
-	echo $1
-	case 0 in
-		# Each client invocation should be different, but 
-		# obviously must result in the same information.
+	THE_ADDR=`echo $1 | awk '{ print $1 }'`
+	THE_CLIENT=curl
+	FILEBASE=$OUTPUT_DIR/`randstr 32`
+
+	# Define places for content
+	PAGE_ADDR=${FILEBASE}-addr
+	PAGE_HEADERS=${FILEBASE}-headers
+	PAGE_CONTENT=${FILEBASE}-content
+	PAGE_STATUS=${FILEBASE}-status
+	PAGE_LENGTH=${FILEBASE}-length
+
+	# First generate a unique ID and put it somewhere (we'll use it later when reassembling)
+	echo $FILEBASE > $FILEBASE
+	echo $THE_ADDR > ${FILEBASE}-addr
+
+	# Each client invocation should be different, but 
+	# obviously must result in the same information.
+	case $THE_CLIENT in
+		# happy-eyeballs-timeout-ms ?
 		curl)
+			BUFFILE=/tmp/`randstr 64`
+			curl -i \
+				--no-styled-output \
+				--connect-timeout 1 \
+				$THE_ADDR > $BUFFILE
+
+			# There was a failure of some sort...
+			test -f $BUFFILE || return 
+			
+			# Get the line number b/c it doesn't seem like curl splits the header and body  
+			CHOPLINE=$( 
+				grep --line-number $'\x0D' $BUFFILE | \
+				sed -n '/[0-9]:\r$/ p' | \
+				sed 's/:.*//'
+			)
+
+			# Get the line count
+			LINECOUNT=$( wc -l $BUFFILE | awk '{ print $1 }' )
+
+			# Then start playing with files
+			sed -n "1,$(( $CHOPLINE - 1 ))p" $BUFFILE > $PAGE_HEADERS
+			sed -n "${CHOPLINE},$(( $LINECOUNT + 1 ))p" $BUFFILE > $PAGE_CONTENT
+			grep "HTTP/[01].[01]" $PAGE_HEADERS | awk '{ print $2 }' > $PAGE_STATUS
+			grep "Content-Length:" $PAGE_HEADERS | awk '{ print $2 }' > $PAGE_LENGTH
+			
+			# Get rid of this temp file.
+			rm $BUFFILE
 		;;
-		chromium)
-		;;
-		chrome)
-		;;
+
 		wget)
 			wget \
 				--timeout=1 \
 				--tries=2 \
-				-S -O/dev/null \
-				http://`basename DD` 2>&1
+				-S -O${PAGE_CONTENT} \
+				$THE_ADDR 2>${PAGE_HEADERS}
+			# Output status 
+			#printf "output status: "
+			grep "HTTP/[01].[01]" $PAGE_HEADERS | awk '{ print $2 }' > $PAGE_STATUS
+			# Output length 
+			#printf "content length: "
+			grep "Content-Length:" $PAGE_HEADERS | awk '{ print $2 }' > $PAGE_LENGTH
+		;;
+
+		chromium)
+		;;
+		chrome)
+		;;
+		opera)
+		;;
+		edge)
 		;;
 	esac
 }
@@ -192,9 +249,9 @@ do
 	# Run the test
 	if [ $THREAD -eq 0 ]
 	then
-		xclient "$line" > $FILEBASE
+		xclient "$line" #> $FILEBASE
 	else
-		xclient "$line" > $FILEBASE &
+		xclient "$line" & #> $FILEBASE &
  		PID=$!
 		echo $PID
 	fi
@@ -208,6 +265,49 @@ then
 	# Let all background processes come to an end.
 	wait
 fi
+
+
+# Reassembly should take place somewhere
+# Though you have some choices on how this can look.
+# sqlite3 was my first choice...
+# html is the current one...
+printf "
+	<table>
+		<thead>
+			<th>ID</th>
+			<th>Length</th>
+			<th>Status</th>
+			<th>Content</th>
+			<th>Headers</th>
+			<th>Addr</th>
+		</thead>
+"
+find $OUTPUT_DIR -type f ! -name "*-*" | \
+	xargs -IFF sh -c '
+	printf "<tr>\n"
+	printf "<td>`cat FF`</td>\n"
+	for n in length status content headers addr; do
+		if [[ $n == "headers" ]]
+		then
+			printf "<td><pre>`cat FF-$n`</pre></td>\n"
+		elif [[ $n == "content" ]]
+		then
+			printf "<td><pre>"
+			printf "`cat FF-$n | sed "s/</\&lt;/g" | sed "s/>/\&gt;/g"`"
+			printf "</pre></td>\n"
+		else
+			printf "<td>`cat FF-$n`</td>\n"
+		fi
+	done
+	printf "</tr>\n"
+	'
+printf "</table>\n"
+
+
+
+exit
+
+
 
 
 
