@@ -1,10 +1,13 @@
 #!/bin/bash -
-#Run each command from a file.
-#You could save an individual file (since there is no limit to number of inodes 
-#on a system (well there is, but it's ridiculously high).  With these short
-#requests, it's unlikely that you'll exceed 1K (or even 10K connections)
-#At the end of the process, you could do something
-
+#
+# The most solid way to run this is against an echo server.
+#
+# Test parameters:
+# - Do all 7 HTTP methods work for each endpoint you're running against?
+# - Does the expected response match the expected response.
+# - Was the request successful (or was there some kind of crash?)
+# - Was invalid input processed?
+#  
 THIS=hypnotest
 CONST_DB=126
 CONST_FILE=127
@@ -150,11 +153,10 @@ fi
 
 
 
-
-
 # Update the port 
 test -f /tmp/urlcmds && rm -f /tmp/urlcmds
 sed "s;@@PORT@@;$PORT;" $URLFILE > /tmp/urlcmds 
+
 
 
 # For the sake of keeping things clear, this function goes here
@@ -171,13 +173,13 @@ xclient() {
 	PAGE_CONTENT=${FILEBASE}-content
 	PAGE_STATUS=${FILEBASE}-status
 	PAGE_LENGTH=${FILEBASE}-length
+	PAGE_DATE=${FILEBASE}-date
 
 	# First generate a unique ID and put it somewhere (we'll use it later when reassembling)
-	echo $FILEBASE > $FILEBASE
+	basename $FILEBASE > $FILEBASE
 	echo $THE_ADDR > ${FILEBASE}-addr
 
-	# Each client invocation should be different, but 
-	# obviously must result in the same information.
+	# Run the full set of methods against your server
 	case $THE_CLIENT in
 		# happy-eyeballs-timeout-ms ?
 		curl)
@@ -233,13 +235,15 @@ xclient() {
 		edge)
 		;;
 	esac
+
+	# Add the final date.
+	date --rfc-3339=ns > $PAGE_DATE
 }
 
 
 # Read each line and do something
 while read line
 do
-#FILEBASE=$OUTPUT_DIR/`randstr 16`
 	# If the first character is a comment, continue
 	[ ${line:0:1} == '#' ] && continue
 
@@ -249,9 +253,9 @@ do
 	# Run the test
 	if [ $THREAD -eq 0 ]
 	then
-		xclient "$line" #> $FILEBASE
+		xclient "$line"
 	else
-		xclient "$line" & #> $FILEBASE &
+		xclient "$line" &
  		PID=$!
 		echo $PID
 	fi
@@ -267,26 +271,40 @@ then
 fi
 
 
+# Using SQLite would be better for this.  You can pull out all the failures
+# on the fly w/o xargs magic...
+
+
+
 # Reassembly should take place somewhere
 # Though you have some choices on how this can look.
 # sqlite3 was my first choice...
 # html is the current one...
+
+
+# TODO: C structures make this a LOT simpler. 
+# 200 or 500? (when expected)
+# Content should match what was sent
 printf "
 	<table>
 		<thead>
 			<th>ID</th>
 			<th>Length</th>
 			<th>Status</th>
-			<th>Content</th>
 			<th>Headers</th>
 			<th>Addr</th>
+			<th>Request Made</th>
+			<!-- <th>Method</th> -->
+			<!-- <th>Successful?</th> -->
+			<th>Content</th>
 		</thead>
 "
+
 find $OUTPUT_DIR -type f ! -name "*-*" | \
 	xargs -IFF sh -c '
 	printf "<tr>\n"
 	printf "<td>`cat FF`</td>\n"
-	for n in length status content headers addr; do
+	for n in length status content headers addr date; do
 		if [[ $n == "headers" ]]
 		then
 			printf "<td><pre>`cat FF-$n`</pre></td>\n"
@@ -298,13 +316,21 @@ find $OUTPUT_DIR -type f ! -name "*-*" | \
 		else
 			printf "<td>`cat FF-$n`</td>\n"
 		fi
+		rm FF-$n
 	done
+	rm FF
 	printf "</tr>\n"
 	'
-printf "</table>\n"
 
+printf "
+	</table>
+<style>
+th { text-align: left; }
+</style>
+	"
 
-
+# Get rid of the output directory
+rm -rf $OUTPUT_DIR
 exit
 
 
