@@ -172,6 +172,7 @@ sed "s;@@PORT@@;$PORT;" $URLFILE > /tmp/urlcmds
 # One select will be FAR faster than what you're doing with rand...
 
 
+
 # For the sake of keeping things clear, this function goes here
 xclient() {
 	# This is here so that servers can be randomized in the future.
@@ -290,6 +291,14 @@ continue
 			# happy-eyeballs-timeout-ms ?
 			# curl supports the -D option to put headers in a specific place
 			curl)
+	sqlite3 tests/test.db "select curl_headers,curl_body,url,get from t where uuid = 1;" | \
+		awk \
+			-vSITE="http://localhost:2000" \
+			-F '|' '{
+				printf "curl %s %s %s%s%s\n", $1, $2, SITE, $3, $4
+		}'	
+
+
 				BUFFILE=/tmp/`randstr 64`
 				curl -i \
 					--no-styled-output \
