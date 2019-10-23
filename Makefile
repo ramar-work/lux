@@ -21,9 +21,17 @@ OBJ = ${SRC:.c=.o}
 
 
 # Unfortunately, I'm still working on this...
-a:
-	$(CC) $(CFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c
+default:
+	$(CC) $(CFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c && \
 	$(CC) $(CFLAGS) -lgnutls -DSQROOGE_H -o bin/th test.c vendor/single.c
+
+clang:
+	clang $(CLANGFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c && \
+	clang $(CLANGFLAGS) -lgnutls -DSQROOGE_H -o bin/th test.c vendor/single.c
+
+gcc:
+	gcc $(GCCFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c && \
+	gcc $(GCCFLAGS) -lgnutls -DSQROOGE_H -o bin/th test.c vendor/single.c
 
 # A main target, that will most likely result in a binary
 main: RICKROSS=main
@@ -32,10 +40,26 @@ main:
 	mv $(RICKROSS) bin/hypno
 	$(CC) $(CFLAGS) -lgnutls -DSQROOGE_H -o th test.c vendor/single.c && mv th bin/
 
+# Run a test on the server running in the foreground
+test-srv:
+	bin/socketmgr --start --port $(PORT) 
 
-# Generate a bunch of stuff
-# You can have a file called test.sh with options...
+# Run a test on the server running in the foreground, using LLVM
+test-srv-asan:
+	ASAN_OPTIONS=symbolize=1 ASAN_SYMBOLIZER_PATH=$(shell which llvm-symbolizer) bin/socketmgr --start --port $(PORT) 
 
+# Run a test on the server running in the foreground, using Valgrind 
+test-srv-vg:
+	valgrind bin/socketmgr --start --port $(PORT) 
+
+
+# Run a test on the server running in the foreground
+kill-srv:
+	ps aux | grep bin/socketmgr | awk '{ print $$2 }' | xargs kill -9
+
+# Run a test with a variety of clients
+test-cli:
+	tests/test.sh --port $(PORT)
 
 # You can generate a PPM file as a quick easy test of binary image formats...
 ppm-test:
@@ -205,5 +229,5 @@ test-build-Linux:
 # Clean target...
 #		`echo $(IGNCLEAN) | sed '{ s/ / ! -iname /g; s/^/! -iname /; }'` 
 clean:
-	-@rm $(NAME) cli testrouter testchains testsql testrender
+	-@rm $(NAME) cli testrouter testchains testsql testrender bin/*
 	-@find . | egrep '\.o$$' | grep -v sqlite | xargs rm

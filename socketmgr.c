@@ -2,6 +2,40 @@
 #include "vendor/single.h"
 #include <gnutls/gnutls.h>
 
+const char http_200_fixed[] = ""
+	"HTTP/1.1 200 OK\r\n"
+	"Content-Length: 11\r\n"
+	"Content-Type: text/html\r\n\r\n"
+	"<h2>Ok</h2>";
+
+const char http_200_custom[] = ""
+	"HTTP/1.1 200 OK\r\n"
+	"Content-Length: %d\r\n"
+	"Content-Type: text/html\r\n\r\n";
+
+const char http_404_fixed[] = ""
+	"HTTP/1.1 404 Internal Server Error\r\n"
+	"Content-Length: 21\r\n"
+	"Content-Type: text/html\r\n\r\n"
+	"<h2>Not Found...</h2>";
+
+const char http_404_custom[] = ""
+	"HTTP/1.1 500 Internal Server Error\r\n"
+	"Content-Length: %d\r\n"
+	"Content-Type: text/html\r\n\r\n";
+
+const char http_500_fixed[] = ""
+	"HTTP/1.1 500 Internal Server Error\r\n"
+	"Content-Length: 18\r\n"
+	"Content-Type: text/html\r\n\r\n"
+	"<h2>Not OK...</h2>";
+
+const char http_500_custom[] = ""
+	"HTTP/1.1 500 Internal Server Error\r\n"
+	"Content-Length: %d\r\n"
+	"Content-Type: text/html\r\n\r\n";
+
+
 #define ADD_ELEMENT( ptr, ptrListSize, eSize, element ) \
 	if ( ptr ) \
 		ptr = realloc( ptr, sizeof( eSize ) * ( ptrListSize + 1 ) ); \
@@ -175,7 +209,7 @@ char *get_lstr( char **str, char chr, int *lt ) {
 		rr[ *lt - 1 ] = '\0';
 	}	
 	else {
-		rr = malloc( r );
+		rr = malloc( r + 1 );
 		memset( rr, 0, r );
 		memcpy( rr, *str, r );	
 		rr[ r ] = '\0';
@@ -270,6 +304,16 @@ unsigned char *httptrim (uint8_t *msg, const char *trim, int len, int *nlen) {
 }
 
 
+//Just copy the key
+char *copystr ( uint8_t *src, int len ) {
+	len++;
+	char *dest = malloc( len );
+	memset( dest, 0, len );
+	memcpy( dest, src, len - 1 );
+	return dest;
+} 
+
+
 //tell me the error returned.  I don't know what happened...
 void whatsockerr( int e ) {
 	if ( e == EBADF  ) fprintf( stderr, "Got sockerr: %s", "EBADF " );
@@ -350,16 +394,75 @@ int t_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 
 //Any processing can be done in the middle.  Since we're in another "thread" anyway
 int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
-	const char http_200[] = ""
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: 11\r\n"
-		"Content-Type: text/html\r\n\r\n"
-		"<h2>Ok</h2>";
 	fprintf( stderr, "REQUEST IS:\n" );
 	print_httpbody( rq );
 	fprintf( stderr, "RESPONSE IS:\n" );
 	print_httpbody( rs );
-	if ( write( fd, http_200, strlen(http_200)) == -1 ) {
+	if ( write( fd, http_200_fixed, strlen(http_200_fixed)) == -1 ) {
+		fprintf(stderr, "Couldn't write all of message..." );
+		close(fd);
+		return 0;
+	}
+
+	return 0;
+}
+
+
+int proc_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+
+	//Allocate a big buffer and do work
+	int progress = 0;
+	int p[]={ 0,0,0 };
+	char *buf = malloc( 1 );
+	struct HTTPRecord **t[] = { rq->url, rq->headers, rq->body };
+
+	//Loop through all three...
+	for ( int i=0; i<sizeof(t)/sizeof(struct HTTPRecord **); i++ ) {
+		struct HTTPRecord **w = t[i];
+		if ( *w ) {
+			p[i] = 1;
+			while ( *w ) {
+				struct HTTPRecord *r = *w;	
+				int fieldLen = strlen( r->field );
+				//Allocate enough for fields and length of strings: ' => ', '<br>', '\n' & '\0'
+				int newSize = fieldLen + r->size + 10; 
+				//Return early on lack of memory...
+				if ( ( buf = realloc( buf, newSize + progress ) ) == NULL ) {
+					write( fd, http_500, strlen(http_500) );
+					close( fd );
+					return 0;
+				}
+
+				//Initialize the new memory
+				memset( &buf[ progress ], 0, newSize );
+
+				//Go through and copy everything else.
+				memcpy( &buf[ progress ], r->field, fieldLen );
+				progress += fieldLen;
+
+				memcpy( &buf[ progress ], " => ", 4 );
+				progress += 4;
+
+				memcpy( &buf[ progress ], r->value, r->size ); 
+				progress += r->size;
+
+				memcpy( &buf[ progress ], "<br>\n", 5 ); 
+				progress += 5;
+				
+				w++;
+			}
+		}
+	}
+
+	//Get the length of the format string and allocate enough for buffer and thing
+	int sendLen = strlen( http_200_custom ) + 6 + progress; //get the length of number 
+	char *sendBuf = malloc( sendLen );	
+	memset( sendBuf, 0, sendLen );
+	int written = snprintf( sendBuf, sendLen,	http_200_custom, progress );
+	memcpy( &sendBuf[ written ], buf, progress );
+
+	//Send the message to server, and see if it's read or not...
+	if ( write( fd, sendBuf, sendLen ) == -1 ) {
 		fprintf(stderr, "Couldn't write all of message..." );
 		close(fd);
 		return 0;
@@ -532,12 +635,6 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 
 	//Read all the data from a socket.
 #if 0
-	unsigned char *buf = malloc( 1 );
-	int rdFromSock = read_from_socket( fd, &buf, NULL );
-
-fprintf( stderr, "rdFromSock: %d\n", rdFromSock );
-write( 2, buf, rdFromSock ); 
-exit( 0 );
 #else
 	unsigned char *buf = malloc( 1 );
 	int mult = 0;
@@ -659,7 +756,7 @@ exit( 0 );
 #endif
 
 	//Show what I received so far...
-	if ( 1 ) {
+	if ( 0 ) {
 		write( 2, rq->msg, rq->mlen );
 	}
 
@@ -669,6 +766,10 @@ exit( 0 );
 	const int flLen = pLen + strlen( "\r\n" );
 	int hdLen = memstrat( rq->msg, "\r\n\r\n", rq->mlen );
 
+	//...
+	rq->headers = NULL;
+	rq->body = NULL;
+	rq->url = NULL;
 	rq->method = get_lstr( &header, ' ', &pLen );
 	rq->path = get_lstr( &header, ' ', &pLen );
 	rq->protocol = get_lstr( &header, ' ', &pLen ); 
@@ -688,7 +789,7 @@ exit( 0 );
 		//If clen is -1, ... hmmm.  At some point, I still need to do the rest of the work. 
 	}
 
-	if ( 1 )  {
+	if ( 0 )  {
 		print_httpbody( rq );	
 	}
 
@@ -698,7 +799,7 @@ exit( 0 );
 	Mem set;
 	memset( &set, 0, sizeof( Mem ) );
 
-	//Always process the URL
+	//Always process the URL (specifically GET vars)
 	if ( strlen( rq->path ) > 1 ) {
 		int index = 0;
 		while ( strwalk( &set, rq->path, "?&" ) ) {
@@ -709,11 +810,17 @@ exit( 0 );
 			if ( !b || at == -1 || !set.size ) 
 				;
 			else {
-				char *k = malloc( at );
-				memset( k, 0, at );
+			#if 1
+				int klen = at + 1;
+				b->field = copystr( t, klen );
+			#else	
+				int klen = at + 1;
+				char *k = malloc( klen );
+				memset( k, 0, klen );
 				memcpy( k, t, at );
 				b->field = k;
-				at += 1, t += at, set.size -= at;
+			#endif
+				klen += 1, t += klen, set.size -= klen;
 				b->value = t;
 				b->size = set.size;
 				ADD_ELEMENT( rq->url, len, struct HTTPRecord, b );
@@ -721,7 +828,7 @@ exit( 0 );
 		}
 		ADD_ELEMENT( rq->url, len, struct HTTPRecord, NULL );
 
-		if ( 1 ) {
+		if ( 0 ) {
 			fprintf(stderr,"URL received was:\n" );
 			print_httprecords( rq->url );
 		}
@@ -744,21 +851,31 @@ exit( 0 );
 			else {
 				at -= 2;
 				t += 2;
+			#if 1
+				b->field = copystr( t, at );
+			#else
 				char *k = malloc( at );
 				memset( k, 0, at );
 				memcpy( k, t, at );
 				b->field = k;
+			#endif
 				at += 2;  //Increment to get past ': ' 
 				t += at, set.size -= at;
 				b->value = t;
-				b->size = set.size;
+				//TODO: What is the deal here?
+				b->size = set.size - 1;
+			#if 0
+				write( 2, "'", 1 );
+				write( 2, b->value, b->size );
+				write( 2, "'", 1 );
+			#endif
 				ADD_ELEMENT( rq->headers, len, struct HTTPRecord, b );
 			}
 		}
 	}
 	ADD_ELEMENT( rq->headers, len, struct HTTPRecord, NULL );
 
-	if ( 1 ) {
+	if ( 0 ) {
 		fprintf(stderr,"Headers received were:\n" );
 		print_httprecords( rq->headers );
 	}
@@ -770,7 +887,10 @@ exit( 0 );
 	int plen = rq->mlen - rq->hlen;
 	
 	//TODO: If this is a xfer-encoding chunked msg, rq->clen needs to get filled in when done.
-	if ( strcmp( "POST", rq->method ) == 0 ) {
+	if ( strcmp( "POST", rq->method ) != 0 ) {
+		ADD_ELEMENT( rq->body, len, struct HTTPRecord, NULL );
+	}
+	else {
 		struct HTTPRecord *b = NULL;
 		#if 0
 		fprintf( stderr, "\nSTART OF POST REQUEST\n" );
@@ -791,10 +911,14 @@ exit( 0 );
 				if ( *m == '\n' || *m == '&' ) {
 					b = malloc( sizeof( struct HTTPRecord ) );
 					memset( b, 0, sizeof( struct HTTPRecord ) ); 
-					char *k = malloc( set.size );
-					memset( k, 0, set.size );
+				#if 1
+					b->field = copystr( ++m, set.size );
+				#else
+					char *k = malloc( set.size + 1 );
+					memset( k, 0, set.size + 1 );
 					memcpy( k, ++m, set.size );
 					b->field = k; 
+				#endif
 				}
 				else if ( *m == '=' ) {
 					b->value = ++m;
@@ -810,15 +934,11 @@ exit( 0 );
 				//However, as long as headers were sent (and 99.99999999% of the time they will be)
 				//this negative index will point to valid allocated memory...
 				uint8_t *m = &p[ set.pos - 1 ];  
-				if ( memcmp( m, "; name=", 7 ) == 0 ) { 
-					//fprintf( stderr, "got name field... pass %d\n", ++index );
+				if ( memcmp( m, "; name=", 7 ) == 0 )
 					name = 1;
-				}
 				//"\r\n\r\n"
-				else if ( memcmp( m, "\r\n\r\n", 4 ) == 0 && !value ) {
-					//fprintf( stderr, "setting value bit... pass %d\n", ++index );
+				else if ( memcmp( m, "\r\n\r\n", 4 ) == 0 && !value )
 					value = 1;
-				}
 				else if ( memcmp( m, "\r\n-", 3 ) == 0 && !value ) {
 					//fprintf( stderr, "got a boundary... pass %d\n", ++index );
 					b = malloc( sizeof( struct HTTPRecord ) );
@@ -836,20 +956,29 @@ exit( 0 );
 				else if ( *m == '=' && name == 1 ) {
 					//fprintf( stderr, "copying name field... pass %d\n", ++index );
 					int size = *(m + 1) == '"' ? set.size - 2 : set.size;
+				#if 1
+					m += ( *(m + 1) == '"' ) ? 2 : 1 ;
+				#else
 					int ptrinc = *(m + 1) == '"' ? 2 : 1;
-					char *k = malloc( set.size );
-					m += ptrinc;	
-					memset( k, 0, set.size );
+					m += ptrinc;
+				#endif
+				#if 1
+					b->field = copystr( m, size );
+				#else
+					char *k = malloc( set.size + 1 );
+					memset( k, 0, set.size + 1 );
 					memcpy( k, m, size );
 					b->field = k;
+				#endif
 					name = 0;
 				}
 			}
 		}
 		ADD_ELEMENT( rq->body, len, struct HTTPRecord, NULL );
 		//This MAY help in handling malformed messages...
-		if ( b && (!b->field || !b->value) ) free( b );
-		if ( 1 ) {
+		( b && (!b->field || !b->value) ) ? free( b ) : 0;
+
+		if ( 0 ) {
 			fprintf( stderr, "BODY got:\n" );
 			print_httprecords( rq->body );
 		}
@@ -863,12 +992,7 @@ exit( 0 );
 
 int ssl_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 	//write (write all the data in one call if you fork like this) 
-	const char http_200[] = ""
-		"HTTP/1.1 200 OK\r\n"
-		"Content-Length: 11\r\n"
-		"Content-Type: text/html\r\n\r\n"
-		"<h2>Ok</h2>";
-	if ( write( fd, http_200, strlen(http_200)) == -1 ) {
+	if ( write( fd, http_200_fixed, strlen(http_200_fixed)) == -1 ) {
 		fprintf(stderr, "Couldn't write all of message..." );
 		close(fd);
 		return 0;
@@ -904,7 +1028,7 @@ struct senderrecvr {
 	void *readf;
 	void *writef;
 } sr[] = {
-	{ h_read, h_proc, h_write }
+	{ h_read, proc_echo /*h_proc*/, h_write }
 , { t_read, NULL, t_write  }
 ,	{ NULL }
 };
@@ -939,12 +1063,18 @@ int main (int argc, char *argv[]) {
 				values.start = 1;
 			else if ( strcmp( *argv, "--kill" ) == 0 ) 
 				values.kill = 1;
-			else if ( strcmp( *argv, "--port" ) == 0 ) 
-				values.port = atoi( *argv );
 			else if ( strcmp( *argv, "--ssl" ) == 0 ) 
 				values.ssl = 1;
 			else if ( strcmp( *argv, "--daemonize" ) == 0 ) 
 				values.fork = 1;
+			else if ( strcmp( *argv, "--port" ) == 0 ) {
+				argv++;
+				if ( !*argv ) {
+					fprintf( stderr, "Expected argument for --port!" );
+					return 0;
+				} 
+				values.port = atoi( *argv );
+			}
 			else if ( strcmp( *argv, "--user" ) == 0 ) {
 				argv++;
 				if ( !*argv ) {
