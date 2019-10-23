@@ -25,16 +25,13 @@ OBJ = ${SRC:.c=.o}
 
 # Unfortunately, I'm still working on this...
 default:
-	$(CC) $(CFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c && \
-	$(CC) $(CFLAGS) -lgnutls -DSQROOGE_H -o bin/th test.c vendor/single.c
+	$(CC) $(CFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c
 
 clang:
-	clang $(CLANGFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c && \
-	clang $(CLANGFLAGS) -lgnutls -DSQROOGE_H -o bin/th test.c vendor/single.c
+	clang $(CLANGFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c
 
 gcc:
-	gcc $(GCCFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c && \
-	gcc $(GCCFLAGS) -lgnutls -DSQROOGE_H -o bin/th test.c vendor/single.c
+	gcc $(GCCFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c
 
 # A main target, that will most likely result in a binary
 main: BINNAME=main

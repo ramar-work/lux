@@ -412,57 +412,70 @@ int proc_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 
 	//Allocate a big buffer and do work
 	int progress = 0;
-	int p[]={ 0,0,0 };
 	char *buf = malloc( 1 );
-	struct HTTPRecord **t[] = { rq->url, rq->headers, rq->body };
+	const char *names[] = { "Headers", "GET", "POST" };
+	struct HTTPRecord **t[] = { rq->headers, rq->url, rq->body };
 
 	//Loop through all three...
 	for ( int i=0; i<sizeof(t)/sizeof(struct HTTPRecord **); i++ ) {
 		struct HTTPRecord **w = t[i];
-		if ( *w ) {
-			p[i] = 1;
-			while ( *w ) {
-				struct HTTPRecord *r = *w;	
-				int fieldLen = strlen( r->field );
-				//Allocate enough for fields and length of strings: ' => ', '<br>', '\n' & '\0'
-				int newSize = fieldLen + r->size + 10; 
-				//Return early on lack of memory...
-				if ( ( buf = realloc( buf, newSize + progress ) ) == NULL ) {
-					write( fd, http_500, strlen(http_500) );
-					close( fd );
-					return 0;
-				}
+		//Always write the type of request.
+		char h2buf[32], *endstr = ( *w ) ? "\n" : "\n-<br>\n";
+		memset( h2buf, 0, sizeof(h2buf) );
+		int h2len = snprintf( h2buf, sizeof(h2buf)-1, "<h2>%s</h2>%s", names[i], endstr );
 
-				//Initialize the new memory
-				memset( &buf[ progress ], 0, newSize );
+		//Reallocate a buffer
+		if ( ( buf = realloc( buf, h2len + progress ) ) == NULL ) {
+			write( fd, http_500_fixed, strlen(http_500_fixed) );
+			close( fd );
+			return 0;
+		}
 
-				//Go through and copy everything else.
-				memcpy( &buf[ progress ], r->field, fieldLen );
-				progress += fieldLen;
+		//Write the title out
+		memset( &buf[ progress ], 0, h2len );
+		memcpy( &buf[ progress ], h2buf, h2len );
+		progress += h2len;
 
-				memcpy( &buf[ progress ], " => ", 4 );
-				progress += 4;
-
-				memcpy( &buf[ progress ], r->value, r->size ); 
-				progress += r->size;
-
-				memcpy( &buf[ progress ], "<br>\n", 5 ); 
-				progress += 5;
-				
-				w++;
+		//Now go through the rest
+		while ( *w ) {
+			struct HTTPRecord *r = *w;	
+			int fieldLen = strlen( r->field );
+			//Allocate enough for fields and length of strings: ' => ', '<br>', '\n' & '\0'
+			int newSize = fieldLen + r->size + 10; 
+			//Return early on lack of memory...
+			if ( ( buf = realloc( buf, newSize + progress ) ) == NULL ) {
+				write( fd, http_500_fixed, strlen(http_500_fixed) );
+				close( fd );
+				return 0;
 			}
+
+			//Initialize the new memory
+			memset( &buf[ progress ], 0, newSize );
+
+			//Go through and copy everything else.
+			memcpy( &buf[ progress ], r->field, fieldLen );
+			progress += fieldLen;
+			memcpy( &buf[ progress ], " => ", 4 );
+			progress += 4;
+			memcpy( &buf[ progress ], r->value, r->size ); 
+			progress += r->size;
+			memcpy( &buf[ progress ], "<br>\n", 5 ); 
+			progress += 5;
+			w++;
 		}
 	}
 
 	//Get the length of the format string and allocate enough for buffer and thing
 	int sendLen = strlen( http_200_custom ) + 6 + progress; //get the length of number 
+	int actualLen = 0, written = 0;
 	char *sendBuf = malloc( sendLen );	
 	memset( sendBuf, 0, sendLen );
-	int written = snprintf( sendBuf, sendLen,	http_200_custom, progress );
+	written = snprintf( sendBuf, sendLen,	http_200_custom, progress );
 	memcpy( &sendBuf[ written ], buf, progress );
+	actualLen = written + progress;
 
 	//Send the message to server, and see if it's read or not...
-	if ( write( fd, sendBuf, sendLen ) == -1 ) {
+	if ( write( fd, sendBuf, actualLen ) == -1 ) {
 		fprintf(stderr, "Couldn't write all of message..." );
 		close(fd);
 		return 0;
@@ -1281,6 +1294,10 @@ int main (int argc, char *argv[]) {
 		else if ( cpid == 0 ) {
 			//TODO: The parent should probably log some important info here.	
 			fprintf(stderr, "in parent...\n" );
+			//Close the file descriptor here?
+			if ( close( fd ) == -1 ) {
+				fprintf( stderr, "Parent couldn't close socket." );
+			}
 		}
 		else if ( cpid ) {
 			//TODO: Somewhere in here, a signal needs to run that allows this thing to die.
