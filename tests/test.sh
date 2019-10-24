@@ -52,6 +52,7 @@ WAIT_FOR_INPUT=0
 DRYRUN=0
 VERBOSE=0
 SLEEP=0
+INITTEST=0
 SLEEP_INTERVAL=5
 
 # Possible test styles are here.
@@ -100,6 +101,11 @@ err() {
 	exit ${2:-1}
 }
 
+# keep this little sanity check in here
+test -z "$TESTCASES" && {
+	err "No test cases specified (uncomment one of the TESTCASES options in $0)."
+}
+
 
 # show usage
 usage() {
@@ -113,6 +119,8 @@ cat <<EOF
 -p, --port <arg>          Use this port.
 -w, --wait                Wait for input before running a test command.
     --dry-run             Do not actually do anything, but show what would be done.
+-i, --init-tests          Initialize the test files.
+-r, --records <arg>       Generate <arg> records when generating tests.
     --verbose             Be verbose and spit out commands before we execute them.
 -h, --help                Show help
 EOF
@@ -193,35 +201,166 @@ do
 			DRYRUN=1
 			VERBOSE=1
 		;;
-		--verbose)
+		-v|--verbose)
 			VERBOSE=1
 		;;
 		-h|--help)
 			usage 0	
 		;;
+		-i|--init-tests)
+			INITTEST=1
+		;;
 	esac
 	shift
-
 done
 
 
 
-# test-init?
-#
 
 
-# Quick checks for an output directory... 
-test ! -z "$OUTPUT_DIR" || err "No output directory specified."
-test -d $OUTPUT_DIR || mkdir -p $OUTPUT_DIR || err "Could not create output directory."
+# Initialize the test suite.
+inittest() {
+
+	# Define all the constants
+	TESTSQL=tests/test.sql
+	TESTDB=tests/test.db
+	TC_WORDS=tests/words
+	TC_CWORDS=tests/words_no_apostrophe
+	TC_BLOCKS=tests/wordblocks
+	RECORDS=3
+
+	# Generate a table from scratch
+	echo "
+		CREATE TABLE t ( 
+			uuid INTEGER PRIMARY KEY AUTOINCREMENT, 
+			id TEXT, 
+			url TEXT, 
+			curl_headers TEXT, 
+			wget_headers TEXT, 
+			chrome_headers TEXT, 
+			get TEXT, 
+			curl_body TEXT, 
+			wget_body TEXT, 
+			chrome_body TEXT,
+			expected_response TEXT 
+		);
+	" > $TESTSQL
+
+	# Generate records for $RECORDS amount 
+	for i in `seq 0 $RECORDS`
+	do 
+		WL=`wc -l $TC_WORDS | awk '{ print $1 }'`; 
+		BL=`wc -l $TC_BLOCKS | awk '{ print $1 }'`; 
+		WNOL=`wc -l $TC_CWORDS | awk '{ print $1 }'`;  
+
+		# Generate random header data 
+		HEADER=
+		CURL_HEADER=
+		WGET_HEADER=
+		CHROME_HEADER=
+		HEADER_ARR=
+		for n in `seq 0 $(( $RANDOM % 20 ))`
+		do 
+			HEADERBLOCK="X-header-xxxx-`sed -n "$(( $RANDOM % $WNOL ))p" $TC_CWORDS`: `sed -n "$(( $RANDOM % $WNOL ))p" $TC_CWORDS`"; 
+			HEADER+="$HEADERBLOCK"; 
+			CURL_HEADER+=" -H '$HEADERBLOCK'"; 
+			WGET_HEADER+=" --header '$HEADERBLOCK'"; 
+			CHROME_HEADER+="$HEADERBLOCK"; 
+			HEADER_ARR[ $n ]="$HEADERBLOCK<br>"; 
+		done
+
+		# Generate random query string data.
+		GET= 
+		GET_ARR=
+		for n in `seq 0 $(( $RANDOM % 20 ))`
+		do 
+			GETBLOCK="&`sed -n "$(( $RANDOM % $WNOL ))p" $TC_WORDS`=`sed -n "$(( $RANDOM % $BL ))p" $TC_BLOCKS`"; 
+			GET+="$GETBLOCK" 
+			GET_ARR[ $n ]="$GETBLOCK<br>"; 
+		done
+
+		# Generate random POST body data.
+		BODY= 
+		CURL_BODY= 
+		WGET_BODY= 
+		CHROME_BODY= 
+		BODY_ARR= 
+		for n in `seq 0 $(( $RANDOM % 13 ))`
+		do 
+			BODYBLOCK="`sed -n "$(( $RANDOM % $BL ))p" $TC_BLOCKS`"; 
+			INNERKEY=`randstr $(( $RANDOM % 37 ))`
+			BODY+="$BODYBLOCK"; 
+			CURL_BODY+=" --data-urlencode '$INNERKEY=$BODYBLOCK'"; 
+			WGET_BODY+="&$INNERKEY=$BODYBLOCK"; 
+			CHROME_BODY+="$INNERKEY=$BODYBLOCK"; 
+			BODY_ARR[ $n ]="$INNERKEY=$BODYBLOCK<br>\n"; \
+		done; 
+
+		# Generate random URI data 
+		URLBODY= 
+		URLBODY_ARR= 
+		for n in `seq 0 $(( $RANDOM % 13 ))`
+		do 
+			URLBLOCK="/`sed -n "$(( $RANDOM % $WNOL ))p" $TC_CWORDS`"; 
+			URLBODY+="$URLBLOCK"; 
+			URLBODY_ARR[ $n ]="$URLBLOCK"; 
+		done
+
+		# Response generation
+		RESPONSE_FILE=/tmp/shimmy
+		test -f $RESPONSE_FILE && rm $RESPONSE_FILE
+		printf "<h2>URL</h2>\n$URLBODY<br>\n" >> $RESPONSE_FILE;
+
+		printf "\n<h2>Headers</h2>" >> $RESPONSE_FILE;
+		for n in ${HEADER_ARR[@]}; do 
+			printf "$n" | sed 's/:/ => /; s/X-/\nX-/g'
+		done >> $RESPONSE_FILE
+
+		printf "\n\n<h2>GET</h2>" >> $RESPONSE_FILE;
+		for n in ${GET_ARR[@]}; do 
+			printf "$n " | sed 's/=/ => /; s/&/\n/g'
+		done >> $RESPONSE_FILE
+
+		printf "\n\n<h2>POST</h2>\n" >> $RESPONSE_FILE;
+		for n in ${BODY_ARR[@]}; do 
+			printf "$n " | sed 's/=/ => /'
+		done >> $RESPONSE_FILE
+
+		# Generate SQL statement 
+#		printf "INSERT INTO t VALUES( 
+#			 NULL, 
+#			\"`randstr 9`\", 
+#			\"$URLBODY\", 
+#			\"`printf -- "$CURL_HEADER" | sed "s/'/''/g"`\", 
+#			\"`printf -- "$WGET_HEADER" | sed "s/'/''/g"`\", 
+#			\"`printf -- "$CHROME_HEADER" | sed "s/'/''/g"`\", 
+#			\"`printf -- "$GET" | sed "s/^./?/; s/ /%%20/g"`\", 
+#			\"`printf -- "$CURL_BODY" | sed "s/'/''/g"`\", 
+#			\"`printf -- "$WGET_BODY" | sed "s/'/''/g"`\",
+#			\"`printf -- "$CHROME_BODY" | sed "s/'/''/g"`\",
+#			\"`cat $RESPONSE_FILE | sed "s/'/''/g"`\"
+#		 );\n" >> $TESTSQL
+		printf "INSERT INTO t VALUES( 
+			 NULL, 
+			\"`randstr 9`\", 
+			\"$URLBODY\", 
+			\"`printf -- "$CURL_HEADER"`\", 
+			\"`printf -- "$WGET_HEADER"`\", 
+			\"`printf -- "$CHROME_HEADER"`\", 
+			\"`printf -- "$GET" | sed "s/^./?/; s/ /%%20/g"`\", 
+			\"`printf -- "$CURL_BODY"`\", 
+			\"`printf -- "$WGET_BODY"`\",
+			\"`printf -- "$CHROME_BODY"`\",
+			\"`cat $RESPONSE_FILE`\"
+		 );\n" >> $TESTSQL
+	done; 
 
 
-# Debug and dump
-if [ 1 -eq 1 ]
-then
-	cat <<EOF
-Running tests against server '$SERVER' with the following parameters:
-EOF
-fi
+	# Load all the data
+	test -f $TESTDB && rm $TESTDB
+	sqlite3 $TESTDB < $TESTSQL
+}
+
 
 
 # Runs a chosen client, placing its output in a variety of files.
@@ -234,7 +373,7 @@ xclient() {
 	CLI=$3
 
 	# Constants: Templates for commands, etc
-	CURL_CMD="curl -D/dev/stderr --silent -i --no-styled-output --connect-timeout 1 "
+	CURL_CMD="curl -D /dev/stderr --silent --no-styled-output --connect-timeout 1 "
 	WGET_CMD="wget --timeout=1 --tries=2 -S -O- "
 	CHROME_CMD=
 	sqlite3="sqlite3 tests/test.db"
@@ -252,6 +391,8 @@ xclient() {
 	PAGE_STATUS=${FILEBASE}-status
 	PAGE_LENGTH=${FILEBASE}-length
 	PAGE_DATE=${FILEBASE}-date
+	PAGE_METHOD=${FILEBASE}-method
+	PAGE_EXPECTED=${FILEBASE}-expected
 
 	# Write the client, date, address and ID to individual files
 	date --rfc-3339=ns > $PAGE_DATE
@@ -261,6 +402,7 @@ xclient() {
 
 	# Decide how to format the test
 	case $TESTTYPE in
+		head)                 awk_fmt='{ printf "%s %s\n", CLIENT, SITE }'  ;;
 		no_url)               awk_fmt='{ printf "%s %s\n", CLIENT, SITE }'  ;;
 		no_url+headers)       awk_fmt='{ printf "%s %s %s\n", CLIENT, $1, SITE }'  ;;
 		url)                  awk_fmt='{ printf "%s %s%s\n", CLIENT, SITE, $3 }'  ;;
@@ -276,6 +418,9 @@ xclient() {
 		post+headers+get)     awk_fmt='{ printf "%s %s %s %s%s\n", CLIENT, $1, $2, SITE, $4 }'  ;;
 		post+headers+get+url) awk_fmt='{ printf "%s %s %s %s%s%s\n", CLIENT, $1, $2, SITE, $3, $4 }'  ;;
 	esac
+
+	# Guess the intended method by the command line arguments
+	test ${TESTTYPE:0:1} == 'p' && echo POST || echo GET > $PAGE_METHOD
 
 	# Choose the command to execute here.
 	case $CLI in
@@ -301,7 +446,16 @@ xclient() {
 	test $WAIT_FOR_INPUT -eq 1 && read 
 
 	# Execute command
-	$CLIENT_CMD >$PAGE_CONTENT 2>$PAGE_HEADERS
+	$CLIENT_CMD 2>$PAGE_HEADERS >$PAGE_CONTENT || {
+		printf "Client call failed...\n" >/dev/stderr
+		if [ 0 -eq 1 ]
+		then
+			return
+		else
+			rm -rf /tmp/hypno-tests	
+			exit
+		fi	
+	}
 	grep "HTTP/[01].[01]" $PAGE_HEADERS | awk '{ print $2 }' > $PAGE_STATUS
 	grep "Content-Length:" $PAGE_HEADERS | awk '{ print $2 }' > $PAGE_LENGTH
 
@@ -314,10 +468,35 @@ xclient() {
 }
 
 
+
+# Generate a test suite...
+if [ $INITTEST -eq 1 ]
+then
+	echo "Generating test suite..."
+	inittest
+	echo "DONE!"
+	exit
+fi
+
+
+
+# Quick checks for an output directory... 
+test ! -z "$OUTPUT_DIR" || err "No output directory specified."
+test -d $OUTPUT_DIR || mkdir -p $OUTPUT_DIR || err "Could not create output directory."
+
+
+# Debug and dump
+if [ 1 -eq 1 ]
+then
+	cat <<EOF
+Running tests against server '$SERVER' with the following parameters:
+EOF
+fi
+
+
 # Choose default site and set default client.
 line="$WWWADDR:$WWWPORT"
 CLIENT=${CLIENT:-curl}
-
 
 # TODO: Use SQlite to get a count of values (or just specify on the command line)
 COUNT=0
@@ -358,33 +537,30 @@ printf "
 			<th>Length</th>
 			<th>Status</th>
 			<th>Headers</th>
-			<th>Addr</th>
-			<th>Request Made</th>
-			<!-- <th>Method</th> -->
-			<!-- <th>Successful?</th> -->
 			<th>Content</th>
+			<th>URL Requested</th>
+			<th>Method</th>
+			<th>Request Date</th>
+			<!-- <th>Successful?</th> -->
 		</thead>
 "
 
 find $OUTPUT_DIR -type f ! -name "*-*" | \
 	xargs -IFF sh -c '
 	printf "<tr>\n"
-	printf "<td>`cat FF`</td>\n"
-	for n in length status content headers addr date; do
-		if [[ $n == "headers" ]]
-		then
+	for n in id length status headers content addr method date; do
+		if [[ $n == "id" ]]; then
+			printf "<td>`cat FF | head -c 6`</td>\n"
+		elif [[ $n == "headers" ]]; then
 			printf "<td><pre>`cat FF-$n`</pre></td>\n"
-		elif [[ $n == "content" ]]
-		then
+		elif [[ $n == "content" ]]; then
 			printf "<td><pre>"
 			printf "`cat FF-$n | sed "s/</\&lt;/g" | sed "s/>/\&gt;/g"`"
 			printf "</pre></td>\n"
 		else
 			printf "<td>`cat FF-$n`</td>\n"
 		fi
-		rm FF-$n
 	done
-	rm FF
 	printf "</tr>\n"
 	'
 
@@ -392,12 +568,15 @@ printf "
 	</table>
 <style>
 th { text-align: left; }
+tr:nth-child(even) { background-color: #ddd; }
 </style>
 	"
 
 # Get rid of the output directory
 rm -rf $OUTPUT_DIR
-exit
+
+# Return with success
+exit 0
 
 
 

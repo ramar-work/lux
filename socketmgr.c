@@ -45,6 +45,11 @@ const char http_500_custom[] = ""
 	*(&ptr[ ptrListSize ]) = element; \
 	ptrListSize++;
 
+#define DUMP_RIGHT( ptr, size ) \
+	write( 2, "'", 1 ); \
+	write( 2, ptr, size ); \
+	write( 2, "'", 1 );
+
 
 struct HTTPRecord {
 	const char *field; 
@@ -417,8 +422,10 @@ int proc_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	struct HTTPRecord **t[] = { rq->headers, rq->url, rq->body };
 
 	//Loop through all three...
+//printf( "%ld\n", sizeof(t)/sizeof(struct HTTPRecord **)); getchar();
 	for ( int i=0; i<sizeof(t)/sizeof(struct HTTPRecord **); i++ ) {
 		struct HTTPRecord **w = t[i];
+	#if 1
 		//Always write the type of request.
 		char h2buf[32], *endstr = ( *w ) ? "\n" : "\n-<br>\n";
 		memset( h2buf, 0, sizeof(h2buf) );
@@ -435,6 +442,7 @@ int proc_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 		memset( &buf[ progress ], 0, h2len );
 		memcpy( &buf[ progress ], h2buf, h2len );
 		progress += h2len;
+	#endif
 
 		//Now go through the rest
 		while ( *w ) {
@@ -779,7 +787,7 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 	const int flLen = pLen + strlen( "\r\n" );
 	int hdLen = memstrat( rq->msg, "\r\n\r\n", rq->mlen );
 
-	//...
+	//Initialize the remainder of variables 
 	rq->headers = NULL;
 	rq->body = NULL;
 	rq->url = NULL;
@@ -813,7 +821,10 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 	memset( &set, 0, sizeof( Mem ) );
 
 	//Always process the URL (specifically GET vars)
-	if ( strlen( rq->path ) > 1 ) {
+	if ( strlen( rq->path ) == 1 ) {
+		ADD_ELEMENT( rq->url, len, struct HTTPRecord, NULL );
+	}
+	else {
 		int index = 0;
 		while ( strwalk( &set, rq->path, "?&" ) ) {
 			uint8_t *t = (uint8_t *)&rq->path[ set.pos ];
@@ -862,25 +873,13 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 			if ( !b || at == -1 || at > 127 )
 				;
 			else {
-				at -= 2;
-				t += 2;
-			#if 1
+				at -= 2, t += 2;
 				b->field = copystr( t, at );
-			#else
-				char *k = malloc( at );
-				memset( k, 0, at );
-				memcpy( k, t, at );
-				b->field = k;
-			#endif
-				at += 2;  //Increment to get past ': ' 
-				t += at, set.size -= at;
+				at += 2 /*Increment to get past ': '*/, t += at, set.size -= at;
 				b->value = t;
-				//TODO: What is the deal here?
 				b->size = set.size - 1;
 			#if 0
-				write( 2, "'", 1 );
-				write( 2, b->value, b->size );
-				write( 2, "'", 1 );
+				DUMP_RIGHT( b->value, b->size );
 			#endif
 				ADD_ELEMENT( rq->headers, len, struct HTTPRecord, b );
 			}
@@ -888,10 +887,6 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 	}
 	ADD_ELEMENT( rq->headers, len, struct HTTPRecord, NULL );
 
-	if ( 0 ) {
-		fprintf(stderr,"Headers received were:\n" );
-		print_httprecords( rq->headers );
-	}
 
 	//Always process the body 
 	memset( &set, 0, sizeof( Mem ) );
@@ -906,15 +901,10 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 	else {
 		struct HTTPRecord *b = NULL;
 		#if 0
-		fprintf( stderr, "\nSTART OF POST REQUEST\n" );
-		write( 2, "'", 1 ); 
-		write( 2, p, rq->mlen - rq->hlen ); 
-		fprintf( stderr, "\nEND OF POST REQUEST\n" );
+		DUMP_RIGHT( p, rq->mlen - rq->hlen ); 
 		#endif
 		//TODO: Bitmasking is 1% more efficient, go for it.
-		int name=0;
-		int value=0;
-		int index=0;
+		int name=0, value=0, index=0;
 
 		//url encoded is a little bit different.  no real reason to use the same code...
 		if ( strcmp( rq->ctype, "application/x-www-form-urlencoded" ) == 0 ) {
@@ -924,14 +914,8 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 				if ( *m == '\n' || *m == '&' ) {
 					b = malloc( sizeof( struct HTTPRecord ) );
 					memset( b, 0, sizeof( struct HTTPRecord ) ); 
-				#if 1
+					//TODO: Should be checking that allocation was successful
 					b->field = copystr( ++m, set.size );
-				#else
-					char *k = malloc( set.size + 1 );
-					memset( k, 0, set.size + 1 );
-					memcpy( k, ++m, set.size );
-					b->field = k; 
-				#endif
 				}
 				else if ( *m == '=' ) {
 					b->value = ++m;
@@ -975,18 +959,13 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 					int ptrinc = *(m + 1) == '"' ? 2 : 1;
 					m += ptrinc;
 				#endif
-				#if 1
 					b->field = copystr( m, size );
-				#else
-					char *k = malloc( set.size + 1 );
-					memset( k, 0, set.size + 1 );
-					memcpy( k, m, size );
-					b->field = k;
-				#endif
 					name = 0;
 				}
 			}
 		}
+
+		//Add a terminator element
 		ADD_ELEMENT( rq->body, len, struct HTTPRecord, NULL );
 		//This MAY help in handling malformed messages...
 		( b && (!b->field || !b->value) ) ? free( b ) : 0;

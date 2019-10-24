@@ -11,7 +11,10 @@ CC = gcc
 PREFIX = /usr/local
 VERSION = 0.01
 PORT = 2200
-RECORDS=10
+RANDOM_PORT = 1
+PORT_FILE = /tmp/hypno.port
+BROWSER = chromium
+RECORDS=50
 
 # Some Linux systems need these, but pkg-config should handle it
 #INCLUDE_DIR=-I/usr/include/lua5.3
@@ -47,11 +50,21 @@ test-srv:
 
 # Run a test on the server running in the foreground, using LLVM
 test-srv-asan:
-	ASAN_OPTIONS=symbolize=1 ASAN_SYMBOLIZER_PATH=$(shell which llvm-symbolizer) bin/socketmgr --start --port $(PORT) 
+	-@make kill-srv
+	make clean
+	make clang
+	test $(RANDOM_PORT) -eq 1 && MYPORT=$$(( ( $$RANDOM % 7000 ) + 1000 )) || MYPORT=$(PORT); \
+	echo $$MYPORT > $(PORT_FILE); \
+	ASAN_OPTIONS=symbolize=1 ASAN_SYMBOLIZER_PATH=$(shell which llvm-symbolizer) bin/socketmgr --start --port $$MYPORT
 
 # Run a test on the server running in the foreground, using Valgrind 
 test-srv-vg:
-	valgrind bin/socketmgr --start --port $(PORT) 
+	-@make kill-srv
+	make clean
+	make gcc 
+	test $(RANDOM_PORT) -eq 1 && MYPORT=$$(( ( $$RANDOM % 7000 ) + 1000 )) || MYPORT=$(PORT); \
+	echo $$MYPORT > $(PORT_FILE); \
+	valgrind bin/socketmgr --start --port $$MYPORT;
 
 # Run a test on the server running in the foreground
 kill-srv:
@@ -59,93 +72,15 @@ kill-srv:
 
 # Run a test with a variety of clients
 test-cli:
-	tests/test.sh --port $(PORT)
+	@test -f $(PORT_FILE) && MYPORT=`cat $(PORT_FILE)` || MYPORT=$(PORT); \
+	echo tests/test.sh -v --port $$MYPORT; \
+	HTMLDOC=/tmp/hypno-test-run.html; \
+	tests/test.sh -v --port $$MYPORT > $$HTMLDOC && \
+		$(BROWSER) file://$$HTMLDOC || echo "Test suite failed..."
 
 # init-test - Generate test data for use by different web clients
 init-test:
-	@echo "Initializing test suite (this could take a while...)"
-	@echo "CREATE TABLE t ( \
-		uuid INTEGER PRIMARY KEY AUTOINCREMENT, \
-		id TEXT, \
-		url TEXT, \
-		curl_headers TEXT, \
-		wget_headers TEXT, \
-		chrome_headers TEXT, \
-		get TEXT, \
-		curl_body TEXT, \
-		wget_body TEXT, \
-		chrome_body TEXT \
-	);\
-	" > tests/test.sql; \
-	for i in `seq 0 $(RECORDS)`; do \
-		WL=`wc -l tests/words | awk '{ print $$1 }'`; \
-		BL=`wc -l tests/wordblocks | awk '{ print $$1 }'`; \
-		WNOL=`wc -l tests/words_no_apostrophe | awk '{ print $$1 }'`;  \
-		ALPHABET="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" && \
-		RANDSTR= && \
-		for n in `seq 0 32`; do \
-			RANDSTR+=$${ALPHABET:$$(( $$RANDOM % $${#ALPHABET} )):1}; \
-		done; \
-		HEADER= && CURL_HEADER= && WGET_HEADER= && CHROME_HEADER= && HEADER_ARR= && \
-		for n in `seq 0 $$(( $$RANDOM % 20 ))`; do \
-			HEADERBLOCK="X-header-xxxx-`sed -n "$$(( $$RANDOM % $$WNOL ))p" tests/words_no_apostrophe`: `sed -n "$$(( $$RANDOM % $$WNOL ))p" tests/words_no_apostrophe`"; \
-			HEADER+="$$HEADERBLOCK"; \
-			CURL_HEADER+=" -H '$$HEADERBLOCK'"; \
-			WGET_HEADER+=" --header '$$HEADERBLOCK'"; \
-			CHROME_HEADER+="$$HEADERBLOCK"; \
-			HEADER_ARR[ n ]="$$HEADERBLOCK<br>"; \
-		done; \
-		GET= && GET_ARR= && \
-		for n in `seq 0 $$(( $$RANDOM % 20 ))`; do \
-			GETBLOCK="&`sed -n "$$(( $$RANDOM % $$WNOL ))p" tests/words_no_apostrophe`=`sed -n "$$(( $$RANDOM % $$BL ))p" tests/wordblocks`"; \
-			GET+="$$GETBLOCK" \
-			GET_ARR[ n ]="$$GETBLOCK<br>"; \
-		done; \
-		BODY= && CURL_BODY= && WGET_BODY= && CHROME_BODY= && BODY_ARR= && \
-		for n in `seq 0 $$(( $$RANDOM % 13 ))`; do \
-			BODYBLOCK="`sed -n "$$(( $$RANDOM % $$BL ))p" tests/wordblocks`"; \
-			INNERKEY= ; \
-			for j in `seq 0 $$(( $$RANDOM % 37 ))`; do \
-				INNERKEY+=$${ALPHABET:$$(( $$RANDOM % $${#ALPHABET} )):1}; \
-			done; \
-			BODY+="$$BODYBLOCK"; \
-			CURL_BODY+=" --data-urlencode '$$INNERKEY=$$BODYBLOCK'"; \
-			WGET_BODY+="&$$BODYBLOCK"; \
-			CHROME_BODY+="$$BODYBLOCK"; \
-			BODY_ARR[ n ]="$$INNERKEY=$$BODYBLOCK<br>\n"; \
-		done; \
-		URLBODY= && URLBODY_ARR= && \
-		for n in `seq 0 $$(( $$RANDOM % 13 ))`; do \
-			URLBLOCK="/`sed -n "$$(( $$RANDOM % $$WNOL ))p" tests/words_no_apostrophe`"; \
-			URLBODY+="$$URLBLOCK"; \
-			URLBODY_ARR[ n ]="$$URLBLOCK"; \
-		done; \
-		test -f /tmp/shimmy && rm /tmp/shimmy || printf ''; \
-		printf "<h2>URL</h2>\n$$URLBODY<br>\n" >> /tmp/shimmy; \
-		printf "\n<h2>Headers</h2>" >> /tmp/shimmy;  \
-		for n in $${HEADER_ARR[@]}; do printf "$$n" | sed 's/:/ => /; s/X-/\nX-/g'; done >> /tmp/shimmy; \
-		printf "\n\n<h2>GET</h2>" >> /tmp/shimmy; \
-		for n in $${GET_ARR[@]}; do printf "$$n " | sed 's/=/ => /; s/\&/\n/g'; done >> /tmp/shimmy; \
-		printf "\n\n<h2>POST</h2>\n" >> /tmp/shimmy;  \
-		for n in $${BODY_ARR[@]}; do printf "$$n " | sed 's/=/ => /'; done >> /tmp/shimmy; \
-		OIFS="$$IFS"; IFS="^"; IFS="$$OIFS"; \
-		printf "INSERT INTO t VALUES( \
-			 NULL, \
-			'$$RANDSTR', \
-			'$$URLBODY', \
-			'`printf -- "$$CURL_HEADER" | sed "s/'/''/g"`', \
-			'`printf -- "$$WGET_HEADER" | sed "s/'/''/g"`', \
-			'`printf -- "$$CHROME_HEADER" | sed "s/'/''/g"`', \
-			'`printf -- "$$GET" | sed "s/^./?/; s/ /%%20/g"`', \
-			'`printf -- "$$CURL_BODY" | sed "s/'/''/g"`', \
-			'`printf -- "$$WGET_BODY" | sed "s/'/''/g"`', \
-			'`printf -- "$$CHROME_BODY" | sed "s/'/''/g"`' \
-		 );\n" >> tests/test.sql; \
-	done; 
-	@test -f tests/test.db && rm tests/test.db || printf ''>/dev/null;
-	@sqlite3 tests/test.db < tests/test.sql;
-	@echo "DONE!."
-
+	tests/test.sh --init-tests -r 50
 
 # Test suites can be randomly generated
 gen-test:
