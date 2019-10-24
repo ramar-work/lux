@@ -76,6 +76,7 @@ KEEP=0
 # 
 # Uncomment the ones you'd like to use below.
 TESTCASES=(no_url+headers url+headers get+headers+url)
+#TESTCASES=(post+headers+get+url)
 
 #TESTCASES=(no_url)
 #TESTCASES=(no_url no_url+headers)
@@ -480,7 +481,7 @@ xclient() {
 	test $WAIT_FOR_INPUT -eq 1 && read
 
 	# Execute command
-	$CLIENT_CMD 2>$PAGE_HEADERS >$PAGE_CONTENT || {
+	sh -c "$CLIENT_CMD 2>$PAGE_HEADERS >$PAGE_CONTENT" || {
 		printf "Client call failed...\n" >/dev/stderr
 		if [ 0 -eq 1 ]
 		then
@@ -553,6 +554,7 @@ do
 		fi
 	done
 done
+exit
 
 
 # If it's a dry run, nothing happened, so stop.
