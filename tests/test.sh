@@ -75,7 +75,7 @@ KEEP=0
 #	post+headers+get+url
 # 
 # Uncomment the ones you'd like to use below.
-TESTCASES=(no_url+headers url+headers get+headers+url)
+TESTCASES=(get_only get+url get+headers+url)
 #TESTCASES=(post+headers+get+url)
 
 #TESTCASES=(no_url)
@@ -349,7 +349,7 @@ inittest() {
 			\"`printf -- "$CURL_HEADER"`\",
 			\"`printf -- "$WGET_HEADER"`\",
 			\"`printf -- "$CHROME_HEADER"`\",
-			\"`printf -- "$GET"`\",
+			\"`printf -- "$GET" | sed 's/^\&/?/'`\",
 			\"`printf -- "$CURL_BODY"`\",
 			\"`printf -- "$WGET_BODY"`\",
 			\"`printf -- "$CHROME_BODY"`\",

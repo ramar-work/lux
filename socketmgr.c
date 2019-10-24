@@ -655,8 +655,6 @@ int swrite_to_socket ( int fd, uint8_t *b ) {
 int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 
 	//Read all the data from a socket.
-#if 0
-#else
 	unsigned char *buf = malloc( 1 );
 	int mult = 0;
 	int try=0;
@@ -741,7 +739,7 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 			rq->msg = buf;
 			break;
 		}
-#if 0
+	#if 0
 		else if ( rd == GNUTLS_E_REHANDSHAKE ) {
 			fprintf(stderr, "SSL got handshake reauth request..." );
 			continue;
@@ -750,7 +748,7 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 			fprintf(stderr, "SSL was interrupted...  Try request again...\n" );
 			continue;
 		}
-#endif
+	#endif
 		else {
 			//realloc manually and read
 			if ((buf = realloc( buf, bfsize )) == NULL ) {
@@ -773,12 +771,6 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 				fprintf( stderr, "Recvd %d bytes on fd %d\n", rd, fd ); 
 			}
 		}
-	}
-#endif
-
-	//Show what I received so far...
-	if ( 0 ) {
-		write( 2, rq->msg, rq->mlen );
 	}
 
 	//Prepare the rest of the request
@@ -834,16 +826,8 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 			if ( !b || at == -1 || !set.size ) 
 				;
 			else {
-			#if 1
-				int klen = at + 1;
+				int klen = at;
 				b->field = copystr( t, klen );
-			#else	
-				int klen = at + 1;
-				char *k = malloc( klen );
-				memset( k, 0, klen );
-				memcpy( k, t, at );
-				b->field = k;
-			#endif
 				klen += 1, t += klen, set.size -= klen;
 				b->value = t;
 				b->size = set.size;
