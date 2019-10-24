@@ -74,7 +74,7 @@ kill-srv:
 test-cli:
 	@test -f $(PORT_FILE) && MYPORT=`cat $(PORT_FILE)` || MYPORT=$(PORT); \
 	HTMLDOC=/tmp/hypno-test-run.html; \
-	tests/test.sh --keep -v --port $$MYPORT > $$HTMLDOC && \
+	tests/test.sh -v --port $$MYPORT > $$HTMLDOC && \
 		$(BROWSER) file://$$HTMLDOC || echo "Test suite failed..."
 
 		

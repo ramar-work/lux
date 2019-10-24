@@ -30,7 +30,6 @@
 # ----
 # - Move `make init-test` here.  Call it with option --initialize or --init
 #
-#
 # -----------------------------------------------------------------------------  
 THIS=hypnotest
 CONST_DB=126
@@ -554,7 +553,6 @@ do
 		fi
 	done
 done
-exit
 
 
 # If it's a dry run, nothing happened, so stop.
@@ -586,17 +584,17 @@ find $OUTPUT_DIR -type f ! -name "*-*" | \
 	printf "<tr>\n"
 	for n in id length status headers content addr method date; do
 		if [[ $n == "id" ]]; then
-			printf -- "<td>`cat FF | head -c 6`</td>\n"
+			echo "<td>`cat FF | head -c 6`</td>"
 		elif [[ $n == "headers" ]]; then
-			printf -- "<td><pre>`cat FF-$n`</pre></td>\n"
+			echo "<td><pre>`cat FF-$n`</pre></td>"
 		elif [[ $n == "addr" ]]; then
-			printf -- "<td>`cat FF-$n``cat FF-url`</td>\n"
+			echo "<td>`cat FF-$n``cat FF-url`</td>"
 		elif [[ $n == "content" ]]; then
-			printf -- "<td><pre>"
-			printf -- "`cat FF-$n | sed \"s/</\&lt;/g\" | sed \"s/>/\&gt;/g\"`"
-			printf -- "</pre></td>\n"
+			echo "<td><pre>"
+			echo "`cat FF-$n | sed \"s/</\&lt;/g\" | sed \"s/>/\&gt;/g\"`"
+			echo "</pre></td>"
 		else
-			printf -- "<td>`cat FF-$n`</td>\n"
+			echo "<td>`cat FF-$n`</td>"
 		fi
 	done
 	printf "</tr>\n"

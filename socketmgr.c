@@ -45,6 +45,7 @@ const char http_500_custom[] = ""
 	*(&ptr[ ptrListSize ]) = element; \
 	ptrListSize++;
 
+
 #define DUMP_RIGHT( ptr, size ) \
 	write( 2, "'", 1 ); \
 	write( 2, ptr, size ); \
@@ -417,32 +418,44 @@ int proc_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 
 	//Allocate a big buffer and do work
 	int progress = 0;
-	char *buf = malloc( 1 );
+	char *buf = malloc( 6 );
 	const char *names[] = { "Headers", "GET", "POST" };
 	struct HTTPRecord **t[] = { rq->headers, rq->url, rq->body };
+	char sbuf[ 4096 ];
+	memset( sbuf, 0, sizeof( sbuf ) );
+
+	//Reallocate a buffer
+	int suplen = snprintf( sbuf, sizeof(sbuf)-1, "<h2>URL</h2>\n%s<br>\n", rq->path );
+	if ( ( buf = realloc( buf, suplen ) ) == NULL ) {
+		write( fd, http_500_fixed, strlen( http_500_fixed ) );
+		close( fd );
+		return 0;
+	}
+
+	//Add the URL (paths should never be more than 2048, but ensure this before write)
+	memcpy( &buf[ progress ], sbuf, suplen );
+	progress += suplen;
 
 	//Loop through all three...
-//printf( "%ld\n", sizeof(t)/sizeof(struct HTTPRecord **)); getchar();
-	for ( int i=0; i<sizeof(t)/sizeof(struct HTTPRecord **); i++ ) {
+	for ( int i=0; i < sizeof(t)/sizeof(struct HTTPRecord **); i++ ) {
+		
+		//Define stuff
 		struct HTTPRecord **w = t[i];
-	#if 1
-		//Always write the type of request.
-		char h2buf[32], *endstr = ( *w ) ? "\n" : "\n-<br>\n";
-		memset( h2buf, 0, sizeof(h2buf) );
-		int h2len = snprintf( h2buf, sizeof(h2buf)-1, "<h2>%s</h2>%s", names[i], endstr );
+		char *endstr = ( *w ) ? "\n" : "\n-<br>\n";
+		memset( sbuf, 0, sizeof(sbuf) );
+		suplen = snprintf( sbuf, sizeof(sbuf)-1, "<h2>%s</h2>%s", names[i], endstr );
 
 		//Reallocate a buffer
-		if ( ( buf = realloc( buf, h2len + progress ) ) == NULL ) {
-			write( fd, http_500_fixed, strlen(http_500_fixed) );
+		if ( ( buf = realloc( buf, suplen + progress ) ) == NULL ) {
+			write( fd, http_500_fixed, strlen( http_500_fixed ) );
 			close( fd );
 			return 0;
 		}
 
 		//Write the title out
-		memset( &buf[ progress ], 0, h2len );
-		memcpy( &buf[ progress ], h2buf, h2len );
-		progress += h2len;
-	#endif
+		memset( &buf[ progress ], 0, suplen );
+		memcpy( &buf[ progress ], sbuf, suplen );
+		progress += suplen;
 
 		//Now go through the rest
 		while ( *w ) {
@@ -835,11 +848,6 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 			}
 		}
 		ADD_ELEMENT( rq->url, len, struct HTTPRecord, NULL );
-
-		if ( 0 ) {
-			fprintf(stderr,"URL received was:\n" );
-			print_httprecords( rq->url );
-		}
 	}
 
 
@@ -921,12 +929,10 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 				else if ( memcmp( m, "\r\n\r\n", 4 ) == 0 && !value )
 					value = 1;
 				else if ( memcmp( m, "\r\n-", 3 ) == 0 && !value ) {
-					//fprintf( stderr, "got a boundary... pass %d\n", ++index );
 					b = malloc( sizeof( struct HTTPRecord ) );
 					memset( b, 0, sizeof( struct HTTPRecord ) ); 
 				}
 				else if ( memcmp( m, "\r\n", 2 ) == 0 && value == 1 ) {
-					//fprintf( stderr, "copying value...  pass %d\n", ++index );
 					m += 2;
 					b->value = m;//++t;
 					b->size = set.size - 1;
@@ -979,7 +985,6 @@ int ssl_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 
 //read (reads a message)
-//int http_read( ) {
 int ssl_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 	//read (read all the data in one call if you fork like this)
 	const int size = 100000;
