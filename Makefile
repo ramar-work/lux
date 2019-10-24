@@ -14,7 +14,7 @@ PORT = 2200
 RANDOM_PORT = 1
 PORT_FILE = /tmp/hypno.port
 BROWSER = chromium
-RECORDS=50
+RECORDS=3
 
 # Some Linux systems need these, but pkg-config should handle it
 #INCLUDE_DIR=-I/usr/include/lua5.3
@@ -73,14 +73,20 @@ kill-srv:
 # Run a test with a variety of clients
 test-cli:
 	@test -f $(PORT_FILE) && MYPORT=`cat $(PORT_FILE)` || MYPORT=$(PORT); \
-	echo tests/test.sh -v --port $$MYPORT; \
 	HTMLDOC=/tmp/hypno-test-run.html; \
-	tests/test.sh -v --port $$MYPORT > $$HTMLDOC && \
+	tests/test.sh --keep -v --port $$MYPORT > $$HTMLDOC && \
 		$(BROWSER) file://$$HTMLDOC || echo "Test suite failed..."
+
+		
+test-cli-nobrowser:
+	@test -f $(PORT_FILE) && MYPORT=`cat $(PORT_FILE)` || MYPORT=$(PORT); \
+	tests/test.sh -v --keep --port $$MYPORT 
+
 
 # init-test - Generate test data for use by different web clients
 init-test:
-	tests/test.sh --init-tests -r 50
+	@echo '(WARNING: This could take a while.)'
+	@tests/test.sh -v --init-tests -r $(RECORDS) 
 
 # Test suites can be randomly generated
 gen-test:

@@ -54,6 +54,8 @@ VERBOSE=0
 SLEEP=0
 INITTEST=0
 SLEEP_INTERVAL=5
+RECORDS=3
+KEEP=0
 
 # Possible test styles are here.
 # ------------------------------
@@ -73,8 +75,10 @@ SLEEP_INTERVAL=5
 #	post+headers+get+url
 # 
 # Uncomment the ones you'd like to use below.
+TESTCASES=(no_url+headers url+headers get+headers+url)
+
 #TESTCASES=(no_url)
-TESTCASES=(no_url no_url+headers)
+#TESTCASES=(no_url no_url+headers)
 #TESTCASES=(no_url no_url+headers url)
 #TESTCASES=(no_url no_url+headers url url+headers)
 #TESTCASES=(no_url no_url+headers url url+headers get_only)
@@ -119,9 +123,10 @@ cat <<EOF
 -p, --port <arg>          Use this port.
 -w, --wait                Wait for input before running a test command.
     --dry-run             Do not actually do anything, but show what would be done.
+    --keep                Keep the result set
 -i, --init-tests          Initialize the test files.
 -r, --records <arg>       Generate <arg> records when generating tests.
-    --verbose             Be verbose and spit out commands before we execute them.
+-v, --verbose             Be verbose and spit out commands before we execute them.
 -h, --help                Show help
 EOF
 exit $1
@@ -210,11 +215,16 @@ do
 		-i|--init-tests)
 			INITTEST=1
 		;;
+		--keep)
+			KEEP=1
+		;;
+		-r|--records)
+			shift
+			RECORDS=$1
+		;;
 	esac
 	shift
 done
-
-
 
 
 
@@ -227,7 +237,7 @@ inittest() {
 	TC_WORDS=tests/words
 	TC_CWORDS=tests/words_no_apostrophe
 	TC_BLOCKS=tests/wordblocks
-	RECORDS=3
+	SED_URLENCODER=tests/urlencode.sed
 
 	# Generate a table from scratch
 	echo "
@@ -249,6 +259,10 @@ inittest() {
 	# Generate records for $RECORDS amount 
 	for i in `seq 0 $RECORDS`
 	do 
+		# 
+		test $VERBOSE -eq 1 && echo Generating record $i > /dev/stderr
+
+		# 
 		WL=`wc -l $TC_WORDS | awk '{ print $1 }'`; 
 		BL=`wc -l $TC_BLOCKS | awk '{ print $1 }'`; 
 		WNOL=`wc -l $TC_CWORDS | awk '{ print $1 }'`;  
@@ -274,7 +288,7 @@ inittest() {
 		GET_ARR=
 		for n in `seq 0 $(( $RANDOM % 20 ))`
 		do 
-			GETBLOCK="&`sed -n "$(( $RANDOM % $WNOL ))p" $TC_WORDS`=`sed -n "$(( $RANDOM % $BL ))p" $TC_BLOCKS`"; 
+			GETBLOCK="&`sed -n "$(( $RANDOM % $WNOL ))p" $TC_CWORDS`=`sed -n "$(( $RANDOM % $BL ))p" $TC_BLOCKS | sed -f $SED_URLENCODER`"; 
 			GET+="$GETBLOCK" 
 			GET_ARR[ $n ]="$GETBLOCK<br>"; 
 		done
@@ -327,38 +341,25 @@ inittest() {
 		done >> $RESPONSE_FILE
 
 		# Generate SQL statement 
-#		printf "INSERT INTO t VALUES( 
-#			 NULL, 
-#			\"`randstr 9`\", 
-#			\"$URLBODY\", 
-#			\"`printf -- "$CURL_HEADER" | sed "s/'/''/g"`\", 
-#			\"`printf -- "$WGET_HEADER" | sed "s/'/''/g"`\", 
-#			\"`printf -- "$CHROME_HEADER" | sed "s/'/''/g"`\", 
-#			\"`printf -- "$GET" | sed "s/^./?/; s/ /%%20/g"`\", 
-#			\"`printf -- "$CURL_BODY" | sed "s/'/''/g"`\", 
-#			\"`printf -- "$WGET_BODY" | sed "s/'/''/g"`\",
-#			\"`printf -- "$CHROME_BODY" | sed "s/'/''/g"`\",
-#			\"`cat $RESPONSE_FILE | sed "s/'/''/g"`\"
-#		 );\n" >> $TESTSQL
-		printf "INSERT INTO t VALUES( 
+		echo "INSERT INTO t VALUES( 
 			 NULL, 
 			\"`randstr 9`\", 
 			\"$URLBODY\", 
-			\"`printf -- "$CURL_HEADER"`\", 
-			\"`printf -- "$WGET_HEADER"`\", 
-			\"`printf -- "$CHROME_HEADER"`\", 
-			\"`printf -- "$GET" | sed "s/^./?/; s/ /%%20/g"`\", 
-			\"`printf -- "$CURL_BODY"`\", 
+			\"`printf -- "$CURL_HEADER"`\",
+			\"`printf -- "$WGET_HEADER"`\",
+			\"`printf -- "$CHROME_HEADER"`\",
+			\"`printf -- "$GET"`\",
+			\"`printf -- "$CURL_BODY"`\",
 			\"`printf -- "$WGET_BODY"`\",
 			\"`printf -- "$CHROME_BODY"`\",
-			\"`cat $RESPONSE_FILE`\"
-		 );\n" >> $TESTSQL
+			\"`cat $RESPONSE_FILE | sed 's/^ //'`\"
+		 );" >> $TESTSQL
 	done; 
 
 
 	# Load all the data
 	test -f $TESTDB && rm $TESTDB
-	sqlite3 $TESTDB < $TESTSQL
+	sqlite3 $TESTDB < $TESTSQL || err "Failed to generate test suite..." 1
 }
 
 
@@ -393,6 +394,7 @@ xclient() {
 	PAGE_DATE=${FILEBASE}-date
 	PAGE_METHOD=${FILEBASE}-method
 	PAGE_EXPECTED=${FILEBASE}-expected
+	PAGE_URL=${FILEBASE}-url
 
 	# Write the client, date, address and ID to individual files
 	date --rfc-3339=ns > $PAGE_DATE
@@ -400,27 +402,58 @@ xclient() {
 	echo $SITE > $PAGE_ADDR
 	echo $CLI > $PAGE_CLIENT
 
+	# ...
+	printf '' > $PAGE_URL
+
 	# Decide how to format the test
 	case $TESTTYPE in
-		head)                 awk_fmt='{ printf "%s %s\n", CLIENT, SITE }'  ;;
-		no_url)               awk_fmt='{ printf "%s %s\n", CLIENT, SITE }'  ;;
-		no_url+headers)       awk_fmt='{ printf "%s %s %s\n", CLIENT, $1, SITE }'  ;;
-		url)                  awk_fmt='{ printf "%s %s%s\n", CLIENT, SITE, $3 }'  ;;
-		url+headers)          awk_fmt='{ printf "%s %s %s%s\n", CLIENT, $1, SITE, $3 }'  ;;
-		get_only)             awk_fmt='{ printf "%s %s%s\n", CLIENT, SITE, $4 }'  ;;
-		get+url)              awk_fmt='{ printf "%s %s%s%s\n", CLIENT, SITE, $3, $4 }'  ;;
-		get+headers)          awk_fmt='{ printf "%s %s %s%s\n", CLIENT, $1, SITE, $4 }'  ;;
-		get+headers+url)      awk_fmt='{ printf "%s %s %s%s%s\n", CLIENT, $1, SITE, $3, $4 }'  ;;
-		post_only)            awk_fmt='{ printf "%s %s %s\n", CLIENT, $2, SITE }'  ;;
-		post+url)             awk_fmt='{ printf "%s %s %s%s\n", CLIENT, $2, SITE, $3 }'  ;;
-		post+headers)         awk_fmt='{ printf "%s %s %s %s\n", CLIENT, $1, $2, SITE }'  ;;
-		post+headers+url)     awk_fmt='{ printf "%s %s %s %s%s\n", CLIENT, $1, $2, SITE, $3 }'  ;;
-		post+headers+get)     awk_fmt='{ printf "%s %s %s %s%s\n", CLIENT, $1, $2, SITE, $4 }'  ;;
-		post+headers+get+url) awk_fmt='{ printf "%s %s %s %s%s%s\n", CLIENT, $1, $2, SITE, $3, $4 }'  ;;
+		head)                 awk_fmt='{ printf "%s \"%s\"\n", CLIENT, SITE }'  
+		;;
+		no_url)               awk_fmt='{ printf "%s \"%s\"\n", CLIENT, SITE }'  
+		;;
+		no_url+headers)       awk_fmt='{ printf "%s %s \"%s\"\n", CLIENT, $1, SITE }'  
+		;;
+		url)                  awk_fmt='{ printf "%s \"%s%s\"\n", CLIENT, SITE, $3 }'  
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $3 }' > $PAGE_URL
+		;;
+		url+headers)          awk_fmt='{ printf "%s %s \"%s%s\"\n", CLIENT, $1, SITE, $3 }'  
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $3 }' > $PAGE_URL
+		;;
+		get_only)             awk_fmt='{ printf "%s \"%s%s\"\n", CLIENT, SITE, $4 }'  
+		;;
+		get+url)              awk_fmt='{ printf "%s \"%s%s%s\"\n", CLIENT, SITE, $3, $4 }'  
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $3 }' > $PAGE_URL
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $4 }' >> $PAGE_URL
+		;;
+		get+headers)          awk_fmt='{ printf "%s %s \"%s%s\"\n", CLIENT, $1, SITE, $4 }'  
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $4 }' > $PAGE_URL
+		;;
+		get+headers+url)      awk_fmt='{ printf "%s %s \"%s%s%s\"\n", CLIENT, $1, SITE, $3, $4 }'  
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $3 }' > $PAGE_URL
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $4 }' >> $PAGE_URL
+		;;
+		post_only)            awk_fmt='{ printf "%s %s \"%s\"\n", CLIENT, $2, SITE }'  
+		;;
+		post+url)             awk_fmt='{ printf "%s %s \"%s%s\"\n", CLIENT, $2, SITE, $3 }'  
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $3 }' > $PAGE_URL
+		;;
+		post+headers)         awk_fmt='{ printf "%s %s %s \"%s\"\n", CLIENT, $1, $2, SITE }'  
+		;;
+		post+headers+url)     awk_fmt='{ printf "%s %s %s \"%s%s\"\n", CLIENT, $1, $2, SITE, $3 }'  
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $3 }' > $PAGE_URL
+		;;
+		post+headers+get)     awk_fmt='{ printf "%s %s %s \"%s%s\"\n", CLIENT, $1, $2, SITE, $4 }'  
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $4 }' > $PAGE_URL
+		;;
+		post+headers+get+url) awk_fmt='{ printf "%s %s %s \"%s%s%s\"\n", CLIENT, $1, $2, SITE, $3, $4 }'  
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $3 }' > $PAGE_URL
+		$sqlite3 "$sql_fmt" | awk -F'|' '{ print $4 }' >> $PAGE_URL
+		;;
 	esac
 
 	# Guess the intended method by the command line arguments
-	test ${TESTTYPE:0:1} == 'p' && echo POST || echo GET > $PAGE_METHOD
+	# test ${TESTTYPE:0:1} == 'p' && echo POST || echo GET > $PAGE_METHOD
+	echo $TESTTYPE > $PAGE_METHOD
 
 	# Choose the command to execute here.
 	case $CLI in
@@ -438,12 +471,13 @@ xclient() {
 		;;
 	esac
 
+
 	# Test the differences
-	test $VERBOSE -eq 1 && echo $CLIENT_CMD
+	test $VERBOSE -eq 1 && echo $CLIENT_CMD > /dev/stderr
 	test $DRYRUN -eq 1 && return 
 	test $SLEEP -eq 1 && sleep $SLEEP_INTERVAL
-	test $WAIT_FOR_INPUT -eq 1 && echo "Awaiting user input..." 
-	test $WAIT_FOR_INPUT -eq 1 && read 
+	test $WAIT_FOR_INPUT -eq 1 && echo "Awaiting user input..." >/dev/stderr
+	test $WAIT_FOR_INPUT -eq 1 && read
 
 	# Execute command
 	$CLIENT_CMD 2>$PAGE_HEADERS >$PAGE_CONTENT || {
@@ -452,7 +486,7 @@ xclient() {
 		then
 			return
 		else
-			rm -rf /tmp/hypno-tests	
+			test $KEEP -eq 0 && rm -rf /tmp/hypno-tests	
 			exit
 		fi	
 	}
@@ -472,10 +506,10 @@ xclient() {
 # Generate a test suite...
 if [ $INITTEST -eq 1 ]
 then
-	echo "Generating test suite..."
+	test $VERBOSE -eq 1 && echo "Generating test suite..." > /dev/stderr
 	inittest
-	echo "DONE!"
-	exit
+	test $VERBOSE -eq 1 && echo "DONE!" > /dev/stderr
+	exit 0
 fi
 
 
@@ -550,15 +584,17 @@ find $OUTPUT_DIR -type f ! -name "*-*" | \
 	printf "<tr>\n"
 	for n in id length status headers content addr method date; do
 		if [[ $n == "id" ]]; then
-			printf "<td>`cat FF | head -c 6`</td>\n"
+			printf -- "<td>`cat FF | head -c 6`</td>\n"
 		elif [[ $n == "headers" ]]; then
-			printf "<td><pre>`cat FF-$n`</pre></td>\n"
+			printf -- "<td><pre>`cat FF-$n`</pre></td>\n"
+		elif [[ $n == "addr" ]]; then
+			printf -- "<td>`cat FF-$n``cat FF-url`</td>\n"
 		elif [[ $n == "content" ]]; then
-			printf "<td><pre>"
-			printf "`cat FF-$n | sed "s/</\&lt;/g" | sed "s/>/\&gt;/g"`"
-			printf "</pre></td>\n"
+			printf -- "<td><pre>"
+			printf -- "`cat FF-$n | sed \"s/</\&lt;/g\" | sed \"s/>/\&gt;/g\"`"
+			printf -- "</pre></td>\n"
 		else
-			printf "<td>`cat FF-$n`</td>\n"
+			printf -- "<td>`cat FF-$n`</td>\n"
 		fi
 	done
 	printf "</tr>\n"
@@ -573,12 +609,9 @@ tr:nth-child(even) { background-color: #ddd; }
 	"
 
 # Get rid of the output directory
-rm -rf $OUTPUT_DIR
+test $KEEP -eq 0 && rm -rf $OUTPUT_DIR
 
 # Return with success
 exit 0
-
-
-
 
 
