@@ -12,3 +12,12 @@
 </li>
 {{/ cod }} 
 </ul>
+
+<p>{{?regardless}}</p>
+<table>
+{{#  bobbito }}
+<tr>
+<td>{{ .rush }}</td>
+</tr>
+{{ / bobbito }}
+</table>

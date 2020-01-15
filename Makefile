@@ -23,14 +23,14 @@ RECORDS=3
 
 # Not sure why these don't always work...
 #SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c socketmgr.c bridge.c 
-SRC = vendor/single.o vendor/sqlite3.o bridge.c socketmgr.c
+SRC = vendor/single.o vendor/sqlite3.o bridge.c
 OBJ = ${SRC:.c=.o}
 
 renderagent:
-	$(CC) $(CFLAGS) -o bin/render vendor/single.o render.c
+	$(CC) $(CFLAGS) -o bin/render $(SRC) render.c
 
 default:
-	$(CC) $(CFLAGS) -o bin/socketmgr $(SRC)
+	$(CC) $(CFLAGS) -o bin/socketmgr $(SRC) socketmgr.c
 
 # Create depedencies seperately
 deps:
