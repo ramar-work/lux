@@ -1,7 +1,8 @@
 # This project...
 NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
-LDFLAGS = -Llib/hypno -Iinclude
+#LDFLAGS = -Llib/hypno -lgnutls -llua -Iinclude 
+LDFLAGS = -lgnutls -llua -ldl -lpthread -Iinclude 
 CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H -DNW_PERFLOG
 GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 -Wno-format-truncation $(LDFLAGS) -DDEBUG_H #-ansi
 CFLAGS = $(CLANGFLAGS)
@@ -22,19 +23,19 @@ RECORDS=3
 
 # Not sure why these don't always work...
 #SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c socketmgr.c bridge.c 
-SRC = vendor/single.c vendor/sqlite3.c socketmgr.c #bridge.c 
+SRC = vendor/single.o vendor/sqlite3.o bridge.c socketmgr.c
 OBJ = ${SRC:.c=.o}
 
+renderagent:
+	$(CC) $(CFLAGS) -o bin/render vendor/single.o render.c
 
-# Unfortunately, I'm still working on this...
 default:
-	$(CC) $(CFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c
+	$(CC) $(CFLAGS) -o bin/socketmgr $(SRC)
 
-clang:
-	clang $(CLANGFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c
-
-gcc:
-	gcc $(GCCFLAGS) -lgnutls -DSQROOGE_H -o bin/socketmgr socketmgr.c vendor/single.c
+# Create depedencies seperately
+deps:
+	gcc -o vendor/single.o -c vendor/single.c 
+	gcc -o vendor/sqlite3.o -c vendor/sqlite3.c 
 
 # A main target, that will most likely result in a binary
 main: BINNAME=main
@@ -173,7 +174,7 @@ test-build-Linux:
 # clean - Get rid of the crap
 clean:
 	-@rm $(NAME) cli testrouter testchains testsql testrender bin/*
-	-@find . | egrep '\.o$$' | grep -v sqlite | xargs rm
+	-@find . -maxdepth 1 -name "*.o" ! -name "sqlite3.o" ! -name "single.o"
 
 # pkg - Make a package for distribution
 pkg:

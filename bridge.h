@@ -1,8 +1,10 @@
 #include "vendor/single.h"
-#include "vendor/http.h"
 #include "hypno/lua.h"
 #include "hypno/lauxlib.h"
 #include "hypno/lualib.h"
+#if 0
+#include "vendor/http.h"
+#endif
 
 #ifdef DEBUG_H
  #define obprintf( f, ... ) fprintf( f, __VA_ARGS__ )
@@ -55,7 +57,7 @@ int lua_load_file2( lua_State *, Table *, const char *, char * );
 void lua_tdump (lua_State *L);
 void lua_stackclear ( lua_State *L );
 void lua_stackdump ( lua_State *L );
-Loader *parse_route( Loader *, int, HTTP *http, Table *routeTable );
+//Loader *parse_route( Loader *, int, HTTP *http, Table *routeTable );
 char *printCCtype ( CCtype cc );
 int lua_db ( lua_State *L );
 int lua_aggregate (lua_State *L);

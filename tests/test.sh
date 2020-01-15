@@ -74,12 +74,12 @@ KEEP=0
 #	post+headers+get+url
 # 
 # Uncomment the ones you'd like to use below.
-TESTCASES=(get_only get+url get+headers+url)
+#TESTCASES=(get_only get+url get+headers+url)
 #TESTCASES=(post+headers+get+url)
 
 #TESTCASES=(no_url)
 #TESTCASES=(no_url no_url+headers)
-#TESTCASES=(no_url no_url+headers url)
+TESTCASES=(no_url no_url+headers url)
 #TESTCASES=(no_url no_url+headers url url+headers)
 #TESTCASES=(no_url no_url+headers url url+headers get_only)
 #TESTCASES=(no_url no_url+headers url url+headers get_only get+url)

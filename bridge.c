@@ -312,6 +312,7 @@ void lua_stackdump ( lua_State *L ) {
 }
 
 
+#if 0
 //Parse the current route according to what was in the table.
 Loader *parse_route ( Loader *l, int lsize, HTTP *http, Table *routeTable ) {
 	//Define and declare
@@ -399,7 +400,7 @@ exit(0);
 	free( viewTag );
 	return l;
 }
-
+#endif
 
 
 int load_and_run_files ( Loader *l ) { 
@@ -460,8 +461,11 @@ int lua_writetable( lua_State *L, int *pos, int ti ) {
 }
 
 
-//This is a Lua function
+
 int lua_db ( lua_State *L ) {
+#if 1
+	return 0;
+#else
 	//...
 	int rc;
 	int len = 0;
@@ -548,6 +552,7 @@ int lua_db ( lua_State *L ) {
 
 	//Put things on the stack and return
 	return 1;
+#endif
 }
 
 
