@@ -75,6 +75,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 	const int EACH_KEY = 34;
 	const int EXECUTE = 35;
 	const int BOOLEAN = 36;
+	const int RAW = 37;
 	const int BLOCK_START = 0;
 	const int BLOCK_END = 0;
 	uint8_t *dest = NULL;
@@ -108,7 +109,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 	//Yet another way to do it, is to make the data structure much bigger.
 	//Then you don't have to move backwards in a list of pointers...
 	//If this is really a two-column list, then it won't take much space... 
-#define RBDEF
+//#define RBDEF
 #ifdef RBDEF
 	struct rb { int action, len, **hashList; uint8_t *ptr; } **rr = NULL ; 
 #else
@@ -129,7 +130,8 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 		['$'] = EACH_KEY, 
 		['`'] = EXECUTE, //PAIR_EXTRACT
 		['!'] = BOOLEAN,
-		[256] = 0
+		[254] = RAW,
+		[255] = 0
 	};
 
 	//Allocate a new block to copy everything to
@@ -172,10 +174,10 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 				if ( !maps[ *p ] ) {
 					//Find the hash of whatever this is...
 				#ifdef RBDEF
-					rbb.ptr = p;
-					rbb.len = nlen;
+					rbb.action = SIMPLE_EXTRACT;
 					rbb.hash = lt_get_long_i(t, p, nlen);
-					rbb.rbptr = NULL;
+					//rbb.len = nlen;
+					//rbb.rbptr = NULL;
 				#else
 					rbb.ptr = p;
 					rbb.len = nlen;
@@ -187,6 +189,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 					int action = maps[ *p ];
 					int alen = 0;
 					char aa = *p;
+					rbb.action = maps[ *p ];
 					//Advance and reset p b/c we need just the text...
 					p = trim( p, ". #/$`!\t", nlen, &alen );
 					
