@@ -13,9 +13,8 @@
 {{/ cod }} 
 </ul>
 
-<p>{{?regardless}}</p>
 <table>
-{{#  bobbito }}
+{{# bobbito }}
 <tr>
 <td>{{ .rush }}</td>
 </tr>
