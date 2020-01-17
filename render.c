@@ -2,6 +2,12 @@
 testrender.c 
 
 Test out rendering...
+
+TODO / TASKS
+------------
+- Get proper renders to work...
+- Make it work with nested anything
+
  * --------------------------------------------------- */
 #include "../vendor/single.h"
 #include "../bridge.h"
@@ -31,10 +37,21 @@ Test out rendering...
 #define DPRINTF(...) \
 	fprintf( stderr, __VA_ARGS__ );
 
+#define DUMPACTION( NUM ) \
+	( NUM == LOOP_START ) ? "LOOP_START" : \
+	( NUM == LOOP_END ) ? "LOOP_END" : \
+	( NUM == COMPLEX_EXTRACT ) ? "COMPLEX_EXTRACT" : \
+	( NUM == SIMPLE_EXTRACT ) ? "SIMPLE_EXTRACT" : \
+	( NUM == EACH_KEY ) ? "EACH_KEY" : \
+	( NUM == EXECUTE ) ? "EXECUTE" : \
+	( NUM == BOOLEAN ) ? "BOOLEAN" : \
+	( NUM == RAW ) ? "RAW" : "UNKNOWN" 
+
 #define DUMPTMPROW( row ) \
-	fprintf( stderr, "[%d] => len: %d, hash: %d, rbptr: %p, ptr: ", i, \
-		item->len, item->hash, item->rbptr ); \
+	fprintf( stderr, "[%d] => len: %3d, hash: %3d, action: %-16s, rbptr: %p, ptr: ", i, \
+		item->len, item->hash, DUMPACTION( item->action ), item->hashList ); \
 	ENCLOSE( row->ptr, 0, row->len );
+
 
 #if 0
 	write( 2, item->ptr, item->len ); \
@@ -82,6 +99,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 	int destlen = 0;
 	int ACTION = 0;
 	int BLOCK = 0;
+	int SKIP = 0;
 	int INSIDE = 0;
 	Mem r;
 	memset( &r, 0, sizeof( Mem ) );
@@ -110,11 +128,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 	//Then you don't have to move backwards in a list of pointers...
 	//If this is really a two-column list, then it won't take much space... 
 //#define RBDEF
-#ifdef RBDEF
-	struct rb { int action, len, **hashList; uint8_t *ptr; } **rr = NULL ; 
-#else
-	struct rb { int len; int hash; int action; uint8_t *ptr; int **rbptr; } **rr = NULL ; 
-#endif
+	struct rb { int action, len, hash, **hashList; uint8_t *ptr; } **rr = NULL ; 
 	struct parent { uint8_t *parent; uint8_t *text; int len; int plen; int childCount; } **pp = NULL;
 	int rrlen = 0;
 	int pplen = 0;
@@ -156,7 +170,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 			}
 		}
 		else if ( r.chr == '}' ) {
-		#if 0		
+		#if 0
 			fprintf( stderr, "block end?: " );
 			write( 2, "'", 1 );
 			write( 2, &src[ r.pos + r.size + 1 ], 1 );
@@ -173,83 +187,74 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 				DPRINTF( "%c maps to => %d\n", *p, maps[ *p ] ); 
 				if ( !maps[ *p ] ) {
 					//Find the hash of whatever this is...
-				#ifdef RBDEF
 					rbb.action = SIMPLE_EXTRACT;
 					rbb.hash = lt_get_long_i(t, p, nlen);
-					//rbb.len = nlen;
-					//rbb.rbptr = NULL;
-				#else
-					rbb.ptr = p;
-					rbb.len = nlen;
-					rbb.hash = lt_get_long_i(t, p, nlen);
-					rbb.rbptr = NULL;
-				#endif
 				}
 				else {
-					int action = maps[ *p ];
-					int alen = 0;
-					char aa = *p;
-					rbb.action = maps[ *p ];
 					//Advance and reset p b/c we need just the text...
+					int alen = 0;
+					rbb.action = maps[ *p ];
 					p = trim( p, ". #/$`!\t", nlen, &alen );
-					
-					//Set defaults for the new object 
-					rbb.ptr = p;
-					rbb.len = alen;
-
-DPRINTF( "GOT ACTION '%c' => %d, and TEXT = ", aa, action ); 
-ENCLOSE( p, 0, alen );
+					DPRINTF("GOT ACTION %s, and TEXT = ", DUMPACTION(rbb.action));
+					ENCLOSE( p, 0, alen );
 
 					//Figure some things out...
-					if ( action == LOOP_START ) {
+					if ( rbb.action == LOOP_START ) {
 						//If this hash is not here, skip this and each of the things in it...
-						rbb.hash = lt_get_long_i( t, p, alen );
-						DPRINTF( "@LOOP_START :: CHECK FOR HASH %d...", rbb.hash );
-
-						if ( rbb.hash == -1 ) {
-							//TODO: Things MAY need to be freed here...
+						//rbb.hash = lt_get_long_i( t, p, alen );
+						DPRINTF( "@LOOP_START :: CHECK FOR HASH ..." );
+						if ( (rbb.hash = lt_get_long_i( t, p, alen ))  == -1 ) {
+							DPRINTF( "NOT FOUND" );
+							rbb.len = 0;
+							rbb.ptr = NULL;
+							rbb.hashList = NULL;
+							struct rb *rp = malloc( sizeof( struct rb ) );
+							memcpy( rp, &rbb, sizeof( struct rb ) ); 
+							ADDITEM(rp, struct rb, rr, rrlen);
 							continue; 
 						}
 
 						//Set up the parent structure
+						DPRINTF( "FOUND %d", rbb.hash );
 						struct parent *par = NULL; 
 						if (( par = malloc( sizeof(struct parent) )) == NULL ) {
 							//TODO: Cut out and free things
 						}
 
+						//Both len and childCount will be the number of elements to loop
+						rbb.len = par->childCount = lt_counti( t, rbb.hash );
 						par->len = alen;
-						par->childCount = lt_counti( t, rbb.hash );
 						par->text = p;
+						//par->childCount = lt_counti( t, rbb.hash );
 
 						if ( INSIDE > 1 ) {
 							//Get the last parent and make that the thing
-							struct parent *op = pp[ pplen ];
+							struct parent *op = pp[ pplen /* - 1 */ ];
 							par->parent = op->text;
 							par->plen = op->len + alen;
 						}
 						ADDITEM( par, struct parent, pp, pplen );
 						INSIDE++;
 					}
-					else if ( action == LOOP_END ) {
+					else if ( rbb.action == LOOP_END ) {
 						//If inside is > 1, check for a period, strip it backwards...
 						DPRINTF( "@LOOP_END :: Should these match?\n" );
-						if ( !INSIDE ) 
-							continue;
-						else {
-							//free( pp[ pplen - 1 ] );
-							//( pplen > 1 ) ? pplen-- : 0;
+						rbb.hash = lt_get_long_i( t, p, alen );
+						if ( !INSIDE )
+							;
+						else if ( pplen == INSIDE ) {
+							free( pp[ pplen - 1 ] );
 							pplen--;
 							INSIDE--;
 						}
 					}
-					else if ( action == COMPLEX_EXTRACT ) {
+					else if ( rbb.action == COMPLEX_EXTRACT ) {
 						DPRINTF( "@COMPLEX_EXTRACT :: Check for children " );
 						if ( !INSIDE ) //INSIDE should equal parent level (so pplen + 1 )
 							continue;
 						else { 
 							char CHILD[ 2048 ];
 							int CHILDLEN = 0;
-DPRINTF( "Grabbing parent index at %d\n", pplen - 1 );
 							struct parent *par = pp[ pplen - 1 ];
 
 							//Append things to CHILD data
@@ -271,25 +276,20 @@ DPRINTF( "Grabbing parent index at %d\n", pplen - 1 );
 									*hash = lt_get_long_i( t, (uint8_t *)CHILD, cl );
 									DPRINTF( "COMPLEX_EXTRACT CHECKING FOR: " ); 
 									DPRINTF( "%d '%s', GOT: %d\n", br, CHILD, *hash );
-									//Add each int
-									ADDITEM( hash, int *, rbb.rbptr, rblen ); 
+									ADDITEM( hash, int *, rbb.hashList, rblen ); 
 								}
-								#if 0
-								//This is debug purposes as well...
-								for ( int i=0; i<rblen - 1; i++ ) {
-									fprintf( stderr, "\tEXTRACT HASHES GOT: %d\n", *rbb.rbptr[ i ] );
-								}
-								#endif
+								//This could work for you...
+								//rbb.len = rblen;
 							}
 						}
 					}
-					else if ( action == EACH_KEY ) {
+					else if ( rbb.action == EACH_KEY ) {
 						DPRINTF( "@EACH_KEY :: Nothing yet...\n" );
 					}
-					else if ( action == EXECUTE ) {
+					else if ( rbb.action == EXECUTE ) {
 						DPRINTF( "@EXECUTE :: Nothing yet...\n" );
 					}
-					else if ( action == BOOLEAN ) {
+					else if ( rbb.action == BOOLEAN ) {
 						DPRINTF( "@BOOLEAN :: Nothing yet...\n" );
 					}
 				}
@@ -302,29 +302,31 @@ DPRINTF( "Grabbing parent index at %d\n", pplen - 1 );
 				ADDITEM(rp, struct rb, rr, rrlen);
 			}
 		}
-#if 0
+#if 1
 		else {
+			DPRINTF( "@RAW BLOCK COPY" ); 
 			//We can simply copy if ACTION & BLOCK are 0 
 			if ( !ACTION && !BLOCK ) {
+				struct rb rbb = { 0 };
 				fprintf( stderr, "DO RAW COPY OF: " );
 				write( 2, &src[ r.pos ], r.size );
 				write( 2, "\n", 1 );
-
-				struct rb *rb = malloc( sizeof( struct rb ) );
-				memset( rb, 0, sizeof( struct rb ) );
-				rb->len = r.size;	
-				rb->ptr = (uint8_t *)&src[ r.pos ];	
-				rb->hash = 0;
-				rb->rbptr = NULL;
-				if (( rr = realloc( rr, sizeof( struct rb ) * rrlen )) == NULL ) {
-					fprintf (stderr, "Could not reallocate new rendering struct...\n" );
-					return NULL;
-				}
-				rr[ rrlen - 1 ] = rb;
-				rrlen++;
+		
+				//Set defaults
+				rbb.len = r.size;	
+				rbb.hash = -2;
+				rbb.action = RAW;
+				rbb.hashList = NULL;
+				rbb.ptr = (uint8_t *)&src[ r.pos ];	
+				
+				//Save a new record
+				struct rb *rp = malloc( sizeof( struct rb ) );
+				memcpy( rp, &rbb, sizeof( struct rb ) ); 
+				ADDITEM(rp, struct rb, rr, rrlen);
 			}	
 		}
 #endif
+		//DPRINTF( "Press enter to proceed...\n" ); getchar();
 	}
 
 #if 1

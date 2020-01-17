@@ -1,4 +1,4 @@
-<h1>{{ title }}</h1>
+<h1>{{ .title }}</h1>
 {{# clients }}
 <h2>{{ .client }}</h2>
 
