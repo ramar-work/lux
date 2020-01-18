@@ -48,9 +48,12 @@ TODO / TASKS
 	( NUM == RAW ) ? "RAW" : "UNKNOWN" 
 
 #define DUMPTMPROW( row ) \
-	fprintf( stderr, "[%d] => len: %3d, hash: %3d, action: %-16s, rbptr: %p, ptr: ", i, \
-		item->len, item->hash, DUMPACTION( item->action ), item->hashList ); \
+	fprintf( stderr, "[%d] => len: %3d, hash: --, action: %-16s, rbptr: %p, ptr: ", i, \
+		item->len, DUMPACTION( item->action ), item->hashList ); \
 	ENCLOSE( row->ptr, 0, row->len );
+
+#define DUMPPTRS( row )
+
 
 
 #if 0
@@ -136,7 +139,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 	//Then you don't have to move backwards in a list of pointers...
 	//If this is really a two-column list, then it won't take much space... 
 //#define RBDEF
-	struct rb { int action, len, hash, **hashList; uint8_t *ptr; } **rr = NULL ; 
+	struct rb { int action, **hashList; int len; uint8_t *ptr; } **rr = NULL ; 
 	struct parent { struct parent *parent; uint8_t *text; int len, childCount; } **pp = NULL;
 	int rrlen = 0;
 	int pplen = 0;
@@ -175,6 +178,8 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 				//Start extraction...
 				BLOCK = BLOCK_END;
 				int nlen = 0;	
+				int **hashList = NULL;
+				int hashListLen = 0;
 				uint8_t *p = trim( (uint8_t *)&src[r.pos], " \t", r.size, &nlen );
 				struct rb rbb = { 0 };
 
@@ -182,7 +187,12 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 				DPRINTF( "%c maps to => %d\n", *p, maps[ *p ] ); 
 				if ( !maps[ *p ] ) {
 					rbb.action = SIMPLE_EXTRACT; 
-					rbb.hash = lt_get_long_i(t, p, nlen);
+					int hash = -1;
+					if ( (hash = lt_get_long_i(t, p, nlen) ) > -1 ) {
+						int *h = malloc( sizeof(int) );
+						memcpy( h, &hash, sizeof( int ) );
+						ADDITEM( h, int *, hashList, hashListLen ); 
+					}
 				}
 				else {
 					//Advance and reset p b/c we need just the text...
@@ -196,73 +206,83 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 					if ( rbb.action == LOOP_START ) {
 
 						//We could be just about anywhere, so anticipate that the parent could be here
-						struct parent *op = NULL, *np = NULL; 
-						uint8_t ROOT[ 2048 ] = { 0 };
-						int ROOTLEN = 0;
-						int ppCount = 0;
+						int hash = -1;
+						int blen = 0;
+						int eCount = 0;
+						uint8_t bbuf[ 2048 ] = { 0 };
+						struct parent *cp = NULL;
 
 						//If a parent should exist, copy the parent's text 
 						//TODO: Eventually, numbers shouldn't be necessary on this check
 						if ( !INSIDE ) {
 							//Copy the data
-							memcpy( &ROOT[ ROOTLEN ], p, alen );
-							ROOTLEN += alen;
+							memcpy( &bbuf[ blen ], p, alen );
+							blen += alen;
+						
+							DPRINTF( "@LOOP_START :: Checking for level[0] table " );	
+							ENCLOSE( bbuf, 0, blen );
+							//This is the only thing, get the hash and end it
+							if ( (hash = lt_get_long_i(t, bbuf, blen ) ) > -1 ) {
+								int *h = malloc( sizeof(int) );
+								memcpy( h, &hash, sizeof( int ) );
+								ADDITEM( h, int *, hashList, hashListLen ); 
+								eCount = lt_counti( t, hash );
+							}
 						}
 						else {
 							//If there are 3 parents, you need to start at the beginning and come out
 							//Find the MAX count of all the rows that are there... This way you'll have the right count everytime...
-							DPRINTF( "@LOOP_START :: Parent checks start here." );
-							for ( int i=0; i<INSIDE; i++ ) {
-								op = pp[ i ];
-								memcpy( ROOT, op->text, op->len );
-								ROOTLEN += op->len;
-							#if 1
+							DPRINTF( "@LOOP_START :: Checking for level[n+1] table " );	
+
+							//Get a count of the number of elements in the parent.
+							int maxCount = 0;
+							cp = pp[ pplen - 1 ];
+							DPRINTF("@LOOP_START :: Checking level[n+1] table w/ %d members\n", cp->childCount);
+
+							for ( int i=0, cCount=0; i<cp->childCount; i++ ) {
 								char num[ 64 ] = { 0 };
+								uint8_t nbuf[ 2048 ] = { 0 };
 								int numlen = snprintf( num, sizeof( num ) - 1, ".%d.", i );	
-								memcpy( &ROOT[ ROOTLEN ], num, numlen );
-								ROOTLEN += numlen;
-							#else
-								memcpy( &ROOT[ ROOTLEN ], ".", 1 );
-								ROOTLEN += 1;
-								char num[ 10 ] = { 0 };
-								sprintf( num, ".%d."	
-								memcpy( &ROOT[ ROOTLEN ], ".", 1 );
-								ROOTLEN += 1;
-								memcpy( &ROOT[ ROOTLEN ], ".", 1 );
-								ROOTLEN += 1;
-							#endif
+
+								//Copy to static buffer
+								memcpy( bbuf, cp->text, cp->len );
+								blen = cp->len;
+								memcpy( &bbuf[ blen ], num, numlen );
+								blen += numlen;
+								memcpy( &bbuf[ blen ], p, alen );
+								blen += alen;
 							
-								ENCLOSE( ROOT, 0, ROOTLEN );
+								//Check for the hash
+								//This check is not always going to fly...
+								hash = lt_get_long_i(t, bbuf, blen ); 
+								int *h = malloc( sizeof(int) );
+								memcpy( h, &hash, sizeof( int ) );
+								ADDITEM( h, int *, hashList, hashListLen ); 
+								DPRINTF( "@LOOP_START :: Checking for children, hash is: %3d, ", hash );	
+							
+								if ( hash > -1 && (cCount = lt_counti( t, hash )) > maxCount ) {
+									maxCount = cCount;	
+									DPRINTF( "@LOOP_START :: COUNT OF ELEMENTS ARE: %3d\n", maxCount );	
+								}
+
+								ENCLOSE( bbuf, 0, blen );
 							}
+							eCount = maxCount;
 						}
 
-
-						//Search for this
-						rbb.hash = lt_get_long_i( t, ROOT, ROOTLEN );
-						DPRINTF( "@LOOP_START :: HASH IS: %d, LOOP SEARCH STRING IS ", rbb.hash );
-						ENCLOSE( ROOT, 0, ROOTLEN );
-						getchar();
-
 						//Find the hash
-						if ( rbb.hash > -1 ) {
+						if ( hashListLen ) {
+							struct parent *np = NULL; 
 							//Set up the parent structure
-							DPRINTF( "FOUND %d", rbb.hash );
 							if (( np = malloc( sizeof(struct parent) )) == NULL ) {
 								//TODO: Cut out and free things
 							}
 
-							//Allocate a spot for the parent text too
-							if (( np->text = malloc( ROOTLEN + 1 )) == NULL ) {
-								//TODO: Cut out and free things
-							}
-
 							//NOTE: len will contain the number of elements to loop
-							rbb.len = lt_counti( t, rbb.hash );
-							np->childCount = rbb.len;
-							np->len = ROOTLEN;
-							memset( np->text, 0, ROOTLEN + 1 );
-							memcpy( np->text, ROOT, ROOTLEN );
-							np->parent = op;
+							np->childCount = eCount;
+							np->len = alen;
+							np->text = p; 
+							np->parent = cp;
 							ADDITEM( np, struct parent, pp, pplen );
 							INSIDE++;
 						}
@@ -271,7 +291,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 						//If inside is > 1, check for a period, strip it backwards...
 						DPRINTF( "@LOOP_END :: Should these match?\n" );
 						//TODO: Check that the hashes match instead of just pplen
-						rbb.hash = lt_get_long_i( t, p, alen );
+						//rbb.hash = lt_get_long_i( t, p, alen );
 						if ( !INSIDE )
 							;
 						else if ( pplen == INSIDE ) {
@@ -282,7 +302,13 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 					}
 					else if ( rbb.action == COMPLEX_EXTRACT ) {
 						DPRINTF( "@COMPLEX_EXTRACT :: Check for children... " );
-#if 1
+
+						//I have a parent structure, which I need to loop through to get stuff
+						//I have a set of hashes which will tell me how long I need to loop for
+
+						//Build a string out of the parent structure for each hash
+
+#if 0
 						char CHILD[ 2048 ] = { 0 };
 						int CHILDLEN = 0;
 
@@ -335,8 +361,16 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 				//Create a new row with what we found.
 				DPRINTF( "@END: Adding new row to template set.  rrlen: %d, pplen: %d.  Got ", rrlen, pplen );
 				ENCLOSE( rbb.ptr, 0, rbb.len );
+
 				struct rb *rp = malloc( sizeof( struct rb ) );
 				memcpy( rp, &rbb, sizeof( struct rb ) ); 
+				if ( !hashListLen )
+					rp->hashList = NULL;
+				else {
+					rp->hashList = hashList; 
+					ADDITEM( NULL, int *, rp->hashList, hashListLen );
+				}
+				
 				ADDITEM(rp, struct rb, rr, rrlen);
 			}
 		}
@@ -352,7 +386,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 		
 				//Set defaults
 				rbb.len = r.size;	
-				rbb.hash = -2;
+				//rbb.hash = -2;
 				rbb.action = RAW;
 				rbb.hashList = NULL;
 				rbb.ptr = (uint8_t *)&src[ r.pos ];	
@@ -364,14 +398,34 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 			}	
 		}
 #endif
-		//DPRINTF( "Press enter to proceed...\n" ); getchar();
 	}
 
 #if 1
 	//Loop through all of items
 	for ( int i=0; i<rrlen; i++ ) {
 		struct rb *item = rr[ i ];
-		DUMPTMPROW( item );
+
+		//Dump the unchanging elements out...
+		fprintf( stderr, "[%d] => action: %-16s", i, DUMPACTION( item->action ) );
+
+		if ( item->action == RAW || item->action == EXECUTE ) {
+			fprintf( stderr, " len: %3d, ", item->len ); 
+			ENCLOSE( item->ptr, 0, item->len );
+		}
+		else {
+			fprintf( stderr, " list: %p => ", item->hashList );
+			int **ii = item->hashList;
+			if ( !ii ) 
+				fprintf( stderr , "NULL" );
+			else {
+				int d=0;
+				while ( *ii ) {
+					fprintf( stderr, "%c%d", d++ ? ',' : ' ',  **ii );
+					ii++;
+				}
+			}
+			fprintf( stderr, "\n" );
+		}
 	}
 #endif
 
