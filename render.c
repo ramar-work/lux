@@ -307,6 +307,37 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 						//I have a set of hashes which will tell me how long I need to loop for
 
 						//Build a string out of the parent structure for each hash
+						if ( pplen ) {
+
+							//I feel like you need to make an array out of all the childCounts
+		
+							//Loop through them, generating a bigger string, each new invocation
+							//needs to start with the same thing
+
+							//We need to loop through each parent
+							for ( int pi=0; pi < pplen; pi++ ) {
+								struct parent *yp = pp[ pplen - 1 ];
+								int yplen = 0;
+								uint8_t ypstr[2048] = {0};
+								DPRINTF( "@parent=%p, childCount=%d, ptext=", yp, yp->childCount );
+
+								//We build something for each of these...
+								for ( int ci=0; ci < yp->childCount; ci++ ) {
+									//Build the root strings here (can't remember why)
+									uint8_t ypnum[64] = {0};
+									yplen = 0;
+									memcpy( &ypstr[ yplen ], yp->text, yp->len);
+									yplen += yp->len;	
+									yplen += sprintf( (char *)&ypstr[ yplen ], ".%d.", ci );
+
+									//Enclose
+									ENCLOSE( ypstr, 0, yplen ); //ccp->text, 0, ccp->len );
+								}
+
+							}
+						}
+						fprintf(stderr,"Getchar()\n" );
+						getchar();
 
 #if 0
 						char CHILD[ 2048 ] = { 0 };
