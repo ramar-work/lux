@@ -48,6 +48,7 @@ int main (int argc, char *argv[]) {
 			for ( int i=0; i<p; i++ ) {
 				printf( "%d,", intset[i]->a );
 			}
+			printf( "\n" );
 
 			//Increment the number 
 			while ( 1 ) {
