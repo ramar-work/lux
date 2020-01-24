@@ -147,7 +147,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 //#define RBDEF
 	struct rb { 
 		int action, **hashList; 
-		int len; uint8_t *ptr; 
+		int len; void *ptr; 
 	} **rr = NULL ; 
 	struct parent { 
 	#if 0
@@ -441,7 +441,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 #endif
 	}
 
-#if 1
+#if 0
 	//DEBUG: Show me what's on the list...
 	for ( int i=0; i<rrlen; i++ ) {
 		struct rb *item = rr[ i ];
@@ -470,7 +470,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 	}
 #endif
 
-#if 1
+#if 0
 	//This other way will involve generating a longer data structure
 	//The code can just move through the list and not worry about
 	//backreferencing (moving things around is slightly easier)
