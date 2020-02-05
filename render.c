@@ -1,5 +1,5 @@
 /* ---------------------------------------------------
-testrender.c 
+render.c 
 
 Test out rendering...
 

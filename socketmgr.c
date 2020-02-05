@@ -421,10 +421,9 @@ int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	//...
 	char *err = malloc( 2048 );
 	memset( err, 0, 2048 );
-	struct stat sb;
+	struct stat sb =  {0};
 
 	//Check that the directory exists
-	memset( &sb, 0, sizeof( struct stat ) );
 	if ( stat( "www", &sb ) == -1 ) {
 		WRITE_HTTP_500( "Could not locate www/ directory", strerror( errno ) );
 		return 0;
