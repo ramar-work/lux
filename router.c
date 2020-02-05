@@ -17,23 +17,31 @@
 	( NUM == ACT_EITHER   ) ? "ACT_EITHER" : \
 	( NUM == ACT_RAW  ) ? "ACT_RAW" : "UNKNOWN" 
 
+//#define DDD
+#ifdef DDD
+#define FPRINTF(...) \
+	fprintf( stderr, "DEBUG: %s[%d]: ", __FILE__, __LINE__ ); \
+	fprintf( stderr, __VA_ARGS__ );
+#else
+#define FPRINTF(...)
+#endif
+
 //These are static routes
 const char *routes[] = {
-#if 0
+#if 1
   "/"
 , "/route"
 , "/route/"
-  "/route/"
 , "/{route,julius}"
 , "/{route,julius}/:id"
 , "/route"
-#endif
-  "/route/:id"
+, "/route/:id"
 , "/route/:id=string"
 , "/:id"
-#if 0
 , "/route/*"
 , "/route/*/jackbot"
+#endif
+#if 0
 , "/route/?"
 , "/route/?accharat"
 , "/route/??"
@@ -46,13 +54,11 @@ const char *routes[] = {
 
 //These are possible request lines
 const char *requests[] = {
-#if 0
   "/"
-#endif
- "/2"
-#if 0
+, "/2"
 , "/route"
 , "/route/3"
+#if 0
 , "/julius/3"
 , "/3"
 , "/joseph/route/337"
@@ -74,7 +80,9 @@ int resolve ( const char *route, const char *uri ) {
 	const int ACT_SINGLE  = 36;
 	const int ACT_EITHER  = 37;
 	const int ACT_RAW = 38;
-	const char nums[] = "0123456789";
+	const char *NUMS = "0123456789";
+	const char *ALPHA = "abcdefghijklmnopqrstuvwxyz"
+			    "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	const int maps[] = {
 		[':'] = ACT_ID,
 		['?'] = ACT_SINGLE,
@@ -102,47 +110,36 @@ int resolve ( const char *route, const char *uri ) {
 
 	//This is kind of a useless structure, but there is a lot to keep track of
 	struct urimap {
-		const char *routeset;
+		const char *name, *routeset;
 		struct element **list;
 		int listlen;
 		Mem r;
 	} urimaps[] = {
-		{ route, NULL, 0 },
-		{ uri, NULL, 0 },
+		{ "Route", route, NULL, 0, 0 },
+		{ "URI", uri, NULL, 0, 0 },
 	};
 
-	//Generate a little table for the route as is
-	//This map only needs to be done once.
-#if 0
-	fprintf( stderr, "Checking URI (%s) against route (%s)\n", uri, route );
-	const char *rr[] = { route, uri };
-	struct element **ll[] = { expectedList, inputList };
-	int listlens[] = { elistLen, ilistLen };
-	Mem r;
-#endif
 
+	//Loop through all the things...
 	for ( int ri = 0; ri < ( sizeof( urimaps ) / sizeof( struct urimap ) ); ri++ ) {
-		struct urimap map = urimaps[ ri ];
-		memset( &r, 0, sizeof( Mem ) );
-		const char *rt = rr[ ri ];
-		const char *type = ( ri ) ? "Route" : "URI";
-		int *listlen = NULL;
-		listlen = &listlens[ ri ];
-		struct element **ly = ll[ ri ];
-		fprintf( stderr, "%s: %s\n", type, rt );
+		struct urimap *map = &urimaps[ ri ];
+		memset( &map->r, 0, sizeof( Mem ) );
 #if 1
-		while ( strwalk( &r, rt, "/" ) ) {
-			uint8_t *p = (uint8_t *)&rt[ r.pos ];
-			int action = maps[ *p ];
-			struct element *e = malloc( sizeof( struct element ) );
-			memset( e, 0, sizeof( struct element ));
+		while ( strwalk( &map->r, map->routeset, "/" ) ) {
+			uint8_t *p = (uint8_t *)&map->routeset[ map->r.pos ];
+
 			//Skip results that are just one '/'
-			if ( *p == '/' ) {
+			if ( *p == '/' || !map->r.size ) {
 				continue;
 			}
+
+			struct element *e = malloc( sizeof( struct element ) );
+			memset( e, 0, sizeof( struct element ));
+
 			//Count all the single characters and length
-			else if ( maps[ *p ] == ACT_SINGLE ) {
+			if ( maps[ *p ] == ACT_SINGLE ) {
 				e->type = ACT_SINGLE;	
+				//Count all the ?'s and figure out how long it needs to be 
 			}
 			//This can be anything
 			else if ( maps[ *p ] == ACT_WILDCARD ) {
@@ -155,7 +152,7 @@ int resolve ( const char *route, const char *uri ) {
 				uint8_t *block = p + 1;
 				Mem pp;
 				memset( &pp, 0, sizeof(Mem) );
-				while ( memwalk( &pp, block, mb, r.size - 1, strlen(mb) ) ) {
+				while ( memwalk( &pp, block, mb, map->r.size - 1, strlen(mb) ) ) {
 					char buf[ 1024 ] = {0};
 					memcpy( buf, &block[ pp.pos ], pp.size );
 					ADDITEM( strdup( buf ), char *, e->string, e->len );
@@ -166,80 +163,130 @@ int resolve ( const char *route, const char *uri ) {
 				if ( e->len ) {
 					ADDITEM( NULL, char *, e->string, e->len );
 				}
+				if ( e->len > 2 && e->type == ACT_ID ) {
+					//fprintf( stderr, "%s\n", e->string[1] ); getchar(); exit(0);
+					if ( memcmp( e->string[1], "number", 6 ) == 0 ) 
+						e->mustbe = RE_NUMBER;
+					else if ( memcmp( e->string[1], "string", 6 ) == 0 ) {
+						e->mustbe = RE_STRING;
+					}
+				}
 			}
 			else {
 				//This is just some string (I guess the action is RAW)
 				e->type = ACT_RAW;
 				char buf[ 1024 ] = {0};
-				memcpy( buf, p, r.size );
+				memcpy( buf, p, map->r.size );
 				ADDITEM( strdup( buf ), char *, e->string, e->len );
 			}
 
 			if ( e->type ) {
-				ADDITEM( e, struct element *, ll[ ri ], *listlen ); 
+				ADDITEM( e, struct element *, map->list, map->listlen ); 
 			}
 		}
 
-		ADDITEM( NULL, struct element *, ll[ ri ], *listlen ); 
-		fprintf( stderr, "%s list is size %d\n", type, *listlen );
+		ADDITEM( NULL, struct element *, map->list, map->listlen ); 
 #endif
 	}
 
-#if 1
+#ifdef DDD
 	//This exists just for debugging purposes...
-	for ( int ri = 0; ri < ( sizeof(rr) / sizeof(char *) ); ri ++ ) {
-		struct element **a = ll[ ri ];
-		char *type = ( ri ) ? "route" : "URI";
-		fprintf( stderr, "%s looks like: %s\n", type, (*a) ? "" : "(none)"  );
+	for ( int ri = 0; ri < ( sizeof(urimaps) / sizeof(struct urimap) ); ri++ ) {
+		struct urimap *map = &urimaps[ ri ];
+		struct element **a = map->list;
 		while ( *a ) {
-			fprintf( stderr, "action=%s, len=%d, string=", DUMPACTION( (*a)->type ), (*a)->len );
+			FPRINTF( "( string=" ); 
 			char **b = (*a)->string;
 			if ( (*a)->len ) {
-				for ( int i=0; i<(*a)->len; i++ ) {
-					fprintf( stderr, "'%s', ", *b );
-					b++;
-				}
+				for ( int i=0; i<(*a)->len; i++ ) { fprintf( stderr, "'%s', ", *b ); b++; }
 			}
-			fprintf( stderr, "\n" );
+			fprintf( stderr, " action=%s, len=%d )\n", DUMPACTION( (*a)->type ), (*a)->len );
 			a++;
 		}
 	}
 #endif
 
-	//Check that the sizes are equivalent.
-	fprintf( stderr, "%d ?= %d\n", listlens[0], listlens[1] );
-	if ( listlens[0] != listlens[1] ) {
+	//Now, do sanity checks
+	FPRINTF( "%d ?= %d\n", urimaps[0].listlen, urimaps[1].listlen );
+	if ( urimaps[0].listlen != urimaps[1].listlen ) {
+		FPRINTF( "URI map sizes are different (route = %d, URI = %d).\n", urimaps[0].listlen, urimaps[1].listlen );
 		return 0;
 	}
 
-#if 0
 	//Then check that elements match as they should	
-	struct element **elist = expectedList, **ilist = inputList;
-	//If either is null, abort
+	struct element **elist = urimaps[0].list, **ilist = urimaps[1].list;
 	while ( *elist && *ilist ) {
-#if 0
 		int action = (*elist)->type;
 		if ( action == ACT_SINGLE ) {
 		}
 		else if ( action == ACT_EITHER ) {
-			for ( int i=0; i < (*elist)->len; i++ ) {
-				//fprintf(stderr,"Checking %s\n", (*elist)->string[i] );
-				//if ( memcmp( (*ilist)->string, (*elist)->string ) == 0 )
+			FPRINTF( "len is: %d\n", (*elist)->len );
+			int match = 0;
+			char *ii = (*ilist)->string[0];
+			for ( int i=0; i < ((*elist)->len - 1); i++ ) {
+				char *ee = (*elist)->string[i];
+				FPRINTF( "Checking '%s' & '%s'\n", ii, ee );
+				if ( !ii || !ee ) {
+					FPRINTF( "Optional string expected to match '%s', but was empty.\n", ee );
+					continue;
+				}	
+				else if ( strlen(ii) != strlen(ee) ) {
+					FPRINTF( "Optional string '%s' expected to match '%s', but is a different length.\n", ii, ee );
+					continue;
+				}
+				else if ( memcmp( ii, ee, strlen(ii) ) != 0 ) {
+					FPRINTF( "Optional string '%s' does not match expected string '%s'.\n", ii, ee );
+					continue;
+				}
+				match = 1;
 			}
-			//If both matches do not match, return 0 
+			if ( !match ) {
+				return 0;
+			}	
 		}
 		else if ( action == ACT_ID ) {
-			//if it's asking for a type, throw if no match
+			FPRINTF( "len is: %d\n", (*elist)->len );
+			char *s = (*ilist)->string[0];				
+			char *n = (*elist)->mustbe == RE_STRING ? ALPHA : NUMS;
+			int nl = strlen( n );
+			if ( !s ) {
+				FPRINTF( "String passed to ID was empty.\n" );
+				return 0;
+			}
+			if ( (*elist)->mustbe ) {
+				while ( *s ) {
+					if ( !memchr( n, *s, nl ) ) {
+						FPRINTF( "parameter '%s' did not pass type check.\n", (*ilist)->string[0] );
+						return 0;  
+					}
+					s++;
+				}
+			}
+		}
+		else if ( action == ACT_RAW ) {
+			//These should just match one to one
+			char *ii = *(*ilist)->string;
+			char *ee = *(*elist)->string;
+			FPRINTF( "Comparing route stubs '%s' & '%s'\n", ii, ee );
+			if ( !ii ) { 
+				FPRINTF( "Input string expected to match '%s', but was empty.\n", ee );
+				return 0;
+			}
+			else if ( strlen( ii ) != strlen( ee ) ) {
+				FPRINTF( "Input string '%s' expected to match '%s', but is a different length.\n", ii, ee );
+				return 0;
+			}
+			else if ( memcmp( ii, ee, strlen( ee ) ) != 0 ) {
+				FPRINTF( "Input string '%s' does not match expected string '%s'.\n", ii, ee );
+				return 0;
+			}
 		}
 		else if ( action == ACT_WILDCARD ) {
-			
+			//This should theoreticlaly never not return...	
 		}
-#endif
 		elist++, ilist++;
-	getchar();
 	}
-#endif
-	return 0;	
+	return 1;	
 }
 
 
@@ -249,10 +296,10 @@ int main (int argc, char *argv[]) {
 	//We simply want to know whether or not this engine will respond to the request list
 	while ( *routelist ) {
 		const char **requestList = requests;
-		//fprintf( stderr, "%s resolves:\n", *routelist  );
+		fprintf( stderr,  "Checking against this URI: %s\n", *routelist );
 		while ( *requestList ) {
 			char *r = resolve( *routelist, *requestList ) ? "YES" : "NO";
-			fprintf( stderr, "%s ?= %s: %s\n", *routelist, *requestList, r );
+			fprintf( stderr, "%30s ?= %-10s: %s\n", *routelist, *requestList, r );
 			requestList++;
 		}
 		routelist++;
