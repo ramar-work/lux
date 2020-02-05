@@ -37,9 +37,10 @@ const char *routes[] = {
 , "/route"
 , "/route/:id"
 , "/route/:id=string"
+, "/route/:id=number"
 , "/:id"
 , "/route/*"
-, "/route/*/jackbot"
+, "/route/*/jackpot"
 #endif
 #if 0
 , "/route/?"
@@ -58,12 +59,14 @@ const char *requests[] = {
 , "/2"
 , "/route"
 , "/route/3"
+, "/route/bashful"
+, "/route/bashful/jackpot"
+, "/route/333/jackpot"
 #if 0
 , "/julius/3"
 , "/3"
 , "/joseph/route/337"
 , "/route/337a"
-, "/route/bashful"
 , "/route/3"
 #endif
 , NULL
@@ -299,7 +302,7 @@ int main (int argc, char *argv[]) {
 		fprintf( stderr,  "Checking against this URI: %s\n", *routelist );
 		while ( *requestList ) {
 			char *r = resolve( *routelist, *requestList ) ? "YES" : "NO";
-			fprintf( stderr, "%30s ?= %-10s: %s\n", *routelist, *requestList, r );
+			fprintf( stderr, "%20s ?= %-30s: %s\n", *routelist, *requestList, r );
 			requestList++;
 		}
 		routelist++;
