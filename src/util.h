@@ -3,7 +3,6 @@
 
 #define UTIL_H
 
-//ADDITEM( )
 #define ADDITEM(TPTR,SIZE,LIST,LEN,FAIL) \
 	if (( LIST = realloc( LIST, sizeof( SIZE ) * ( LEN + 1 ) )) == NULL ) { \
 		fprintf (stderr, "Could not reallocate new rendering struct...\n" ); \
@@ -37,3 +36,10 @@
 #endif
 
 uint8_t *read_file ( const char *filename, int *len, char *err, int errlen );
+int safeatoi( const char *value );
+char *get_lstr( char **str, char chr, int *lt );
+char *msg_get_value ( const char *value, const char *chrs, uint8_t *msg, int len );
+char *copystr ( uint8_t *src, int len ) ;
+
+
+

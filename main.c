@@ -1,803 +1,981 @@
-/* ---------------------------------------------- *
- * hypno.c
- * =======
- * 
- * Summary
- * ------- 
- * Hypno is a full blown web application environment
- * using Lua as its primary server language.  
- *
- * Author 
- * ------- 
- * Antonio R. Collins II (ramar@tubularmodular.com, ramar.collins@gmail.com)
- * Original Author Date:   Wed Oct 18 20:33:27 2017 -0400
- *
- * Usage 
- * ------- 
- *
- * TODO 
- * ------- 
- * ---------------------------------------------- */
+/*let's try this again.  It seems never to work like it should...*/
 #include "vendor/single.h"
-#include "vendor/nw.h"
-#include "vendor/http.h"
-#include "bridge.h"
-#include <dirent.h>
+#include <gnutls/gnutls.h>
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+#include "luabind.h"
 
-#define PROG "hypno"
-#define DIRNAME_DEFAULT "example"
-#define DATAFILE_NAME "data.lua"
-#define ERR_SRVFORK 20
-#define ERR_PIDFAIL 21
-#define ERR_PIDWRFL 22 
-#define ERR_SSOCKET 23 
-#define ERR_INITCON 24 
-#define ERR_SKLOOPS 25 
-#define SUC_PARENT  27
-#define SUC_CHILD   28
-
-//Add timing functions
-#define INCLUDE_TIMING_INFO_H
-
-//Testing: See line numbers in error messages
-//#define INCLUDE_LINE_NO_ERROR_H ERR_SUPERV                 
-
-//Testing: I'm going to include an EXAMPLE define that uses the 'example' folder.
-#define EXAMPLE_H
-
-//Testing: Option module is not so wonderful yet, so use this to test out things having to do with it.
-#define TESTOPTS_H                   
-
-//This define controls whether or not line numbers will also be included in the error message.
-#ifdef INCLUDE_LINE_NO_ERROR_H
- #define ERRL(...) \
-	( snprintf( err, 24, "[ @%s(), %d ]                 ", __FUNCTION__, __LINE__ ) ? 1 : 1 \
-	&& ( err += 24 ) && snprintf( err, errlen - 24, __VA_ARGS__ ) ) ? 0 : 0
-#else
- #define ERRL(...) snprintf( err, errlen, __VA_ARGS__ ) ? 0 : 0
-#endif
-
-#define ERRP(...) \
- ( (snprintf( err, 24, "[ @%s(), %d ]                 ", __FUNCTION__, __LINE__ ) ? 1 : 1) \
- && ( err += 24 ) && (snprintf( err, errlen - 24, __VA_ARGS__ ) ? 0 : 0 ) && fprintf(stderr, err ))
-//This define should be a bit easier to use than fully calling http_err
-#define ERR_500(...) http_err( r, h, 500, __VA_ARGS__ ) 
-#define ERR_404(...) http_err( r, h, 404, __VA_ARGS__ ) 
-#define ERR_200(...) http_err( r, h, 200, __VA_ARGS__ ) 
-
-#define ERR_500(...) ( ( http_err( r, h, 500, __VA_ARGS__ ) ? 1 : 1 ) && ( fprintf( stderr, "[%s:%d] ",__FILE__,__LINE__) ? 1 : 1 ) && fprintf( stderr, __VA_ARGS__ ) )
-#define ERR_404(...) ( ( http_err( r, h, 404, __VA_ARGS__ ) ? 1 : 1 ) && ( fprintf( stderr, "[%s:%d] ",__FILE__,__LINE__) ? 1 : 1 ) && fprintf( stderr, __VA_ARGS__ ) )
-
-//Lua structure
-typedef struct {
-	char *name; 
-	lua_CFunction func; 
-	char *setname; 
-	int sentinel;
-} luaCF;
-
-//Signature for handling a server.
-_Bool http_run (Recvr *r, void *p, char *e);
-_Bool http_send (Recvr *r, void *p, char *e);
-
-//This is nw's data structure for handling protocols 
-Executor etc[] = {
-	[NW_AT_READ]        = { .exe = http_read, NW_NOTHING },
-	[NW_AT_PROC]        = { .exe = http_run , NW_NOTHING },
-	[NW_AT_WRITE]       = { .exe = http_send, NW_NOTHING },
-	[NW_COMPLETED]      = { .exe = http_fin , NW_NOTHING }
-};
-
-//Static buffer for quickly expanding how much memory is available?
-uint8_t zbuf[ 10485760 ] = { 0 };
-//Useful variables for main()
-static const char pidfile[] = "hypno.pid";
-static char err[ 4096 ] = { 0 };
-static const int errlen = 4096; 
-char default_dirname[] = DIRNAME_DEFAULT;
-
-int hssent = 0;
-#include "tests/char-char.c"
-static uint8_t *tccf = NULL;
-static int tccflen = 0, tccfpos = 0, fd2 = 0;
-//Lua functions
-luaCF lua_functions[] =
-{
-	{ .setname = "set1" },
-		{ "abc", abc },
-		{ "val", abc },
-		{ .sentinel = 1 },
-
-	{ .setname = "set2" },
-		{ "xyz", abc },
-		{ "def", abc },
-		{ .sentinel = 1 },
-#if 0
-	/*Database module*/	
-	{ .setname = "db" },
-		{ "exec",   exec_db },
-		{ "schema", schema_db },
-		{ "check",  check_table },
-		{ .sentinel = 1 },
-#endif
-	/*Render module*/	
-	{ .setname = "render" },
-		{ "file",   abc },
-		{ .sentinel = 1 },
-
-	/*End this*/
-	{ .sentinel = -1 },
-};
+#include "src/http.h"
+#include "src/socket.h"
+#include "src/util.h"
+#include "src/ssl.h"
 
 
-static luaCF *rg = lua_functions;
-
-
-typedef struct {
-	char *filename; //should be utf-8
-	int size;		
-	int fd; 
-	int bufsize;
-} HttpStreamer;
-
-
-void free_hs( HttpStreamer *hs ) {
-	free( hs->filename );
-	free( hs );
-}
-
-
-void print_hs ( HttpStreamer *hs ) {
-	nsprintf( hs->filename );
-	niprintf( hs->bufsize );
-	niprintf( hs->size );
-	niprintf( hs->fd );
-}
-
-
-//Serve a list of files
-void srvListOfFiles() {
-#if 0
-		if (S_ISREG((sb.st_mode))) 
-			fprintf( stderr, "%10s", "file:" );
-		else if (S_ISDIR((sb.st_mode)))
-			fprintf( stderr, "%10s", "dir:" );
-		else if (S_ISCHR((sb.st_mode))) 
-			fprintf( stderr, "%10s", "char:" );
-		else if (S_ISBLK((sb.st_mode))) 
-			fprintf( stderr, "%10s", "block:" );
-		else if (S_ISFIFO((sb.st_mode))) 
-			fprintf( stderr, "%10s", "felse ifo:" );
-		else if (S_ISLNK((sb.st_mode))) 
-			fprintf( stderr, "%10s", "link:" );
-		else if (S_ISSOCK((sb.st_mode))) {
-			fprintf( stderr, "%10s", "socket:" );
-		}
-#endif
-}
-
-
-//Serve binary files
-void srvBinaryFiles() {
-	#if 0
-	//Binary data using server stuff
-	#include "tests/why_tif.c"
-	http_set_status( h, 200 );
-	http_set_content( h, "image/tiff", ( uint8_t * )why_tif, why_tif_len );
-	http_pack_response( h );
-	#endif
-}
-
-
-//Serve a basic canned response
-void srvBasicCannedResponse() {
-  #if 0 
-	//Static response, with no help from the server.
-	const char resp[] = 
-		"HTTP/2.0 200 OK\r\n"
-		"Content-Type: text/html\r\n"
-		"Content-Length: 23\r\n\r\n"
-		"<h2>Hello, world!</h2>\n";
-	http_set_status( h, 200 );
-	http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
-	#endif
-	#if 0
-	//Static response leaning on the server
-	const char resp[] = 
-		"<h2>Hello, world!</h2>\n";
-	http_set_status( h, 200 );
-	http_set_content( h, "text/html", ( uint8_t * )resp, strlen( resp ) );
-	http_pack_response( h );
-  #endif
-}
-
-
-typedef struct Passthru {
-
-	//struct stat sb;
-	char *webroot;
-	char *activeDir;
-	char *datafile ;
-	DIR *ds; 
-	struct dirent *de;
-	short singleDir;
+extern const char http_200_custom[];
+extern const char http_200_fixed[];
+extern const char http_400_custom[];
+extern const char http_400_fixed[];
+extern const char http_500_custom[];
+extern const char http_500_fixed[];
 
 #if 0
-	Table  routes, request, model;
-	Loader ld[ 10 ], *l = NULL;
-	Render ren;
-	uint8_t *renbuf = NULL;
-	int renbuflen = 0;
-	HTTP *h = (HTTP *)r->userdata;
-	HTTP_Request *req = &h->request;
-	lua_State *L  = luaL_newstate(); 
+#define ADD_ELEMENT( ptr, ptrListSize, eSize, element ) \
+	if ( ptr ) \
+		ptr = realloc( ptr, sizeof( eSize ) * ( ptrListSize + 1 ) ); \
+	else { \
+		ptr = malloc( sizeof( eSize ) ); \
+	} \
+	*(&ptr[ ptrListSize ]) = element; \
+	ptrListSize++;
 #endif
-	
-} Passthru;
 
 
-int hssent = 0;
-#include "tests/char-char.c"
-static uint8_t *tccf = NULL;
-static int tccflen = 0, tccfpos = 0, fd2 = 0;
-//Let's create a data member that contains info on differeent parts of this process
-//I can never tell.
-//Or at the very least, one function that can tell me what everything else looks like.
-void whathappened ( Recvr *r, HTTP *h ) {
-	//what's in http?
-	//what's in HTTP_Request?
-	//what's in HTTP_Response?
-	print_recvr( r ); 
-	http_print_request( h ); 
-	http_print_response( h ); 
-}
-
-//This is what handles streaming in case it's needed.
-_Bool http_send (Recvr *r, void *p, char *e) {
-	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "about to send message over wire." );
-	HTTP *h = (HTTP *)r->userdata;
-	HttpStreamer *hs = NULL;
-	whathappened( r, h );
-
-	if ( *r->bypass == 0 )
-		r->stage = NW_COMPLETED;	
-	else {
-		if ( !(hs = (HttpStreamer *)h->userdata) ) {
-			return ERR_500( "Issues with HttpStreamer structure." );	
-		}
-
-		//Define and initialize
-		char statline[ 32 ]; 
-		int bufmv = ( hs->size < hs->bufsize ) ? hs->size : hs->bufsize;
-		uint8_t tmpbuf[ bufmv ];
-		memset( statline, 0, sizeof( statline )); 
-		memset( tmpbuf, 0, bufmv ); 
-
-		//Add a size and status line
-		snprintf( statline, sizeof(statline), "%2x\r\n", bufmv ); 
-		bf_append( &r->_response, (uint8_t *)statline, strlen( statline ) ); 
-
-		//Read file contents into a buffer
-		if ( read( hs->fd, tmpbuf, bufmv ) == -1 ) {
-			free_hs( hs );	
-			return ERR_500( "Issues with reading from file into buffer." );	
-		}
-
-		//Append data
-		if ( !bf_append( &r->_response, tmpbuf, bufmv ) ) { 
-			free_hs( hs );	
-			return ERR_500( "Issues with adding to message queue." );	
-		}
-	
-		//TODO: Fix this, this is stupid...
-		if ( !bf_append( &r->_response, (uint8_t *)"\r\n", 2 ) ) {
-			free_hs( hs );	
-			return ERR_500( "Issues with adding to message queue." );	
-		}
-
-		//Move file pointer
-		if ( lseek( hs->fd, 0, SEEK_CUR ) == -1 ) {
-			free_hs( hs );	
-			return ERR_500( "Issues with changing file pos: %s.", strerror(errno) );	
-		}
-
-		//Either end it or keep it going
-		if ( (hs->size -= bufmv) > 0 ) 
-			r->stage = NW_AT_WRITE;
-		else {
-			free_hs( hs );
-			if ( !bf_append( &r->_response, (uint8_t *)"0\r\n", 3 ) ) {
-				free_hs( hs );	
-				return ERR_500( "Couldn't send final chunk." );	
-			}
-			r->stage = NW_COMPLETED;
-			memset( h, 0, sizeof(HTTP) ); 
-			return 1;
-		}
-	}
-	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "should have sent message over wire." );
-	return 1;
-} 
-
-
-
-//Kill the server
-int kill_cmd( Option *opts, char *err, Passthru *pt ) {
-#ifdef WIN32
- #error "Kill (as written here anyway) does not work on Windows."
-#endif
-	pid_t pid;
-	int fd, len;
-	struct stat sb;
-	char buf[64] = {0};
-
-	//For right now, we can just naively assume that the server has not started yet.
-	if ( stat(pidfile, &sb) == -1 )	
-		return ERRL( "Could not locate server process: %s", strerror(errno)  );
-	
-	//Make sure size isn't bigger than buffer
-	if ( sb.st_size >= sizeof(buf) )
-		return ERRL( "Error initializing process id."  );
- 
-	//Get the pid otherwise
-	if ((fd = open( pidfile, O_RDONLY )) == -1 || (len = read( fd, buf, sb.st_size )) == -1) { 
-		close( fd );
-		return ERRL( "Cannot access my PID file; %s", strerror(errno)  );
+//send (sends a message, may take many times)
+int t_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+	//write (write all the data in one call if you fork like this) 
+	const char http_200[] = ""
+		"HTTP/1.1 200 OK\r\n"
+		"Content-Length: 11\r\n"
+		"Content-Type: text/html\r\n\r\n"
+		"<h2>Ok</h2>";
+	if ( write( fd, http_200, strlen(http_200)) == -1 ) {
+		fprintf(stderr, "Couldn't write all of message..." );
+		close(fd);
+		return 0;
 	}
 
-	//More checking...
-	close( fd );
-	for (int i=0; i<len; i++) {
-		if ( !isdigit(buf[i]) ) {
-			return ERRL( "PID is not a number."  );
-		}
-	}
-
-	//Close the process
-	pid = atoi( buf );
-	if ( kill(pid, SIGTERM) == -1 )
-		return ERRL( "Failed to kill server process: %s", strerror( errno )  );
-
-	return 1;
+	return 0;
 }
 
 
-//Load a different data.lua file from main()
-int file_cmd( Option *opts, char *err, Passthru *pt ) {
-	lua_State *L = NULL;  
-	char *f = opt_get( opts, "--file" ).s;
-	struct stat sb;
-	Table t;
-
-	if (!( L = luaL_newstate() ))
-		return ERRL( "L is not initialized..."  );
-
-	if ( stat( f, &sb ) == -1 )
-		return ERRL( "File %s inaccessbile. %s", f, strerror( errno ) );
-	
-	if ( !lt_init( &t, NULL, 127 ) ) 
-		return ERRL( "Couldn't initialize table for file reading."  );
-
-	if ( !lua_load_file( L, f, &err ) ) {
-		//TODO: Why does ERRL( str, f, err ) throw a compiler error? 
-		char err2[4096] = { 0 };
-		snprintf( err2, 4095, "%s", err );
-		return ERRL( "Couldn't run file %s.  Error: %s", f, err2 );
+//read (reads a message)
+int t_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+	//read (read all the data in one call if you fork like this)
+	const int size = 100000;
+	unsigned char *rqb = malloc( size );
+	memset( rqb, 0, size );	
+	if (( rq->mlen = read( fd, rqb, size )) == -1 ) {
+		fprintf(stderr, "Couldn't read all of message...\n" );
+		close(fd);
+		return 0;
 	}
 
-	lua_to_table( L, 1, &t );
-	lt_dump( &t );
-	return 1;
+	return 0;
 }
 
 
-//Runs at every invocation
-int http_pre ( Recvr *r, void *ud, char *err ) {
-	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "about to open connection." );
+//Any processing can be done in the middle.  Since we're in another "thread" anyway
+int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+	//...
+	char *err = malloc( 2048 );
+	memset( err, 0, 2048 );
+	struct stat sb =  {0};
 
-	//Still may have to negotiate when to initiailize SSL and when not...
-	
-
-	//Also may need some hook functions to determine who's cert to use and where traffic is intended to go... BOY!
-
-
-		
-	return 1;
-}
-
-//Runs at every invocation
-int http_post ( Recvr *r, void *ud, char *err ) {
-	fprintf( stderr,"[%s:%d] %s\n", __func__, __LINE__, "about to close connection." );
-	return 1;
-}
-
-
-
-//This is the single-threaded HTTP run function
-_Bool http_run ( Recvr *r, void *p, char *err ) { 
-
-fprintf( stderr, "BYE!\n" );
-exit( 0 );
- #ifdef INCLUDE_TIMING_INFO_H
-	char tbuf[1024]={0};
-	Timer t;
-	sprintf( tbuf,  "http_run at %s:%d\n", __FUNCTION__, __LINE__ ); 
-	timer_use_us( &t );
-	timer_start( &t );
- #endif	
- #if 0
-	struct stat sb;
-	char *ag->activeDir = NULL;
-	char *datafile = NULL;
-	char *fSetName = NULL;
-	DIR *ds = NULL;
-	struct dirent *de;
-	const char *ag->webroot = "example";
- #endif
-
-	//This is a hell of a lot of data.
-	char *fSetName;
-	char *datafile;
-	struct stat sb;
-	Table  routes, request, model;
-	Table *mm = NULL;
-	Loader ld[ 10 ], *l = NULL;
-	Render ren;
-	uint8_t *renbuf = NULL;
-	int renbuflen = 0;
-
-	//Anything that should be set or initialized is here
-	Passthru *pt = (Passthru *)p;
-	HTTP *h = (HTTP *)r->userdata;
-	HTTP_Request *req = &h->request;
-	lua_State *L = luaL_newstate(); 
-//http_print_request( h ); exit( 0 );
-
-	//Set the message length
-	req->mlen = r->recvd;
-
-	//Set up the "loader" structure
-	memset( ld, 0, sizeof( Loader ) * 10 );
-
-	//This should receive the entire request
-	if ( !http_get_remaining( h, r->request, r->recvd ) )
-		return ERR_500("Error processing request." );
-
-	//Try to open the web root
-	if ( !( pt->ds = opendir( pt->webroot ) ) )
-		return ERR_500("Couldn't access web root: %s.", strerror(errno) );
-
-#if 0
-	//If the webroot is the web application directory, set things accordingly
-	if ( pt->singleDir ) {
-		//Make a fully qualified path from the filename
-		char *fd = strcmbd( "/", pt->webroot, pt->de->d_name );
-
-		//Check the name of the folder and see if the hostname matches
-		if ( S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode)) ) {
-			if ( strcmp( pt->de->d_name, h->hostname ) == 0 ) {
-				pt->activeDir = fd;
-			}	
-		}
-	}
-	else {
-	}
-#endif
-	//fprintf( stderr, "Directory '%s' contains:\n", pt->webroot );
-	while ( (pt->de = readdir( pt->ds )) ) {
-		//Make a fully qualified path from the filename
-		char *fd = strcmbd( "/", pt->webroot, pt->de->d_name );
-
-		//Check that the child inode is accessible
-		if ( lstat( fd, &sb ) == -1 )
-			return ERR_500("Can't access directory %s: %s.", fd, strerror(errno));
-
-		//Check the name of the folder and see if the hostname matches
-		if ( S_ISDIR(sb.st_mode) || S_ISLNK((sb.st_mode)) ) {
-			if ( strcmp( pt->de->d_name, h->hostname ) == 0 ) {
-				pt->activeDir = fd;
-				break;
-			}	
-		}
-		free(fd);
+	//Check that the directory exists
+	if ( stat( "www", &sb ) == -1 ) {
+		WRITE_HTTP_500( "Could not locate www/ directory", strerror( errno ) );
+		return 0;
 	}
 
-	//Default responses get handled here 
-	if ( !pt->activeDir ) {
-		return ERR_404( "No site matching hostname '%s' found.", h->hostname );
+	//Check for a primary framework file
+	memset( &sb, 0, sizeof( struct stat ) );
+	if ( stat( "www/main.lua", &sb ) == -1 ) {
+		WRITE_HTTP_500( "Could not find file www/main.lua", strerror( errno ) );
+		return 0;
 	}
 
-	//Lastly, check that the client isn't asking for actual files.
-	int rplen = strlen( h->request.path );
-	if ( memchr( h->request.path, '.', rplen ) ) {
-		//Check for a known extension
-		char *extck = &h->request.path[ rplen ];
-		while ( extck-- && *extck != '.' ) ; 	
-		extck++;
-
-		//Now check for a valid mimetype	
-		char *mt = (char *)mtfref( extck );
-	
-		//If the mimetype is not supported, that's technically a 404
-		//but right now, use application/octet-stream to check for validity
-		if ( strcmp( mt, "application/octet-stream" ) > 0 ) {
-			//Check for the path name relative to the currently chosen directory
-			HttpStreamer *hs = malloc( sizeof( HttpStreamer ) );
-			memset( hs, 0, sizeof(HttpStreamer) );
-			hs->filename = strcmbd( "/", pt->activeDir, &h->request.path[ 1 ] );
-			hs->fd = 0;
-			hs->size = 0;
-			hs->bufsize = 1028;
-
-			if ( stat( hs->filename, &sb ) == -1 ) {	
-				free_hs( hs );
-				return ERR_404( "File not found: %s", hs->filename );
-			}
-
-			if (( hs->size = sb.st_size ) == 0 ) {
-				free_hs( hs );
-				return ERR_500( "Requested file: %s is zero length.", hs->filename );
-			}
-
-			if (( hs->fd = open( hs->filename, O_RDONLY ) ) == -1 ) {
-				free_hs( hs );
-				return ERR_500( "Requested file: %s could not be opened.", hs->filename );
-			}
-
-			//Prepare the actual reponse
-			h->userdata = hs;
-			http_set_status( h, 200 );
-			http_set_content_type( h, mt );
-			http_set_header( h, "Transfer-Encoding", "chunked" );
-			http_pack_response( h );
-			r->stage = NW_AT_WRITE;
-			*r->bypass = 1;
-			return 1;
-		}
-	}
-
-	//Check that Lua initialized here
-	if ( !L ) {
-		return ERR_500("Failed to create new Lua state?" );
-	}
-
-	//Open Lua libraries.
+	//Initialize Lua environment and add a global table
+	//fprintf( stderr, "Initializing Lua env.\n" );
+	lua_State *L = luaL_newstate();
 	luaL_openlibs( L );
-	lua_newtable( L );
+	lua_newtable( L ); 
 
-	//Read the data file for whatever "site" is gonna be run.
-	if ( !(datafile = strcmbd( "/", pt->activeDir, DATAFILE_NAME )) ) {
-		return ERR_500("Low mem" );
+	//Put all of the HTTP data on the stack
+	const char *names[] = { "headers", "get", "post" };
+	struct HTTPRecord **t[] = { rq->headers, rq->url, rq->body };
+	for ( int i=0; i < sizeof(t)/sizeof(struct HTTPRecord **); i++ ) {
+		//Add the new name first
+		lua_pushstring( L, names[ i ] ); 
+		lua_newtable( L );
+
+		//Add each value
+		struct HTTPRecord **w = t[i];
+		while ( *w ) {
+			lua_pushstring( L, (*w)->field );
+			lua_pushlstring( L, (char *)(*w)->value, (*w)->size );
+			lua_settable( L, 3 );
+			w++;
+		}
+	
+		//Set this table and key as a value in the global table
+		lua_settable( L, 1 );
 	}
 
-	//Always waste some time looking for the file
-	if ( stat( datafile, &sb ) == -1 ) {
-		return ERR_500("Couldn't find file containing site data: %s.", datafile );
-	}
+	//Push the path as well
+	lua_pushstring( L, "url" );
+	lua_pushstring( L, rq->path );
+	lua_settable( L, 1 );
 
-	//Load the route file.
-	if ( !lua_load_file( L, datafile, &err ) ) {
-		return ERR_500("Loading routes failed at file '%s': %s", datafile, err );
-	}
+	//Additionally, the framework methods and whatnot are also needed...
+	//...
 
-	//If there is no data, then I shouldn't move forward
-	char *dfbuf = NULL; 
-	int dfd = open( datafile, O_RDONLY );
-	dfbuf = malloc( sb.st_size );
-	memset( dfbuf, 0, sb.st_size );
+	//Assign this globally
+	lua_setglobal( L, "newenv" );	
 
-	if ( !dfbuf || dfd == -1 || read( dfd, dfbuf, sb.st_size ) == -1)  {
-		free( dfbuf );
-		return ERR_500( "Issues reading %s to buffer: %s", datafile, strerror( errno ) );
-	}
+	//Try running a few files and see what the stack looks like
+	char *files[] = { "www/main.lua", "www/etc.lua", "www/def.lua" };
+	for ( int i=0; i<3;i++ ) {
+		char *f = files[i];
+		int lerr = 0;  //Follow errors with this
+		char fileerr[2048] = {0};
+		memset( fileerr, 0, sizeof(fileerr) );
 
-	//Then check that there is something besides blank space in the file
-	if ( sb.st_size == 0 )
-		return ERR_500( "Datafile at %s is zero length, can't continue...\n", datafile );
-	else {
-		int fnd_oc = 0;
-		while ( dfbuf++ ) {
-			if ( *dfbuf != '\0' && *dfbuf != '\t' && *dfbuf != ' ' ) {
-				fnd_oc = 1;
-				break;
+		//Load the file first 
+		fprintf( stderr, "Attempting to load file: %s\n", f );
+		if (( lerr = luaL_loadfile( L, f )) != LUA_OK ) { 
+			int errlen = 0;
+			if ( lerr == LUA_ERRSYNTAX )
+				errlen = snprintf( fileerr, sizeof(fileerr), "Syntax error at file: %s", f );
+			else if ( lerr == LUA_ERRMEM )
+				errlen = snprintf( fileerr, sizeof(fileerr), "Memory allocation error at file: %s", f );
+			else if ( lerr == LUA_ERRGCMM )
+				errlen = snprintf( fileerr, sizeof(fileerr), "GC meta-method error at file: %s", f );
+			else if ( lerr == LUA_ERRFILE ) {
+				errlen = snprintf( fileerr, sizeof(fileerr), "File access error at: %s", f );
 			}
+			WRITE_HTTP_500( fileerr, (char *)lua_tostring( L, -1 ) );
+			lua_pop( L, lua_gettop( L ) );
+			break;
 		}
-		if ( fnd_oc == 0 ) {
-			return ERR_500( "Datafile at %s is blank, can't continue...\n", datafile );
+
+		//Then execute
+		fprintf( stderr, "Attempting to execute file: %s\n", f );
+		if (( lerr = lua_pcall( L, 0, LUA_MULTRET, 0 ) ) != LUA_OK ) {
+			if ( lerr == LUA_ERRRUN ) 
+				snprintf( fileerr, sizeof(fileerr), "Runtime error at: %s", f );
+			else if ( lerr == LUA_ERRMEM ) 
+				snprintf( fileerr, sizeof(fileerr), "Memory allocation error at file: %s", f );
+			else if ( lerr == LUA_ERRERR ) 
+				snprintf( fileerr, sizeof(fileerr), "Error while running message handler: %s", f );
+			else if ( lerr == LUA_ERRGCMM ) {
+				snprintf( fileerr, sizeof(fileerr), "Error while runnig __gc metamethod at: %s", f );
+			}
+			//fprintf(stderr, "LUA EXECUTE ERROR: %s, stack top is: %d\n", fileerr, lua_gettop(L) );
+			WRITE_HTTP_500( fileerr, (char *)lua_tostring( L, -1 ) );
+			lua_pop( L, lua_gettop( L ) );
+			break;
 		}
 	}
 
-	//Convert this to an actual table so C can work with it...
-	if ( !lt_init( &routes, NULL, 666 ) || !lua_to_table( L, 2, &routes) ) {
-		return ERR_500("Converting routes from file '%s' failed.", datafile );
+	//If we're here, and the stack has values, start running renders
+	//This is the model.
+	lua_stackdump( L );
+
+	//View
+
+	//Close Lua environment
+	//fprintf( stderr, "Killing Lua env.\n" );
+	lua_close( L );	
+
+#if 1
+	//Write the response (this should really be a thing of its own)
+	if ( write( fd, http_200_fixed, strlen(http_200_fixed)) == -1 ) {
+		fprintf(stderr, "Couldn't write all of message..." );
+		close(fd);
+		return 0;
 	}
-
-	//Clear stack to get rid of what came from routes
-	lua_settop( L, 0 );
-
-	//Add HTTP to the global space.
-	lua_newtable( L );
-	table_to_lua( L, 1, &h->request.table );
-	lua_setglobal( L, "env" );
-
-	//Register each of the Lua functions (TODO: every time... not good for perf)
-	while ( rg->sentinel != -1 ) {
-		//Set the top table
-		if ( rg->sentinel == 1 ) {
-			lua_setglobal( L, fSetName );
-		}
-		else if ( !rg->name && rg->setname ) {
-			fSetName = rg->setname;
-			lua_newtable( L );
-		}
-		else if ( rg->name ) {
-			lua_pushstring( L, rg->name );
-			lua_pushcfunction( L, rg->func );
-			lua_settable( L, 1 );
-		}
-		rg++;
-	}
-
-	//Parse the routes that come off of this file
-	if ( !parse_route( ld, sizeof(ld) / sizeof(Loader), h, &routes ) )
-		return ERR_500("Finding the model and view for the current route failed." );
-
-	//Reset Loader pointer and clear the stack
-	l = &ld[0];
-	lua_settop( L, 0 );
-
-#if 0
-	//What's in this weird little data structure thing that never works?
-	while ( l->content ) {
-		fprintf( stderr, "%s: %s\n", (l->type==CC_MODEL)?"model":"view",l->content );
-		l++;
-	}
-exit( 0 );
 #endif
 
-	//Loop through all of this content	
-	//l = &ld[0];
-	while ( l->content ) {
-		//Load each model file (which is just running via Lua)
-		if ( l->type == CC_MODEL ) { 
-			//Somehow have to get the root directory of the site in question...
-			char *mfile = strcmbd( "/", pt->activeDir, "models", l->content, "lua" );
-			mfile[ strlen(mfile) - 4 ] = '.';
-		fprintf( stderr, "Attempting to load: %s\n", mfile );
-
-			return ERR_500("Life is grand, but there was a 500 error: %s.", mfile );
-
-			if ( stat( mfile, &sb ) == -1 ) {
-				return ERR_500("Couldn't find model file: %s.", mfile );
-			}
-
-			if ( luaL_dofile( L, mfile ) ) {
-				return ERR_500("Could not load Lua file: %s. %s\n", mfile, lua_tostring(L, -1));
-			}
-		}
-		l++;
-	}
-
-	//Still gotta figure out the reason for that crash...
-fprintf( stderr, "%s\n", "Lua table aggregation is taking place." );
-	lua_aggregate( L );
-	lua_pushstring( L, "model" );
-	lua_pushvalue( L, 1 );
-	lua_newtable( L );
-	lua_replace( L, 1 );
-	lua_settable( L, 1 );
-	
-	//There is a thing called model now.
-fprintf( stderr, "%s\n", "C table stuff is taking place." );
-	if ( !lt_init( &model, NULL, 1027 ) || !lua_to_table( L, 1, &model ) )
-		return ERR_500("Couldn't turn aggregate table into a C table.\n" );
-
-	//Make a new "render buffer"
-	if ( !(renbuf = malloc( 30000 )) || !memset( renbuf, 0, 30000 ) )
-		return ERR_500("Couldn't allocate enough space for a render buffer.\n" );
-
-	//Rewind Loader ptr and load each view's raw text
-	l = &ld[0];
-	mm = &model;
-	lt_dump( mm );
-
-	//Load each view into a single buffer (can be malloc'd uint8 for now)
-	while ( l->content ) {
-		if ( l->type == CC_VIEW ) {
-			//Somehow have to get the root directory of the site in question...
-			char *vfile = strcmbd( "/", pt->activeDir, "views", l->content, "html" );
-			int fd = 0, bt = 0;
-			vfile[ strlen(vfile) - 5 ] = '.';
-		fprintf( stderr, "Attempting to load: %s\n", vfile );
-
-			if ( stat( vfile, &sb ) == -1 )
-				return ERR_500("Couldn't find view file: %s. Error: %s", vfile, strerror( errno ) );
-
-			//TODO: Pull a realloc here and just keep adding to the same buffer.
-			//if ( !(renbuf = realloc( sb.st_size )) )
-			//	return ERR_500("Couldn't reallocate enough space for output buffer." );
-			
-			if ( (fd = open( vfile, O_RDONLY )) == -1 )
-				return ERR_500("Couldn't open view file: %s. Error: %s", vfile, strerror( errno ) );
-			
-			if ( (bt += read(fd, &renbuf[renbuflen], sb.st_size )) == -1 )
-				return ERR_500("Couldn't read view file into buffer: %s.  Error: %s", vfile, strerror( errno ) );
-			
-			renbuflen += bt;
-		}
-		l++;
-	}
-
-	//A bug(?) in the rendering engine prevents anything from showing up when no model is there
-	//Should just copy data, but it's not...
-	if ( !render_init( &ren, &model ) )
-		return ERR_500("Couldn't initialize rendering engine." );
-
-	//This may or may not return something, if it returns nothing, i dunno...
-	if ( !render_map( &ren, (uint8_t *)renbuf, strlen( (char *)renbuf ) ) )
-		return ERR_500("Couldn't set up render mapping." );
-
-	if ( !render_render( &ren ) )	
-		return ERR_500("Failed to carry out templating on buffer." );
-
-	//Prepare the actual reponse
-	http_set_status( h, 200 );
-	http_set_content( h, "text/html", ( uint8_t * )
-		bf_data(render_rendered(&ren)), bf_written(render_rendered(&ren)) );
-
-	//Set the end of the response preparation step
-	http_pack_response( h );
- #ifdef INCLUDE_TIMING_INFO_H
-	timer_end( &t );
-	timer_print( &t );
- #endif	
-
-	fprintf( stderr, "HTTP @ http_run\n==================\n" );
-	http_print_request( h );
-	http_print_response( h );
-
-	//fprintf( stderr, "RECVR @ http_run\n==================\n" );
-	//print_recvr( r );
-
-	r->stage = NW_AT_WRITE;
-	//free( renbuf );
-	return 1;
+	return 0;
 }
 
 
-//Start the server from main()
-int start_cmd( Option *opts, char *err, Passthru *pt ) {
-	int stat, conn, port, daemonize;
-	daemonize = !opt_set(opts, "--no-daemon");
-	!(conn = opt_get(opts, "--max-conn").n) ? conn = 1000 : 0;
-	!(port = opt_get(opts, "--port").n) ? port = 2000 : 0; 
-	fprintf( stderr, "starting server on %d\n", port );
-	//stat   = startServer( port, conn, daemonize ); 
+int proc_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 
-	//I start a loop above, so... how to handle that when I need to jump out of it?
-	//Define stuff
-	Socket    sock = { 1/*Start a server*/, "localhost", "tcp", .port = port };
-	Selector  sel  = {
-		.read_min   = 12, 
-		.write_min  = 12, 
-		.max_events = 1000, 
-		.global_ud  = pt,
-		.lsize      = sizeof(HTTP),
-		.recv_retry = 10, 
-		.send_retry = 10, 
-		.errors     = _nw_errors,
-		.runners    = etc, 
-		.run_limit  = 3, /*No more than 3 seconds per client*/
+	//Allocate a big buffer and do work
+	int progress = 0;
+	char *buf = malloc( 6 );
+	const char *names[] = { "Headers", "GET", "POST" };
+	struct HTTPRecord **t[] = { rq->headers, rq->url, rq->body };
+	char sbuf[ 4096 ];
+	memset( sbuf, 0, sizeof( sbuf ) );
 
-		.pre = http_pre,
-		.post = http_post
-	};
+	//Reallocate a buffer
+	int suplen = snprintf( sbuf, sizeof(sbuf)-1, "<h2>URL</h2>\n%s<br>\n", rq->path );
+	if ( ( buf = realloc( buf, suplen ) ) == NULL ) {
+		write( fd, http_500_fixed, strlen( http_500_fixed ) );
+		close( fd );
+		return 0;
+	}
 
-	//Fork the children
-	if ( daemonize ) {
+	//Add the URL (paths should never be more than 2048, but ensure this before write)
+	memcpy( &buf[ progress ], sbuf, suplen );
+	progress += suplen;
+
+	//Loop through all three...
+	for ( int i=0; i < sizeof(t)/sizeof(struct HTTPRecord **); i++ ) {
+		
+		//Define stuff
+		struct HTTPRecord **w = t[i];
+		char *endstr = ( *w ) ? "\n" : "\n-<br>\n";
+		memset( sbuf, 0, sizeof(sbuf) );
+		suplen = snprintf( sbuf, sizeof(sbuf)-1, "<h2>%s</h2>%s", names[i], endstr );
+
+		//Reallocate a buffer
+		if ( ( buf = realloc( buf, suplen + progress ) ) == NULL ) {
+			write( fd, http_500_fixed, strlen( http_500_fixed ) );
+			close( fd );
+			return 0;
+		}
+
+		//Write the title out
+		memset( &buf[ progress ], 0, suplen );
+		memcpy( &buf[ progress ], sbuf, suplen );
+		progress += suplen;
+
+		//Now go through the rest
+		while ( *w ) {
+			struct HTTPRecord *r = *w;	
+			int fieldLen = strlen( r->field );
+			//Allocate enough for fields and length of strings: ' => ', '<br>', '\n' & '\0'
+			int newSize = fieldLen + r->size + 10; 
+			//Return early on lack of memory...
+			if ( ( buf = realloc( buf, newSize + progress ) ) == NULL ) {
+				write( fd, http_500_fixed, strlen(http_500_fixed) );
+				close( fd );
+				return 0;
+			}
+
+			//Initialize the new memory
+			memset( &buf[ progress ], 0, newSize );
+
+			//Go through and copy everything else.
+			memcpy( &buf[ progress ], r->field, fieldLen );
+			progress += fieldLen;
+			memcpy( &buf[ progress ], " => ", 4 );
+			progress += 4;
+			memcpy( &buf[ progress ], r->value, r->size ); 
+			progress += r->size;
+			memcpy( &buf[ progress ], "<br>\n", 5 ); 
+			progress += 5;
+			w++;
+		}
+	}
+
+	//Get the length of the format string and allocate enough for buffer and thing
+	int sendLen = strlen( http_200_custom ) + 6 + progress; //get the length of number 
+	int actualLen = 0, written = 0;
+	char *sendBuf = malloc( sendLen );	
+	memset( sendBuf, 0, sendLen );
+	written = snprintf( sendBuf, sendLen,	http_200_custom, progress );
+	memcpy( &sendBuf[ written ], buf, progress );
+	actualLen = written + progress;
+
+	//Send the message to server, and see if it's read or not...
+	if ( write( fd, sendBuf, actualLen ) == -1 ) {
+		fprintf(stderr, "Couldn't write all of message..." );
+		close(fd);
+		return 0;
+	}
+
+	return 0;
+}
+
+
+//Write
+int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+	//if ( 1 ) write( 2, rq->msg, rq->mlen );
+	int sent = 0;
+	int total = rs->mlen;
+	int pos = 0;
+	int try = 0;
+
+	while ( 1 ) { 
+		if (( sent = send( fd, &rs->msg[ pos ], total, MSG_DONTWAIT )) == -1 ) {
+			if ( errno == EBADF )
+				0; //TODO: Can't close a most-likely closed socket.  What do you do?
+			else if ( errno == ECONNREFUSED )
+				close(fd);
+			else if ( errno == EFAULT )
+				close(fd);
+			else if ( errno == EINTR )
+				close(fd);
+			else if ( errno == EINVAL )
+				close(fd);
+			else if ( errno == ENOMEM )
+				close(fd);
+			else if ( errno == ENOTCONN )
+				close(fd);
+			else if ( errno == ENOTSOCK )
+				close(fd);
+			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				if ( ++try == 2 ) {
+				 #ifdef HTTP_VERBOSE
+					fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
+				 #endif
+					fprintf(stderr, "rs->mlen: %d\n", rs->mlen );
+					//rq->msg = buf;
+					break;
+				}
+			 #ifdef HTTP_VERBOSE
+				fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
+			 #endif
+			}
+			else {
+				//this would just be some uncaught condition...
+			}
+		}
+		else if ( sent == 0 ) {
+
+		}
+		else {
+			//continue resending...
+			pos += sent;
+			total -= sent;	
+		}
+	}
+	return 0;
+}
+
+
+#if 0
+//Return the total bytes read.
+int read_from_socket ( int fd, uint8_t **b, void (*readMore)(int *, void *) ) {
+	return 0;
+	int mult = 0;
+	int try=0;
+	int mlen = 0;
+	const int size = 32767;	
+	uint8_t *buf = malloc( 1 );
+
+	//Read first
+	while ( 1 ) {
+		int rd=0;
+		int bfsize = size * (++mult); 
+		unsigned char buf2[ size ]; 
+		memset( buf2, 0, size );
+
+		//read into new buffer
+		//if (( rd = read( fd, &buf[ rq->mlen ], size )) == -1 ) {
+		//TODO: Yay!  This works great on Arch!  But let's see what about Win, OSX and BSD
+		if (( rd = recv( fd, buf2, size, MSG_DONTWAIT )) == -1 ) {
+			//A subsequent call will tell us a lot...
+			fprintf(stderr, "Couldn't read all of message...\n" );
+			//whatsockerr(errno);
+			if ( errno == EBADF )
+				0; //TODO: Can't close a most-likely closed socket.  What do you do?
+			else if ( errno == ECONNREFUSED )
+				close(fd);
+			else if ( errno == EFAULT )
+				close(fd);
+			else if ( errno == EINTR )
+				close(fd);
+			else if ( errno == EINVAL )
+				close(fd);
+			else if ( errno == ENOMEM )
+				close(fd);
+			else if ( errno == ENOTCONN )
+				close(fd);
+			else if ( errno == ENOTSOCK )
+				close(fd);
+			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				if ( ++try == 2 ) {
+				 #ifdef HTTP_VERBOSE
+					fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
+				 #endif
+					fprintf(stderr, "mlen: %d\n", mlen );
+					//fprintf(stderr, "%p\n", buf );
+					//rq->msg = buf;
+					break;
+			}
+			 #ifdef HTTP_VERBOSE
+				fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
+			 #endif
+			}
+			else {
+				//this would just be some uncaught condition...
+				fprintf(stderr, "Uncaught condition at read!\n" );
+				return 0;
+			}
+		}
+		else if ( rd == 0 ) {
+			//will a zero ALWAYS be returned?
+			//rq->msg = buf;
+			break;
+		}
+		else {
+			//realloc manually and read
+			if (( b = realloc( b, bfsize )) == NULL ) {
+				fprintf(stderr, "Couldn't allocate buffer..." );
+				close(fd);
+				return 0;
+			}
+
+			//Copy new data and increment bytes read
+			memset( &b[ bfsize - size ], 0, size ); 
+			fprintf(stderr, "pos: %d\n", bfsize - size );
+			memcpy( &b[ bfsize - size ], buf2, rd ); 
+			mlen += rd;
+			//rq->msg = buf; //TODO: You keep resetting this, only needs to be done once...
+
+			//show read progress and data received, etc.
+			if ( 1 ) {
+				fprintf( stderr, "Recvd %d bytes on fd %d\n", rd, fd ); 
+			}
+		}
+	}
+
+	return mlen;
+}
+#endif
+
+
+int write_to_socket ( int fd, uint8_t *b ) {
+	return 0;
+}
+
+int sread_from_socket ( int fd, uint8_t *b ) {
+	return 0;
+}
+
+int swrite_to_socket ( int fd, uint8_t *b ) {
+	return 0;
+}
+
+
+int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
+
+	//Read all the data from a socket.
+	unsigned char *buf = malloc( 1 );
+	int mult = 0;
+	int try=0;
+	const int size = 32767;	
+
+	//Read first
+	while ( 1 ) {
+		int rd=0;
+		int bfsize = size * (++mult); 
+		unsigned char buf2[ size ]; 
+		memset( buf2, 0, size );
+
+		//Read functions...
+		if ( !sess )
+			rd = recv( fd, buf2, size, MSG_DONTWAIT );
+		else {
+			gnutls_session_t *ss = (gnutls_session_t *)sess;
+			rd = gnutls_record_recv( *ss, buf2, size );
+			if ( rd > 0 ) 
+				fprintf(stderr, "SSL might be fine... got %d from gnutls_record_recv\n", rd );
+			else if ( rd == GNUTLS_E_REHANDSHAKE ) {
+				fprintf(stderr, "SSL got handshake reauth request..." );
+				//TODO: There should be a seperate function that handles this.
+				//It's a fail for now...	
+				return 0;
+			}
+			else if ( rd == GNUTLS_E_INTERRUPTED || rd == GNUTLS_E_AGAIN ) {
+				fprintf(stderr, "SSL was interrupted...  Try request again...\n" );
+				continue;
+			}
+			else {
+				fprintf(stderr, "SSL got error code: %d, meaning '%s'.\n", rd, gnutls_strerror( rd ) );
+				continue;
+			}
+		}
+
+		//read into new buffer
+		//TODO: Yay!  This works great on Arch!  But let's see what about Win, OSX and BSD
+		if ( rd == -1 ) {
+			//A subsequent call will tell us a lot...
+			fprintf(stderr, "Couldn't read all of message...\n" );
+			whatsockerr( errno );
+			if ( 0 )
+				0;
+			//ssl stuff has to go first...
+			else if ( errno == EBADF )
+				0; //TODO: Can't close a most-likely closed socket.  What do you do?
+			else if ( errno == ECONNREFUSED )
+				close(fd);
+			else if ( errno == EFAULT )
+				close(fd);
+			else if ( errno == EINTR )
+				close(fd);
+			else if ( errno == EINVAL )
+				close(fd);
+			else if ( errno == ENOMEM )
+				close(fd);
+			else if ( errno == ENOTCONN )
+				close(fd);
+			else if ( errno == ENOTSOCK )
+				close(fd);
+			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				if ( ++try == 2 ) {
+				 #ifdef HTTP_VERBOSE
+					fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
+				 #endif
+					fprintf(stderr, "rq->mlen: %d\n", rq->mlen );
+					fprintf(stderr, "%p\n", buf );
+					//rq->msg = buf;
+					break;
+			}
+			 #ifdef HTTP_VERBOSE
+				fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
+			 #endif
+			}
+			else {
+				//this would just be some uncaught condition...
+			}
+		}
+		else if ( rd == 0 ) {
+			//will a zero ALWAYS be returned?
+			rq->msg = buf;
+			break;
+		}
+	#if 0
+		else if ( rd == GNUTLS_E_REHANDSHAKE ) {
+			fprintf(stderr, "SSL got handshake reauth request..." );
+			continue;
+		}
+		else if ( rd == GNUTLS_E_INTERRUPTED || rd == GNUTLS_E_AGAIN ) {
+			fprintf(stderr, "SSL was interrupted...  Try request again...\n" );
+			continue;
+		}
+	#endif
+		else {
+			//realloc manually and read
+			if ((buf = realloc( buf, bfsize )) == NULL ) {
+				fprintf(stderr, "Couldn't allocate buffer..." );
+				close(fd);
+				return 0;
+			}
+
+			//Copy new data and increment bytes read
+			memset( &buf[ bfsize - size ], 0, size ); 
+			fprintf(stderr, "buf: %p\n", buf );
+			fprintf(stderr, "buf2: %p\n", buf2 );
+			fprintf(stderr, "pos: %d\n", bfsize - size );
+			memcpy( &buf[ bfsize - size ], buf2, rd ); 
+			rq->mlen += rd;
+			rq->msg = buf; //TODO: You keep resetting this, only needs to be done once...
+
+			//show read progress and data received, etc.
+			if ( 1 ) {
+				fprintf( stderr, "Recvd %d bytes on fd %d\n", rd, fd ); 
+			}
+		}
+	}
+
+	//Prepare the rest of the request
+	char *header = (char *)rq->msg;
+	int pLen = memchrat( rq->msg, '\n', rq->mlen ) - 1;
+	const int flLen = pLen + strlen( "\r\n" );
+	int hdLen = memstrat( rq->msg, "\r\n\r\n", rq->mlen );
+
+	//Initialize the remainder of variables 
+	rq->headers = NULL;
+	rq->body = NULL;
+	rq->url = NULL;
+	rq->method = get_lstr( &header, ' ', &pLen );
+	rq->path = get_lstr( &header, ' ', &pLen );
+	rq->protocol = get_lstr( &header, ' ', &pLen ); 
+	rq->hlen = hdLen; 
+	rq->host = msg_get_value( "Host: ", "\r", rq->msg, hdLen );
+
+	//The protocol parsing can happen here...
+	if ( strcmp( rq->method, "HEAD" ) == 0 )
+		;
+	else if ( strcmp( rq->method, "GET" ) == 0 )
+		;
+	else if ( strcmp( rq->method, "POST" ) == 0 ) {
+		rq->clen = safeatoi( msg_get_value( "Content-Length: ", "\r", rq->msg, hdLen ) );
+		rq->ctype = msg_get_value( "Content-Type: ", ";\r", rq->msg, hdLen );
+		rq->boundary = msg_get_value( "boundary=", "\r", rq->msg, hdLen );
+		//rq->mlen = hdLen; 
+		//If clen is -1, ... hmmm.  At some point, I still need to do the rest of the work. 
+	}
+
+	if ( 0 )  {
+		print_httpbody( rq );	
+	}
+
+	//Define records for each type here...
+	//struct HTTPRecord **url=NULL, **headers=NULL, **body=NULL;
+	int len = 0;
+	Mem set;
+	memset( &set, 0, sizeof( Mem ) );
+
+	//Always process the URL (specifically GET vars)
+	if ( strlen( rq->path ) == 1 ) {
+		ADDITEM( NULL, struct HTTPRecord, rq->url, len, 0 );
+	}
+	else {
+		int index = 0;
+		while ( strwalk( &set, rq->path, "?&" ) ) {
+			uint8_t *t = (uint8_t *)&rq->path[ set.pos ];
+			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
+			memset( b, 0, sizeof( struct HTTPRecord ) );
+			int at = memchrat( t, '=', set.size );
+			if ( !b || at == -1 || !set.size ) 
+				;
+			else {
+				int klen = at;
+				b->field = copystr( t, klen );
+				klen += 1, t += klen, set.size -= klen;
+				b->value = t;
+				b->size = set.size;
+				ADDITEM( b, struct HTTPRecord, rq->url, len, 0 );
+			}
+		}
+		ADDITEM( NULL, struct HTTPRecord, rq->url, len, 0 );
+	}
+
+
+	//Always process the headers
+	memset( &set, 0, sizeof( Mem ) );
+	len = 0;
+	uint8_t *h = &rq->msg[ flLen - 1 ];
+	while ( memwalk( &set, h, (uint8_t *)"\r", rq->hlen, 1 ) ) {
+		//Break on newline, and extract the _first_ ':'
+		uint8_t *t = &h[ set.pos - 1 ];
+		if ( *t == '\r' ) {  
+			int at = memchrat( t, ':', set.size );
+			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
+			memset( b, 0, sizeof( struct HTTPRecord ) );
+			if ( !b || at == -1 || at > 127 )
+				;
+			else {
+				at -= 2, t += 2;
+				b->field = copystr( t, at );
+				at += 2 /*Increment to get past ': '*/, t += at, set.size -= at;
+				b->value = t;
+				b->size = set.size - 1;
+			#if 0
+				DUMP_RIGHT( b->value, b->size );
+			#endif
+				ADDITEM( b, struct HTTPRecord, rq->headers, len, 0 );
+			}
+		}
+	}
+	ADDITEM( NULL, struct HTTPRecord, rq->headers, len, 0 );
+
+	//Always process the body 
+	memset( &set, 0, sizeof( Mem ) );
+	len = 0;
+	uint8_t *p = &rq->msg[ rq->hlen + strlen( "\r\n" ) ];
+	int plen = rq->mlen - rq->hlen;
+	
+	//TODO: If this is a xfer-encoding chunked msg, rq->clen needs to get filled in when done.
+	if ( strcmp( "POST", rq->method ) != 0 ) {
+		ADDITEM( NULL, struct HTTPRecord, rq->body, len, 0 );
+	}
+	else {
+		struct HTTPRecord *b = NULL;
+		#if 0
+		DUMP_RIGHT( p, rq->mlen - rq->hlen ); 
+		#endif
+		//TODO: Bitmasking is 1% more efficient, go for it.
+		int name=0, value=0, index=0;
+
+		//url encoded is a little bit different.  no real reason to use the same code...
+		if ( strcmp( rq->ctype, "application/x-www-form-urlencoded" ) == 0 ) {
+			//NOTE: clen is up by two to assist our little tokenizer...
+			while ( memwalk( &set, p, (uint8_t *)"\n=&", rq->clen + 2, 3 ) ) {
+				uint8_t *m = &p[ set.pos - 1 ];  
+				if ( *m == '\n' || *m == '&' ) {
+					b = malloc( sizeof( struct HTTPRecord ) );
+					memset( b, 0, sizeof( struct HTTPRecord ) ); 
+					//TODO: Should be checking that allocation was successful
+					b->field = copystr( ++m, set.size );
+				}
+				else if ( *m == '=' ) {
+					b->value = ++m;
+					b->size = set.size;
+					ADDITEM( b, struct HTTPRecord, rq->body, len, 0 );
+					b = NULL;
+				}
+			}
+		}
+		else {
+			while ( memwalk( &set, p, (uint8_t *)"\r:=;", rq->clen, 4 ) ) {
+				//TODO: If we're being technical, set.pos - 1 can point to a negative index.  
+				//However, as long as headers were sent (and 99.99999999% of the time they will be)
+				//this negative index will point to valid allocated memory...
+				uint8_t *m = &p[ set.pos - 1 ];  
+				if ( memcmp( m, "; name=", 7 ) == 0 )
+					name = 1;
+				//"\r\n\r\n"
+				else if ( memcmp( m, "\r\n\r\n", 4 ) == 0 && !value )
+					value = 1;
+				else if ( memcmp( m, "\r\n-", 3 ) == 0 && !value ) {
+					b = malloc( sizeof( struct HTTPRecord ) );
+					memset( b, 0, sizeof( struct HTTPRecord ) ); 
+				}
+				else if ( memcmp( m, "\r\n", 2 ) == 0 && value == 1 ) {
+					m += 2;
+					b->value = m;//++t;
+					b->size = set.size - 1;
+					ADDITEM( b, struct HTTPRecord, rq->body, len, 0 );
+					value = 0;
+					b = NULL;
+				}
+				else if ( *m == '=' && name == 1 ) {
+					//fprintf( stderr, "copying name field... pass %d\n", ++index );
+					int size = *(m + 1) == '"' ? set.size - 2 : set.size;
+				#if 1
+					m += ( *(m + 1) == '"' ) ? 2 : 1 ;
+				#else
+					int ptrinc = *(m + 1) == '"' ? 2 : 1;
+					m += ptrinc;
+				#endif
+					b->field = copystr( m, size );
+					name = 0;
+				}
+			}
+		}
+
+		//Add a terminator element
+		ADDITEM( NULL, struct HTTPRecord, rq->body, len, 0 );
+		//This MAY help in handling malformed messages...
+		( b && (!b->field || !b->value) ) ? free( b ) : 0;
+
+		if ( 0 ) {
+			fprintf( stderr, "BODY got:\n" );
+			print_httprecords( rq->body );
+		}
+	}
+
+	//for testing, this should stay here...
+	//close(fd);
+	return 0;
+}
+
+
+int ssl_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
+	//write (write all the data in one call if you fork like this) 
+	if ( write( fd, http_200_fixed, strlen(http_200_fixed)) == -1 ) {
+		fprintf(stderr, "Couldn't write all of message..." );
+		close(fd);
+		return 0;
+	}
+
+	return 0;
+}
+
+
+//read (reads a message)
+int ssl_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
+	//read (read all the data in one call if you fork like this)
+	const int size = 100000;
+	unsigned char *rqb = malloc( size );
+	memset( rqb, 0, size );	
+	if (( rq->mlen = read( fd, rqb, size )) == -1 ) {
+		fprintf(stderr, "Couldn't read all of message...\n" );
+		close(fd);
+		return 0;
+	}
+
+	return 0;
+}
+
+
+struct senderrecvr { 
+	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
+	int (*proc)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	int (*write)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	int (*pre)( int, struct HTTPBody *, struct HTTPBody *, void * );
+	int (*post)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	void *readf;
+	void *writef;
+} sr[] = {
+	{ h_read, /*proc_echo*/ h_proc, h_write }
+, { t_read, NULL, t_write  }
+,	{ NULL }
+};
+
+
+
+int main (int argc, char *argv[]) {
+	struct values {
+		int port;
+		int ssl;
+		int start;
+		int kill;
+		int fork;
+		char *user;
+	} values = { 0 };
+
+	//Process all your options...
+	if ( argc < 2 ) {
+		fprintf( stderr, "No options received.\n" );
+		const char *fmt = "  --%-10s       %-30s\n";
+		fprintf( stderr, fmt, "start", "start new servers" );
+		fprintf( stderr, fmt, "kill", "test killing a server" );
+		fprintf( stderr, fmt, "fork", "daemonize the server" );
+		fprintf( stderr, fmt, "port <arg>", "set a differnt port" );
+		fprintf( stderr, fmt, "ssl", "use ssl or not.." );
+		fprintf( stderr, fmt, "user <arg>", "choose a user to start as" );
+		return 0;	
+	}	
+	else {
+		while ( *argv ) {
+			if ( strcmp( *argv, "--start" ) == 0 ) 
+				values.start = 1;
+			else if ( strcmp( *argv, "--kill" ) == 0 ) 
+				values.kill = 1;
+			else if ( strcmp( *argv, "--ssl" ) == 0 ) 
+				values.ssl = 1;
+			else if ( strcmp( *argv, "--daemonize" ) == 0 ) 
+				values.fork = 1;
+			else if ( strcmp( *argv, "--port" ) == 0 ) {
+				argv++;
+				if ( !*argv ) {
+					fprintf( stderr, "Expected argument for --port!" );
+					return 0;
+				} 
+				values.port = atoi( *argv );
+			}
+			else if ( strcmp( *argv, "--user" ) == 0 ) {
+				argv++;
+				if ( !*argv ) {
+					fprintf( stderr, "Expected argument for --user!" );
+					return 0;
+				} 
+				values.user = strdup( *argv );
+			}
+			argv++;
+		}
+	}	
+
+	if ( 1 ) {
+		const char *fmt = "%-10s: %s\n";
+		fprintf( stderr, "Invoked with options:\n" );
+		fprintf( stderr, "%10s: %d\n", "start", values.start );	
+		fprintf( stderr, "%10s: %d\n", "kill", values.kill );	
+		fprintf( stderr, "%10s: %d\n", "port", values.port );	
+		fprintf( stderr, "%10s: %d\n", "fork", values.fork );	
+		fprintf( stderr, "%10s: %s\n", "user", values.user );	
+		fprintf( stderr, "%10s: %s\n", "ssl", values.ssl ? "true" : "false" );	
+	}
+
+
+	//Set all of the socket stuff
+	const int defport = 2000;
+	struct sockAbstr su;
+	su.addrsize = sizeof(struct sockaddr);
+	su.buffersize = 1024;
+	su.opened = 0;
+	su.backlog = 500;
+	su.waittime = 5000;
+	su.protocol = IPPROTO_TCP;
+	su.socktype = SOCK_STREAM;
+	//su.protocol = IPPROTO_UDP;
+	//su.sockettype = SOCK_DGRAM;
+	su.iptype = PF_INET;
+	su.reuse = SO_REUSEADDR;
+	su.port = !values.port ? (int *)&defport : &values.port;
+	su.ssl_ctx = NULL;
+
+	if ( 1 ) {
+		const char *fmt = "%-10s: %s\n";
+		FILE *e = stderr;
+		fprintf( e, "Socket opened with options:\n" );
+		fprintf( e, "%10s: %d\n", "addrsize", su.addrsize );	
+		fprintf( e, "%10s: %d\n", "buffersize", su.buffersize );	
+		fprintf( e, "%10s: %d connections\n", "backlog", su.backlog );	
+		fprintf( e, "%10s: %d microseconds\n", "waittime", su.waittime );	
+		fprintf( e, "%10s: %s\n", "protocol", su.protocol == IPPROTO_TCP ? "tcp" : "udp" );	
+		fprintf( e, "%10s: %s\n", "socktype", su.socktype == SOCK_STREAM ? "stream" : "datagram" );	 
+		fprintf( e, "%10s: %s\n", "IPv6?", su.iptype == PF_INET ? "no" : "yes" );	
+		fprintf( e, "%10s: %d\n", "port", *su.port );	
+		//How to dump all the socket info?
+	}
+
+	//Create the socket body
+	struct sockaddr_in t;
+	memset( &t, 0, sizeof( struct sockaddr_in ) );
+	struct sockaddr_in *sa = &t;
+	sa->sin_family = su.iptype; 
+	sa->sin_port = htons( *su.port );
+	(&sa->sin_addr)->s_addr = htonl( INADDR_ANY );
+
+	//Open the socket (non-blocking, preferably)
+	int status;
+	if (( su.fd = socket( su.iptype, su.socktype, su.protocol )) == -1 ) {
+		fprintf( stderr, "Couldn't open socket! Error: %s\n", strerror( errno ) );
+		return 0;
+	}
+
+	#if 0
+	//Set timeout, reusable bit and any other options 
+	struct timespec to = { .tv_sec = 2 };
+	if (setsockopt(su.fd, SOL_SOCKET, SO_REUSEADDR, &to, sizeof(to)) == -1) {
+		// su.free(sock);
+		su.err = errno;
+		return (0, "Could not reopen socket.");
+	}
+	#endif
+	if ( fcntl( su.fd, F_SETFD, O_NONBLOCK ) == -1 ) {
+		fprintf( stderr, "fcntl error: %s\n", strerror(errno) ); 
+		return 0;
+	}
+
+	if (( status = bind( su.fd, (struct sockaddr *)&t, sizeof(struct sockaddr_in))) == -1 ) {
+		fprintf( stderr, "Couldn't bind socket to address! Error: %s\n", strerror( errno ) );
+		return 0;
+	}
+
+	if (( status = listen( su.fd, su.backlog) ) == -1 ) {
+		fprintf( stderr, "Couldn't listen for connections! Error: %s\n", strerror( errno ) );
+		return 0;
+	}
+
+	//Mark open flag.
+	su.opened = 1;
+
+	//Handle SSL here
+	#if 1 
+	gnutls_certificate_credentials_t x509_cred = NULL;
+  gnutls_priority_t priority_cache;
+	const char *cafile, *crlfile, *certfile, *keyfile;
+	#if 0
+	cafile = 
+	crlfile = 
+	#endif
+	#if 0
+	//These should always be loaded, and there will almost always be a series
+	certfile = 
+	keyfile = 
+	#else
+#define MPATH "/home/ramar/prj/hypno/certs/collinsdesign.net"
+	//Hardcode these for now.
+	certfile = MPATH "/collinsdesign_net.crt";
+	keyfile = MPATH "/server.key";
+	#endif
+	//Obviously, this is great for debugging TLS errors...
+	//gnutls_global_set_log_function( tls_log_func );
+	gnutls_global_init();
+	gnutls_certificate_allocate_credentials( &x509_cred );
+	//find the certificate authority to use
+	//gnutls_certificate_set_x509_trust_file( x509_cred, cafile, GNUTLS_X509_FMT_PEM );
+	//is this for password-protected cert files? I'm so lost...
+	//gnutls_certificate_set_x509_crl_file( x509_cred, crlfile, GNUTLS_X509_FMT_PEM );
+	//this ought to work with server.key and certfile
+	gnutls_certificate_set_x509_key_file( x509_cred, certfile, keyfile, GNUTLS_X509_FMT_PEM );
+	//gnutls_certificate_set_ocsp_status_request( x509_cred, OCSP_STATUS_FiLE, 0 );
+	gnutls_priority_init( &priority_cache, NULL, NULL );
+	#endif
+
+	//If I could open a socket and listen successfully, then write the PID
+	#if 0
+	if ( values.fork ) {
 		pid_t pid = fork();
 		if ( pid == -1 ) {
-			return ERRL( "Failed to daemonize server process: %s", strerror(errno) );
+			fprintf( stderr, "Failed to daemonize server process: %s", strerror(errno) );
+			return 0;
+		}
+		else if ( !pid ) {
+			//Close the parent?
+			return 0;
 		}
 		else if ( pid ) {
 			int len, fd = 0;
@@ -818,110 +996,129 @@ int start_cmd( Option *opts, char *err, Passthru *pt ) {
 			return SUC_PARENT;
 		}
 	}
-
-	//Open the socket
-	if ( !socket_open(&sock) || !socket_bind(&sock) || !socket_listen(&sock) )
-		return ERRL("Failed to initialize a socket for port %d", port );
-
-	//Initialize details for a non-blocking server loop
-	if ( !initialize_selector(&sel, &sock) ) //&l, local_index))
-		return ERRL("Failed to initialize server settings" );
-
-	//Dump some data
-	obprintf(stderr, "Listening at %s:%d\n", sock.hostname, sock.port);
-
-	//Start the non-blocking server loop
-	if ( !activate_selector(&sel) )
-		return ERRL("Failure to properly initialize server select loop" );
-	
-	//Clean up and tear down.
-	free_selector(&sel);
-	return 1; //SUC_CHILD
-}
-
-
-//Command loop
-struct Cmd
-{
-	const char *cmd;
-	int (*exec)( Option *, char *, Passthru *pt );
-} Cmds[] = {
-	{ "--kill"     , kill_cmd  }
- ,{ "--file"     , file_cmd  }
- ,{ "--start"    , start_cmd }
- ,{ NULL         , NULL      }
-};
-
-
-//Options
-Option opts[] = {
-	{ "-s", "--start"    , "Start a server." },
-	{ "-k", "--kill",      "Kill a running server." },
-#if 0
-	{ "-c", "--create",    "Create a new directory for hypno site.",'s' },	
-	{ "-l", "--list",      "List all hypno sites on the system.",'s' },	
-	//...
-	{ "-d", "--dir",       "Choose this directory for serving web apps.",'s' },
-	{ "-c", "--config",    "Use an alternate file for configuration.",'s' },	
-	//I'm just thinking out loud here.
-	{ "-u", "--user",      "Choose who to run as.",'s' },
-	{ "-m", "--mode",      "Choose how server should evaluate hostnames.",'s' },
-	{ NULL, "--chroot-dir","Choose a directory to change root to.",     's' },
-#endif
-	{ "-d", "--dir",       "Serve just one specific directory.",'s' },
-	{ "-f", "--file",      "Try running a file and seeing its results.",'s' },
-	{ "-m", "--max-conn",  "How many connections to enable at a time.", 'n' },
-	{ "-n", "--no-daemon", "Do not daemonize the server when starting."  },
-	{ "-p", "--port"    ,  "Choose port to start server on."          , 'n' },
-
-	{ .sentinel = 1 }
-};
-
-
-//Server loop
-int main (int argc, char *argv[]) {
-	//Values
-	(argc < 2) ? opt_usage(opts, argv[0], "nothing to do.", 0) : opt_eval(opts, argc, argv);
-
-	//Allocate user data here
-	Passthru *pt = malloc( sizeof(Passthru ) );
-	memset( pt, 0, sizeof(Passthru) );
-
-	//Set things
-	if ( !opt_set( opts, "--dir" ) ) {
-		pt->singleDir = 1; 
-		pt->webroot = default_dirname;
-	}
-	else {
-		//check that dir exists and can be touched
-		struct stat check;
-		pt->webroot = opt_get( opts, "--dir" ).s;
-
-		if ( !pt->webroot || *pt->webroot == 0 || strlen( pt->webroot ) == 0 ) {
-			fprintf( stderr, PROG ": %s\n", "Invalid directory specified." );
-			return 1;
-		}
-
-		if ( stat( pt->webroot, &check ) == -1 ) { 
-			fprintf( stderr, PROG ": %s\n", strerror( errno ) );
-			return 1;
-		}
-	}
-
-	//Evaluate all main stuff by looping through the above structure.
-	struct Cmd *cmd = Cmds;	
-	while ( cmd->cmd ) {
-	#ifdef TESTOPTS_H
-		fprintf( stderr, "Got option: %s? %s\n", cmd->cmd, opt_set(opts, cmd->cmd ) ? "YES" : "NO" );
 	#endif
-		if ( opt_set(opts, cmd->cmd ) && !cmd->exec( opts, err, pt ) ) {
-			fprintf( stderr, PROG ": %s\n", err );
-			return 1;
+
+
+	//Let's start the accept loop here...
+	for ( ;; ) {
+		//Client address and length?
+		struct sockaddr addrinfo;	
+		socklen_t addrlen = sizeof (struct sockaddr);	
+		int fd;	
+
+		//Accept a connection if possible...
+		if (( fd = accept( su.fd, &addrinfo, &addrlen )) == -1 ) {
+			//TODO: Need to check if the socket was non-blocking or not...
+			if ( 0 )
+				; 
+			else {
+				fprintf( stderr, "Accept ran into trouble: %s\n", strerror( errno ) );
+				continue;
+			}
 		}
-		cmd++;
+#if 0
+		//Make the new socket non-blocking too...
+		if ( fcntl( fd, F_SETFD, O_NONBLOCK ) == -1 ) {
+			fprintf( stderr, "fcntl error at child socket: %s\n", strerror(errno) ); 
+			return 0;
+		}
+#endif
+
+		//Dump the client info and the child fd
+		if ( 1 ) {
+			struct sockaddr_in *cin = (struct sockaddr_in *)&addrinfo;
+			char *ip = inet_ntoa( cin->sin_addr );
+			fprintf( stderr, "Got request from: %s on new file: %d\n", ip, fd );	
+		}
+
+		//Fork and go crazy
+		pid_t cpid = fork();
+		if ( cpid == -1 ) {
+			//TODO: There is most likely a reason this didn't work.
+			fprintf( stderr, "Failed to setup new child connection. %s\n", strerror(errno) );
+		}
+		else if ( cpid == 0 ) {
+			//TODO: The parent should probably log some important info here.	
+			fprintf(stderr, "in parent...\n" );
+			//Close the file descriptor here?
+			if ( close( fd ) == -1 ) {
+				fprintf( stderr, "Parent couldn't close socket." );
+			}
+		}
+		else if ( cpid ) {
+			//TODO: Somewhere in here, a signal needs to run that allows this thing to die.
+			//TODO: Handle read and write errno cases 
+			#if 1
+			//SSL again
+			gnutls_session_t session, *sptr = NULL;
+			if ( values.ssl ) {
+				gnutls_init( &session, GNUTLS_SERVER );
+				gnutls_priority_set( session, priority_cache );
+				gnutls_credentials_set( session, GNUTLS_CRD_CERTIFICATE, x509_cred );
+				//NOTE: I need to do this b/c clients aren't expected to send a certificate with their request
+				gnutls_certificate_server_set_request( session, GNUTLS_CERT_IGNORE ); 
+				gnutls_handshake_set_timeout( session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT ); 
+				//Bind the current file descriptor to GnuTLS instance.
+				gnutls_transport_set_int( session, fd );
+				//Do the handshake here
+				//TODO: I write nothing that looks like this, please refactor it...
+				int success = 0;
+				do {
+					success = gnutls_handshake( session );
+				} while ( success == GNUTLS_E_AGAIN || success == GNUTLS_E_INTERRUPTED );	
+				if ( success < 0 ) {
+					close( fd );
+					gnutls_deinit( session );
+					//TODO: Log all handshake failures.  Still don't know where.
+					fprintf( stderr, "%s\n", "SSL handshake failed." );
+					continue;
+				}
+				fprintf( stderr, "%s\n", "SSL handshake successful." );
+				sptr = &session;
+			}
+			#endif
+
+			//All the processing occurs here.
+			struct HTTPBody rq = { 0 }; 
+			struct HTTPBody rs = { 0 };
+			struct senderrecvr *f = &sr[ 0 ]; 
+#if 0
+			//TODO: This doesn't seem quite optimal, but I'm doing it.
+			struct SSLContext ssl = {
+				.read = gnutls_record_recv
+			, .write = gnutls_record_send
+			, .data = (void *)&rq
+			}; 
+#endif
+			//Read the message	
+			if (( status = f->read( fd, &rq, &rs, sptr )) == -1 ) {
+				//what to do with the response...
+			}
+
+			//Generate a new message	
+			if ( f->proc && ( status = f->proc( fd, &rq, &rs, NULL )) == -1 ) {
+				//...
+			}
+			
+			//Write a new message	
+			if (( status = f->write( fd, &rq, &rs, &session )) == -1 ) {
+				//...
+			}
+
+			if ( close( fd ) == -1 ) {
+				fprintf( stderr, "Couldn't close child socket. %s\n", strerror(errno) );
+				return 0;
+			}
+		}
+
 	}
 
-	free( pt );
+	//Close the server process.
+	if ( close( su.fd ) == -1 ) {
+		fprintf( stderr, "Couldn't close socket! Error: %s\n", strerror( errno ) );
+		return 0;
+	}
+
 	return 0;
 }
 
