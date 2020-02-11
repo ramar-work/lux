@@ -4,6 +4,8 @@
 
 #define obprintf(...)
 
+#define PRETTY_TABS( ct ) \
+	fprintf( stderr, "%s", &"                    "[ 20 - ct ] );
 
 //Loop through a table in memory
 void lua_loop ( lua_State *L ) {

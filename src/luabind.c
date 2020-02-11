@@ -17,6 +17,112 @@ void lua_loop ( lua_State *L ) {
 }
 
 
+//A better load file
+int lua_exec_string( lua_State *L, const char *str, char *err, int errlen ) {
+	int lerr = 0;
+	int len = 0;
+
+	if ( !str || strlen( str ) < 3 ) {
+		snprintf( err, errlen, "%s", "No Lua string supplied to load or execute." );
+		return 0;
+	}
+
+	//Load the string, execute
+	if (( lerr = luaL_loadstring( L, str )) != LUA_OK ) {
+		if ( lerr == LUA_ERRSYNTAX )
+			len = snprintf( err, errlen, "Syntax error: " );
+		else if ( lerr == LUA_ERRMEM )
+			len = snprintf( err, errlen, "Memory allocation error: " );
+		else if ( lerr == LUA_ERRGCMM )
+			len = snprintf( err, errlen, "GC meta-method error: " );
+		else {
+			len = snprintf( err, errlen, "Unknown error occurred: " );
+
+		}
+	
+		errlen -= len;	
+		snprintf( &err[ len ], errlen, "%s\n", (char *)lua_tostring( L, -1 ) );
+		//fprintf(stderr, "LUA LOAD ERROR: %s, %s", err, (char *)lua_tostring( L, -1 ) );
+		lua_pop( L, lua_gettop( L ) );
+		return 0;	
+	}
+
+	//Then execute
+	if (( lerr = lua_pcall( L, 0, LUA_MULTRET, 0 ) ) != LUA_OK ) {
+		if ( lerr == LUA_ERRRUN ) 
+			len = snprintf( err, errlen, "Runtime error: " );
+		else if ( lerr == LUA_ERRMEM ) 
+			len = snprintf( err, errlen, "Memory allocation error: " );
+		else if ( lerr == LUA_ERRERR ) 
+			len = snprintf( err, errlen, "Error while running message handler: " );
+		else if ( lerr == LUA_ERRGCMM ) {
+			len = snprintf( err, errlen, "Error while running __gc metamethod at: " );
+		}
+
+		errlen -= len;	
+		snprintf( &err[ len ], errlen, "%s\n", (char *)lua_tostring( L, -1 ) );
+		//fprintf(stderr, "LUA EXEC ERROR: %s, %s", err, (char *)lua_tostring( L, -1 ) );	
+		lua_pop( L, lua_gettop( L ) );
+		return 0;	
+	}
+	return 1;	
+}
+
+
+//A better load file
+int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
+	int lerr = 0;
+	int len = 0;
+
+	if ( !f || !strlen( f ) ) {
+		snprintf( err, errlen, "%s", "No filename supplied to load or execute." );
+		return 0;
+	}
+
+	//Load the string, execute
+	if (( lerr = luaL_loadfile( L, f )) != LUA_OK ) {
+		if ( lerr == LUA_ERRSYNTAX )
+			len = snprintf( err, errlen, "Syntax error at %s: ", f );
+		else if ( lerr == LUA_ERRMEM )
+			len = snprintf( err, errlen, "Memory allocation error at %s: ", f );
+		else if ( lerr == LUA_ERRGCMM )
+			len = snprintf( err, errlen, "GC meta-method error at %s: ", f );
+		else if ( lerr == LUA_ERRFILE )
+			len = snprintf( err, errlen, "File access error at %s: ", f );
+		else {
+			len = snprintf( err, errlen, "Unknown error occurred at %s: ", f );
+
+		}
+	
+		errlen -= len;	
+		snprintf( &err[ len ], errlen, "%s\n", (char *)lua_tostring( L, -1 ) );
+		//fprintf(stderr, "LUA LOAD ERROR: %s, %s", err, (char *)lua_tostring( L, -1 ) );
+		lua_pop( L, lua_gettop( L ) );
+		return 0;	
+	}
+
+	//Then execute
+	if (( lerr = lua_pcall( L, 0, LUA_MULTRET, 0 ) ) != LUA_OK ) {
+		if ( lerr == LUA_ERRRUN ) 
+			len = snprintf( err, errlen, "Runtime error when executing %s: ", f );
+		else if ( lerr == LUA_ERRMEM ) 
+			len = snprintf( err, errlen, "Memory allocation error at %s: ", f );
+		else if ( lerr == LUA_ERRERR ) 
+			len = snprintf( err, errlen, "Error while running message handler for %s: ", f );
+		else if ( lerr == LUA_ERRGCMM ) {
+			len = snprintf( err, errlen, "Error while running __gc metamethod at %s: ", f );
+		}
+
+		errlen -= len;	
+		snprintf( &err[ len ], errlen, "%s\n", (char *)lua_tostring( L, -1 ) );
+		//fprintf(stderr, "LUA EXEC ERROR: %s, %s", err, (char *)lua_tostring( L, -1 ) );	
+		lua_pop( L, lua_gettop( L ) );
+		return 0;	
+	}
+	return 1;	
+}
+
+
 void lua_dumptable ( lua_State *L, int *pos, int *sd ) {
 	lua_pushnil( L );
 	//fprintf( stderr, "*pos = %d\n", *pos );

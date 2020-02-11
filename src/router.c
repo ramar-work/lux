@@ -1,14 +1,7 @@
 //Compile me with: 
 //gcc -ldl -lpthread -o router vendor/single.o vendor/sqlite3.o router.c && ./router
-#include "vendor/single.h"
-
-#define ADDITEM(TPTR,SIZE,LIST,LEN) \
-	if (( LIST = realloc( LIST, sizeof( SIZE ) * ( LEN + 1 ) )) == NULL ) { \
-		fprintf (stderr, "Could not reallocate new rendering struct...\n" ); \
-		return NULL; \
-	} \
-	LIST[ LEN ] = TPTR; \
-	LEN++;
+#include "../vendor/single.h"
+#include "util.h"
 
 #define DUMPACTION( NUM ) \
 	( NUM == ACT_ID    ) ? "ACT_ID" : \
@@ -16,62 +9,6 @@
 	( NUM == ACT_SINGLE   ) ? "ACT_SINGLE" : \
 	( NUM == ACT_EITHER   ) ? "ACT_EITHER" : \
 	( NUM == ACT_RAW  ) ? "ACT_RAW" : "UNKNOWN" 
-
-//#define DDD
-#ifdef DDD
-#define FPRINTF(...) \
-	fprintf( stderr, "DEBUG: %s[%d]: ", __FILE__, __LINE__ ); \
-	fprintf( stderr, __VA_ARGS__ );
-#else
-#define FPRINTF(...)
-#endif
-
-//These are static routes
-const char *routes[] = {
-#if 1
-  "/"
-, "/route"
-, "/route/"
-, "/{route,julius}"
-, "/{route,julius}/:id"
-, "/route"
-, "/route/:id"
-, "/route/:id=string"
-, "/route/:id=number"
-, "/:id"
-, "/route/*"
-, "/route/*/jackpot"
-#endif
-#if 0
-, "/route/?"
-, "/route/?accharat"
-, "/route/??"
-, "/route/???"
-//Do I want to handle regular expressions?
-//, "/route/[^a-z]"
-#endif
-, NULL
-};
-
-//These are possible request lines
-const char *requests[] = {
-  "/"
-, "/2"
-, "/route"
-, "/route/3"
-, "/route/bashful"
-, "/route/bashful/jackpot"
-, "/route/333/jackpot"
-#if 0
-, "/julius/3"
-, "/3"
-, "/joseph/route/337"
-, "/route/337a"
-, "/route/3"
-#endif
-, NULL
-};
-
 
 //Return true on whatever resolved?
 int resolve ( const char *route, const char *uri ) {
@@ -117,9 +54,11 @@ int resolve ( const char *route, const char *uri ) {
 		struct element **list;
 		int listlen;
 		Mem r;
-	} urimaps[] = {
-		{ "Route", route, NULL, 0, 0 },
-		{ "URI", uri, NULL, 0, 0 },
+	}; 
+
+	struct urimap urimaps[] = {
+		{ "Route", route, NULL, 0, { 0 } },
+		{ "URI", uri, NULL, 0, { 0 } },
 	};
 
 
@@ -155,16 +94,16 @@ int resolve ( const char *route, const char *uri ) {
 				uint8_t *block = p + 1;
 				Mem pp;
 				memset( &pp, 0, sizeof(Mem) );
-				while ( memwalk( &pp, block, mb, map->r.size - 1, strlen(mb) ) ) {
+				while ( memwalk( &pp, block, (uint8_t *)mb, map->r.size - 1, strlen(mb) ) ) {
 					char buf[ 1024 ] = {0};
 					memcpy( buf, &block[ pp.pos ], pp.size );
-					ADDITEM( strdup( buf ), char *, e->string, e->len );
+					ADDITEM( strdup( buf ), char *, e->string, e->len, 0 );
 					if ( pp.chr == '}' ) {
 						break;
 					}
 				}
 				if ( e->len ) {
-					ADDITEM( NULL, char *, e->string, e->len );
+					ADDITEM( NULL, char *, e->string, e->len, 0 );
 				}
 				if ( e->len > 2 && e->type == ACT_ID ) {
 					//fprintf( stderr, "%s\n", e->string[1] ); getchar(); exit(0);
@@ -180,15 +119,15 @@ int resolve ( const char *route, const char *uri ) {
 				e->type = ACT_RAW;
 				char buf[ 1024 ] = {0};
 				memcpy( buf, p, map->r.size );
-				ADDITEM( strdup( buf ), char *, e->string, e->len );
+				ADDITEM( strdup( buf ), char *, e->string, e->len, 0 );
 			}
 
 			if ( e->type ) {
-				ADDITEM( e, struct element *, map->list, map->listlen ); 
+				ADDITEM( e, struct element *, map->list, map->listlen, 0 ); 
 			}
 		}
 
-		ADDITEM( NULL, struct element *, map->list, map->listlen ); 
+		ADDITEM( NULL, struct element *, map->list, map->listlen, 0 ); 
 #endif
 	}
 
@@ -250,7 +189,7 @@ int resolve ( const char *route, const char *uri ) {
 		else if ( action == ACT_ID ) {
 			FPRINTF( "len is: %d\n", (*elist)->len );
 			char *s = (*ilist)->string[0];				
-			char *n = (*elist)->mustbe == RE_STRING ? ALPHA : NUMS;
+			const char *n = (*elist)->mustbe == RE_STRING ? ALPHA : NUMS;
 			int nl = strlen( n );
 			if ( !s ) {
 				FPRINTF( "String passed to ID was empty.\n" );
@@ -293,18 +232,3 @@ int resolve ( const char *route, const char *uri ) {
 }
 
 
-int main (int argc, char *argv[]) {
-	//It can be from Lua too, I suppose, which ever is easier...
-	const char **routelist = routes;
-	//We simply want to know whether or not this engine will respond to the request list
-	while ( *routelist ) {
-		const char **requestList = requests;
-		fprintf( stderr,  "Checking against this URI: %s\n", *routelist );
-		while ( *requestList ) {
-			char *r = resolve( *routelist, *requestList ) ? "YES" : "NO";
-			fprintf( stderr, "%20s ?= %-30s: %s\n", *routelist, *requestList, r );
-			requestList++;
-		}
-		routelist++;
-	}
-}

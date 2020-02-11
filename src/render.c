@@ -21,34 +21,17 @@ Stuck on COMPLEX_EXTRACT.
 	- Generate full strings at the COMPLEX_EXTRACT part
 	- Full strings also have to be generated at LOOP_START
 
+//{{ # xxx }} - LOOP START
+//{{ / xxx }} - LOOP END 
+//{{ x     }} - SIMPLE EXTRACT
+//{{ .     }} - COMPLEX EXTRACT
+//{{ $     }} - EACH KEY OR VALUE IN A TABLE 
+//{{ `xxx` }} - EXECUTE 
+//{{ !xxx  }} - BOOLEAN? 
+//{{ xxx ? y : z }} - TERNARY
+
  * --------------------------------------------------- */
-#include "../vendor/single.h"
-#include "../bridge.h"
-#define SQROOGE_H
-
-#define ENCLOSE(SRC, POS, LEN) \
-	write( 2, "'", 1 ); \
-	write( 2, &SRC[ POS ], LEN ); \
-	write( 2, "'\n", 2 );
-
-#define CREATEITEM(TPTR,SIZE,SPTR,HASH,LEN) \
-	struct rb *TPTR = malloc( sizeof( SIZE ) ); \
-	memset( TPTR, 0, sizeof( SIZE ) ); \
-	TPTR->len = LEN;	\
-	TPTR->ptr = SPTR; \
-	TPTR->hash = HASH; \
-	TPTR->rbptr = NULL;
-
-#define ADDITEM(TPTR,SIZE,LIST,LEN) \
-	if (( LIST = realloc( LIST, sizeof( SIZE ) * ( LEN + 1 ) )) == NULL ) { \
-		fprintf (stderr, "Could not reallocate new rendering struct...\n" ); \
-		return NULL; \
-	} \
-	LIST[ LEN ] = TPTR; \
-	LEN++;
-
-#define DPRINTF(...) \
-	fprintf( stderr, __VA_ARGS__ );
+#include "render.h"
 
 #define DUMPACTION( NUM ) \
 	( NUM == LOOP_START ) ? "LOOP_START" : \
@@ -60,58 +43,20 @@ Stuck on COMPLEX_EXTRACT.
 	( NUM == BOOLEAN ) ? "BOOLEAN" : \
 	( NUM == RAW ) ? "RAW" : "UNKNOWN" 
 
-
-
-#if 0
-	write( 2, item->ptr, item->len ); \
-	fprintf( stderr, "', rbptr: %p }", item->rbptr );	\
-	write( 2, "\n", 1 );
-#endif
-
-
-//TODO: Embed the tests here.
-#if 0
-#endif
-
-
-const char *files[] = {
-	"multi", 
-#if 0
-	"castigan", 
-
-	"african", 
-	"roche", 
-	"tyrian"
-#endif
-};
-
-
-
-//Should I still rely on function pointers?
-//No, let's do something different...
-
-//{{ # xxx }} - LOOP START
-//{{ / xxx }} - LOOP END 
-//{{ x     }} - SIMPLE EXTRACT
-//{{ .     }} - COMPLEX EXTRACT
-//{{ $     }} - EACH KEY OR VALUE IN A TABLE 
-//{{ `xxx` }} - EXECUTE 
-//{{ !xxx  }} - BOOLEAN? 
-//{{ xxx ? y : z }} - TERNARY
+static const int LOOP_START = 30;
+static const int LOOP_END = 31;
+static const int SIMPLE_EXTRACT = 32;
+static const int COMPLEX_EXTRACT = 33;
+static const int EACH_KEY = 34;
+static const int EXECUTE = 35;
+static const int BOOLEAN = 36;
+static const int RAW = 37;
+static const int BLOCK_START = 0;
+static const int BLOCK_END = 0;
 
 //Bitmasking will tell me a lot...
-uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
+uint8_t *table_to_template ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 	//Constants for now, b/c I forgot how to properly bitmask
-	const int LOOP_START = 30;
-	const int LOOP_END = 31;
-	const int SIMPLE_EXTRACT = 32;
-	const int COMPLEX_EXTRACT = 33;
-	const int EACH_KEY = 34;
-	const int EXECUTE = 35;
-	const int BOOLEAN = 36;
-	const int RAW = 37;
-	const int BLOCK_START = 0;
-	const int BLOCK_END = 0;
 	uint8_t *dest = NULL;
 	int destlen = 0;
 	int ACTION = 0;
@@ -145,10 +90,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 	//Then you don't have to move backwards in a list of pointers...
 	//If this is really a two-column list, then it won't take much space... 
 //#define RBDEF
-	struct rb { 
-		int action, **hashList; 
-		int len; void *ptr; 
-	} **rr = NULL ; 
+	struct rb { int action, len, **hashList; void *ptr; } **rr = NULL ; 
 	struct parent { 
 	#if 0
 		struct parent *parent; 
@@ -215,7 +157,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 					if ( (hash = lt_get_long_i(t, p, nlen) ) > -1 ) {
 						int *h = malloc( sizeof(int) );
 						memcpy( h, &hash, sizeof( int ) );
-						ADDITEM( h, int *, hashList, hashListLen ); 
+						ADDITEM( h, int *, hashList, hashListLen, NULL ); 
 					}
 				}
 				else {
@@ -223,14 +165,14 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 					int alen = 0;
 					rp->action = maps[ *p ];
 					p = trim( p, ". #/$`!\t", nlen, &alen );
-					DPRINTF("GOT ACTION %s, and TEXT = ", DUMPACTION(rp->action));
+					FPRINTF("GOT ACTION %s, and TEXT = ", DUMPACTION(rp->action));
 					ENCLOSE( p, 0, alen );
 
 					//Figure some things out...
 					if ( rp->action == LOOP_START ) {
 
 						//We could be just about anywhere, so anticipate that the parent could be here
-						DPRINTF( "@LOOP_START - " );	
+						FPRINTF( "@LOOP_START - " );	
 						int hash = -1;
 						int blen = 0;
 						int eCount = 0;
@@ -244,26 +186,26 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 							memcpy( &bbuf[ blen ], p, alen );
 							blen += alen;
 						
-							DPRINTF( "Checking level[0] table " );	
+							FPRINTF( "Checking level[0] table " );	
 							ENCLOSE( bbuf, 0, blen );
 							//This is the only thing, get the hash and end it
 							if ( (hash = lt_get_long_i( t, bbuf, blen ) ) > -1 ) {
 								int *h = malloc( sizeof( int ) );
 								memcpy( h, &hash, sizeof( int ) );
-								ADDITEM( h, int *, hashList, hashListLen ); 
+								ADDITEM( h, int *, hashList, hashListLen, NULL ); 
 								eCount = lt_counti( t, hash );
 							}
 						}
 						else {
 							//If there are 3 parents, you need to start at the beginning and come out
 							//Find the MAX count of all the rows that are there... This way you'll have the right count everytime...
-							DPRINTF( "Checking level[n+1] table " );	
+							FPRINTF( "Checking level[n+1] table " );	
 
 							//Get a count of the number of elements in the parent.
 							int maxCount = 0;
 							cp = pp[ pplen - 1 ];
-							DPRINTF( "containing %d members.\n", cp->childCount );
-							DPRINTF( "\tParent strings are:\n" ); 
+							FPRINTF( "containing %d members.\n", cp->childCount );
+							FPRINTF( "\tParent strings are:\n" ); 
 
 							for ( int i=0, cCount=0; i<cp->childCount; i++ ) {
 								char num[ 64 ] = { 0 };
@@ -285,12 +227,12 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 								hash = lt_get_long_i(t, bbuf, blen ); 
 								int *h = malloc( sizeof(int) );
 								memcpy( h, &hash, sizeof( int ) );
-								ADDITEM( h, int *, hashList, hashListLen ); 
-								DPRINTF( "; hash is: %3d, ", hash );	
+								ADDITEM( h, int *, hashList, hashListLen, NULL ); 
+								FPRINTF( "; hash is: %3d, ", hash );	
 							
 								if ( hash > -1 && (cCount = lt_counti( t, hash )) > maxCount ) {
 									maxCount = cCount;	
-									DPRINTF( " child count is: %3d\n", maxCount );	
+									FPRINTF( " child count is: %3d\n", maxCount );	
 								}
 
 							}
@@ -310,13 +252,13 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 							np->pos = 0;
 							np->len = alen;
 							np->text = p; 
-							ADDITEM( np, struct parent, pp, pplen );
+							ADDITEM( np, struct parent, pp, pplen, NULL );
 							INSIDE++;
 						}
 					}
 					else if ( rp->action == LOOP_END ) {
 						//If inside is > 1, check for a period, strip it backwards...
-						DPRINTF( "@LOOP_END - " );
+						FPRINTF( "@LOOP_END - " );
 						//TODO: Check that the hashes match instead of just pplen
 						//rp->hash = lt_get_long_i( t, p, alen );
 						if ( !INSIDE )
@@ -328,11 +270,12 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 						}
 					}
 					else if ( rp->action == COMPLEX_EXTRACT ) {
-						DPRINTF( "@COMPLEX_EXTRACT - " );
+						FPRINTF( "@COMPLEX_EXTRACT - " );
 						if ( pplen ) {
 							struct parent **w = pp;
 							int c = 0;
 							while ( (*w)->pos < (*w)->childCount ) {
+						FPRINTF( "@IS THIS RUNNING AT ALL?\n" ); getchar();
 								//Move to the next block or build a sequence
 								if ( c < (pplen - 1) ) {
 									w++, c++;
@@ -358,8 +301,8 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 									int hh = lt_get_long_i(t, tr, trlen ); 
 									int *h = malloc( sizeof(int) );
 									memcpy( h, &hh, sizeof(int) );	
-									ADDITEM( h, int *, hashList, hashListLen ); 
-									DPRINTF( "string = %s, hash = %3d, ", tr, hh );	
+									ADDITEM( h, int *, hashList, hashListLen, NULL ); 
+									FPRINTF( "string = %s, hash = %3d, ", tr, hh );	
 								}
 
 								//Increment the number 
@@ -382,19 +325,19 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 						}
 					}
 					else if ( rp->action == EACH_KEY ) {
-						DPRINTF( "@EACH_KEY :: Nothing yet...\n" );
+						FPRINTF( "@EACH_KEY :: Nothing yet...\n" );
 					}
 					else if ( rp->action == EXECUTE ) {
-						DPRINTF( "@EXECUTE :: Nothing yet...\n" );
+						FPRINTF( "@EXECUTE :: Nothing yet...\n" );
 					}
 					else if ( rp->action == BOOLEAN ) {
-						DPRINTF( "@BOOLEAN :: Nothing yet...\n" );
+						FPRINTF( "@BOOLEAN :: Nothing yet...\n" );
 					}
 				}
 
 				//Create a new row with what we found.
-				DPRINTF( "\n@END: Adding new row to template set.  rrlen: %d, pplen: %d.  Got ", rrlen, pplen );
-				ENCLOSE( rp->ptr, 0, rp->len );
+				FPRINTF( "\n@END: Adding new row to template set.  rrlen: %d, pplen: %d.  Got ", rrlen, pplen );
+				//ENCLOSE( rp->ptr, 0, rp->len );
 
 				//struct rb *rp = malloc( sizeof( struct rb ) );
 				//memcpy( rp, &rbb, sizeof( struct rb ) ); 
@@ -402,15 +345,15 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 					rp->hashList = NULL;
 				else {
 					rp->hashList = hashList; 
-					ADDITEM( NULL, int *, rp->hashList, hashListLen );
+					ADDITEM( NULL, int *, rp->hashList, hashListLen, NULL );
 				}
 				
-				ADDITEM(rp, struct rb, rr, rrlen);
+				ADDITEM(rp, struct rb, rr, rrlen, NULL);
 			}
 		}
 #if 1
 		else {
-			DPRINTF( "@RAW BLOCK COPY" ); 
+			FPRINTF( "@RAW BLOCK COPY" ); 
 			//We can simply copy if ACTION & BLOCK are 0 
 			if ( !ACTION && !BLOCK ) {
 				//struct rb rbb = { 0 };
@@ -435,13 +378,13 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 				struct rb *rp = malloc( sizeof( struct rb ) );
 				memcpy( rp, &rbb, sizeof( struct rb ) ); 
 #endif
-				ADDITEM(rp, struct rb, rr, rrlen);
+				ADDITEM(rp, struct rb, rr, rrlen, NULL);
 			}	
 		}
 #endif
 	}
 
-#if 0
+#if 1
 	//DEBUG: Show me what's on the list...
 	for ( int i=0; i<rrlen; i++ ) {
 		struct rb *item = rr[ i ];
@@ -451,7 +394,8 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 
 		if ( item->action == RAW || item->action == EXECUTE ) {
 			fprintf( stderr, " len: %3d, ", item->len ); 
-			ENCLOSE( item->ptr, 0, item->len );
+			uint8_t *pp = (uint8_t *)item->ptr;
+			ENCLOSE( pp, 0, item->len );
 		}
 		else {
 			fprintf( stderr, " list: %p => ", item->hashList );
@@ -470,7 +414,7 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 	}
 #endif
 
-#if 0
+#if 1
 	//This other way will involve generating a longer data structure
 	//The code can just move through the list and not worry about
 	//backreferencing (moving things around is slightly easier)
@@ -533,172 +477,3 @@ uint8_t *rw ( Table *t, const uint8_t *src, int srclen, int * newlen ) {
 	return NULL;
 }
 
-
-int main (int argc, char *argv[]) {
-	lua_State *L = luaL_newstate();
-	char err[ 2048 ] = { 0 };
-
-	//A good test would be to modify this to where either files*[] can be run or a command line specified file.
-	for ( int i=0; i < sizeof(files)/sizeof(char *); i++ ) {
-		//Filename
-		Render R;
-		Table *t = NULL; 
-		int br = 0;
-		int fd = 0;
-		char ren[ 10000 ] = { 0 };
-		char *m = strcmbd( "/", "tests/render-data", files[i], files[i], "lua" );
-		char *v = strcmbd( "/", "tests/render-data", files[i], files[i], "tpl" );
-		m[ strlen( m ) - 4 ] = '.';
-		v[ strlen( v ) - 4 ] = '.';
-
-		//Choose a file to load
-		char fileerr[2048] = {0};
-		char *f = m;
-		int lerr;
-		fprintf( stderr, "Attempting to load model file: %s\n", f );
-		if (( lerr = luaL_loadfile( L, f )) != LUA_OK ) { 
-			int errlen = 0;
-			if ( lerr == LUA_ERRSYNTAX )
-				errlen = snprintf( fileerr, sizeof(fileerr), "Syntax error at file: %s", f );
-			else if ( lerr == LUA_ERRMEM )
-				errlen = snprintf( fileerr, sizeof(fileerr), "Memory allocation error at file: %s", f );
-			else if ( lerr == LUA_ERRGCMM )
-				errlen = snprintf( fileerr, sizeof(fileerr), "GC meta-method error at file: %s", f );
-			else if ( lerr == LUA_ERRFILE ) {
-				errlen = snprintf( fileerr, sizeof(fileerr), "File access error at: %s", f );
-			}
-			
-			fprintf(stderr, "LUA LOAD ERROR: %s, %s", fileerr, (char *)lua_tostring( L, -1 ) );	
-			lua_pop( L, lua_gettop( L ) );
-			exit( 1 );
-			break;
-		}
-
-		//Then execute
-		fprintf( stderr, "Attempting to execute file: %s\n", f );
-		if (( lerr = lua_pcall( L, 0, LUA_MULTRET, 0 ) ) != LUA_OK ) {
-			if ( lerr == LUA_ERRRUN ) 
-				snprintf( fileerr, sizeof(fileerr), "Runtime error at: %s", f );
-			else if ( lerr == LUA_ERRMEM ) 
-				snprintf( fileerr, sizeof(fileerr), "Memory allocation error at file: %s", f );
-			else if ( lerr == LUA_ERRERR ) 
-				snprintf( fileerr, sizeof(fileerr), "Error while running message handler: %s", f );
-			else if ( lerr == LUA_ERRGCMM ) {
-				snprintf( fileerr, sizeof(fileerr), "Error while runnig __gc metamethod at: %s", f );
-			}
-
-			fprintf(stderr, "LUA EXEC ERROR: %s, %s", fileerr, (char *)lua_tostring( L, -1 ) );	
-			lua_pop( L, lua_gettop( L ) );
-			exit( 1 );
-			break;
-		}
-
-		//Dump the stack
-		lua_stackdump( L );
-
-		//Allocate a new "Table" structure...
-		if ( !(t = malloc(sizeof(Table))) || !lt_init( t, NULL, 1024 )) {
-			fprintf( stderr, "MALLOC ERROR FOR TABLE: %s\n", strerror( errno ) );
-			exit( 1 );
-		}
-
-		//Convert Lua to Table
-		if ( !lua_to_table( L, 1, t ) ) {
-			fprintf( stderr, "%s\n", err );
-			//goto cleanit;
-		}
-
-		//Show the table after conversion from Lua
-		if ( 1 ) {
-			lt_dump( t );
-		}
-
-	#if 1
-		//Check for and load whatever file
-		int fstat, bytesRead, fileSize;
-		uint8_t *buf = NULL;
-		struct stat sb;
-		memset( &sb, 0, sizeof( struct stat ) );
-
-		//Check for the file 
-		if ( (fstat = stat( v, &sb )) == -1 ) {
-			fprintf( stderr, "FILE STAT ERROR: %s\n", strerror( errno ) );
-			exit( 1 );
-		}
-
-		//Check for the file 
-		if ( (fd = open( v, O_RDONLY )) == -1 ) {
-			fprintf( stderr, "FILE OPEN ERROR: %s\n", strerror( errno ) );
-			exit( 1 );
-		}
-
-		//Allocate a buffer
-		fileSize = sb.st_size + 1;
-		if ( !(buf = malloc( fileSize )) || !memset(buf, 0, fileSize)) {
-			fprintf( stderr, "COULD NOT OPEN VIEW FILE: %s\n", strerror( errno ) );
-			exit( 1 );
-		}
-
-		//Read the entire file into memory, b/c we'll probably have space 
-		if ( (bytesRead = read( fd, buf, sb.st_size )) == -1 ) {
-			fprintf( stderr, "COULD NOT READ ALL OF VIEW FILE: %s\n", strerror( errno ) );
-			exit( 1 );
-		}
-
-		//Dump the file just cuz...
-		if ( 1 ) {
-			write( 2, buf, sb.st_size );
-		}
-
-		//Finding the marks is good if there is enough memory to do it
-		int renderLen = 0;
-		uint8_t *rendered = rw( t, buf, sb.st_size , &renderLen );
-		if ( rendered ) {
-			write( 2, rendered, renderLen );
-		}
-
-	#else	
-		//Prepare the rendering engine
-		fprintf( stderr, "Rendering against view file %s\n", v );
-		if ( !render_init( &R, &t ) )
-			{ fprintf( stderr, "render_init failed...\n"); goto cleanit ; }
-
-		//Load up the file for the rendering engine
-		fd = open( v, O_RDONLY );
-		if (( br = read( fd, ren, sizeof( ren ) - 1 )) == -1 )
-			{ fprintf( stderr, "loading file '%s' failed...\n", v); goto cleanit ; }
-
-		//Dump the block
-		if ( 1 )
-			write( 2, ren, br );
-		
-		//"Score" the block to render
-		if ( !render_map( &R, (uint8_t *)ren, br ) )
-			{ fprintf( stderr, "render mapping failed...\n"); goto cleanit ; }
-
-		//Start rendering
-		if ( !render_render( &R ) )
-			{ fprintf( stderr, "render_init failed...\n"); goto cleanit ; }
-
-		//Show the results
-		if ( 1 )
-			write( 2, bf_data( render_rendered( &R ) ), bf_written( render_rendered( &R )) );
-
-		//Clean up
-		render_free( &R );
-		lt_free( &t );
-	#endif
-		//Free things
-	#if 0
-cleanit:
-		if ( fd ) { 
-			close(fd); 
-			fd = 0; 
-		}
-		lua_settop( L, 0 );
-		free( m );
-		free( v );
-	#endif
-	}
-	return 0;
-}

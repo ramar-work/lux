@@ -2,8 +2,7 @@
 //Test parsing Lua config files.
 //Compile me with: 
 //gcc -ldl -llua -o config vendor/single.o config.c luabind.c && ./config
-#include "vendor/single.h"
-#include "luabind.h"
+#include "config.h"
 
 #if 0
  #define FPRINTF(...) \
@@ -12,14 +11,6 @@
 #else
  #define FPRINTF(...)
 #endif
-
-#define ADDITEM(TPTR,SIZE,LIST,LEN) \
-	if (( LIST = realloc( LIST, sizeof( SIZE ) * ( LEN + 1 ) )) == NULL ) { \
-		fprintf (stderr, "Could not reallocate new rendering struct...\n" ); \
-		return NULL; \
-	} \
-	LIST[ LEN ] = TPTR; \
-	LEN++;
 
 #define DUMPTYPE(NUM) \
 	( NUM == BD_VIEW ) ? "BD_VIEW" : \
@@ -129,7 +120,7 @@ int buildRoutes ( LiteKv *kv, int i, void *p ) {
 			else {
 				//This isn't valid, so drop it...
 			}
-			ADDITEM( t, struct routetype *, rr->elements, rr->elen ); 
+			ADDITEM( t, struct routetype *, rr->elements, rr->elen, 0 ); 
 		}
 	}
 
@@ -160,7 +151,7 @@ int buildRoutes ( LiteKv *kv, int i, void *p ) {
 				}
 				parent[ b ] = rr->routename;
 				//FPRINTF( "Got route name (%s), c. parent (%s), n.parent (%s)\n", name, par, parent[ b ] );
-				ADDITEM( rr, struct route *, r->routes, r->len );  
+				ADDITEM( rr, struct route *, r->routes, r->len, 0 );  
 				c = 0;
 			}
 			else {

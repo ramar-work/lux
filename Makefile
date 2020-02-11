@@ -23,11 +23,21 @@ RECORDS=3
 
 # Not sure why these don't always work...
 #SRC = vendor/single.c vendor/nw.c vendor/http.c vendor/sqlite3.c socketmgr.c bridge.c 
-SRC = vendor/single.o vendor/sqlite3.o bridge.c
+SRC = vendor/single.c vendor/sqlite3.c src/util.c src/luabind.c
 OBJ = ${SRC:.c=.o}
 
+
+# A wildcard won't work, but an array might...
+testcases:
+	$(CC) $(CFLAGS) -c src/util.c -o src/util.o
+	$(CC) $(CFLAGS) -o bin/router src/router.c src/router-test.c $(OBJ)
+	$(CC) -DDEBUG -llua $(CFLAGS) -o bin/render src/render.c src/render-test.c $(OBJ)
+	$(CC) -llua $(CFLAGS) -o bin/config src/config.c src/config-test.c $(OBJ)
+	$(CC) -llua $(CFLAGS) -o bin/luabind src/luabind-test.c $(OBJ)
+
+renderagent: CFLAGS=-g -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 -Wno-format-truncation $(LDFLAGS) -DDEBUG_H #-ansi
 renderagent:
-	$(CC) $(CFLAGS) -o bin/render $(SRC) render.c
+	$(CC) $(CFLAGS) -o render render.c $(OBJ)
 
 default:
 	$(CC) $(CFLAGS) -o bin/socketmgr $(SRC) socketmgr.c
