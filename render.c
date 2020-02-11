@@ -113,8 +113,8 @@ void print_render_table( struct map **map, int maplen ) {
 		fprintf( stderr, "[%3d] => action: %-16s", i, DUMPACTION( item->action ) );
 
 		if ( item->action == RAW || item->action == EXECUTE ) {
-			fprintf( stderr, " len: %3d, ", item->len ); 
-			ENCLOSE( item->ptr, 0, item->len );
+			//fprintf( stderr, " len: %3d, ", item->len ); 
+			//ENCLOSE( (uint8_t *)item->ptr, 0, item->len );
 		}
 		else {
 			fprintf( stderr, " len: %3d, list: %p => ", item->len, item->hashList );
@@ -134,20 +134,6 @@ void print_render_table( struct map **map, int maplen ) {
 }
 
 
-//Bitmasking will tell me a lot...
-struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen ) {
-	uint8_t *dest = NULL;
-	int destlen = 0;
-	int ACTION = 0;
-	int BLOCK = 0;
-	int SKIP = 0;
-	int INSIDE = 0;
-	struct map **rr = NULL ; 
-	struct parent **pp = NULL;
-	int rrlen = 0;
-	int pplen = 0;
-	Mem r;
-	memset( &r, 0, sizeof( Mem ) );
 int maps[] = {
 	//['#'] = SIMPLE_EXTRACT,
 	['#'] = LOOP_START,
@@ -160,11 +146,52 @@ int maps[] = {
 	[255] = 0
 };
 
-
-	//Allocate a new block to copy everything to
-	if (( dest = malloc( 8 ) ) == NULL ) {
-		return NULL;
+#if 0
+void ppdoc() {
+	char *terms = "#/.$`!";
+	while ( *terms ) {
+		int m = maps[ *terms ];
+		fprintf( stderr, "Got: %s",
+		( m == LOOP_START ) ? "LOOP_START" : \
+		( m == LOOP_END ) ? "LOOP_END" : \
+		( m == COMPLEX_EXTRACT ) ? "COMPLEX_EXTRACT" : \
+		( m == SIMPLE_EXTRACT ) ? "SIMPLE_EXTRACT" : \
+		( m == EACH_KEY ) ? "EACH_KEY" : \
+		( m == EXECUTE ) ? "EXECUTE" : \
+		( m == BOOLEAN ) ? "BOOLEAN" : \
+		( m == RAW ) ? "RAW" : "UNKNOWN" ); 
+		terms++;
 	}
+
+	for ( int i=0; i < 255; i++ ) {
+		int m = maps[ i ];
+		fprintf( stderr, "Got: %s",
+		( m == LOOP_START ) ? "LOOP_START" : \
+		( m == LOOP_END ) ? "LOOP_END" : \
+		( m == COMPLEX_EXTRACT ) ? "COMPLEX_EXTRACT" : \
+		( m == SIMPLE_EXTRACT ) ? "SIMPLE_EXTRACT" : \
+		( m == EACH_KEY ) ? "EACH_KEY" : \
+		( m == EXECUTE ) ? "EXECUTE" : \
+		( m == BOOLEAN ) ? "BOOLEAN" : \
+		( m == RAW ) ? "RAW" : "UNKNOWN" 
+		);
+	}
+}
+#endif
+
+//Bitmasking will tell me a lot...
+struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen ) {
+	int destlen = 0;
+	int ACTION = 0;
+	int BLOCK = 0;
+	int SKIP = 0;
+	int INSIDE = 0;
+	struct map **rr = NULL ; 
+	struct parent **pp = NULL;
+	int rrlen = 0;
+	int pplen = 0;
+	Mem r;
+	memset( &r, 0, sizeof( Mem ) );
 
 	//Allocating a list of characters to elements is easiest.
 	while ( memwalk( &r, (uint8_t *)src, (uint8_t *)"{}", srclen, 2 ) ) {
@@ -373,8 +400,8 @@ int maps[] = {
 				}
 
 				//Create a new row with what we found.
-				FPRINTF( "\n@END: Adding new row to template set.  rrlen: %d, pplen: %d.  Got ", rrlen, pplen );
-				ENCLOSE( rp->ptr, 0, rp->len );
+				//FPRINTF( "\n@END: Adding new row to template set.  rrlen: %d, pplen: %d.  Got ", rrlen, pplen );
+				//ENCLOSE( rp->ptr, 0, rp->len );
 				if ( !hashListLen )
 					rp->hashList = NULL;
 				else {
@@ -420,7 +447,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 	//Start the writes, by using the structure as is
 	uint8_t *block = NULL;
 	int blockLen = 0;
-	struct dep { int index, current, childCount; } depths[100] = { 0, 0, 0 };
+	struct dep { int index, current, childCount; } depths[100] = { { 0, 0, 0 } };
 	struct dep *d = depths;
 
 	fprintf( stderr, "RENDER\n======\n" );
@@ -430,7 +457,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 		#ifdef DEBUG
 			fprintf( stderr, "%-20s", "RAW" );
 			fprintf( stderr, "len: %3d, ", item->len ); 
-			ENCLOSE( item->ptr, 0, item->len );
+			//ENCLOSE( item->ptr, 0, item->len );
 		#endif
 			blockLen += item->len;
 			if ( (block = realloc( block, blockLen )) == NULL ) {
