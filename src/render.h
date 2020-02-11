@@ -5,4 +5,4 @@
 #include "util.h"
 #endif
 
-uint8_t *table_to_template ( Table *t, const uint8_t *src, int srclen, int * newlen );
+uint8_t *table_to_uint8t ( Table *, const uint8_t *, int, int * );

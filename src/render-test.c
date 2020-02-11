@@ -12,6 +12,26 @@ const char *files[] = {
 };
 
 
+char *append ( char *str, const char **elements ) {
+	int len = 0;
+	int max = 2048;
+	while ( *elements ) {
+		memcpy( &str[ len ], *elements, strlen( *elements ) );
+		len += strlen( *elements );
+		memcpy( &str[ len ], "/", 1 );
+		len += 1;
+		fprintf(stderr, "%s\n", *elements );
+		elements++;
+	}
+
+	elements--;
+	fprintf( stderr, "%s\n", *elements );
+	str[ len - strlen( *elements ) - 2 ] = '.';
+	str[ len - 1 ] = '\0';
+	return str;
+}
+
+
 int main (int argc, char *argv[]) {
 	lua_State *L = luaL_newstate();
 	char err[ 2048 ] = { 0 };
@@ -19,28 +39,20 @@ int main (int argc, char *argv[]) {
 	//A good test would be to modify this to where either files*[] can be run or a command line specified file.
 	for ( int i=0; i < sizeof(files)/sizeof(char *); i++ ) {
 		Table *t = NULL; 
-		int br = 0;
-		int fd = 0;
-		char ren[ 10000 ] = { 0 };
-		char *m = strcmbd( "/", "tests/render-data", files[i], files[i], "lua" );
-		char *v = strcmbd( "/", "tests/render-data", files[i], files[i], "tpl" );
-		m[ strlen( m ) - 4 ] = '.';
-		v[ strlen( v ) - 4 ] = '.';
-
-		//Choose a file to load
+		char model[2048] = {0}, view[2048] = {0};
 		char fileerr[2048] = {0};
-		char *f = m;
-		int lerr;
-		int status = 0;
-		fprintf( stderr, "Attempting to load and execute model file: %s\n", f );
-		if ( !( status = lua_exec_file( L, f, fileerr, sizeof(fileerr) ) ) ) {
-			fprintf(stderr, "Error loading/executing model file: %s, %s\n", f, fileerr);
+		int blen = 0, rlen = 0;
+		uint8_t *buf = NULL, *rendered = NULL;
+
+		//Generate the model and view file names
+		append( model, (const char *[]){ "tests/render-data", files[i], files[i], "lua", NULL } );
+		append( view, (const char *[]){ "tests/render-data", files[i], files[i], "tpl", NULL } );
+
+		//Run the Lua file
+		if ( !lua_exec_file( L, model, fileerr, sizeof(fileerr) ) ) {
+			fprintf(stderr, "Error loading/executing model file: %s, %s\n", model, fileerr);
 			return 0;
 		}
-		fprintf( stderr, "SUCCESS!\n" );
-
-		//Dump the stack
-		//lua_stackdump( L );
 
 		//Allocate a new "Table" structure...
 		if ( !(t = malloc(sizeof(Table))) || !lt_init( t, NULL, 1024 )) {
@@ -54,36 +66,17 @@ int main (int argc, char *argv[]) {
 			//goto cleanit;
 		}
 
-		//Show the table after conversion from Lua
-		if ( 0 ) {
-			lt_dump( t );
-		}
-
-		uint8_t *buf = NULL;
-		int blen = 0;
-		if ( !( buf = read_file( v, &blen, fileerr, sizeof(fileerr) ) ) ) {
-			fprintf(stderr, "Error reading template file: %s, %s\n", f, fileerr );
+		if ( !( buf = read_file( view, &blen, fileerr, sizeof(fileerr) ) ) ) {
+			fprintf(stderr, "Error reading template file: %s, %s\n", view, fileerr );
 			return 0;
 		}
 
 		//Finding the marks is good if there is enough memory to do it
-		int renderLen = 0;
-		uint8_t *rendered = table_to_template( t, buf, blen, &renderLen );
-		if ( rendered ) {
-			write( 2, rendered, renderLen );
+		if (( rendered = table_to_uint8t( t, buf, blen, &rlen ) ) == NULL ) {
+			fprintf(stderr, "Error rendering template file: %s\n", view );
+			return 0;
 		}
-
-		//Free things
-	#if 0
-cleanit:
-		if ( fd ) { 
-			close(fd); 
-			fd = 0; 
-		}
-		lua_settop( L, 0 );
-		free( m );
-		free( v );
-	#endif
+		write( 2, rendered, rlen );
 	}
 	return 0;
 }
