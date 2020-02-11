@@ -832,8 +832,9 @@ uint8_t *table_to_uint8t( Table *t, const uint8_t *src, int srclen, int *newlen 
 	//Start the writes, by using the structure as is
 	uint8_t *block = NULL;
 	int blockLen = 0;
-	struct dep { int index, current, childCount; } depths[100] = { 0, 0, 0 };
+	struct dep { int index, current, childCount; } depths[100];
 	struct dep *d = depths;
+ 	memset( d, 0, sizeof( depths ) / sizeof( struct dep ) );	
 
 	fprintf( stderr, "RENDER\n======\n" );
 	for ( int i = 0; i < rrlen; i++ ) {
