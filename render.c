@@ -92,13 +92,26 @@ const int RAW = 37;
 const int BLOCK_START = 0;
 const int BLOCK_END = 0;
 const int TERM = -2;
+const int UNINIT = 166;
+const int maps[] = {
+	['#'] = LOOP_START,
+	['/'] = LOOP_END,
+	['.'] = COMPLEX_EXTRACT,
+	['$'] = EACH_KEY, 
+	['`'] = EXECUTE, //PAIR_EXTRACT
+	['!'] = BOOLEAN,
+	[254] = RAW,
+	[255] = 0
+};
+
 struct parent { 
 	uint8_t *text; 
 	int len, pos, childCount; 
 }; 
 
 struct map { 
-	int action, **hashList; 
+	int action; 
+	int **hashList; 
 	int len; 
 	void *ptr; 
 };
@@ -113,8 +126,8 @@ void print_render_table( struct map **map, int maplen ) {
 		fprintf( stderr, "[%3d] => action: %-16s", i, DUMPACTION( item->action ) );
 
 		if ( item->action == RAW || item->action == EXECUTE ) {
-			//fprintf( stderr, " len: %3d, ", item->len ); 
-			//ENCLOSE( (uint8_t *)item->ptr, 0, item->len );
+			fprintf( stderr, " len: %3d, ", item->len ); 
+			ENCLOSE( item->ptr, 0, item->len );
 		}
 		else {
 			fprintf( stderr, " len: %3d, list: %p => ", item->len, item->hashList );
@@ -134,19 +147,36 @@ void print_render_table( struct map **map, int maplen ) {
 }
 
 
-int maps[] = {
-	//['#'] = SIMPLE_EXTRACT,
-	['#'] = LOOP_START,
-	['/'] = LOOP_END,
-	['.'] = COMPLEX_EXTRACT,
-	['$'] = EACH_KEY, 
-	['`'] = EXECUTE, //PAIR_EXTRACT
-	['!'] = BOOLEAN,
-	[254] = RAW,
-	[255] = 0
-};
+void destroy_render_table( struct map **map, int maplen ) {
+	for ( int i=0; i < maplen; i++ ) {
+		struct map *item = map[ i ];
 
-#if 0
+		//Dump the unchanging elements out...
+		fprintf( stderr, "[%3d] => action: %-16s", i, DUMPACTION( item->action ) );
+
+		if ( item->action == RAW || item->action == EXECUTE ) {
+			fprintf( stderr, " len: %3d, ", item->len ); 
+			ENCLOSE( item->ptr, 0, item->len );
+		}
+		else {
+			fprintf( stderr, " len: %3d, list: %p => ", item->len, item->hashList );
+			int **ii = item->hashList;
+			if ( !ii ) 
+				fprintf( stderr , "NULL" );
+			else {
+				int d=0;
+				while ( *ii ) {
+					fprintf( stderr, "%c%d", d++ ? ',' : ' ',  **ii );
+					ii++;
+				}
+			}
+			fprintf( stderr, "\n" );
+		}
+	}
+}
+
+
+#if 1
 void ppdoc() {
 	char *terms = "#/.$`!";
 	while ( *terms ) {
@@ -165,16 +195,19 @@ void ppdoc() {
 
 	for ( int i=0; i < 255; i++ ) {
 		int m = maps[ i ];
-		fprintf( stderr, "Got: %s",
-		( m == LOOP_START ) ? "LOOP_START" : \
-		( m == LOOP_END ) ? "LOOP_END" : \
-		( m == COMPLEX_EXTRACT ) ? "COMPLEX_EXTRACT" : \
-		( m == SIMPLE_EXTRACT ) ? "SIMPLE_EXTRACT" : \
-		( m == EACH_KEY ) ? "EACH_KEY" : \
-		( m == EXECUTE ) ? "EXECUTE" : \
-		( m == BOOLEAN ) ? "BOOLEAN" : \
-		( m == RAW ) ? "RAW" : "UNKNOWN" 
+		if ( m ) { 
+			fprintf( stderr, "Got: %d, %d, %s\n", i, m, 
+			( m == UNINIT ) ? "UNINIT" : \
+			( m == LOOP_START ) ? "LOOP_START" : \
+			( m == LOOP_END ) ? "LOOP_END" : \
+			( m == COMPLEX_EXTRACT ) ? "COMPLEX_EXTRACT" : \
+			( m == SIMPLE_EXTRACT ) ? "SIMPLE_EXTRACT" : \
+			( m == EACH_KEY ) ? "EACH_KEY" : \
+			( m == EXECUTE ) ? "EXECUTE" : \
+			( m == BOOLEAN ) ? "BOOLEAN" : \
+			( m == RAW ) ? "RAW" : "UNKNOWN" 
 		);
+		}
 	}
 }
 #endif
@@ -209,12 +242,17 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 				int nlen = 0;	
 				int **hashList = NULL;
 				int hashListLen = 0;
-				uint8_t *p = trim( (uint8_t *)&src[r.pos], " \t", r.size, &nlen );
-				struct map *rp = malloc( sizeof( struct map ) );
-				if ( !rp ) {
+				uint8_t *p = trim( (uint8_t *)&src[r.pos], " ", r.size, &nlen );
+				struct map *rp = NULL; 
+				if ( !(rp = malloc( sizeof( struct map ) )) ) {
 					//Free and destroy things
 					return NULL;
 				}
+
+				rp->action = 0; 
+				rp->ptr = NULL; 
+				rp->len = 0; 
+				rp->hashList = NULL; 
 
 				//Extract the first character
 				if ( !maps[ *p ] ) {
@@ -559,20 +597,17 @@ uint8_t *table_to_uint8t ( Table *t, const uint8_t *src, int srclen, int *newlen
 	int blocklen = 0;
 	int maplen = 0;
 
-	//Check tables first
-	//if ( !t ???? )
-	
 	//Convert T to a map
 	if ( !( map = table_to_map( t, src, srclen, &maplen ) ) ) {
-
+		return NULL;
 	}
 
 	//See the map 
 	print_render_table( map, maplen );
-exit(0);	
+
 	//Do the map	
 	if ( !( block = map_to_uint8t( t, map, maplen, &blocklen ) ) ) {
-
+		return NULL;
 	}
 
 	*newlen = blocklen;
