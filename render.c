@@ -562,7 +562,7 @@ uint8_t *table_to_uint8t ( Table *t, const uint8_t *src, int srclen, int *newlen
 #endif
 
 
-uint8_t *table_to_map ( Table *t, const uint8_t *src, int srclen, int *newlen ) {
+uint8_t *table_to_uint8t( Table *t, const uint8_t *src, int srclen, int *newlen ) {
 	//Constants for now, b/c I forgot how to properly bitmask
 	uint8_t *dest = NULL;
 	int destlen = 0;
