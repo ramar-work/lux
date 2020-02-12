@@ -1,15 +1,15 @@
 /*let's try this again.  It seems never to work like it should...*/
-#include "vendor/single.h"
+#include "../vendor/single.h"
 #include <gnutls/gnutls.h>
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
 
-#include "src/luabind.h"
-#include "src/http.h"
-#include "src/socket.h"
-#include "src/util.h"
-#include "src/ssl.h"
+#include "luabind.h"
+#include "http.h"
+#include "socket.h"
+#include "util.h"
+#include "ssl.h"
 
 
 extern const char http_200_custom[];
@@ -806,7 +806,7 @@ int main (int argc, char *argv[]) {
 
 	//Process all your options...
 	if ( argc < 2 ) {
-		fprintf( stderr, "No options received.\n" );
+		fprintf( stderr, "%s: No options received.\n", __FILE__ );
 		const char *fmt = "  --%-10s       %-30s\n";
 		fprintf( stderr, fmt, "start", "start new servers" );
 		fprintf( stderr, fmt, "kill", "test killing a server" );

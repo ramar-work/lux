@@ -27,7 +27,8 @@ OBJ = ${SRC:.c=.o}
 
 # main
 main: $(OBJ)
-	$(CC) $(CFLAGS) main.c -o $(NAME) $(OBJ)
+	$(CC) $(CFLAGS) src/main.c -o $(NAME) $(OBJ)
+	$(CC) $(CFLAGS) src/cli.c -o hcli $(OBJ)
 
 # Object
 %.o: %.c 
