@@ -22,7 +22,7 @@ RECORDS=3
 
 # Not sure why these don't always work...
 TESTS = config database http luabind render router socket ssl
-SRC = vendor/single.c vendor/sqlite3.c src/config.c src/database.c src/http.c src/luabind.c src/render.c src/router.c src/socket.c src/ssl.c src/static.c src/util.c src/xml.c #src/json.c src/dirent-filter.c
+SRC = vendor/single.c vendor/sqlite3.c src/config.c src/database.c src/http.c src/luabind.c src/mime.c src/render.c src/router.c src/socket.c src/ssl.c src/filter-static.c src/util.c src/xml.c #src/json.c src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
 
 # main

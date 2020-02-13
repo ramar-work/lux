@@ -1,4 +1,4 @@
-/*dirent.c is a directory handler*/
+/*dirent.c - a directory handler*/
 int dir_http_handler (HTTP *h, Table *env)
 {
 	char path[PATHLEN] = {0};

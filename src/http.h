@@ -3,6 +3,8 @@
 
 #define HTTP_H
 
+extern const char http_200_fixed[];
+
 struct HTTPRecord {
 	const char *field; 
 	const char *metadata; 

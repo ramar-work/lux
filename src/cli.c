@@ -12,6 +12,24 @@
 	"	</body>\n" \
 	"</html>\n"
 
+#define DEFAULT_LUA \
+	"return {\n" \
+	"	db = \"roast.db\",\n" \
+	"	title = \"da food snob\",\n" \
+	"	fqdn = \"dafoodsnob.com\",\n" \
+	"	template_engine = \"roast.db\",\n" \
+	"	static = \"static\",\n" \
+	"	routes = {\n" \
+	"		default = { model=\"roast\",view=\"roast\" },\n" \
+	"		turkey = { model=\"turkey\",view=\"roast\" },\n" \
+	"		chicken = { model=\"chicken\",view=\"roast\" },\n" \
+	"		beef = { model=\"beef\",view=\"roast\" },\n" \
+	"		recipe = {\n" \
+	"			[\":id=number\"] = { model=\"recipe\",view=\"recipe\" },\n" \
+	"		},\n" \
+	"	}	\n" \
+	"}\n"
+
 #define ERRPRINTF(...) \
 	fprintf( stderr, "%s: ", "hcli" ); \
 	fprintf( stderr, __VA_ARGS__ ); \
@@ -38,6 +56,7 @@ struct app defaults[] = {
 	{ "/static/index.html", H_FILE, BASIC_HTML },
 	{ "/app/hello.lua", H_FILE, NULL },
 	{ "/views/hello.tpl", H_FILE, NULL },
+	{ "/config.lua", H_FILE, DEFAULT_LUA },
 	{ NULL }
 };
 
@@ -60,7 +79,7 @@ int dir_cmd( struct app *layout, char *err, int errlen ) {
 		//fprintf( stdout, "resource name: %s\n", rname );
 #if 1
 		if ( layout->type == H_DIR ) {	
-			if ( mkdir( rname, S_IRWXU ) == -1 ) {
+			if ( mkdir( rname, 0755 ) == -1 ) {
 				snprintf( err, errlen, "Directory creation failure at %s: %s", rname, strerror( errno ));
 				return 0;
 			}
@@ -68,7 +87,7 @@ int dir_cmd( struct app *layout, char *err, int errlen ) {
 		else if ( layout->type == H_FILE ) {
 			int fd = 0;
 			const char *content = layout->content;
-			if ( ( fd = open( rname, S_IRWXU | O_RDWR ) ) == -1 ) {
+			if ( ( fd = open( rname, O_CREAT | O_RDWR, 0755 ) ) == -1 ) {
 				snprintf( err, errlen, "Failed to open file at %s: %s", rname, strerror( errno ));
 				return 0;
 			} 
@@ -127,7 +146,7 @@ int main (int argc, char *argv[]) {
 	struct stat sb;
 	if ( stat( arg_srcdir, &sb ) == -1 ) {
 		fprintf( stderr, "Source directory '%s' does not exist.\n", arg_srcdir );
-		if ( mkdir( arg_srcdir, S_IRWXO ) == -1 ) {
+		if ( mkdir( arg_srcdir, 0755 ) == -1 ) {
 			ERRPRINTF( "Failed to create source directory '%s': %s.", arg_srcdir, strerror(errno) );
 			return 0;
 		}
