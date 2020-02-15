@@ -1,5 +1,15 @@
 #include "util.h"
 
+//Print binary data (in hex) using name of variable as key
+#define nbprintf(v, n) \
+	fprintf (stderr,"%-30s: ", k); \
+	for (int i=0; i < n; i++) fprintf( stderr, "%02x", v[i] ); \
+	fprintf (stderr, "\n")
+
+
+
+
+//TODO: None of these should take an error buffer.  They are just utilities...
 uint8_t *read_file ( const char *filename, int *len, char *err, int errlen ) {
 	//Check for and load whatever file
 	int fd, fstat, bytesRead, fileSize;
@@ -136,4 +146,19 @@ char *copystr ( uint8_t *src, int len ) {
 	memset( dest, 0, len );
 	memcpy( dest, src, len - 1 );
 	return dest;
-} 
+}
+
+
+uint8_t *append_to_uint8t ( uint8_t **dest, int *len, uint8_t *src, int srclen ) {
+	if ( !( *dest = realloc( *dest, (*len) + srclen ) ) ) {	
+		return NULL;
+	}
+
+	if ( !memcpy( &(*dest)[ *len ], src, srclen ) ) {
+		return NULL;
+	}
+
+	*len += srclen;
+	return *dest;
+}
+ 

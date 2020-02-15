@@ -21,6 +21,10 @@ extern const char http_400_fixed[];
 extern const char http_500_custom[];
 extern const char http_500_fixed[];
 
+const int defport = 2000;
+int arg_verbose = 0;
+int arg_debug = 0;
+
 #if 0
 #define ADD_ELEMENT( ptr, ptrListSize, eSize, element ) \
 	if ( ptr ) \
@@ -561,6 +565,14 @@ int ssl_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 	return 0;
 }
 
+struct values {
+	int port;
+	int ssl;
+	int start;
+	int kill;
+	int fork;
+	char *user;
+}; 
 
 struct senderrecvr { 
 	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
@@ -578,102 +590,99 @@ struct senderrecvr {
 
 
 
+int help () {
+	const char *fmt = "  --%-10s       %-30s\n";
+	fprintf( stderr, "%s: No options received.\n", __FILE__ );
+	fprintf( stderr, fmt, "start", "start new servers" );
+	fprintf( stderr, fmt, "debug", "set debug rules" );
+	fprintf( stderr, fmt, "kill", "test killing a server" );
+	fprintf( stderr, fmt, "fork", "daemonize the server" );
+	fprintf( stderr, fmt, "port <arg>", "set a differnt port" );
+	fprintf( stderr, fmt, "ssl", "use ssl or not.." );
+	fprintf( stderr, fmt, "user <arg>", "choose a user to start as" );
+	return 0;	
+}
+
+
+void print_options ( struct values *v ) {
+	const char *fmt = "%-10s: %s\n";
+	fprintf( stderr, "%s invoked with options:\n", __FILE__ );
+	fprintf( stderr, "%10s: %d\n", "start", v->start );	
+	fprintf( stderr, "%10s: %d\n", "kill", v->kill );	
+	fprintf( stderr, "%10s: %d\n", "port", v->port );	
+	fprintf( stderr, "%10s: %d\n", "fork", v->fork );	
+	fprintf( stderr, "%10s: %s\n", "user", v->user );	
+	fprintf( stderr, "%10s: %s\n", "ssl", v->ssl ? "true" : "false" );	
+}
+
+
 int main (int argc, char *argv[]) {
-	struct values {
-		int port;
-		int ssl;
-		int start;
-		int kill;
-		int fork;
-		char *user;
-	} values = { 0 };
+	struct values values = { 0 };
+	char err[ 2048 ] = { 0 };
 
-	//Process all your options...
 	if ( argc < 2 ) {
-		fprintf( stderr, "%s: No options received.\n", __FILE__ );
-		const char *fmt = "  --%-10s       %-30s\n";
-		fprintf( stderr, fmt, "start", "start new servers" );
-		fprintf( stderr, fmt, "kill", "test killing a server" );
-		fprintf( stderr, fmt, "fork", "daemonize the server" );
-		fprintf( stderr, fmt, "port <arg>", "set a differnt port" );
-		fprintf( stderr, fmt, "ssl", "use ssl or not.." );
-		fprintf( stderr, fmt, "user <arg>", "choose a user to start as" );
-		return 0;	
-	}	
-	else {
-		while ( *argv ) {
-			if ( strcmp( *argv, "--start" ) == 0 ) 
-				values.start = 1;
-			else if ( strcmp( *argv, "--kill" ) == 0 ) 
-				values.kill = 1;
-			else if ( strcmp( *argv, "--ssl" ) == 0 ) 
-				values.ssl = 1;
-			else if ( strcmp( *argv, "--daemonize" ) == 0 ) 
-				values.fork = 1;
-			else if ( strcmp( *argv, "--port" ) == 0 ) {
-				argv++;
-				if ( !*argv ) {
-					fprintf( stderr, "Expected argument for --port!" );
-					return 0;
-				} 
-				values.port = atoi( *argv );
-			}
-			else if ( strcmp( *argv, "--user" ) == 0 ) {
-				argv++;
-				if ( !*argv ) {
-					fprintf( stderr, "Expected argument for --user!" );
-					return 0;
-				} 
-				values.user = strdup( *argv );
-			}
+		return help();
+	}
+	
+	while ( *argv ) {
+		if ( strcmp( *argv, "--start" ) == 0 ) 
+			values.start = 1;
+		else if ( strcmp( *argv, "--kill" ) == 0 ) 
+			values.kill = 1;
+		else if ( strcmp( *argv, "--ssl" ) == 0 ) 
+			values.ssl = 1;
+		else if ( strcmp( *argv, "--daemonize" ) == 0 ) 
+			values.fork = 1;
+		else if ( strcmp( *argv, "--debug" ) == 0 ) 
+			arg_debug = 1;
+		else if ( strcmp( *argv, "--port" ) == 0 ) {
 			argv++;
+			if ( !*argv ) {
+				fprintf( stderr, "Expected argument for --port!" );
+				return 0;
+			} 
+			values.port = atoi( *argv );
 		}
-	}	
-
-	if ( 1 ) {
-		const char *fmt = "%-10s: %s\n";
-		fprintf( stderr, "Invoked with options:\n" );
-		fprintf( stderr, "%10s: %d\n", "start", values.start );	
-		fprintf( stderr, "%10s: %d\n", "kill", values.kill );	
-		fprintf( stderr, "%10s: %d\n", "port", values.port );	
-		fprintf( stderr, "%10s: %d\n", "fork", values.fork );	
-		fprintf( stderr, "%10s: %s\n", "user", values.user );	
-		fprintf( stderr, "%10s: %s\n", "ssl", values.ssl ? "true" : "false" );	
+		else if ( strcmp( *argv, "--user" ) == 0 ) {
+			argv++;
+			if ( !*argv ) {
+				fprintf( stderr, "Expected argument for --user!" );
+				return 0;
+			} 
+			values.user = strdup( *argv );
+		}
+		argv++;
 	}
 
+	if ( arg_debug ) {
+		print_options( &values );
+	}
 
 	//Set all of the socket stuff
-	const int defport = 2000;
 	struct sockAbstr su;
 	su.addrsize = sizeof(struct sockaddr);
 	su.buffersize = 1024;
 	su.opened = 0;
 	su.backlog = 500;
 	su.waittime = 5000;
-	su.protocol = IPPROTO_TCP;
-	su.socktype = SOCK_STREAM;
-	//su.protocol = IPPROTO_UDP;
-	//su.sockettype = SOCK_DGRAM;
+	su.protocol = IPPROTO_TCP; // || IPPROTO_UDP
+	su.socktype = SOCK_STREAM; // || SOCK_DGRAM
 	su.iptype = PF_INET;
 	su.reuse = SO_REUSEADDR;
 	su.port = !values.port ? (int *)&defport : &values.port;
 	su.ssl_ctx = NULL;
 
-	if ( 1 ) {
-		const char *fmt = "%-10s: %s\n";
-		FILE *e = stderr;
-		fprintf( e, "Socket opened with options:\n" );
-		fprintf( e, "%10s: %d\n", "addrsize", su.addrsize );	
-		fprintf( e, "%10s: %d\n", "buffersize", su.buffersize );	
-		fprintf( e, "%10s: %d connections\n", "backlog", su.backlog );	
-		fprintf( e, "%10s: %d microseconds\n", "waittime", su.waittime );	
-		fprintf( e, "%10s: %s\n", "protocol", su.protocol == IPPROTO_TCP ? "tcp" : "udp" );	
-		fprintf( e, "%10s: %s\n", "socktype", su.socktype == SOCK_STREAM ? "stream" : "datagram" );	 
-		fprintf( e, "%10s: %s\n", "IPv6?", su.iptype == PF_INET ? "no" : "yes" );	
-		fprintf( e, "%10s: %d\n", "port", *su.port );	
-		//How to dump all the socket info?
+	if ( arg_debug ) {
+		print_socket( &su ); 
 	}
 
+#if 1
+	if ( !open_listening_socket( &su, err, sizeof(err) ) ) {
+		fprintf( stderr, "%s\n", err );
+		close_listening_socket( &su, err, sizeof(err) );
+		return 0;
+	}
+#else
 	//Create the socket body
 	struct sockaddr_in t;
 	memset( &t, 0, sizeof( struct sockaddr_in ) );
@@ -692,7 +701,7 @@ int main (int argc, char *argv[]) {
 	#if 0
 	//Set timeout, reusable bit and any other options 
 	struct timespec to = { .tv_sec = 2 };
-	if (setsockopt(su.fd, SOL_SOCKET, SO_REUSEADDR, &to, sizeof(to)) == -1) {
+	if ( setsockopt(su.fd, SOL_SOCKET, SO_REUSEADDR, &to, sizeof(to)) == -1 ) {
 		// su.free(sock);
 		su.err = errno;
 		return (0, "Could not reopen socket.");
@@ -715,6 +724,7 @@ int main (int argc, char *argv[]) {
 
 	//Mark open flag.
 	su.opened = 1;
+#endif
 
 	//Handle SSL here
 	#if 1 
@@ -866,6 +876,7 @@ int main (int argc, char *argv[]) {
 			struct HTTPBody rq = { 0 }; 
 			struct HTTPBody rs = { 0 };
 			struct senderrecvr *f = &sr[ 0 ]; 
+			int status = 0;
 #if 0
 			//TODO: This doesn't seem quite optimal, but I'm doing it.
 			struct SSLContext ssl = {
@@ -891,17 +902,23 @@ int main (int argc, char *argv[]) {
 
 			if ( close( fd ) == -1 ) {
 				fprintf( stderr, "Couldn't close child socket. %s\n", strerror(errno) );
-				return 0;
+				return 1;
 			}
 		}
-
 	}
 
+#if 1
+	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
+		fprintf( stderr, "%s\n", err );
+		return 1;
+	}
+#else
 	//Close the server process.
 	if ( close( su.fd ) == -1 ) {
 		fprintf( stderr, "Couldn't close socket! Error: %s\n", strerror( errno ) );
 		return 0;
 	}
+#endif
 
 	return 0;
 }

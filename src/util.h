@@ -40,6 +40,7 @@ int safeatoi( const char *value );
 char *get_lstr( char **str, char chr, int *lt );
 char *msg_get_value ( const char *value, const char *chrs, uint8_t *msg, int len );
 char *copystr ( uint8_t *src, int len ) ;
+uint8_t *append_to_uint8t ( uint8_t **, int *, uint8_t *, int ); 
 
 
 

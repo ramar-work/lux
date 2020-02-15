@@ -1,4 +1,5 @@
 #include "../vendor/single.h"
+#include "util.h"
 #ifndef HTTP_H
 
 #define HTTP_H
@@ -25,9 +26,12 @@ struct HTTPBody {
 	char *host;
 	char *boundary;
  	uint8_t *msg;
-#if 1
-	struct HTTPRecord **url;
+#if 0
+	//This may make things more efficient
+	struct HTTPRecord **values;
+#else
 	struct HTTPRecord **headers;
+	struct HTTPRecord **url;
 	struct HTTPRecord **body;
 #endif
 };
@@ -51,4 +55,6 @@ unsigned char *httpvtrim (uint8_t *msg, int len, int *nlen) ;
 unsigned char *httptrim (uint8_t *msg, const char *trim, int len, int *nlen) ;
 void print_httprecords ( struct HTTPRecord **r ) ;
 void print_httpbody ( struct HTTPBody *r ) ;
+struct HTTPBody * http_finalize_response (struct HTTPBody *entity, char *err, int errlen);
+struct HTTPBody * http_finalize_request (struct HTTPBody *entity, char *err, int errlen);
 #endif

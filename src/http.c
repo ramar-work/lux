@@ -115,6 +115,15 @@ static const char *http_status[] = {
 };
 
 
+const char *http_get_status_text ( HTTP_Status status ) {
+	//TODO: This should error out if HTTP_Status is not received...
+	if ( status < 100 || status > sizeof( http_status ) / sizeof( char * ) ) {
+		return http_status[ 200 ];	
+	}
+	return http_status[ status ];	
+}
+
+
 //Trim whitespace
 unsigned char *httpvtrim (uint8_t *msg, int len, int *nlen) {
 	//Define stuff
@@ -169,4 +178,166 @@ void print_httpbody ( struct HTTPBody *r ) {
 	fprintf( stderr, "r->boundary: '%s'\n", r->boundary );
 }
 
+#if 0
+//Like lt_* - this can be done with a bunch of #defines
+int http_response_set_headers ( struct HTTPBody *entity );
+int http_request_set_headers ( struct HTTPBody *entity );
+#endif
 
+//Pack an HTTP request
+int http_pack_request ( struct HTTPBody *entity, struct HTTPRecord **headers, struct HTTPRecord **body ) {
+	return 0;
+}
+
+//Finalize an HTTP request (really just returns a uint8_t, but this can handle it)
+struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, int errlen ) {
+	return NULL;
+}
+
+
+//Finalize an HTTP response (really just returns a uint8_t, but this can handle it)
+struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, int errlen ) {
+	uint8_t *msg = NULL;
+	int msglen = 0;
+	int http_header_len = 0;
+	struct HTTPRecord **headers = NULL;
+	struct HTTPRecord **body = NULL;
+	char http_header_buf[ 2048 ] = { 0 };
+	char http_header_fmt[] = "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\n";
+
+	#if 0
+	fprintf( stderr, "%p\n", entity );
+	fprintf( stderr, "headerlist: %p\n", entity->headers );
+	if ( entity->headers && entity->headers[0] ) {
+		fprintf( stderr, "header (1e): %p %p\n", entity->headers[0], *(entity->headers) );
+		fprintf( stderr, "size: %d\n", (*entity->headers)->size );
+		fprintf( stderr, "value: %p\n", (*entity->headers)->value );
+	}
+
+	fprintf( stderr, "bodylist:   %p\n", entity->body );
+	if ( entity->body && (*entity->body) ) {
+		fprintf( stderr, "body (1e): %p %p\n", entity->body[0], *(entity->body) );
+		fprintf( stderr, "%d\n", (*entity->body)->size );
+		fprintf( stderr, "%p\n", (*entity->body)->value );
+	}
+	#endif
+
+	if ( !entity->headers && !entity->body ) {
+		snprintf( err, errlen, "%s", "No headers or body specified with response." );
+		return NULL;
+	}
+
+	if ( !entity->ctype ) {
+		snprintf( err, errlen, "%s", "No Content-Type specified with response." );
+		return NULL;
+	}
+
+	if ( !entity->status ) {
+		snprintf( err, errlen, "%s", "No status specified with response." );
+		return NULL;
+	}
+
+	if ( (*entity->body) && ( !(*entity->body)->value || !(*entity->body)->size ) ) {
+		snprintf( err, errlen, "%s", "No body length specified with response." );
+		return NULL;
+	}
+
+	//This assumes (perhaps wrongly) that ctype is already set.
+	entity->clen = (*entity->body)->size;
+	http_header_len = snprintf( http_header_buf, sizeof(http_header_buf) - 1, http_header_fmt,
+		entity->status, http_get_status_text( entity->status ), entity->ctype, (*entity->body)->size );
+
+	if ( !append_to_uint8t( &msg, &msglen, (uint8_t *)http_header_buf, http_header_len ) ) {
+		snprintf( err, errlen, "%s", "Failed to add default HTTP headers to message." );
+		return NULL;
+	}
+
+	//TODO: Catch each of these or use a static buffer and append ONE time per struct...
+	while ( entity->headers && (*entity->headers)->field ) {
+		struct HTTPRecord *r = *entity->headers;
+		append_to_uint8t( &msg, &msglen, (uint8_t *)r->field, strlen( r->field ) ); 
+		append_to_uint8t( &msg, &msglen, (uint8_t *)": ", 2 ); 
+		append_to_uint8t( &msg, &msglen, (uint8_t *)r->value, r->size ); 
+		append_to_uint8t( &msg, &msglen, (uint8_t *)"\r\n", 2 ); 
+		entity->headers++;
+	}
+
+	if ( !msg ) {
+		snprintf( err, errlen, "Failed to append all headers" );
+		return NULL;
+	}
+
+	if ( !append_to_uint8t( &msg, &msglen, (uint8_t *)"\r\n", 2 ) ) {
+		snprintf( err, errlen, "%s", "Could not add header terminator to message." );
+		return NULL;
+	}
+
+	if ( !append_to_uint8t( &msg, &msglen, (*entity->body)->value, (*entity->body)->size ) ) {
+		snprintf( err, errlen, "%s", "Could not add content to message." );
+		return NULL;
+	}
+
+	entity->msg = msg;
+	entity->mlen = msglen;
+	//fprintf( stderr, "entity->msg: %p\n", entity->msg );
+	//fprintf( stderr, "entity->mlen : %d\n", entity->mlen );
+	return entity;
+}
+
+//Pack an HTTP response
+//Content-Type
+//Content-Length
+//Status
+//Content
+//Additional headers
+int http_pack_response ( struct HTTPBody *entity, uint8_t *msg, int msglen, struct HTTPRecord **headers ) {
+	//A finished message belongs in r->msg
+#if 0
+	//Define 
+	HTTP_Response *res = &h->response;
+	uint8_t statline[1024] = { 0 };
+	char ff[4] = { 0 };
+	const char *fmt   = "HTTP/%s %d %s\r\n";
+	const char *cfmt  = "Content-Length: %d\r\n";
+	const char *ctfmt = "Content-Type: %s\r\n\r\n";
+
+	//Set defaults
+	(!res->version) ? res->version = 1.1              : 0;
+	(!res->ctype)   ? res->ctype   = "text/html"      : 0;
+	(!res->status)  ? res->status  = 200              : 0;
+	(!res->sttext)  ? res->sttext  = http_status[200] : 0;
+	snprintf(ff, 4, (res->version < 2) ? "%1.1f" : "%1.0f", res->version);
+
+	//Copy the status line
+	res->mlen += sprintf( (char *)&statline[res->mlen], fmt, 
+		ff, res->status, res->sttext);
+
+	//All other headers get res->mlen here
+	//....?
+
+	//Always have at least a content length line
+	res->mlen += sprintf( (char *)&statline[res->mlen], cfmt, res->clen);
+
+	//Finally, set a content-type
+	res->mlen += sprintf( (char *)&statline[res->mlen], ctfmt, res->ctype);
+
+	//Stop now if this is a zero length message.
+	if (!res->clen) {
+		//memcpy( &res->msg[0], statline, res->mlen );
+		if ( !bf_append( h->resb, statline, res->mlen ) ) {
+			return 0;
+		}
+		return 1;
+	}
+
+	//Move the message (provided there's space)		
+	//This will fail when using fixed buffers...
+	if ( !bf_prepend( h->resb, statline, res->mlen ) ) {
+		return 0;
+	}
+	//memmove( &res->msg[res->mlen], &res->msg[0], res->clen);
+	//memcpy( &res->msg[0], statline, res->mlen ); 
+	res->mlen += res->clen;
+#endif
+	return 1;
+}
