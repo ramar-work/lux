@@ -178,6 +178,206 @@ void print_httpbody ( struct HTTPBody *r ) {
 	fprintf( stderr, "r->boundary: '%s'\n", r->boundary );
 }
 
+
+
+
+//Parse an HTTP request
+struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int errlen ) {
+
+	//Prepare the rest of the request
+	char *header = (char *)entity->msg;
+	int pLen = memchrat( entity->msg, '\n', entity->mlen ) - 1;
+	const int flLen = pLen + strlen( "\r\n" );
+	int hdLen = memstrat( entity->msg, "\r\n\r\n", entity->mlen );
+
+	//Initialize the remainder of variables 
+	entity->headers = NULL;
+	entity->body = NULL;
+	entity->url = NULL;
+	entity->method = get_lstr( &header, ' ', &pLen );
+	entity->path = get_lstr( &header, ' ', &pLen );
+	entity->protocol = get_lstr( &header, ' ', &pLen ); 
+	entity->hlen = hdLen; 
+	entity->host = msg_get_value( "Host: ", "\r", entity->msg, hdLen );
+
+	//The protocol parsing can happen here...
+	if ( strcmp( entity->method, "HEAD" ) == 0 )
+		;
+	else if ( strcmp( entity->method, "GET" ) == 0 )
+		;
+	else if ( strcmp( entity->method, "POST" ) == 0 ) {
+		entity->clen = safeatoi( msg_get_value( "Content-Length: ", "\r", entity->msg, hdLen ) );
+		entity->ctype = msg_get_value( "Content-Type: ", ";\r", entity->msg, hdLen );
+		entity->boundary = msg_get_value( "boundary=", "\r", entity->msg, hdLen );
+		//entity->mlen = hdLen; 
+		//If clen is -1, ... hmmm.  At some point, I still need to do the rest of the work. 
+	}
+
+	#if 1	
+	print_httpbody( entity );	
+	getchar();
+	#endif	
+
+	//Define records for each type here...
+	//struct HTTPRecord **url=NULL, **headers=NULL, **body=NULL;
+	int len = 0;
+	Mem set;
+	memset( &set, 0, sizeof( Mem ) );
+
+	//Always process the URL (specifically GET vars)
+	if ( strlen( entity->path ) == 1 ) {
+		ADDITEM( NULL, struct HTTPRecord, entity->url, len, 0 );
+	}
+	else {
+		int index = 0;
+		while ( strwalk( &set, entity->path, "?&" ) ) {
+			uint8_t *t = (uint8_t *)&entity->path[ set.pos ];
+			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
+			memset( b, 0, sizeof( struct HTTPRecord ) );
+			int at = memchrat( t, '=', set.size );
+			if ( !b || at == -1 || !set.size ) 
+				;
+			else {
+				int klen = at;
+				b->field = copystr( t, klen );
+				klen += 1, t += klen, set.size -= klen;
+				b->value = t;
+				b->size = set.size;
+				ADDITEM( b, struct HTTPRecord, entity->url, len, 0 );
+			}
+		}
+		ADDITEM( NULL, struct HTTPRecord, entity->url, len, 0 );
+	}
+
+
+	//Always process the headers
+	memset( &set, 0, sizeof( Mem ) );
+	len = 0;
+	uint8_t *h = &entity->msg[ flLen - 1 ];
+	while ( memwalk( &set, h, (uint8_t *)"\r", entity->hlen, 1 ) ) {
+		//Break on newline, and extract the _first_ ':'
+		uint8_t *t = &h[ set.pos - 1 ];
+		if ( *t == '\r' ) {  
+			int at = memchrat( t, ':', set.size );
+			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
+			memset( b, 0, sizeof( struct HTTPRecord ) );
+			if ( !b || at == -1 || at > 127 )
+				;
+			else {
+				at -= 2, t += 2;
+				b->field = copystr( t, at );
+				at += 2 /*Increment to get past ': '*/, t += at, set.size -= at;
+				b->value = t;
+				b->size = set.size - 1;
+			#if 0
+				DUMP_RIGHT( b->value, b->size );
+			#endif
+				ADDITEM( b, struct HTTPRecord, entity->headers, len, 0 );
+			}
+		}
+	}
+	ADDITEM( NULL, struct HTTPRecord, entity->headers, len, 0 );
+
+	//Always process the body 
+	memset( &set, 0, sizeof( Mem ) );
+	len = 0;
+	uint8_t *p = &entity->msg[ entity->hlen + strlen( "\r\n" ) ];
+	int plen = entity->mlen - entity->hlen;
+	
+	//TODO: If this is a xfer-encoding chunked msg, entity->clen needs to get filled in when done.
+	if ( strcmp( "POST", entity->method ) != 0 ) {
+		ADDITEM( NULL, struct HTTPRecord, entity->body, len, 0 );
+	}
+	else {
+		struct HTTPRecord *b = NULL;
+		#if 0
+		DUMP_RIGHT( p, entity->mlen - entity->hlen ); 
+		#endif
+		//TODO: Bitmasking is 1% more efficient, go for it.
+		int name=0, value=0, index=0;
+
+		//url encoded is a little bit different.  no real reason to use the same code...
+		if ( strcmp( entity->ctype, "application/x-www-form-urlencoded" ) == 0 ) {
+			//NOTE: clen is up by two to assist our little tokenizer...
+			while ( memwalk( &set, p, (uint8_t *)"\n=&", entity->clen + 2, 3 ) ) {
+				uint8_t *m = &p[ set.pos - 1 ];  
+				if ( *m == '\n' || *m == '&' ) {
+					b = malloc( sizeof( struct HTTPRecord ) );
+					memset( b, 0, sizeof( struct HTTPRecord ) ); 
+					//TODO: Should be checking that allocation was successful
+					b->field = copystr( ++m, set.size );
+				}
+				else if ( *m == '=' ) {
+					b->value = ++m;
+					b->size = set.size;
+					ADDITEM( b, struct HTTPRecord, entity->body, len, 0 );
+					b = NULL;
+				}
+			}
+		}
+		else {
+			while ( memwalk( &set, p, (uint8_t *)"\r:=;", entity->clen, 4 ) ) {
+				//TODO: If we're being technical, set.pos - 1 can point to a negative index.  
+				//However, as long as headers were sent (and 99.99999999% of the time they will be)
+				//this negative index will point to valid allocated memory...
+				uint8_t *m = &p[ set.pos - 1 ];  
+				if ( memcmp( m, "; name=", 7 ) == 0 )
+					name = 1;
+				//"\r\n\r\n"
+				else if ( memcmp( m, "\r\n\r\n", 4 ) == 0 && !value )
+					value = 1;
+				else if ( memcmp( m, "\r\n-", 3 ) == 0 && !value ) {
+					b = malloc( sizeof( struct HTTPRecord ) );
+					memset( b, 0, sizeof( struct HTTPRecord ) ); 
+				}
+				else if ( memcmp( m, "\r\n", 2 ) == 0 && value == 1 ) {
+					m += 2;
+					b->value = m;//++t;
+					b->size = set.size - 1;
+					ADDITEM( b, struct HTTPRecord, entity->body, len, 0 );
+					value = 0;
+					b = NULL;
+				}
+				else if ( *m == '=' && name == 1 ) {
+					//fprintf( stderr, "copying name field... pass %d\n", ++index );
+					int size = *(m + 1) == '"' ? set.size - 2 : set.size;
+				#if 1
+					m += ( *(m + 1) == '"' ) ? 2 : 1 ;
+				#else
+					int ptrinc = *(m + 1) == '"' ? 2 : 1;
+					m += ptrinc;
+				#endif
+					b->field = copystr( m, size );
+					name = 0;
+				}
+			}
+		}
+
+		//Add a terminator element
+		ADDITEM( NULL, struct HTTPRecord, entity->body, len, 0 );
+		//This MAY help in handling malformed messages...
+		( b && (!b->field || !b->value) ) ? free( b ) : 0;
+
+		if ( 0 ) {
+			fprintf( stderr, "BODY got:\n" );
+			print_httprecords( entity->body );
+		}
+	}
+
+	return NULL;
+} 
+
+
+//Parse an HTTP response
+struct HTTPBody * http_parse_response ( struct HTTPBody *entity, char *err, int errlen ) {
+
+	return NULL;
+} 
+
+
+
+
+
 #if 0
 //Like lt_* - this can be done with a bunch of #defines
 int http_response_set_headers ( struct HTTPBody *entity );
@@ -188,6 +388,67 @@ int http_request_set_headers ( struct HTTPBody *entity );
 int http_pack_request ( struct HTTPBody *entity, struct HTTPRecord **headers, struct HTTPRecord **body ) {
 	return 0;
 }
+
+
+//Pack an HTTP response
+//Content-Type
+//Content-Length
+//Status
+//Content
+//Additional headers
+int http_pack_response ( struct HTTPBody *entity, uint8_t *msg, int msglen, struct HTTPRecord **headers ) {
+	//A finished message belongs in r->msg
+#if 0
+	//Define 
+	HTTP_Response *res = &h->response;
+	uint8_t statline[1024] = { 0 };
+	char ff[4] = { 0 };
+	const char *fmt   = "HTTP/%s %d %s\r\n";
+	const char *cfmt  = "Content-Length: %d\r\n";
+	const char *ctfmt = "Content-Type: %s\r\n\r\n";
+
+	//Set defaults
+	(!res->version) ? res->version = 1.1              : 0;
+	(!res->ctype)   ? res->ctype   = "text/html"      : 0;
+	(!res->status)  ? res->status  = 200              : 0;
+	(!res->sttext)  ? res->sttext  = http_status[200] : 0;
+	snprintf(ff, 4, (res->version < 2) ? "%1.1f" : "%1.0f", res->version);
+
+	//Copy the status line
+	res->mlen += sprintf( (char *)&statline[res->mlen], fmt, 
+		ff, res->status, res->sttext);
+
+	//All other headers get res->mlen here
+	//....?
+
+	//Always have at least a content length line
+	res->mlen += sprintf( (char *)&statline[res->mlen], cfmt, res->clen);
+
+	//Finally, set a content-type
+	res->mlen += sprintf( (char *)&statline[res->mlen], ctfmt, res->ctype);
+
+	//Stop now if this is a zero length message.
+	if (!res->clen) {
+		//memcpy( &res->msg[0], statline, res->mlen );
+		if ( !bf_append( h->resb, statline, res->mlen ) ) {
+			return 0;
+		}
+		return 1;
+	}
+
+	//Move the message (provided there's space)		
+	//This will fail when using fixed buffers...
+	if ( !bf_prepend( h->resb, statline, res->mlen ) ) {
+		return 0;
+	}
+	//memmove( &res->msg[res->mlen], &res->msg[0], res->clen);
+	//memcpy( &res->msg[0], statline, res->mlen ); 
+	res->mlen += res->clen;
+#endif
+	return 1;
+}
+
+
 
 //Finalize an HTTP request (really just returns a uint8_t, but this can handle it)
 struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, int errlen ) {
@@ -282,62 +543,4 @@ struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, i
 	//fprintf( stderr, "entity->msg: %p\n", entity->msg );
 	//fprintf( stderr, "entity->mlen : %d\n", entity->mlen );
 	return entity;
-}
-
-//Pack an HTTP response
-//Content-Type
-//Content-Length
-//Status
-//Content
-//Additional headers
-int http_pack_response ( struct HTTPBody *entity, uint8_t *msg, int msglen, struct HTTPRecord **headers ) {
-	//A finished message belongs in r->msg
-#if 0
-	//Define 
-	HTTP_Response *res = &h->response;
-	uint8_t statline[1024] = { 0 };
-	char ff[4] = { 0 };
-	const char *fmt   = "HTTP/%s %d %s\r\n";
-	const char *cfmt  = "Content-Length: %d\r\n";
-	const char *ctfmt = "Content-Type: %s\r\n\r\n";
-
-	//Set defaults
-	(!res->version) ? res->version = 1.1              : 0;
-	(!res->ctype)   ? res->ctype   = "text/html"      : 0;
-	(!res->status)  ? res->status  = 200              : 0;
-	(!res->sttext)  ? res->sttext  = http_status[200] : 0;
-	snprintf(ff, 4, (res->version < 2) ? "%1.1f" : "%1.0f", res->version);
-
-	//Copy the status line
-	res->mlen += sprintf( (char *)&statline[res->mlen], fmt, 
-		ff, res->status, res->sttext);
-
-	//All other headers get res->mlen here
-	//....?
-
-	//Always have at least a content length line
-	res->mlen += sprintf( (char *)&statline[res->mlen], cfmt, res->clen);
-
-	//Finally, set a content-type
-	res->mlen += sprintf( (char *)&statline[res->mlen], ctfmt, res->ctype);
-
-	//Stop now if this is a zero length message.
-	if (!res->clen) {
-		//memcpy( &res->msg[0], statline, res->mlen );
-		if ( !bf_append( h->resb, statline, res->mlen ) ) {
-			return 0;
-		}
-		return 1;
-	}
-
-	//Move the message (provided there's space)		
-	//This will fail when using fixed buffers...
-	if ( !bf_prepend( h->resb, statline, res->mlen ) ) {
-		return 0;
-	}
-	//memmove( &res->msg[res->mlen], &res->msg[0], res->clen);
-	//memcpy( &res->msg[0], statline, res->mlen ); 
-	res->mlen += res->clen;
-#endif
-	return 1;
 }

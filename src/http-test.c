@@ -1,20 +1,31 @@
 #include "http.h"
-#include "aeon_thumb_favicon.c"
+#include "http-test-data.c"
 
 const char default_protocol[] = "HTTP/1.1";
 
 struct HTTPRecord *text_body[] = { 
 	&(struct HTTPRecord){ NULL, NULL, (uint8_t *)"<h2>Ok</h2>", 11 } 
 };
+
 struct HTTPRecord *uint8_body[] = { 
 	&(struct HTTPRecord){ NULL, NULL, aeon_thumb_favicon_jpg, 3848 } 
 };
+
+struct HTTPRecord *text_body_no_body[] = { 
+	&(struct HTTPRecord){ NULL, NULL, NULL, 11 } 
+};
+
+struct HTTPRecord *text_body_no_len[] = { 
+	&(struct HTTPRecord){ NULL, NULL, (uint8_t *)"<h2>Ok</h2>" } 
+};
+
 struct HTTPRecord *headers[] = {
 	&(struct HTTPRecord){ "X-Case-Contact", NULL, (uint8_t *)"Lydia", 5 },
 	&(struct HTTPRecord){ "ETag", NULL, (uint8_t *)"dd323d9asdf", 11 },
 	&(struct HTTPRecord){ "Accept", NULL, (uint8_t *)"*/*", 3 },
 	&(struct HTTPRecord){ NULL }
 };
+
 struct HTTPRecord xheaders[] = {
 	{ "X-Case-Contact", NULL, (uint8_t *)"Lydia", 5 },
 	{ "ETag", NULL, (uint8_t *)"dd323d9asdf", 11 },
@@ -40,22 +51,19 @@ struct HTTPBody response_small_body = {
 	.headers = NULL
 };
 
-struct HTTPBody response_binary_body = {
+struct HTTPBody response_small_body_missing_params_1 = {
 	.status = 200,
 	.ctype = "image/jpeg",
 	.protocol = "HTTP/1.1",
-	.body = (struct HTTPRecord **)uint8_body 
+	.body = (struct HTTPRecord **)text_body_no_body
 };
 
-//TODO: Add a response with no body value or len, and see that the check works...
-#if 0
-struct HTTPBody response_binary_body = {
+struct HTTPBody response_small_body_missing_params_2 = {
 	.status = 200,
 	.ctype = "image/jpeg",
 	.protocol = "HTTP/1.1",
-	.body = (struct HTTPRecord **)uint8_body 
+	.body = (struct HTTPRecord **)text_body_no_len
 };
-#endif
 
 struct HTTPBody response_small_body_with_headers = {
 	.status = 200,
@@ -63,16 +71,6 @@ struct HTTPBody response_small_body_with_headers = {
 	.protocol = "HTTP/1.1",
 	.headers = (struct HTTPRecord **)&headers,
 	.body = (struct HTTPRecord **)&text_body,
-#if 0
-	.body = ( struct HTTPRecord ** )( struct HTTPRecord *[] ){
-		&( struct HTTPRecord ){ NULL, NULL, (uint8_t *)"<h2>Ok</h2>", 11 }
-	},
-	.headers = ( struct HTTPRecord ** )( struct HTTPRecord *[] ){
-		&( struct HTTPRecord ){ "X-Case-Contact", NULL, (uint8_t *)"Lydia", 5 },
-		{ "ETag", NULL, (uint8_t *)"dd323d9asdf", 11 },
-		{ "Accept", NULL, (uint8_t *)"*/*", 3 },
-	},
-#endif
 };
 
 struct HTTPBody response_with_error_not_found = {
@@ -84,8 +82,6 @@ struct HTTPBody response_with_error_not_found = {
 	}
 };
 
-
-#if 0
 struct HTTPBody response_with_error_internal_server_error = {
 	.status = 500,
 	.ctype = "text/html",
@@ -103,8 +99,13 @@ struct HTTPBody response_with_invalid_error_code = {
 		&(struct HTTPRecord){ NULL, NULL, (uint8_t *)"<h2>Never</h2>", 14 }
 	}
 };
-#endif
 
+struct HTTPBody response_binary_body = {
+	.status = 200,
+	.ctype = "image/jpeg",
+	.protocol = "HTTP/1.1",
+	.body = (struct HTTPRecord **)uint8_body 
+};
 
 #if 0
 //Build a response body like it would be in a real environment
@@ -156,24 +157,140 @@ struct HTTPBody *build_test_object ( int status, char *ctype, uint8_t *body, int
 }
 #endif
 
+
+
+//small HEAD 
+//small GET
+//big GET
+//small POST
+//big POST 
+//binary POST 
+//small PUT
+//big PUT
+//binary PUT 
+//small DELETE 
+//small OPTIONS 
+
+const uint8_t head_body[] =
+ "HEAD /gan HTTP/1.1\r\n"
+ "Content-Type: text/html\r\n"
+ "Text-trapper: Nannybot\r\n\r\n"
+;
+
+const uint8_t head_body_missing_protocol[] =
+ "HEAD /gan\r\n"
+ "Content-Type: text/html\r\n"
+ "Text-trapper: Nannybot\r\n\r\n"
+;
+
+const uint8_t get_body_missing_path[] =
+ "GET HTTP/1.1\r\n"
+ "Content-Type: text/html\r\n"
+ "Text-trapper: Nannybot\r\n\r\n"
+;
+
+const uint8_t get_body_missing_headers[] =
+ "GET HTTP/1.1\r\n"
+;
+
+const uint8_t get_body_extra_long_path[] =
+ "GET " HTTP_PATH_2048_CHARS " HTTP/1.1\r\n"
+;
+
+const uint8_t get_body_1[] =
+ "GET / HTTP/1.1\r\n"
+ "Content-Type: text/html\r\n"
+ "Text-trapper: Nannybot\r\n\r\n"
+;
+
+const uint8_t get_body_2[] =
+ "GET /j HTTP/1.1\r\n"
+ "Content-Type: text/html\r\n"
+ "Text-trapper: Nannybot\r\n\r\n"
+;
+
+const uint8_t get_body_3[] =
+ "GET /etc/2001-06-07?index=full&get=all HTTP/1.1\r\n"
+ "Content-Type:"" text/html\r\n"
+ "Host: hellohellion.com:3496\r\n"
+ "Upgrade:"     " HTTP/2.0, HTTPS/1.3, IRC/6.9, RTA/x11, websocket\r\n"
+ "Text-trapper:"" Nannybot\r\n\r\n"
+;
+
+//Tests cookies and Hosts with colons
+const uint8_t get_body_4[] =
+ "GET /jax HTTP/1.1\r\n"
+ "Content-Type: text/html\r\n"
+ "Host: jimmycrackcorn.com:3496\r\n"
+ "Set-Cookie: name=Nicholas; expires=Sat, 02 May 2009 23:38:25 GMT\r\n"
+ "Text-trapper: Nannybot\r\n\r\n"
+;
+
+const uint8_t get_body_5[] =
+ "GET /etc/2001-06-07?index=full&get=all&funder=3248274982j2kljjjoasdf HTTP/1.1\r\n"
+ "Content-Type:"" text/html\r\n"
+ "Upgrade:"     " HTTP/2.0, HTTPS/1.3, IRC/6.9, RTA/x11, websocket\r\n"
+ "Text-trapper:"" Nannybot\r\n\r\n"
+;
+
+const uint8_t get_body_6[] =
+ "GET /etc/2001-06-07?index=full&get=allxxxxxxxxxxxxxxxxx HTTP/1.1\r\n"
+ "Content-Type:"" text/html\r\n"
+ "Upgrade:"     " HTTP/2.0, HTTPS/1.3, IRC/6.9, RTA/x11, websocket\r\n"
+ "Text-trapper:"" Nannybot\r\n\r\n"
+;
+
+const uint8_t post_body_1[] =
+ "POST /chinchinchinny/washhouse/2011-01-20/index?get=html&version=12 HTTP/1.1\r\n"
+ "Content-Type"     ": application/x-www-form-urlencoded\r\n"
+ "TE"               ": trailers,Â deflate\r\n"
+ "Upgrade"          ": HTTP/2.0, HTTPS/1.3, IRC/6.9, RTA/x11, websocket\r\n"
+ //"User-Agent"       ": Mozilla/5.0 (X11; Linux x86_64; rv:12.0) Gecko/20100101 Firefox/21.0\r\n"
+ "Via"              ": 1.0 fred, 1.1 example.com (Apache/1.1)\r\n"
+ "Warning"          ": 199 Miscellaneous warning\r\n"
+ "X-Requested-With" ": XMLHttpRequest\r\n"
+ "Content-Length"   ": 72\r\n\r\n" 
+ "FirstName=Bacon&LastName=Gordon&Age=67" 
+ "&Formula=a+%2B+b+%3D%3D+13%25%21\r\n"
+;
+
+const uint8_t put_body[] =
+ "PUT /chinchinchinny HTTP/1.1\r\n"
+ "Content-Type: application/x-www-form-urlencoded\r\n"
+ "Content-Length: 72\r\n\r\n" 
+ "FirstName=Bacon&LastName=Gordon&Age=67" 
+ "&Formula=a+%2B+b+%3D%3D+13%25%21\r\n"
+;
+
+
+struct HTTPBody *requests[] = {
+	&(struct HTTPBody){ .msg = (uint8_t *)head_body,  .mlen = sizeof( head_body ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)get_body_1, .mlen = sizeof( get_body_1 ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)get_body_2, .mlen = sizeof( get_body_2 ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)get_body_3, .mlen = sizeof( get_body_3 ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)get_body_4, .mlen = sizeof( get_body_4 ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)get_body_5, .mlen = sizeof( get_body_5 ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)get_body_6, .mlen = sizeof( get_body_6 ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)post_body_1,.mlen = sizeof( post_body_1 ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)post_body_2,.mlen = sizeof( post_body_2 ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)put_body,   .mlen = sizeof( put_body ) },
+};
+
+
 struct HTTPBody *responses[] = {
 	&response_missing_body,
 	&response_small_body,
+	&response_small_body_missing_params_1,
+	&response_small_body_missing_params_2,
 	&response_small_body_with_headers,
 	&response_with_error_not_found,
-	&response_binary_body,
-#if 0
 	&response_with_error_internal_server_error,
 	&response_with_invalid_error_code,
-#endif
+	&response_binary_body,
 	NULL
 };
 
-struct HTTPBody *requests[] = {
-	NULL
-};
-
-
+#if 0
 struct HTTPRecord ** build_header_structure( struct HTTPRecord **h ) {
 	struct HTTPRecord **hh = headers;
 	struct HTTPRecord **new = NULL;
@@ -190,43 +307,19 @@ struct HTTPRecord ** build_header_structure( struct HTTPRecord **h ) {
 	ADDITEM( NULL, struct HTTPRecord, new, newlen, NULL );
 	return new;
 }
+#endif
+
 
 int main ( int argc, char *argv[] ) {
-	struct HTTPRecord **hk = build_header_structure( headers );
-#if 0
-	while ( *hk ) {
-		fprintf(stderr,"%s\n",(*hk)->field );
-		hk++;
-	}
-return 0;
-#endif
-#if 0
-	struct HTTPBody *resp[] = {
-		build_test_object( 200, "text/html", NULL, 0, NULL ),
-		build_test_object( 200, "text/html", (uint8_t *)"<h2>Ok!</h2>", 11, NULL ),
-		build_test_object( 200, "text/html", aeon_thumb_favicon_jpg, aeon_thumb_favicon_jpg_len, NULL ),
-		build_test_object( 200, "text/html", (uint8_t *)"<h2>Ok!</h2>", 11, (struct HTTPRecord *[]){ 
-			&( struct HTTPRecord ){ "X-Case-Contact", NULL, (uint8_t *)"Lydia", 5 },
-			&( struct HTTPRecord ){ "ETag", NULL, (uint8_t *)"dd323d9asdf", 11 },
-			NULL
-	#if 0
-			{ "Accept", NULL, (uint8_t *)"*/*", 3 },
-	#endif
-		}),
-		build_test_object( 404, "text/html", (uint8_t *)"<h2>Internal Server Error</h2>", 31, NULL ),
-		build_test_object( 500, "text/html", (uint8_t *)"<h2>Never</h2>", 14, NULL ),
-		build_test_object( 909, "text/html", (uint8_t *)"<h2>Ok!</h2>", 11, NULL ),
-		NULL
-	};
-#endif
-
 	//All this does is output text strings
-#if 0
 	fprintf( stderr, "Request parsing:\n" );
 	struct HTTPBody **req = requests;
+	//const uint8_t **req = requests;
 	while ( *req ) {
 		char err[ 2048 ] = { 0 };
-		struct HTTPBody *body = http_finalize_response( *req, err, sizeof(err) );
+		//write( 2, (*req)->msg, 7 );	
+#if 1
+		struct HTTPBody *body = http_parse_request( *req, err, sizeof(err) );
 		if ( !body ) {
 			fprintf( stderr, "FAILED - %s\n", err );
 			req++;
@@ -234,11 +327,13 @@ return 0;
 		}
 
 		fprintf( stderr, "SUCCESS - " );
-		write( 2, body->msg, body->mlen );
+		//All of the members should be filled out...
+		//write( 2, body->msg, body->mlen );
+#endif
 		req++;
 	}
-#endif
 
+#if 0
 	fprintf( stderr, "Response packing:\n" );
 	struct HTTPBody **res = responses;
 	while ( *res ) {
@@ -246,9 +341,10 @@ return 0;
 		struct HTTPBody *body = NULL;
 		char err[ 2048 ] = { 0 };
 		int m = 0;
+		fprintf( stderr, "\n" );
 
 		if ( !( body = http_finalize_response( *res, err, sizeof(err) ) ) ) {
-			fprintf( stderr, "FAILED - %s\n", err );
+			fprintf( stderr, "FAILED - %s", err );
 			res++;
 			continue;
 		}
@@ -260,5 +356,6 @@ return 0;
 		}
 		res++;
 	}
+#endif
 	return 0;
 }

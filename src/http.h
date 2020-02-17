@@ -57,4 +57,6 @@ void print_httprecords ( struct HTTPRecord **r ) ;
 void print_httpbody ( struct HTTPBody *r ) ;
 struct HTTPBody * http_finalize_response (struct HTTPBody *entity, char *err, int errlen);
 struct HTTPBody * http_finalize_request (struct HTTPBody *entity, char *err, int errlen);
+struct HTTPBody * http_parse_request (struct HTTPBody *entity, char *err, int errlen);
+struct HTTPBody * http_parse_response (struct HTTPBody *entity, char *err, int errlen);
 #endif

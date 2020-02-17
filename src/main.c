@@ -353,6 +353,13 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 		}
 	}
 
+#if 1
+	char err[ 2048 ] = {0};
+	if ( !http_parse_response( rq, err, sizeof(err) ) ) {
+		//close( fd );
+		return 0;
+	}
+#else
 	//Prepare the rest of the request
 	char *header = (char *)rq->msg;
 	int pLen = memchrat( rq->msg, '\n', rq->mlen ) - 1;
@@ -534,6 +541,7 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 
 	//for testing, this should stay here...
 	//close(fd);
+#endif
 	return 0;
 }
 
