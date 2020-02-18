@@ -14,6 +14,17 @@ const char *words[] = {
 
 int main ( int argc, char *argv[] ) {
 
+	char buf[ 24 ];
+	char *a = srand_nums( buf, sizeof(buf) );
+	fprintf( stderr, "rand nums: %s\n", a );
+#if 0
+	char *b = srand_nums( &buf, sizeof(buf) );
+	fprintf( stderr, "rand nums: %s\n", b );
+	char *c = srand_nums( &buf, sizeof(buf) );
+	fprintf( stderr, "rand nums: %s\n", c );
+#endif
+return 0;
+
 	//Test append with a bunch of stuff for now...
 	fprintf( stderr, "APPEND_TO_UINT8T: " );
 	const char **ww = words;

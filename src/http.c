@@ -493,6 +493,7 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 	uint8_t *msg = NULL;
 	int msglen = 0;
 	int http_header_len = 0;
+	int multipart = 0;
 	struct HTTPRecord **headers = NULL;
 	struct HTTPRecord **body = NULL;
 	char http_header_buf[ 2048 ] = { 0 };
@@ -516,52 +517,46 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 	}
 
 	if ( strcmp( entity->method, "POST" ) == 0 || strcmp( entity->method, "PUT" ) == 0 ) {
+	#if 0
 		if ( !entity->clen ) {
 			snprintf( err, errlen, "Content-Length not specified for %s request.", entity->method );
 			return NULL;
 		}
+	#endif
 
-		if ( !entity->ctype ) {
+		if ( !entity->body && !entity->ctype ) {
 			snprintf( err, errlen, "Content-type not specified for %s request.", entity->method );
 			return NULL;
 		}
 
-		if ( memcmp( entity->ctype, "multi", 5 ) == 0 ) {
+		if ( ( multipart = ( memcmp( entity->ctype, "multi", 5 ) == 0 ) ) ) {
+		#if 0
 			entity->boundary = "a___boundary"; //Generate this...
+		#else
+			Random t;
+			char buf[ 32 ];
+			memset( buf, '-', sizeof( buf ) );
+			//memcpy( &buf[6], rand_alnum( &t, 24 ), 24 );
+			char *a = rand_alnum( &t, 24 );
+fprintf( stderr, "BOUNDARY: %s\n", a );
+			entity->boundary = strdup( buf );
+fprintf( stderr, "BOUNDARY: %s\n", entity->boundary );
+		#endif
 		}
 	}
 
+	//Because of the way that this works, I have to do this at the end
+	#if 0
 	http_header_len = snprintf( http_header_buf, sizeof(http_header_buf) - 1, http_header_fmt,
 		entity->method, entity->path, entity->protocol );
-
+	
 	if ( !append_to_uint8t( &msg, &msglen, (uint8_t *)http_header_buf, http_header_len ) ) {
 		snprintf( err, errlen, "%s", "Failed to add HTTP metadata to request." );
 		return NULL;
 	}
-
-	//Add content-type, length and host if exists
-	if ( entity->host ) {
-		append_to_uint8t( &msg, &msglen, (uint8_t *)http_host_header_str, sizeof( http_host_header_str ) );
-		append_to_uint8t( &msg, &msglen, (uint8_t *)entity->host, strlen( entity->host ) );
-	}
-
-	#if 0
-	if ( entity->clen ) {
-		append_to_uint8t( &msg, &msglen, (uint8_t *)http_content_length_header_str, sizeof( http_content_length_header_str ) );
-		//append_to_uint8t( &msg, &msglen, (uint8_t *)entity->clen, strlen( entity->clen ) );
-	}
 	#endif
 
-	if ( entity->ctype ) {
-		append_to_uint8t( &msg, &msglen, (uint8_t *)http_content_type_header_str, sizeof( http_content_type_header_str ) );
-		if ( !entity->boundary ) {
-
-		}
-		else {
-			//Append with the boundary
-		}
-	}
-
+	#if 1
 	//TODO: Catch each of these or use a static buffer and append ONE time per struct...
 	while ( entity->headers && (*entity->headers)->field ) {
 		struct HTTPRecord *r = *entity->headers;
@@ -572,28 +567,56 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 		entity->headers++;
 	}
 
-	if ( !msg ) {
-		snprintf( err, errlen, "Failed to append all headers" );
-		return NULL;
-	}
+	//memmove is the most straightforward thing to do (but the slowest)
+	#endif
 
-	#if 0
+	write( 2, msg, msglen );
+	write( 2, "\n", 1 );
+	getchar();
+
+	#if 1
 	//TODO: Catch each of these or use a static buffer and append ONE time per struct...
-	while ( entity->body && (*entity->body)->field ) {
-		struct HTTPRecord *r = *entity->body;
-		append_to_uint8t( &msg, &msglen, (uint8_t *)r->field, strlen( r->field ) ); 
-		append_to_uint8t( &msg, &msglen, (uint8_t *)": ", 2 ); 
-		append_to_uint8t( &msg, &msglen, (uint8_t *)r->value, r->size ); 
-		append_to_uint8t( &msg, &msglen, (uint8_t *)"\r\n", 2 ); 
-		append_to_uint8t( &msg, &msglen, (uint8_t *)entity->boundary, strlen( entity->boundary ) ); 
-		entity->body++;
+	if ( strcmp( entity->method, "POST" ) == 0 || strcmp( entity->method, "PUT" ) == 0 ) {
+		while ( entity->body && (*entity->body)->field ) {
+		
+			struct HTTPRecord *r = *entity->body;
+			append_to_uint8t( &msg, &msglen, (uint8_t *)r->field, strlen( r->field ) ); 
+			append_to_uint8t( &msg, &msglen, (uint8_t *)": ", 2 ); 
+			append_to_uint8t( &msg, &msglen, (uint8_t *)r->value, r->size ); 
+			append_to_uint8t( &msg, &msglen, (uint8_t *)"\r\n", 2 ); 
+			//append_to_uint8t( &msg, &msglen, (uint8_t *)entity->boundary, strlen( entity->boundary ) ); 
+			entity->body++;
+		}
 	}
 	#endif
 
-	if ( !msg ) {
-		snprintf( err, errlen, "Failed to append body" );
-		return NULL;
+	write( 2, msg, msglen );
+	write( 2, "\n", 1 );
+	getchar();
+
+
+	#if 0
+	//Add content-type, length and host if exists
+	if ( entity->host ) {
+		append_to_uint8t( &msg, &msglen, (uint8_t *)http_host_header_str, sizeof( http_host_header_str ) );
+		append_to_uint8t( &msg, &msglen, (uint8_t *)entity->host, strlen( entity->host ) );
 	}
+
+	if ( entity->clen ) {
+		append_to_uint8t( &msg, &msglen, (uint8_t *)http_content_length_header_str, sizeof( http_content_length_header_str ) );
+		//append_to_uint8t( &msg, &msglen, (uint8_t *)entity->clen, strlen( entity->clen ) );
+	}
+
+	if ( entity->ctype ) {
+		append_to_uint8t( &msg, &msglen, (uint8_t *)http_content_type_header_str, sizeof( http_content_type_header_str ) );
+		if ( !entity->boundary ) {
+
+		}
+		else {
+			//Append with the boundary
+		}
+	}
+	#endif
 
 	entity->msg = msg;
 	entity->mlen = msglen;

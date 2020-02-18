@@ -144,11 +144,12 @@ struct HTTPBody request_text_html = {
 	.ctype = "text/html"
 };
 
-struct HTTPBody request_application_x_www_url_formencoded_no_length = {
+struct HTTPBody request_application_x_www_url_formencoded_no_headers = {
 	.protocol = "HTTP/1.1",
 	.method = "POST",
 	.path = "/",
-	.ctype = "text/html"
+	.ctype = "text/html",
+	.body = bodies
 };
 
 struct HTTPBody request_application_x_www_url_formencoded = {
@@ -156,12 +157,14 @@ struct HTTPBody request_application_x_www_url_formencoded = {
 	.method = "POST",
 	.path = "/useless-post",
 	.ctype = "application/x-www-form-urlencoded",
-	.clen = 130,
+	.headers = headers, 
+	.body = bodies
 };
 
 struct HTTPBody request_multipart_text_no_content = { 
 	.protocol = "HTTP/1.1",
 	.method = "POST",
+	.path = "/post",
 	.ctype = "text/html"
 };
 
@@ -169,6 +172,7 @@ struct HTTPBody request_multipart_text = {
 	.protocol = "HTTP/1.1",
 	.method = "POST",
 	.ctype = "multipart/form-data",
+	.path = "/post",
 	.headers = headers,
 	.body = bodies
 };
@@ -177,6 +181,7 @@ struct HTTPBody request_multipart_binary = {
 	.protocol = "HTTP/1.1",
 	.method = "POST",
 	.ctype = "multipart/form-data",
+	.path = "/post",
 	.body = bodies,
 };
 
@@ -349,15 +354,17 @@ struct HTTPBody *requests_received[] = {
 };
 
 struct HTTPBody *requests_to_send[] = {
+#if 0
 	&request_head,	
 	&request_text_html_no_path,	
 	&request_text_html,	
 	&request_application_x_www_url_formencoded_no_length,
 	&request_application_x_www_url_formencoded,
+#endif
 	&request_multipart_text,	
+#if 0
 	&request_multipart_binary,	
 	&request_multipart_text_no_content,	
-#if 0
 #endif
 	NULL
 };
