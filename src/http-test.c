@@ -3,6 +3,7 @@
 
 const char default_protocol[] = "HTTP/1.1";
 
+/*data*/
 struct HTTPRecord *text_body[] = { 
 	&(struct HTTPRecord){ NULL, NULL, (uint8_t *)"<h2>Ok</h2>", 11 } 
 };
@@ -26,6 +27,20 @@ struct HTTPRecord *headers[] = {
 	&(struct HTTPRecord){ NULL }
 };
 
+struct HTTPRecord *bodies[] = {
+	&(struct HTTPRecord){ "field1", "text/html", (uint8_t *)"Lots+of+text", 12 },
+	&(struct HTTPRecord){ "another_field", "text/plain", (uint8_t *)"dd323d9asdf", 11 },
+	&(struct HTTPRecord){ "gunz", "text/plain", (uint8_t *)"Hello,+world!", 13 },
+	&(struct HTTPRecord){ NULL }
+};
+
+struct HTTPRecord *bodies_bin[] = {
+	&(struct HTTPRecord){ "field1", "text/html", (uint8_t *)"Lots+of+text", 12 },
+	&(struct HTTPRecord){ "another_field", "text/plain", (uint8_t *)"dd323d9asdf", 11 },
+	&(struct HTTPRecord){ "binary", "image/jpeg", (uint8_t *)aeon_thumb_favicon_jpg, AEON_THUMB_LEN },
+	&(struct HTTPRecord){ NULL }
+};
+
 struct HTTPRecord xheaders[] = {
 	{ "X-Case-Contact", NULL, (uint8_t *)"Lydia", 5 },
 	{ "ETag", NULL, (uint8_t *)"dd323d9asdf", 11 },
@@ -33,6 +48,7 @@ struct HTTPRecord xheaders[] = {
 	{ NULL }
 };
 
+/*responses*/
 struct HTTPBody response_missing_body = {
 	.clen = 12,
 	.mlen = 16,
@@ -107,55 +123,62 @@ struct HTTPBody response_binary_body = {
 	.body = (struct HTTPRecord **)uint8_body 
 };
 
-#if 0
-//Build a response body like it would be in a real environment
-struct HTTPBody *build_test_object ( int status, char *ctype, uint8_t *body, int bodylen, struct HTTPRecord **headers ) {
-	
-	//Allocate
-	struct HTTPBody *object = NULL;
-	if ( !( object = malloc( sizeof( struct HTTPRecord ) ) ) ) {
-		fprintf( stderr, "Failed to allocate space for test object.\n" );
-		exit( 0 );
-		return NULL;
-	}
+/*requests*/
+struct HTTPBody request_head = {
+	.protocol = "HTTP/1.1",
+	.method = "HEAD",
+	.path = "/juice",
+	.ctype = "text/html"
+};
 
-	if ( body ) {
-		struct HTTPRecord *b = NULL;
-		if ( !( *object->body = b = malloc( bodylen ) ) || !memset( b, 0, bodylen ) ) {
-			fprintf( stderr, "Failed to allocate space for test body object.\n" );
-			exit( 0 );
-			return NULL;
-		}
+struct HTTPBody request_text_html_no_path = {
+	.protocol = "HTTP/1.1",
+	.method = "GET",
+	.ctype = "text/html"
+};
 
-		if ( !memcpy( b, body, bodylen ) ) {
-			fprintf( stderr, "Failed to allocate space for test body object.\n" );
-			exit( 0 );
-			return NULL;
-		}
-	}
+struct HTTPBody request_text_html = {
+	.protocol = "HTTP/1.1",
+	.method = "GET",
+	.path = "/",
+	.ctype = "text/html"
+};
 
-	if ( headers ) {
-		int headerlen = 0;
-		while ( *headers ) {
-			//Allocate each new header item...
-			//ADDITEM( 
-			struct HTTPRecord *r = malloc( sizeof( struct HTTPRecord ) );
-			//memcpy( r, *headers, sizeof( struct HTTPRecord ) );
-			fprintf( stderr, "field   : %s\n", (*headers)->field ); 
-			fprintf( stderr, "metadata: %s\n", (*headers)->metadata ); 
-			fprintf( stderr, "value   : " );
-			write( 2, (*headers)->value, (*headers)->size ); 
-			fprintf( stderr, "\n" );
-			headers++;
-		}
-	}
+struct HTTPBody request_application_x_www_url_formencoded_no_length = {
+	.protocol = "HTTP/1.1",
+	.method = "POST",
+	.path = "/",
+	.ctype = "text/html"
+};
 
-	object->status = status;
-	object->ctype = ctype;
-	object->protocol = (char *)default_protocol;
-	return NULL;
-}
-#endif
+struct HTTPBody request_application_x_www_url_formencoded = {
+	.protocol = "HTTP/1.1",
+	.method = "POST",
+	.path = "/useless-post",
+	.ctype = "application/x-www-form-urlencoded",
+	.clen = 130,
+};
+
+struct HTTPBody request_multipart_text_no_content = { 
+	.protocol = "HTTP/1.1",
+	.method = "POST",
+	.ctype = "text/html"
+};
+
+struct HTTPBody request_multipart_text = { 
+	.protocol = "HTTP/1.1",
+	.method = "POST",
+	.ctype = "multipart/form-data",
+	.headers = headers,
+	.body = bodies
+};
+
+struct HTTPBody request_multipart_binary = { 
+	.protocol = "HTTP/1.1",
+	.method = "POST",
+	.ctype = "multipart/form-data",
+	.body = bodies,
+};
 
 const uint8_t head_body[] =
  "HEAD /gan HTTP/1.1\r\n"
@@ -248,8 +271,70 @@ const uint8_t put_body[] =
  "&Formula=a+%2B+b+%3D%3D+13%25%21\r\n"
 ;
 
+const uint8_t text_html_body[] =
+	"HTTP/1.1 200 OK\r\n"
+	"Content-Type: text/html\r\n"
+	"Content-Length: 11\r\n\r\n"
+	"<h2>Ok!</h2>"
+;
 
-struct HTTPBody *requests[] = {
+const uint8_t text_plain_body[] =
+	"HTTP/1.1 200 OK\r\n"
+	"\r\n"
+	"\r\n\r\n"
+	""
+;
+
+const uint8_t zero_length_body[] =
+	"HTTP/1.1 200 OK\r\n"
+	"Content-Length: 0\r\n\r\n"
+;
+
+const uint8_t statusless_body[] =
+	"HTTP/1.1 OK\r\n"
+	"Content-Length: 11\r\n\r\n"
+	"<h2>Ok!</h2>"
+;
+
+const uint8_t eww_body[] =
+	"OK\r\n"
+	"Content-Type: text/html\r\n"
+	"Content-Length: 11\r\n\r\n"
+	"<h2>Ok!</h2>"
+;
+
+const uint8_t headerless_body[] =
+	"HTTP/1.1 200 OK\r\n"
+;
+
+const uint8_t missing_host_body[] =
+	"HTTP/1.1 200 OK\r\n"
+	"\r\n"
+	"\r\n\r\n"
+	""
+;
+
+const uint8_t missing_content_length_body[] =
+	"HTTP/1.1 200 OK\r\n"
+	"Host: geeneus.net\r\n\r\n"
+;
+
+#if 0
+const uint8_t multipart_text_body[] =
+	"HTTP/1.1 200 OK\r\n"
+	"Content-Length: 0\r\n\r\n"
+;
+
+const uint8_t image_jpeg_body[] =
+	"HTTP/1.1 200 OK\r\n"
+	"Content-Type: image/jpeg\r\n"
+	"Content-Length: 11\r\n\r\n"
+	"\r\n\r\n"
+	""
+;
+#endif
+
+struct HTTPBody *requests_received[] = {
 	&(struct HTTPBody){ .msg = (uint8_t *)head_body,  .mlen = sizeof( head_body ) },
 	&(struct HTTPBody){ .msg = (uint8_t *)get_body_1, .mlen = sizeof( get_body_1 ) },
 	&(struct HTTPBody){ .msg = (uint8_t *)get_body_2, .mlen = sizeof( get_body_2 ) },
@@ -260,10 +345,35 @@ struct HTTPBody *requests[] = {
 	&(struct HTTPBody){ .msg = (uint8_t *)post_body_1,.mlen = sizeof( post_body_1 ) },
 	&(struct HTTPBody){ .msg = (uint8_t []){ POST_BODY },.mlen = POST_BODY_LEN },
 	&(struct HTTPBody){ .msg = (uint8_t *)put_body,   .mlen = sizeof( put_body ) },
+	NULL
 };
 
+struct HTTPBody *requests_to_send[] = {
+	&request_head,	
+	&request_text_html_no_path,	
+	&request_text_html,	
+	&request_application_x_www_url_formencoded_no_length,
+	&request_application_x_www_url_formencoded,
+	&request_multipart_text,	
+	&request_multipart_binary,	
+	&request_multipart_text_no_content,	
+#if 0
+#endif
+	NULL
+};
 
-struct HTTPBody *responses[] = {
+struct HTTPBody *responses_received[] = {
+	&(struct HTTPBody){ .msg = (uint8_t *)text_html_body, .mlen = sizeof( text_html_body ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)image_jpeg_body, .mlen = sizeof( image_jpeg_body ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)text_plain_body, .mlen = sizeof( text_plain_body ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)zero_length_body, .mlen = sizeof( zero_length_body ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)headerless_body, .mlen = sizeof( headerless_body ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)missing_host_body, .mlen = sizeof( missing_host_body ) },
+	&(struct HTTPBody){ .msg = (uint8_t *)missing_content_length_body, .mlen = sizeof( missing_content_length_body ) },
+	NULL
+};
+
+struct HTTPBody *responses_to_send[] = {
 	&response_missing_body,
 	&response_small_body,
 	&response_small_body_missing_params_1,
@@ -272,7 +382,7 @@ struct HTTPBody *responses[] = {
 	&response_with_error_not_found,
 	&response_with_error_internal_server_error,
 	&response_with_invalid_error_code,
-	&response_binary_body,
+	//&response_binary_body,
 	NULL
 };
 
@@ -285,7 +395,7 @@ void print_test_request ( struct HTTPBody *entity ) {
 	fprintf( stderr, ", clen: %-5d", entity->clen );
 	fprintf( stderr, ", hlen: %-3d", entity->hlen );
 	fprintf( stderr, ", path: %s",   entity->path );
-	fprintf( stderr, ", host: %s,", entity->host );
+	fprintf( stderr, ", host: %s", entity->host );
 	if ( entity->method && strcmp( entity->method, "POST" ) == 0 ) {
 		fprintf( stderr, ", ctype: %s", entity->ctype );
 		fprintf( stderr, ", boundary: %s", entity->boundary );
@@ -293,55 +403,57 @@ void print_test_request ( struct HTTPBody *entity ) {
 	fprintf( stderr, " ]\n" );
 }
 
+
 void print_test_response ( struct HTTPBody *entity ) {
 	write( 2, entity->msg, entity->mlen );
 }
 
+
 int main ( int argc, char *argv[] ) {
-	//All this does is output text strings
-	fprintf( stderr, "Request parsing:\n" );
-	struct HTTPBody **req = requests;
-	while ( *req ) {
-		char err[ 2048 ] = { 0 };
-		struct HTTPBody *body = NULL;
+	//struct HTTPBody **r = NULL; 
+	char err[ 2048 ] = { 0 };
 
-		//Situations w/: 
-		//	- malformed headers, 
-		//	- missing protocol, path or negative length etc
-		//	- realloc failures
-		//	- invalid content-type on non-null POSTs
-		// should all fail and show in *err
-		if ( !( body = http_parse_request( *req, err, sizeof(err) ) ) ) {
-			fprintf( stderr, "FAILED - %s\n", err );
-			req++;
-			continue;
+	struct test { 
+		const char *name;
+		struct HTTPBody **list; 
+		struct HTTPBody * (*transform)( struct HTTPBody *, char *, int );
+		void (*print)( struct HTTPBody * );
+		void (*free)( struct HTTPBody * );
+	} tests[] = {
+		//{ "REQUESTS - PARSE", requests_received, http_parse_request, print_test_request, http_free_body },
+		{ "REQUESTS - PACK",  requests_to_send,  http_finalize_request, print_test_request, NULL },
+#if 0
+		{ "REPSONSES- PARSE", responses_received, http_parse_response, print_test_response, http_free_body },
+		{ "RESPONSES- PACK", responses_to_send,  http_finalize_response, print_test_response, NULL },
+#endif
+	};
+	
+
+	//TODO: This wants to be a loop so bad...
+	//This will have to check certain fields in the HTTPBody structure
+	for ( int i = 0; i < sizeof(tests)/sizeof(struct test); i++ ) {
+		struct HTTPBody **r = tests[i].list;
+		fprintf( stderr, "%s\n===================\n", tests[i].name );
+		while ( *r ) {
+			memset( err, 0, sizeof(err) );	
+			if ( !tests[i].transform( *r, err, sizeof(err) ) ) {
+				fprintf( stderr, "FAILED - %s\n", err );
+				r++;
+				continue;
+			}
+
+			fprintf( stderr, "SUCCESS - " );
+			if ( tests[i].print ) {
+				tests[i].print( *r );
+			}
+
+#if 0
+			if ( tests[i].free ) {
+				tests[i].free( *r );
+			}
+#endif
+			r++;
 		}
-
-		fprintf( stderr, "SUCCESS - " );
-		print_test_request( *req );
-		//http_free_request( *req );
-		req++;
-	}
-
-	fprintf( stderr, "Response packing:\n" );
-	struct HTTPBody **res = responses;
-	while ( *res ) {
-		//fprintf( stderr, "%p\n", *res );
-		struct HTTPBody *body = NULL;
-		char err[ 2048 ] = { 0 };
-		int m = 0;
-		fprintf( stderr, "\n" );
-
-		if ( !( body = http_finalize_response( *res, err, sizeof(err) ) ) ) {
-			fprintf( stderr, "FAILED - %s", err );
-			res++;
-			continue;
-		}
-
-		fprintf( stderr, "SUCCESS - " );
-		print_test_response( *res );
-		//http_free_response( *req );
-		res++;
 	}
 
 	//Now, just have to request pack and response parse... Could be done in same loop

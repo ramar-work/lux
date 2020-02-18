@@ -36,6 +36,11 @@ struct HTTPBody {
 #endif
 };
 
+#define http_free_request( entity ) \
+	http_free_body( entity )
+
+#define http_free_response( entity ) \
+	http_free_body( entity )
 
 #define WRITE_HTTP_500( cstr, estr ) \
 	char hbuf[ 2048 ]; \
@@ -51,12 +56,13 @@ struct HTTPBody {
 	close( fd );
 
 
-unsigned char *httpvtrim (uint8_t *msg, int len, int *nlen) ;
-unsigned char *httptrim (uint8_t *msg, const char *trim, int len, int *nlen) ;
-void print_httprecords ( struct HTTPRecord **r ) ;
-void print_httpbody ( struct HTTPBody *r ) ;
-struct HTTPBody * http_finalize_response (struct HTTPBody *entity, char *err, int errlen);
-struct HTTPBody * http_finalize_request (struct HTTPBody *entity, char *err, int errlen);
-struct HTTPBody * http_parse_request (struct HTTPBody *entity, char *err, int errlen);
-struct HTTPBody * http_parse_response (struct HTTPBody *entity, char *err, int errlen);
+unsigned char *httpvtrim (uint8_t *, int , int *) ;
+unsigned char *httptrim (uint8_t *, const char *, int , int *) ;
+void print_httprecords ( struct HTTPRecord ** ) ;
+void print_httpbody ( struct HTTPBody * ) ;
+void http_free_body( struct HTTPBody * );
+struct HTTPBody * http_finalize_response (struct HTTPBody *, char *, int );
+struct HTTPBody * http_finalize_request (struct HTTPBody *, char *, int );
+struct HTTPBody * http_parse_request (struct HTTPBody *, char *, int );
+struct HTTPBody * http_parse_response (struct HTTPBody *, char *, int );
 #endif

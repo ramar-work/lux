@@ -19,7 +19,6 @@
 #define FPRINTF(...)
 #endif
 
-
 #define ENCLOSE(SRC, POS, LEN) \
 	write( 2, "'", 1 ); \
 	write( 2, &SRC[ POS ], LEN ); \
