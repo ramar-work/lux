@@ -8,7 +8,7 @@ struct HTTPRecord *text_body[] = {
 };
 
 struct HTTPRecord *uint8_body[] = { 
-	&(struct HTTPRecord){ NULL, NULL, aeon_thumb_favicon_jpg, 3848 } 
+	&(struct HTTPRecord){ NULL, NULL, (uint8_t []){ AEON_THUMB }, AEON_THUMB_LEN } 
 };
 
 struct HTTPRecord *text_body_no_body[] = { 
@@ -157,20 +157,6 @@ struct HTTPBody *build_test_object ( int status, char *ctype, uint8_t *body, int
 }
 #endif
 
-
-
-//small HEAD 
-//small GET
-//big GET
-//small POST
-//big POST 
-//binary POST 
-//small PUT
-//big PUT
-//binary PUT 
-//small DELETE 
-//small OPTIONS 
-
 const uint8_t head_body[] =
  "HEAD /gan HTTP/1.1\r\n"
  "Content-Type: text/html\r\n"
@@ -272,7 +258,7 @@ struct HTTPBody *requests[] = {
 	&(struct HTTPBody){ .msg = (uint8_t *)get_body_5, .mlen = sizeof( get_body_5 ) },
 	&(struct HTTPBody){ .msg = (uint8_t *)get_body_6, .mlen = sizeof( get_body_6 ) },
 	&(struct HTTPBody){ .msg = (uint8_t *)post_body_1,.mlen = sizeof( post_body_1 ) },
-	&(struct HTTPBody){ .msg = (uint8_t *)post_body_2,.mlen = sizeof( post_body_2 ) },
+	&(struct HTTPBody){ .msg = (uint8_t []){ POST_BODY },.mlen = POST_BODY_LEN },
 	&(struct HTTPBody){ .msg = (uint8_t *)put_body,   .mlen = sizeof( put_body ) },
 };
 
@@ -290,50 +276,53 @@ struct HTTPBody *responses[] = {
 	NULL
 };
 
-#if 0
-struct HTTPRecord ** build_header_structure( struct HTTPRecord **h ) {
-	struct HTTPRecord **hh = headers;
-	struct HTTPRecord **new = NULL;
-	int newlen = 0;
-	while ( (*hh)->field ) {
-		struct HTTPRecord *k = malloc( sizeof( struct HTTPRecord ) );
-		k->field = (*hh)->field;
-		k->metadata = (*hh)->metadata;
-		k->value = (*hh)->value;
-		k->size = (*hh)->size;
-		ADDITEM( k, struct HTTPRecord, new, newlen, NULL );
-		hh++;
-	} 
-	ADDITEM( NULL, struct HTTPRecord, new, newlen, NULL );
-	return new;
-}
-#endif
 
+void print_test_request ( struct HTTPBody *entity ) {
+	//All of the members should be filled out...
+	fprintf( stderr, "[ " );
+	//fprintf( stderr, "proto: %5s",  entity->protocol );
+	fprintf( stderr, ", method: %4s",  entity->method );
+	fprintf( stderr, ", clen: %-5d", entity->clen );
+	fprintf( stderr, ", hlen: %-3d", entity->hlen );
+	fprintf( stderr, ", path: %s",   entity->path );
+	fprintf( stderr, ", host: %s,", entity->host );
+	if ( entity->method && strcmp( entity->method, "POST" ) == 0 ) {
+		fprintf( stderr, ", ctype: %s", entity->ctype );
+		fprintf( stderr, ", boundary: %s", entity->boundary );
+	}
+	fprintf( stderr, " ]\n" );
+}
+
+void print_test_response ( struct HTTPBody *entity ) {
+	write( 2, entity->msg, entity->mlen );
+}
 
 int main ( int argc, char *argv[] ) {
 	//All this does is output text strings
 	fprintf( stderr, "Request parsing:\n" );
 	struct HTTPBody **req = requests;
-	//const uint8_t **req = requests;
 	while ( *req ) {
 		char err[ 2048 ] = { 0 };
-		//write( 2, (*req)->msg, 7 );	
-#if 1
-		struct HTTPBody *body = http_parse_request( *req, err, sizeof(err) );
-		if ( !body ) {
+		struct HTTPBody *body = NULL;
+
+		//Situations w/: 
+		//	- malformed headers, 
+		//	- missing protocol, path or negative length etc
+		//	- realloc failures
+		//	- invalid content-type on non-null POSTs
+		// should all fail and show in *err
+		if ( !( body = http_parse_request( *req, err, sizeof(err) ) ) ) {
 			fprintf( stderr, "FAILED - %s\n", err );
 			req++;
 			continue;
 		}
 
 		fprintf( stderr, "SUCCESS - " );
-		//All of the members should be filled out...
-		//write( 2, body->msg, body->mlen );
-#endif
+		print_test_request( *req );
+		//http_free_request( *req );
 		req++;
 	}
 
-#if 0
 	fprintf( stderr, "Response packing:\n" );
 	struct HTTPBody **res = responses;
 	while ( *res ) {
@@ -350,12 +339,11 @@ int main ( int argc, char *argv[] ) {
 		}
 
 		fprintf( stderr, "SUCCESS - " );
-		write( 2, body->msg, body->mlen );
-		if ( m ) {
-			//free( (*res)->headers );
-		}
+		print_test_response( *res );
+		//http_free_response( *req );
 		res++;
 	}
-#endif
+
+	//Now, just have to request pack and response parse... Could be done in same loop
 	return 0;
 }

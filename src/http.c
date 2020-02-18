@@ -213,7 +213,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 		//If clen is -1, ... hmmm.  At some point, I still need to do the rest of the work. 
 	}
 
-	#if 1	
+	#if 0	
 	print_httpbody( entity );	
 	getchar();
 	#endif	
@@ -226,7 +226,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 
 	//Always process the URL (specifically GET vars)
 	if ( strlen( entity->path ) == 1 ) {
-		ADDITEM( NULL, struct HTTPRecord, entity->url, len, 0 );
+		ADDITEM( NULL, struct HTTPRecord, entity->url, len, NULL );
 	}
 	else {
 		int index = 0;
@@ -243,10 +243,10 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 				klen += 1, t += klen, set.size -= klen;
 				b->value = t;
 				b->size = set.size;
-				ADDITEM( b, struct HTTPRecord, entity->url, len, 0 );
+				ADDITEM( b, struct HTTPRecord, entity->url, len, NULL );
 			}
 		}
-		ADDITEM( NULL, struct HTTPRecord, entity->url, len, 0 );
+		ADDITEM( NULL, struct HTTPRecord, entity->url, len, NULL );
 	}
 
 
@@ -272,11 +272,11 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 			#if 0
 				DUMP_RIGHT( b->value, b->size );
 			#endif
-				ADDITEM( b, struct HTTPRecord, entity->headers, len, 0 );
+				ADDITEM( b, struct HTTPRecord, entity->headers, len, NULL );
 			}
 		}
 	}
-	ADDITEM( NULL, struct HTTPRecord, entity->headers, len, 0 );
+	ADDITEM( NULL, struct HTTPRecord, entity->headers, len, NULL );
 
 	//Always process the body 
 	memset( &set, 0, sizeof( Mem ) );
@@ -286,7 +286,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 	
 	//TODO: If this is a xfer-encoding chunked msg, entity->clen needs to get filled in when done.
 	if ( strcmp( "POST", entity->method ) != 0 ) {
-		ADDITEM( NULL, struct HTTPRecord, entity->body, len, 0 );
+		ADDITEM( NULL, struct HTTPRecord, entity->body, len, NULL );
 	}
 	else {
 		struct HTTPRecord *b = NULL;
@@ -310,7 +310,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 				else if ( *m == '=' ) {
 					b->value = ++m;
 					b->size = set.size;
-					ADDITEM( b, struct HTTPRecord, entity->body, len, 0 );
+					ADDITEM( b, struct HTTPRecord, entity->body, len, NULL );
 					b = NULL;
 				}
 			}
@@ -334,7 +334,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 					m += 2;
 					b->value = m;//++t;
 					b->size = set.size - 1;
-					ADDITEM( b, struct HTTPRecord, entity->body, len, 0 );
+					ADDITEM( b, struct HTTPRecord, entity->body, len, NULL );
 					value = 0;
 					b = NULL;
 				}
@@ -354,17 +354,17 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 		}
 
 		//Add a terminator element
-		ADDITEM( NULL, struct HTTPRecord, entity->body, len, 0 );
+		ADDITEM( NULL, struct HTTPRecord, entity->body, len, NULL );
 		//This MAY help in handling malformed messages...
 		( b && (!b->field || !b->value) ) ? free( b ) : 0;
 
 		if ( 0 ) {
 			fprintf( stderr, "BODY got:\n" );
-			print_httprecords( entity->body );
+			//print_httprecords( entity->body );
 		}
 	}
 
-	return NULL;
+	return entity;
 } 
 
 
@@ -543,4 +543,17 @@ struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, i
 	//fprintf( stderr, "entity->msg: %p\n", entity->msg );
 	//fprintf( stderr, "entity->mlen : %d\n", entity->mlen );
 	return entity;
+}
+
+
+void http_free_request ( struct HTTPBody *entity ) {
+	//Free anything that has most likely been cloned
+	//Free ** lists
+	//Free big message buffer
+}
+
+void http_free_response ( struct HTTPBody *entity ) {
+	//Free anything that has most likely been cloned
+	//Free ** lists
+	//Free big message buffer
 }
