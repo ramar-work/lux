@@ -28,14 +28,14 @@ struct HTTPRecord *headers[] = {
 };
 
 struct HTTPRecord *bodies[] = {
-	&(struct HTTPRecord){ "field1", "text/html", (uint8_t *)"Lots+of+text", 12 },
+	&(struct HTTPRecord){ "field1", "text/html", (uint8_t *)"Lots of text", 12 },
 	&(struct HTTPRecord){ "another_field", "text/plain", (uint8_t *)"dd323d9asdf", 11 },
-	&(struct HTTPRecord){ "gunz", "text/plain", (uint8_t *)"Hello,+world!", 13 },
+	&(struct HTTPRecord){ "gunz", "text/plain", (uint8_t *)"Hello, world!", 13 },
 	&(struct HTTPRecord){ NULL }
 };
 
 struct HTTPRecord *bodies_bin[] = {
-	&(struct HTTPRecord){ "field1", "text/html", (uint8_t *)"Lots+of+text", 12 },
+	&(struct HTTPRecord){ "field1", "text/html", (uint8_t *)"Lots of text", 12 },
 	&(struct HTTPRecord){ "another_field", "text/plain", (uint8_t *)"dd323d9asdf", 11 },
 	&(struct HTTPRecord){ "binary", "image/jpeg", (uint8_t *)aeon_thumb_favicon_jpg, AEON_THUMB_LEN },
 	&(struct HTTPRecord){ NULL }

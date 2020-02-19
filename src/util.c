@@ -7,79 +7,21 @@
 	fprintf (stderr, "\n")
 
 
-#if 0
-//Use the time and a modulus to calculate some random numbers
-int * mrand_init( void ) {
-	//Generate 32 random numbers, back track and bitshift 3 times?
-	const int count = 32;
-	int *list = malloc( sizeof(int) * count );
-	for ( int i = 0 ; i < count; i++ ) {
-		fprintf( stderr, "ts: %d\n", urand_get( 128 ) );
-	}	
-	return list;
-}
-#endif
-
-static int urand_get( int mod ) {
-	struct timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	//fprintf( stderr, "ts: %ld\n", ts.tv_nsec % 9 );
-	return ts.tv_nsec % mod;
-}
-
-uint8_t * srand_block( uint8_t *src, int srclen, uint8_t *buf, int buflen ) {
-	memset( buf, 0, buflen );
+uint8_t * srand_uint8t( uint8_t *src, int srclen, uint8_t *buf, int buflen ) {
+	if ( !buf || !memset( buf, 0, buflen ) ) { 
+		return NULL;
+	}
+	
 	srclen --;
-	uint8_t **b = &buf;
+	uint8_t *b = buf;
 	while ( --buflen ) {
-		char a = src[ urand_get( srclen ) ]; 
-		fprintf( stderr, "%c\n", a );
-		**b = a;
+		struct timespec ts;
+		clock_gettime(CLOCK_REALTIME, &ts);
+		*b = src[ ts.tv_nsec % srclen ];
 		b++;
 	}
 	return buf;
 }
-
-
-#if 0
-char * srand_nums( char *buf, int buflen ) {
-	char w[] = "0123456789";
-	memset( buf, 0, buflen );
-	while ( --buflen )
-		*buf = urand_get( sizeof(w) ); 
-		buf++;
-	}
-	return buf;
-}
-
-char *srand_chars( char *buf, int buflen, int range ) {
-	return NULL;
-}
-
-unsigned char *srand_uint8t( uint8_t *buf, int buflen, int range ) {
-	return NULL;
-}
-#endif
-
-char * mrand_nums( int len ) {
-	return NULL;
-}
-
-char *mrand_chars( int len ) {
-	return NULL;
-}
-
-unsigned char *mrand_uint8t( int len ) {
-	return NULL;
-}
-
-void mrand_free ( int **num ) {
-	while ( *num ) {
-		free( *num );
-		num++;
-	}
-}
-
 
 
 //TODO: None of these should take an error buffer.  They are just utilities...

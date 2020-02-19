@@ -14,19 +14,29 @@ const char *words[] = {
 
 int main ( int argc, char *argv[] ) {
 
+	//Test random character generation
+	fprintf( stderr, "RANDOM CHARACTER GENERATION (static):\n" );
 	char buf[ 24 ];
 	char *a = srand_nums( buf, sizeof(buf) );
-	fprintf( stderr, "rand nums: %s\n", a );
-#if 0
-	char *b = srand_nums( &buf, sizeof(buf) );
-	fprintf( stderr, "rand nums: %s\n", b );
-	char *c = srand_nums( &buf, sizeof(buf) );
-	fprintf( stderr, "rand nums: %s\n", c );
-#endif
-return 0;
+	fprintf( stderr, "random nums: %s\n", a );
+	char *b = srand_letters( &buf, sizeof(buf) );
+	fprintf( stderr, "random letters: %s\n", b );
+	char *c = srand_chars( &buf, sizeof(buf) );
+	fprintf( stderr, "random chars: %s\n", c );
+
+	fprintf( stderr, "RANDOM CHARACTER GENERATION (dynamic):\n" );
+	char *d = mrand_nums( 20 );
+	fprintf( stderr, "random nums: %s\n", d );
+	free(d);
+	char *e = mrand_letters( 33 ); 
+	fprintf( stderr, "random letters: %s\n", e );
+	free(e);
+	char *f = mrand_chars( 42 ); 
+	fprintf( stderr, "random chars: %s\n", f );
+	free(f);
 
 	//Test append with a bunch of stuff for now...
-	fprintf( stderr, "APPEND_TO_UINT8T: " );
+	fprintf( stderr, "APPEND_TO_UINT8T:\n" );
 	const char **ww = words;
 	uint8_t *w = NULL;
 	int wlen = 0;
