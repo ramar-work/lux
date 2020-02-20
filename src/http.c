@@ -517,7 +517,6 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 	}
 
 	if ( strcmp( entity->method, "POST" ) == 0 || strcmp( entity->method, "PUT" ) == 0 ) {
-
 		if ( !entity->body && !entity->ctype ) {
 			snprintf( err, errlen, "Content-type not specified for %s request.", entity->method );
 			return NULL;
@@ -542,10 +541,8 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 
 	if ( msglen ) {
 		append_to_uint8t( &msg, &msglen, (uint8_t *)"\r\n", 2 );
+		entity->hlen = msglen;
 	}
-
-	entity->hlen = msglen;
-	fprintf( stderr, "clen: %d, hlen: %d\n", msglen, entity->hlen );
  
 	//TODO: Catch each of these or use a static buffer and append ONE time per struct...
 	if ( strcmp( entity->method, "POST" ) == 0 || strcmp( entity->method, "PUT" ) == 0 ) {
@@ -587,8 +584,10 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 		}
 	}
 
-	entity->clen = msglen - entity->hlen;
 	char clen[ 32 ] = {0};
+	uint8_t *hmsg = NULL;
+	int hmsglen = 0;
+	entity->clen = msglen - entity->hlen;
 	snprintf( clen, sizeof( clen ), "%d", entity->clen );
 
 	//There should be a cleaner way to handle this
@@ -598,7 +597,7 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 		{ entity->protocol, "%s\r\n", 1 },
 		{ clen, "Content-Length: %s\r\n", strcmp(entity->method,"POST") == 0 ? 1 : 0 },
 		{ entity->ctype, "Content-Type: %s", strcmp(entity->method,"POST") == 0 ? 1 : 0 },
-		{ (multipart) ? entity->boundary : "", (multipart) ? ";boundary=%s\r\n" : "%s\r\n", strcmp(entity->method,"POST") == 0 ? 1 : 0 },
+		{ (multipart) ? entity->boundary : "", (multipart) ? ";boundary=\"%s\"\r\n" : "%s\r\n", strcmp(entity->method,"POST") == 0 ? 1 : 0 },
 		{ entity->host, "Host: %s\r\n" },
 	};
 	for ( int i = 0; i < sizeof(m)/sizeof(struct t); i++ ) {
@@ -612,35 +611,24 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 			//Add whatever value
 			uint8_t buf[ 1024 ] = { 0 };
 			int len = snprintf( (char *)buf, sizeof(buf), m[i].fmt, m[i].value ); 
-			append_to_uint8t( &msg, &msglen, buf, len );
+			append_to_uint8t( &hmsg, &hmsglen, buf, len );
 			entity->hlen += len;
 		}
 	}
 
-	//Now move
-	if ( !( msg = realloc( msg, msglen + entity->hlen ) ) ) {
-		snprintf( err, errlen, "%s", "Failed to reallocate message." );
+	if ( !( entity->msg = malloc( msglen + hmsglen ) ) ) {
+		snprintf( err, errlen, "%s", "Failed to reallocate message buffer." );
 		return NULL;
 	}
 
-	if ( !memmove( &msg[ entity->hlen ], msg, msglen ) ) {
-		snprintf( err, errlen, "%s", "Failed to reallocate message." );
-		return NULL;
-	}
+	memcpy( &entity->msg[0], hmsg, hmsglen );
+	entity->mlen = hmsglen; 
+	memcpy( &entity->msg[entity->mlen], msg, msglen );
+	entity->mlen += msglen; 
 
-	if ( !memcpy( msg, &msg[ msglen - entity->hlen ], entity->hlen ) ) {
-		snprintf( err, errlen, "%s", "Failed to move headers." );
-		return NULL;
-	}
-
-	memset( &msg[ msglen - entity->hlen ], 0, entity->hlen );	
-	write( 2, msg, msglen );
-	write( 2, "\n", 1 );
-	getchar();
-
-	entity->msg = msg;
-	entity->mlen = msglen;
-	//free( entity->boundary );
+	free( msg );
+	free( hmsg );
+	free( entity->boundary );
 	return entity;
 }
 
@@ -731,12 +719,6 @@ struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, i
 	entity->mlen = msglen;
 	return entity;
 }
-
-#if 0
-struct HTTPBody * http_clone_body ( struct HTTPBody *entity ) {
-	return NULL;
-}
-#endif
 
 
 void http_free_body ( struct HTTPBody *entity ) {

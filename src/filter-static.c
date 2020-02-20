@@ -21,7 +21,7 @@ char *getExtension ( char *filename ) {
 }
 
 
-int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+int filter_static ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	struct stat sb;
 	int file = 0;
 	int len = 0;

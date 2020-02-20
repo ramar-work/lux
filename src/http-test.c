@@ -450,11 +450,12 @@ int main ( int argc, char *argv[] ) {
 			}
 
 			fprintf( stderr, "SUCCESS - " );
+			free( (*r)->msg );
+#if 0
 			if ( tests[i].print ) {
 				tests[i].print( *r );
 			}
 
-#if 0
 			if ( tests[i].free ) {
 				tests[i].free( *r );
 			}

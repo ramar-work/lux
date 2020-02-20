@@ -1,63 +1,43 @@
+#include "luabind.h"
+#include "config.h"
+
+struct keyset { const char *name; int (*fp)( void *p ); } keyset[] = {
+	NULL
+};
 
 //Loads some random files
 int main (int argc, char *argv[]) {
 
-#if 0	
+	//Pull some keys from the config file?
 	int lerr;
 	lua_State *L = luaL_newstate();
 	const char *f = "www/def.lua";
-	char fileerr[2048] = {0};
-#if 1
-//START lua_load_file	
-	//Load route table file
-	fprintf( stderr, "Attempting to parse file: %s\n", f );
-	if (( lerr = luaL_loadfile( L, f )) != LUA_OK ) { 
-		int errlen = 0;
-		if ( lerr == LUA_ERRSYNTAX )
-			errlen = snprintf( fileerr, sizeof(fileerr), "Syntax error at file: %s", f );
-		else if ( lerr == LUA_ERRMEM )
-			errlen = snprintf( fileerr, sizeof(fileerr), "Memory allocation error at file: %s", f );
-		else if ( lerr == LUA_ERRGCMM )
-			errlen = snprintf( fileerr, sizeof(fileerr), "GC meta-method error at file: %s", f );
-		else if ( lerr == LUA_ERRFILE ) {
-			errlen = snprintf( fileerr, sizeof(fileerr), "File access error at: %s", f );
-		}
-		
-		fprintf(stderr, "LUA LOAD ERROR: %s, %s", fileerr, (char *)lua_tostring( L, -1 ) );	
-		lua_pop( L, lua_gettop( L ) );
-		exit( 1 );
+	char err[2048] = {0};
+	Table *t = NULL;
+
+	if ( !lua_exec_file( L, f, err, sizeof(err) ) ) {
+		fprintf( stderr, "%s\n", err );
+		return 1;
 	}
-	fprintf( stderr, "SUCCESS!\n" );
 
-	//Then execute
-	fprintf( stderr, "Attempting to execute file: %s\n", f );
-	if (( lerr = lua_pcall( L, 0, LUA_MULTRET, 0 ) ) != LUA_OK ) {
-		if ( lerr == LUA_ERRRUN ) 
-			snprintf( fileerr, sizeof(fileerr), "Runtime error at: %s", f );
-		else if ( lerr == LUA_ERRMEM ) 
-			snprintf( fileerr, sizeof(fileerr), "Memory allocation error at file: %s", f );
-		else if ( lerr == LUA_ERRERR ) 
-			snprintf( fileerr, sizeof(fileerr), "Error while running message handler: %s", f );
-		else if ( lerr == LUA_ERRGCMM ) {
-			snprintf( fileerr, sizeof(fileerr), "Error while runnig __gc metamethod at: %s", f );
-		}
-
-		fprintf(stderr, "LUA EXEC ERROR: %s, %s", fileerr, (char *)lua_tostring( L, -1 ) );	
-		lua_pop( L, lua_gettop( L ) );
-		exit( 1 );
+	if ( !( t = malloc( sizeof(Table) ) ) || !lt_init( t, NULL, 2048 ) ) {
+		fprintf( stderr, "Failed to allocate space for new Table data.\n" );
+		return 1;
 	}
-	fprintf( stderr, "SUCCESS!\n" );
-//END lua_load_file	
-#endif
 
-	Table *t = malloc( sizeof(Table) );
-	lt_init( t, NULL, 1024 );
 	if ( !lua_to_table( L, 1, t ) ) {
-		FPRINTF( "Failed to convert Lua data to table.\n" );
-		exit(0);
+		fprintf( stderr, "Failed to convert Lua data to table.\n" );
+		return 1;	
 	}
-	//lt_dump( t );
 
+	lt_dump( t );
+
+	//Loop through the keys specified and get something
+	getkey( t, "routes" );	
+	getkey( t, "db" );	
+	getkey( t, "template_engine" );	
+
+#if 0	
 	//Find the routes index, use that as start and move?
 	//struct route **routelist = NULL; //This could be static too... less to clean
 	struct routeset r = { 0, NULL };

@@ -73,12 +73,19 @@ int lua_exec_string( lua_State *L, const char *str, char *err, int errlen ) {
 int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 	int lerr = 0;
 	int len = 0;
+	struct stat check;
 
 	if ( !f || !strlen( f ) ) {
 		snprintf( err, errlen, "%s", "No filename supplied to load or execute." );
 		return 0;
 	}
 
+	//Since this is supposed to accept a file, why not just check for existence?
+	if ( stat( f, &check ) == -1 ) {
+		snprintf( err, errlen, "File %s inaccessible: %s.", f, strerror(errno) );
+		return 0;
+	}
+	
 	//Load the string, execute
 	if (( lerr = luaL_loadfile( L, f )) != LUA_OK ) {
 		if ( lerr == LUA_ERRSYNTAX )

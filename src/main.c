@@ -25,17 +25,6 @@ const int defport = 2000;
 int arg_verbose = 0;
 int arg_debug = 0;
 
-#if 0
-#define ADD_ELEMENT( ptr, ptrListSize, eSize, element ) \
-	if ( ptr ) \
-		ptr = realloc( ptr, sizeof( eSize ) * ( ptrListSize + 1 ) ); \
-	else { \
-		ptr = malloc( sizeof( eSize ) ); \
-	} \
-	*(&ptr[ ptrListSize ]) = element; \
-	ptrListSize++;
-#endif
-
 
 //send (sends a message, may take many times)
 int t_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
@@ -71,169 +60,7 @@ int t_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 }
 
 
-//Write
-int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
-	//if ( 1 ) write( 2, rq->msg, rq->mlen );
-	int sent = 0;
-	int total = rs->mlen;
-	int pos = 0;
-	int try = 0;
-
-	while ( 1 ) { 
-		if (( sent = send( fd, &rs->msg[ pos ], total, MSG_DONTWAIT )) == -1 ) {
-			if ( errno == EBADF )
-				0; //TODO: Can't close a most-likely closed socket.  What do you do?
-			else if ( errno == ECONNREFUSED )
-				close(fd);
-			else if ( errno == EFAULT )
-				close(fd);
-			else if ( errno == EINTR )
-				close(fd);
-			else if ( errno == EINVAL )
-				close(fd);
-			else if ( errno == ENOMEM )
-				close(fd);
-			else if ( errno == ENOTCONN )
-				close(fd);
-			else if ( errno == ENOTSOCK )
-				close(fd);
-			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
-				if ( ++try == 2 ) {
-				 #ifdef HTTP_VERBOSE
-					fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
-				 #endif
-					fprintf(stderr, "rs->mlen: %d\n", rs->mlen );
-					//rq->msg = buf;
-					break;
-				}
-			 #ifdef HTTP_VERBOSE
-				fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
-			 #endif
-			}
-			else {
-				//this would just be some uncaught condition...
-			}
-		}
-		else if ( sent == 0 ) {
-
-		}
-		else {
-			//continue resending...
-			pos += sent;
-			total -= sent;	
-		}
-	}
-	return 0;
-}
-
-
-#if 0
-//Return the total bytes read.
-int read_from_socket ( int fd, uint8_t **b, void (*readMore)(int *, void *) ) {
-	return 0;
-	int mult = 0;
-	int try=0;
-	int mlen = 0;
-	const int size = 32767;	
-	uint8_t *buf = malloc( 1 );
-
-	//Read first
-	while ( 1 ) {
-		int rd=0;
-		int bfsize = size * (++mult); 
-		unsigned char buf2[ size ]; 
-		memset( buf2, 0, size );
-
-		//read into new buffer
-		//if (( rd = read( fd, &buf[ rq->mlen ], size )) == -1 ) {
-		//TODO: Yay!  This works great on Arch!  But let's see what about Win, OSX and BSD
-		if (( rd = recv( fd, buf2, size, MSG_DONTWAIT )) == -1 ) {
-			//A subsequent call will tell us a lot...
-			fprintf(stderr, "Couldn't read all of message...\n" );
-			//whatsockerr(errno);
-			if ( errno == EBADF )
-				0; //TODO: Can't close a most-likely closed socket.  What do you do?
-			else if ( errno == ECONNREFUSED )
-				close(fd);
-			else if ( errno == EFAULT )
-				close(fd);
-			else if ( errno == EINTR )
-				close(fd);
-			else if ( errno == EINVAL )
-				close(fd);
-			else if ( errno == ENOMEM )
-				close(fd);
-			else if ( errno == ENOTCONN )
-				close(fd);
-			else if ( errno == ENOTSOCK )
-				close(fd);
-			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
-				if ( ++try == 2 ) {
-				 #ifdef HTTP_VERBOSE
-					fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
-				 #endif
-					fprintf(stderr, "mlen: %d\n", mlen );
-					//fprintf(stderr, "%p\n", buf );
-					//rq->msg = buf;
-					break;
-			}
-			 #ifdef HTTP_VERBOSE
-				fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
-			 #endif
-			}
-			else {
-				//this would just be some uncaught condition...
-				fprintf(stderr, "Uncaught condition at read!\n" );
-				return 0;
-			}
-		}
-		else if ( rd == 0 ) {
-			//will a zero ALWAYS be returned?
-			//rq->msg = buf;
-			break;
-		}
-		else {
-			//realloc manually and read
-			if (( b = realloc( b, bfsize )) == NULL ) {
-				fprintf(stderr, "Couldn't allocate buffer..." );
-				close(fd);
-				return 0;
-			}
-
-			//Copy new data and increment bytes read
-			memset( &b[ bfsize - size ], 0, size ); 
-			fprintf(stderr, "pos: %d\n", bfsize - size );
-			memcpy( &b[ bfsize - size ], buf2, rd ); 
-			mlen += rd;
-			//rq->msg = buf; //TODO: You keep resetting this, only needs to be done once...
-
-			//show read progress and data received, etc.
-			if ( 1 ) {
-				fprintf( stderr, "Recvd %d bytes on fd %d\n", rd, fd ); 
-			}
-		}
-	}
-
-	return mlen;
-}
-#endif
-
-
-int write_to_socket ( int fd, uint8_t *b ) {
-	return 0;
-}
-
-int sread_from_socket ( int fd, uint8_t *b ) {
-	return 0;
-}
-
-int swrite_to_socket ( int fd, uint8_t *b ) {
-	return 0;
-}
-
-
 int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
-
 	//Read all the data from a socket.
 	unsigned char *buf = malloc( 1 );
 	int mult = 0;
@@ -546,6 +373,201 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 }
 
 
+//Write
+int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+	//if ( 1 ) write( 2, rq->msg, rq->mlen );
+	int sent = 0;
+	int total = rs->mlen;
+	int pos = 0;
+	int try = 0;
+
+	while ( 1 ) { 
+		if (( sent = send( fd, &rs->msg[ pos ], total, MSG_DONTWAIT )) == -1 ) {
+			if ( errno == EBADF )
+				0; //TODO: Can't close a most-likely closed socket.  What do you do?
+			else if ( errno == ECONNREFUSED )
+				close(fd);
+			else if ( errno == EFAULT )
+				close(fd);
+			else if ( errno == EINTR )
+				close(fd);
+			else if ( errno == EINVAL )
+				close(fd);
+			else if ( errno == ENOMEM )
+				close(fd);
+			else if ( errno == ENOTCONN )
+				close(fd);
+			else if ( errno == ENOTSOCK )
+				close(fd);
+			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				if ( ++try == 2 ) {
+				 #ifdef HTTP_VERBOSE
+					fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
+				 #endif
+					fprintf(stderr, "rs->mlen: %d\n", rs->mlen );
+					//rq->msg = buf;
+					break;
+				}
+			 #ifdef HTTP_VERBOSE
+				fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
+			 #endif
+			}
+			else {
+				//this would just be some uncaught condition...
+			}
+		}
+		else if ( sent == 0 ) {
+
+		}
+		else {
+			//continue resending...
+			pos += sent;
+			total -= sent;	
+		}
+	}
+	return 1;
+}
+
+
+int h_proc ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
+	char err[2048] = {0};
+	lua_State *L = luaL_newstate();
+	Table *t = malloc( sizeof( Table ) );
+
+	//After this conversion takes place, destroy the environment
+	if ( !lua_exec_file( L, "www/config.lua", err, sizeof(err) ) ) {
+		fprintf( stderr, "%s\n", err );
+		//send a 500 back
+		return 0;
+	}
+
+	if ( !t || !lt_init( t, 2048, NULL ) ) {
+		snprintf( err, sizeof(err), "%s\n", "Could not initialize memory at h_proc" );
+		fprintf( stderr, "%s\n", err );
+		return 0;
+	}
+
+	//Check that server supports host - send 404 if not
+
+	//Check filter - send 500 if not there or if not supported
+
+	//Check that log dir is writeable - send 500 if not
+
+	//Check that the requested dir is readable - send 500 if not
+
+	//Are there any data structures that need to be populated?
+
+	//Write success message here... but normally, run the filter
+	return 1;
+}
+
+#if 0
+//Return the total bytes read.
+int read_from_socket ( int fd, uint8_t **b, void (*readMore)(int *, void *) ) {
+	return 0;
+	int mult = 0;
+	int try=0;
+	int mlen = 0;
+	const int size = 32767;	
+	uint8_t *buf = malloc( 1 );
+
+	//Read first
+	while ( 1 ) {
+		int rd=0;
+		int bfsize = size * (++mult); 
+		unsigned char buf2[ size ]; 
+		memset( buf2, 0, size );
+
+		//read into new buffer
+		//if (( rd = read( fd, &buf[ rq->mlen ], size )) == -1 ) {
+		//TODO: Yay!  This works great on Arch!  But let's see what about Win, OSX and BSD
+		if (( rd = recv( fd, buf2, size, MSG_DONTWAIT )) == -1 ) {
+			//A subsequent call will tell us a lot...
+			fprintf(stderr, "Couldn't read all of message...\n" );
+			//whatsockerr(errno);
+			if ( errno == EBADF )
+				0; //TODO: Can't close a most-likely closed socket.  What do you do?
+			else if ( errno == ECONNREFUSED )
+				close(fd);
+			else if ( errno == EFAULT )
+				close(fd);
+			else if ( errno == EINTR )
+				close(fd);
+			else if ( errno == EINVAL )
+				close(fd);
+			else if ( errno == ENOMEM )
+				close(fd);
+			else if ( errno == ENOTCONN )
+				close(fd);
+			else if ( errno == ENOTSOCK )
+				close(fd);
+			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				if ( ++try == 2 ) {
+				 #ifdef HTTP_VERBOSE
+					fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
+				 #endif
+					fprintf(stderr, "mlen: %d\n", mlen );
+					//fprintf(stderr, "%p\n", buf );
+					//rq->msg = buf;
+					break;
+			}
+			 #ifdef HTTP_VERBOSE
+				fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
+			 #endif
+			}
+			else {
+				//this would just be some uncaught condition...
+				fprintf(stderr, "Uncaught condition at read!\n" );
+				return 0;
+			}
+		}
+		else if ( rd == 0 ) {
+			//will a zero ALWAYS be returned?
+			//rq->msg = buf;
+			break;
+		}
+		else {
+			//realloc manually and read
+			if (( b = realloc( b, bfsize )) == NULL ) {
+				fprintf(stderr, "Couldn't allocate buffer..." );
+				close(fd);
+				return 0;
+			}
+
+			//Copy new data and increment bytes read
+			memset( &b[ bfsize - size ], 0, size ); 
+			fprintf(stderr, "pos: %d\n", bfsize - size );
+			memcpy( &b[ bfsize - size ], buf2, rd ); 
+			mlen += rd;
+			//rq->msg = buf; //TODO: You keep resetting this, only needs to be done once...
+
+			//show read progress and data received, etc.
+			if ( 1 ) {
+				fprintf( stderr, "Recvd %d bytes on fd %d\n", rd, fd ); 
+			}
+		}
+	}
+
+	return mlen;
+}
+
+
+int write_to_socket ( int fd, uint8_t *b ) {
+	return 0;
+}
+
+int sread_from_socket ( int fd, uint8_t *b ) {
+	return 0;
+}
+
+int swrite_to_socket ( int fd, uint8_t *b ) {
+	return 0;
+}
+#endif
+
+
+
+
 int ssl_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 	//write (write all the data in one call if you fork like this) 
 	if ( write( fd, http_200_fixed, strlen(http_200_fixed)) == -1 ) {
@@ -572,6 +594,12 @@ int ssl_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 	return 0;
 }
+
+
+int f_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+return 0;
+}
+
 
 struct values {
 	int port;
@@ -622,6 +650,13 @@ void print_options ( struct values *v ) {
 	fprintf( stderr, "%10s: %s\n", "user", v->user );	
 	fprintf( stderr, "%10s: %s\n", "ssl", v->ssl ? "true" : "false" );	
 }
+
+
+
+const char *fqdn[] = {
+	"localhost",
+	NULL
+};
 
 
 int main (int argc, char *argv[]) {
@@ -735,7 +770,7 @@ int main (int argc, char *argv[]) {
 #endif
 
 	//Handle SSL here
-	#if 1 
+	#if 0 
 	gnutls_certificate_credentials_t x509_cred = NULL;
   gnutls_priority_t priority_cache;
 	const char *cafile, *crlfile, *certfile, *keyfile;
@@ -818,13 +853,14 @@ int main (int argc, char *argv[]) {
 				continue;
 			}
 		}
-#if 0
+
+	#if 0
 		//Make the new socket non-blocking too...
 		if ( fcntl( fd, F_SETFD, O_NONBLOCK ) == -1 ) {
 			fprintf( stderr, "fcntl error at child socket: %s\n", strerror(errno) ); 
 			return 0;
 		}
-#endif
+	#endif
 
 		//Dump the client info and the child fd
 		if ( 1 ) {
@@ -832,6 +868,8 @@ int main (int argc, char *argv[]) {
 			char *ip = inet_ntoa( cin->sin_addr );
 			fprintf( stderr, "Got request from: %s on new file: %d\n", ip, fd );	
 		}
+exit( 0 );
+
 
 		//Fork and go crazy
 		pid_t cpid = fork();
@@ -850,7 +888,7 @@ int main (int argc, char *argv[]) {
 		else if ( cpid ) {
 			//TODO: Somewhere in here, a signal needs to run that allows this thing to die.
 			//TODO: Handle read and write errno cases 
-			#if 1
+			#if 0
 			//SSL again
 			gnutls_session_t session, *sptr = NULL;
 			if ( values.ssl ) {
@@ -880,21 +918,30 @@ int main (int argc, char *argv[]) {
 			}
 			#endif
 
+			//Somewhere in here, I'll have to find routes, parse conf, etc
+			//
+			//What site is this asking for? (Host header)
+			//Where is said site on a filesystem?
+
 			//All the processing occurs here.
 			struct HTTPBody rq = { 0 }; 
 			struct HTTPBody rs = { 0 };
 			struct senderrecvr *f = &sr[ 0 ]; 
 			int status = 0;
-#if 0
+		#if 0
 			//TODO: This doesn't seem quite optimal, but I'm doing it.
 			struct SSLContext ssl = {
 				.read = gnutls_record_recv
 			, .write = gnutls_record_send
 			, .data = (void *)&rq
 			}; 
-#endif
+		#endif
 			//Read the message	
+		#if 0
 			if (( status = f->read( fd, &rq, &rs, sptr )) == -1 ) {
+		#else
+			if (( status = f->read( fd, &rq, &rs, NULL )) == -1 ) {
+		#endif
 				//what to do with the response...
 			}
 
@@ -904,7 +951,11 @@ int main (int argc, char *argv[]) {
 			}
 
 			//Write a new message	
+		#if 0
 			if (( status = f->write( fd, &rq, &rs, &session )) == -1 ) {
+		#else
+			if (( status = f->write( fd, &rq, &rs, NULL )) == -1 ) {
+		#endif
 				//...
 			}
 

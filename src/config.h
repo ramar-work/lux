@@ -4,3 +4,5 @@
 #include "luabind.h"
 #include "util.h"
 #endif
+
+void *getkey ( Table *t, const char *key );

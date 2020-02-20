@@ -1,16 +1,9 @@
 //config.c
 //Test parsing Lua config files.
+//Each key should return something
 //Compile me with: 
 //gcc -ldl -llua -o config vendor/single.o config.c luabind.c && ./config
 #include "config.h"
-
-#if 0
- #define FPRINTF(...) \
-	fprintf( stderr, "DEBUG: %s[%d]: ", __FILE__, __LINE__ ); \
-	fprintf( stderr, __VA_ARGS__ );
-#else
- #define FPRINTF(...)
-#endif
 
 #define DUMPTYPE(NUM) \
 	( NUM == BD_VIEW ) ? "BD_VIEW" : \
@@ -21,7 +14,8 @@
 
 
 //struct route { char *routename, **elements; };
-struct config { char *item; int (*fp)( char * ); };
+//struct config { char *item; int (*fp)( char * ); };
+struct config { char *item; int (*fp)( LiteKv *, int, void * ); };
 struct routehandler { char *filename; int type; };
 struct route { char *routename; char *parent; int elen; struct routehandler **elements; };
 struct routeset { int len; struct route **routes; };
@@ -66,9 +60,53 @@ const int BD_QUERY = 43;
 const int BD_CONTENT_TYPE = 44;
 const int BD_RETURNS = 45;
 
-int buildRoutes ( LiteKv *kv, int i, void *p ) {
-	struct routeset *r = (struct routeset *)p;
 
+void *get_key ( Table *t, const char *key ) {
+	int index = lt_geti( t, key );
+	int count = lt_counti( t, index );
+	FPRINTF( "Key '%s' = %d.  Contains %d element(s).\n", key, index, count );
+	//Check what is on the other side if it's not -1
+	//If it's string, extract and return it
+	//If it's number, ?
+	//If it's table, ?
+	//Extraction will probably be custom...
+	return NULL;
+}
+
+
+void dump_routes ( struct routeset r ) {
+	
+}
+
+#if 0
+int get_routes ( Table *t ) {
+	//Find the routes index, use that as start and move?
+	//struct route **routelist = NULL; //This could be static too... less to clean
+	struct routeset r = { 0, NULL };
+	int routesIndex = lt_geti( t, "routes" );
+	int count = lt_counti( t, routesIndex );
+	FPRINTF( "routes key at: %d\n", routesIndex );
+
+	//Combine the routes and save each combination (strcmbd?)
+	if ( !lt_exec_complex( t, routesIndex, t->count, (void *)&r, buildRoutes ) ) {
+		FPRINTF( "At end of route data.\n" );
+	}
+
+	for ( int i=0; i < r.len; i++ ) {
+		struct route *rr = r.routes[i];
+		fprintf( stderr, "[%d] %s => ", i, rr->routename );
+		fprintf( stderr, "route composed of %d files.\n", rr->elen );
+		for ( int ii=0; ii < rr->elen; ii++ ) {
+			struct routehandler *t = rr->elements[ ii ];
+			fprintf( stderr, "\t{ %s=%s }\n", DUMPTYPE(t->type), t->filename );
+		}
+	}
+return 0;
+}
+#endif
+
+int route_table_iterator ( LiteKv *kv, int i, void *p ) {
+	struct routeset *r = (struct routeset *)p;
 
 	//Right side should be a table.
 	//FPRINTF( "Index: %d\n", i );
@@ -81,10 +119,9 @@ int buildRoutes ( LiteKv *kv, int i, void *p ) {
 	//If it's a number, it could be something else...
 	else if ( kv->key.type == LITE_TRM ) {
 		//Safest to add a null member to the end of elements
-		b--;
-		if ( b == 0 ) {
+		//b--;
+		if ( (--b) == 0 )
 			return 0;	
-		}
 		else { 
 			if ( b == 1 ) {
 				for ( int i=0; i < sizeof( parent ) / sizeof( char * ); i++ ) {

@@ -11,12 +11,12 @@
 	LIST[ LEN ] = TPTR; \
 	LEN++;
 
-#ifdef DEBUG
-#define FPRINTF(...) \
+#ifdef DEBUG_H
+ #define FPRINTF(...) \
 	fprintf( stderr, "DEBUG: %s[%d]: ", __FILE__, __LINE__ ); \
 	fprintf( stderr, __VA_ARGS__ );
 #else
-#define FPRINTF(...)
+ #define FPRINTF(...)
 #endif
 
 #define ENCLOSE(SRC, POS, LEN) \
