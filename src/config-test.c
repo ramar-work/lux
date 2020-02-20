@@ -32,12 +32,12 @@ int main (int argc, char *argv[]) {
 
 	lt_dump( t );
 
+#if 0	
 	//Loop through the keys specified and get something
 	getkey( t, "routes" );	
 	getkey( t, "db" );	
 	getkey( t, "template_engine" );	
 
-#if 0	
 	//Find the routes index, use that as start and move?
 	//struct route **routelist = NULL; //This could be static too... less to clean
 	struct routeset r = { 0, NULL };

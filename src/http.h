@@ -4,6 +4,45 @@
 
 #define HTTP_H
 
+#define http_free_request( entity ) \
+	http_free_body( entity )
+
+#define http_free_response( entity ) \
+	http_free_body( entity )
+
+#define http_set_status(ENTITY,VAL) \
+	http_set_int( &(ENTITY)->status, VAL )
+
+#define http_set_ctype(ENTITY,VAL) \
+	http_set_char( &(ENTITY)->ctype, VAL )
+	
+#define http_set_method(ENTITY,VAL) \
+	http_set_char( &(ENTITY)->method, VAL )
+	
+#define http_set_protocol(ENTITY,VAL) \
+	http_set_char( &(ENTITY)->protocol, VAL )
+	
+#define http_set_path(ENTITY,VAL) \
+	http_set_char( &(ENTITY)->path, VAL )
+	
+#define http_set_host(ENTITY,VAL) \
+	http_set_char( &(ENTITY)->host, VAL )
+	
+#define http_set_body(ENTITY,KEY,VAL,VLEN) \
+	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, VAL, VLEN )
+	
+#define http_set_content(ENTITY,VAL,VLEN) \
+	http_set_record( ENTITY, &(ENTITY)->body, 1, "", VAL, VLEN )
+
+#define http_set_content_text(ENTITY,VAL) \
+	http_set_record( ENTITY, &(ENTITY)->body, 1, "", (uint8_t *)VAL, strlen(VAL) )
+
+#define http_set_textbody(ENTITY,KEY,VAL) \
+	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, (uint8_t *)strdup(VAL), strlen((char *)VAL) )
+	
+#define http_set_header(ENTITY,KEY,VAL) \
+	http_set_record( ENTITY, &(ENTITY)->headers, 0, KEY, (uint8_t *)VAL, strlen(VAL) )
+
 extern const char http_200_fixed[];
 
 struct HTTPRecord {
@@ -36,26 +75,6 @@ struct HTTPBody {
 #endif
 };
 
-#define http_free_request( entity ) \
-	http_free_body( entity )
-
-#define http_free_response( entity ) \
-	http_free_body( entity )
-
-#define WRITE_HTTP_500( cstr, estr ) \
-	char hbuf[ 2048 ]; \
-	char cbuf[ 4096 ]; \
-	memset( &hbuf, 0, sizeof( hbuf ) ); \
-	memset( &cbuf, 0, sizeof( cbuf ) ); \
-	int clen = snprintf( cbuf, sizeof( cbuf ) - 1, "%s: %s", cstr, estr ); \
-	int hlen = snprintf( hbuf, sizeof( hbuf ) - 1, http_500_custom, clen ); \
-	write( 2, hbuf, hlen ); \
-	write( 2, cbuf, clen ); \
-	write( fd, hbuf, hlen ); \
-	write( fd, cbuf, clen ); \
-	close( fd );
-
-
 unsigned char *httpvtrim (uint8_t *, int , int *) ;
 unsigned char *httptrim (uint8_t *, const char *, int , int *) ;
 void print_httprecords ( struct HTTPRecord ** ) ;
@@ -65,4 +84,7 @@ struct HTTPBody * http_finalize_response (struct HTTPBody *, char *, int );
 struct HTTPBody * http_finalize_request (struct HTTPBody *, char *, int );
 struct HTTPBody * http_parse_request (struct HTTPBody *, char *, int );
 struct HTTPBody * http_parse_response (struct HTTPBody *, char *, int );
+int http_set_int( int *, int );
+char *http_set_char( char **, const char * );
+void *http_set_record( struct HTTPBody *, struct HTTPRecord ***, int, const char *, uint8_t *, int );
 #endif

@@ -394,32 +394,80 @@ struct HTTPBody *responses_to_send[] = {
 };
 
 
-void print_test_request ( struct HTTPBody *entity ) {
+void print_entity_list ( const char *element, struct HTTPRecord **list ) {
+	if ( element ) {
+		fprintf( stderr, "\n%s (%p) = ( ", element, list );
+	}
+
+	while ( list && *list ) { 
+		fprintf( stderr, "%p => %d, ", *list, (*list)->size ); 
+		list++;
+	}
+
+	if ( element ) {
+		fprintf( stderr, ")" );
+	}
+}
+
+
+void print_entity( struct HTTPBody *entity ) {
 	//All of the members should be filled out...
-	fprintf( stderr, "[ " );
+	fprintf( stderr, "{ " );
 	//fprintf( stderr, "proto: %5s",  entity->protocol );
+	fprintf( stderr, ", status: %3d",  entity->status );
 	fprintf( stderr, ", method: %4s",  entity->method );
 	fprintf( stderr, ", clen: %-5d", entity->clen );
 	fprintf( stderr, ", hlen: %-3d", entity->hlen );
 	fprintf( stderr, ", path: %s",   entity->path );
-	fprintf( stderr, ", host: %s", entity->host );
+	fprintf( stderr, ", host: '%s'", entity->host );
+	fprintf( stderr, ", msg: %p", entity->msg );
+
 	if ( entity->method && strcmp( entity->method, "POST" ) == 0 ) {
 		fprintf( stderr, ", ctype: %s", entity->ctype );
 		fprintf( stderr, ", boundary: %s", entity->boundary );
 	}
-	fprintf( stderr, " ]\n" );
+
+	print_entity_list( "headers: ", entity->headers );
+	print_entity_list( "bodies: ", entity->body);
+	fprintf( stderr, " }\n" );
 }
 
-
-void print_test_response ( struct HTTPBody *entity ) {
-	write( 2, entity->msg, entity->mlen );
-}
 
 
 int main ( int argc, char *argv[] ) {
-	//struct HTTPBody **r = NULL; 
 	char err[ 2048 ] = { 0 };
+	
+	//Part 1: Test generating requests and responses in piecemeal.
+	struct HTTPBody *this, that;
+	memset( &that, 0, sizeof( struct HTTPBody ) ); 
+	char *hostname = "bob.net";	
+	int stat = 200;
+	char *text = "<h2>Ok</h2>";
+	
+	http_set_int( &(&that)->status, 200 );
+	http_set_char( &(&that)->host, hostname );
+	http_set_record( &that, &(&that)->headers, 0, "ETag", (uint8_t *)"abcdef", strlen( "abcdef" ) );
+	http_set_record( &that, &(&that)->headers, 0, "Lucy", (uint8_t *)"swell", strlen( "swell" ) );
+	http_set_record( &that, &(&that)->headers, 0, "X-Accept", (uint8_t *)"*/*", strlen( "*/*" ) );
+	http_set_header( &that, "X-Genius", "Louis Farrakhan" );
+	http_set_textbody( &that, "", text );
+	print_entity( &that );
 
+	if ( !( this = malloc( sizeof( struct HTTPBody ) ) ) ) {
+		fprintf( stderr, "Couldn't initialize this!" );
+		return 1;
+	}
+
+	http_set_int( &(this)->status, 500 );
+	http_set_char( &(this)->host, "robertjohnson.net" );
+	http_set_record( this, &(this)->headers, 0, "ETag", (uint8_t *)"ghijkl", strlen( "ghijkl" ) );
+	http_set_record( this, &(this)->body, 1, "message", (uint8_t *)"textual_chocolate", strlen( "textual_chocolate" ) );
+	http_set_body( this, "binary", (uint8_t *)"none", 4 );
+	http_set_textbody( this, "text", "Hello, World" );
+	print_entity( this );
+	free( this );
+
+	//Part 2: Test creating responses & requests from assembled data
 	struct test { 
 		const char *name;
 		struct HTTPBody **list; 
@@ -428,7 +476,7 @@ int main ( int argc, char *argv[] ) {
 		void (*free)( struct HTTPBody * );
 	} tests[] = {
 		//{ "REQUESTS - PARSE", requests_received, http_parse_request, print_test_request, http_free_body },
-		{ "REQUESTS - PACK",  requests_to_send,  http_finalize_request, print_test_request, NULL },
+		//{ "REQUESTS - PACK",  requests_to_send,  http_finalize_request, print_test_request, NULL },
 #if 0
 		{ "REPSONSES- PARSE", responses_received, http_parse_response, print_test_response, http_free_body },
 		{ "RESPONSES- PACK", responses_to_send,  http_finalize_response, print_test_response, NULL },

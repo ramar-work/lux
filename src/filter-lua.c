@@ -8,14 +8,14 @@ int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 
 	//Check that the directory exists
 	if ( stat( "www", &sb ) == -1 ) {
-		WRITE_HTTP_500( "Could not locate www/ directory", strerror( errno ) );
+		//WRITE_HTTP_500( "Could not locate www/ directory", strerror( errno ) );
 		return 0;
 	}
 
 	//Check for a primary framework file
 	memset( &sb, 0, sizeof( struct stat ) );
 	if ( stat( "www/main.lua", &sb ) == -1 ) {
-		WRITE_HTTP_500( "Could not find file www/main.lua", strerror( errno ) );
+		//WRITE_HTTP_500( "Could not find file www/main.lua", strerror( errno ) );
 		return 0;
 	}
 
@@ -78,7 +78,7 @@ int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 			else if ( lerr == LUA_ERRFILE ) {
 				errlen = snprintf( fileerr, sizeof(fileerr), "File access error at: %s", f );
 			}
-			WRITE_HTTP_500( fileerr, (char *)lua_tostring( L, -1 ) );
+			//WRITE_HTTP_500( fileerr, (char *)lua_tostring( L, -1 ) );
 			lua_pop( L, lua_gettop( L ) );
 			break;
 		}
@@ -96,7 +96,7 @@ int h_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 				snprintf( fileerr, sizeof(fileerr), "Error while runnig __gc metamethod at: %s", f );
 			}
 			//fprintf(stderr, "LUA EXECUTE ERROR: %s, stack top is: %d\n", fileerr, lua_gettop(L) );
-			WRITE_HTTP_500( fileerr, (char *)lua_tostring( L, -1 ) );
+			//WRITE_HTTP_500( fileerr, (char *)lua_tostring( L, -1 ) );
 			lua_pop( L, lua_gettop( L ) );
 			break;
 		}

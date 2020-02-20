@@ -414,80 +414,6 @@ print_httpbody( entity );
 
 
 
-
-
-#if 0
-//Like lt_* - this can be done with a bunch of #defines
-int http_response_set_headers ( struct HTTPBody *entity );
-int http_request_set_headers ( struct HTTPBody *entity );
-#endif
-
-//Pack an HTTP request
-int http_pack_request ( struct HTTPBody *entity, struct HTTPRecord **headers, struct HTTPRecord **body ) {
-	return 0;
-}
-
-
-//Pack an HTTP response
-//Content-Type
-//Content-Length
-//Status
-//Content
-//Additional headers
-int http_pack_response ( struct HTTPBody *entity, uint8_t *msg, int msglen, struct HTTPRecord **headers ) {
-	//A finished message belongs in r->msg
-#if 0
-	//Define 
-	HTTP_Response *res = &h->response;
-	uint8_t statline[1024] = { 0 };
-	char ff[4] = { 0 };
-	const char *fmt   = "HTTP/%s %d %s\r\n";
-	const char *cfmt  = "Content-Length: %d\r\n";
-	const char *ctfmt = "Content-Type: %s\r\n\r\n";
-
-	//Set defaults
-	(!res->version) ? res->version = 1.1              : 0;
-	(!res->ctype)   ? res->ctype   = "text/html"      : 0;
-	(!res->status)  ? res->status  = 200              : 0;
-	(!res->sttext)  ? res->sttext  = http_status[200] : 0;
-	snprintf(ff, 4, (res->version < 2) ? "%1.1f" : "%1.0f", res->version);
-
-	//Copy the status line
-	res->mlen += sprintf( (char *)&statline[res->mlen], fmt, 
-		ff, res->status, res->sttext);
-
-	//All other headers get res->mlen here
-	//....?
-
-	//Always have at least a content length line
-	res->mlen += sprintf( (char *)&statline[res->mlen], cfmt, res->clen);
-
-	//Finally, set a content-type
-	res->mlen += sprintf( (char *)&statline[res->mlen], ctfmt, res->ctype);
-
-	//Stop now if this is a zero length message.
-	if (!res->clen) {
-		//memcpy( &res->msg[0], statline, res->mlen );
-		if ( !bf_append( h->resb, statline, res->mlen ) ) {
-			return 0;
-		}
-		return 1;
-	}
-
-	//Move the message (provided there's space)		
-	//This will fail when using fixed buffers...
-	if ( !bf_prepend( h->resb, statline, res->mlen ) ) {
-		return 0;
-	}
-	//memmove( &res->msg[res->mlen], &res->msg[0], res->clen);
-	//memcpy( &res->msg[0], statline, res->mlen ); 
-	res->mlen += res->clen;
-#endif
-	return 1;
-}
-
-
-
 //Finalize an HTTP request (really just returns a uint8_t, but this can handle it)
 struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, int errlen ) {
 	uint8_t *msg = NULL;
@@ -501,6 +427,10 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 	const char http_host_header_str[] = "Host: %s";
 	const char http_content_length_header_str[] = "Content-Length: %d";
 	const char http_content_type_header_str[] = "Content-Type: %s";
+
+	if ( entity->boundary ) {
+		free( entity->boundary );
+	}
 
 	if ( !entity->protocol ) {
 		entity->protocol = "HTTP/1.1";
@@ -718,6 +648,55 @@ struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, i
 	entity->msg = msg;
 	entity->mlen = msglen;
 	return entity;
+}
+
+int http_set_int( int *k, int v ) {
+	return ( *k = v );
+}
+
+char * http_set_char( char **k, const char *v ) {
+	return ( *k = (char *)v );	
+}
+
+void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int type, const char *k, uint8_t *v, int vlen ) {
+
+	int len = 0;
+	struct HTTPRecord *r = NULL;
+
+	//Block bad types in lieu of an enum
+	if ( type < 0 || type > 2 ) {
+		return NULL;
+	}
+
+	//Block empty arguments
+	if ( !k || !v || vlen < 0 ) {
+		return NULL;
+	}
+
+	//We use entity->boundary as a hack to store the current index.
+	if ( !entity->boundary ) {
+		entity->boundary = malloc( 4 );
+		memset( entity->boundary, 0, 4 );
+	}
+
+	if ( !( r = malloc( sizeof( struct HTTPRecord ) ) ) ) {
+		return NULL;
+	}
+
+	//Set the members
+	r->field = k;
+	r->value = v;
+	r->size = vlen;
+	len = entity->boundary[ type ];
+
+	//Reallocate
+	if (( *list = realloc( *list, sizeof( struct HTTPRecord * ) * ( len + 2 ) )) == NULL ) {
+		return NULL;
+	}
+
+	(*list)[ len ] = r, (*list)[ len + 1 ] = NULL, len++; 
+	entity->boundary[ type ] = len;
+	return r;
 }
 
 

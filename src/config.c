@@ -79,7 +79,14 @@ void dump_routes ( struct routeset r ) {
 }
 
 #if 0
-int get_routes ( Table *t ) {
+char ** build_filters ( Table *t ) {
+}
+
+
+char ** build_hosts ( Table *t ) {
+}
+
+char ** build_routes ( Table *t ) {
 	//Find the routes index, use that as start and move?
 	//struct route **routelist = NULL; //This could be static too... less to clean
 	struct routeset r = { 0, NULL };
