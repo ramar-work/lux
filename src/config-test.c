@@ -1,71 +1,70 @@
 #include "luabind.h"
 #include "config.h"
 
-struct keyset { const char *name; int (*fp)( void *p ); } keyset[] = {
+//this is the best way to set config keys
+struct keyset { const char *name; int (*fp)( void *p ); }; 
+
+struct keyset global_config[] = {
+#if 1
 	NULL
+#else
+	{ 
+#endif
 };
+
+
+struct keyset individual_config[] = {
+};
+
 
 //Loads some random files
 int main (int argc, char *argv[]) {
 
-	//Pull some keys from the config file?
-	int lerr;
-	lua_State *L = luaL_newstate();
-	const char *f = "www/def.lua";
-	char err[2048] = {0};
-	Table *t = NULL;
+	const char *files[] = {
+		//"www/def.lua",
+		"www/config.lua"
+	};
 
-	if ( !lua_exec_file( L, f, err, sizeof(err) ) ) {
-		fprintf( stderr, "%s\n", err );
-		return 1;
-	}
+	for ( int i=0; i < sizeof(files)/sizeof(const char *); i++ ) {
 
-	if ( !( t = malloc( sizeof(Table) ) ) || !lt_init( t, NULL, 2048 ) ) {
-		fprintf( stderr, "Failed to allocate space for new Table data.\n" );
-		return 1;
-	}
+		//Pull some keys from the config file?
+		lua_State *L = luaL_newstate();
+		const char *f = files[i];
+		char err[2048] = {0};
+		Table *t = NULL;
+		fprintf( stderr, "Attempting to load and parse %s\n", f );
 
-	if ( !lua_to_table( L, 1, t ) ) {
-		fprintf( stderr, "Failed to convert Lua data to table.\n" );
-		return 1;	
-	}
-
-	lt_dump( t );
-
-	//struct route **hostlist = NULL;
-	//get_values( t, "hosts", (void *)hostlist, host_table_iterator );
-
-	//struct route **routelist = NULL;
-	//get_values( t, "routes", (void *)routelist, route_table_iterator );
-	build_routes( t );
-
-#if 0	
-	//Loop through the keys specified and get something
-	getkey( t, "routes" );	
-	getkey( t, "db" );	
-	getkey( t, "template_engine" );	
-
-	//Find the routes index, use that as start and move?
-	//struct route **routelist = NULL; //This could be static too... less to clean
-	struct routeset r = { 0, NULL };
-	int routesIndex = lt_geti( t, "routes" );
-	int count = lt_counti( t, routesIndex );
-	FPRINTF( "routes key at: %d\n", routesIndex );
-
-	//Combine the routes and save each combination (strcmbd?)
-	if ( !lt_exec_complex( t, routesIndex, t->count, (void *)&r, buildRoutes ) ) {
-		FPRINTF( "At end of route data.\n" );
-	}
-
-	for ( int i=0; i < r.len; i++ ) {
-		struct route *rr = r.routes[i];
-		fprintf( stderr, "[%d] %s => ", i, rr->routename );
-		fprintf( stderr, "route composed of %d files.\n", rr->elen );
-		for ( int ii=0; ii < rr->elen; ii++ ) {
-			struct routehandler *t = rr->elements[ ii ];
-			fprintf( stderr, "\t{ %s=%s }\n", DUMPTYPE(t->type), t->filename );
+		//Loading a config file is awful difficult...
+		if ( !lua_exec_file( L, f, err, sizeof(err) ) ) {
+			fprintf( stderr, "%s\n", err );
+			return 1;
 		}
+
+		if ( !( t = malloc( sizeof(Table) ) ) || !lt_init( t, NULL, 2048 ) ) {
+			fprintf( stderr, "Failed to allocate space for new Table data.\n" );
+			return 1;
+		}
+
+		if ( !lua_to_table( L, 1, t ) ) {
+			fprintf( stderr, "Failed to convert Lua data to table.\n" );
+			return 1;	
+		}
+
+		if ( 1 ) {
+			lt_dump( t );
+		}
+
+		//This isn't superflexible now...
+		struct host **hostlist = build_hosts( t );
+		struct route **routelist = build_routes( t );
+		int item = get_int_value( t, "number", -1 ); 
+		char *wash = get_char_value( t, "wash" );
+
+		fprintf( stderr, "(%s).number: %d\n", f, item );
+		fprintf( stderr, "(%s).wash: %s\n", f, wash );
+		fprintf( stderr, "(%s).hosts:  %p\n", f, hostlist );
+		fprintf( stderr, "(%s).routes: %p\n", f, routelist );
 	}
-#endif	
+
 	return 0;
 }

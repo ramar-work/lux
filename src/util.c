@@ -178,6 +178,31 @@ uint8_t *append_to_uint8t ( uint8_t **dest, int *len, uint8_t *src, int srclen )
 }
 
 
+#if 0
+char *append_strings_to_char (char **dest, int *len, char *delim, ... ) {
+	char *p = NULL;	
+	va_list args;
+	va_start( args, delim );
+	p = va_arg( args, char * );
+
+	while ( p ) { 
+		if ( delim && !append_to_uint8t( (uint8_t **)dest, len, (uint8_t *)delim, strlen( delim ) ) ) {
+			return NULL;
+		}
+
+		if ( !append_to_uint8t( (uint8_t **)dest, len, (uint8_t *)p, strlen( p ) ) ) {
+			return NULL;
+		}
+
+		p = va_arg( args, char * );
+	} 
+
+	va_end( args );
+	return (char *)append_to_uint8t( (uint8_t **)dest, len, (uint8_t *)"\0", 1 );
+}
+#endif
+
+
 //Add to series
 void * add_item_to_list( void ***list, void *element, int size, int * len ) {
 #if 0

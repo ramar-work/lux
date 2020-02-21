@@ -54,6 +54,26 @@ void iterate_charlist ( char *** list ) {
 
 int main ( int argc, char *argv[] ) {
 
+	char *cbuf = NULL;
+	int cbuflen = 0;
+
+#if 0	
+	//Test one with no things
+	fprintf( stderr, "APPEND STRINGS TO CHARACTER ARRAY: " );
+	append_strings_to_char( &cbuf, &cbuflen, NULL, "bug", "bugger", "buggiest" ); 	
+	fprintf( stderr, "first: %s\n", cbuf );
+	free( cbuf );
+
+#if 0
+	char *bbuf = NULL;
+	int bbuflen = 0;
+	append_strings_to_char( &bbuf, &bbuflen, "/", "bug", "bugger", "buggiest" ); 	
+	fprintf( stderr, "second: %s\n", bbuf );
+	free( bbuf );
+exit(0);
+#endif
+#endif
+	
 	//Test add_item
 	fprintf( stderr, "ADD ITEMS TO LIST:\n" );
 	//Add ints

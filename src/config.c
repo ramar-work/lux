@@ -15,18 +15,18 @@
 
 struct fp_iterator { int len, depth; void *userdata; };
 
-//struct route { char *routename, **elements; };
-//struct config { char *item; int (*fp)( char * ); };
-struct config { char *item; int (*fp)( LiteKv *, int, void * ); };
-struct routehandler { char *filename; int type; };
-struct route { char *routename; char *parent; int elen; struct routehandler **elements; };
-struct routeset { int len; struct route **routes; };
+struct route { 
+	char *routename; 
+	char *parent; 
+	int elen; 
+	struct routehandler { char *filename; int type; } **elements;
+};
 
-struct config conf[] = {
-	{ "engine", NULL }
-,	{ "db"    , NULL }
-,	{ "routes", NULL }
-,	{ NULL, NULL }
+struct host {
+	char *name;	
+	char *alias;
+	char *dir;	
+	char *filter;	
 };
 
 const char *keys[] = {
@@ -52,7 +52,7 @@ const char *keysstr =
 	"auth"
 ;
 
-int c = 0;
+//int c = 0;
 char *parent[100] = { NULL };
 char *handler[100] = { NULL };
 const int BD_VIEW = 41;
@@ -125,25 +125,28 @@ return 0;
 
 
 
-void *get_values ( Table *t, const char *key, void *userdata, int (*fp)(LiteKv *, int, void *) ) {
+void *get_values( Table *t, const char *key, void *ud, int (*fp)(LiteKv *, int, void *)) {
 	int index = lt_geti( t, key );
 	int count = lt_counti( t, index );
 
 	struct fp_iterator fp_data;
 	memset( &fp_data, 0, sizeof( struct fp_iterator ) );
-	fp_data.userdata = userdata;
+	fp_data.userdata = ud;
 	fp_data.depth = 0;
 	fp_data.len = 0;
 
-	FPRINTF( "Key '%s' = %d.  Contains %d element(s).\n", key, index, count );
+	//FPRINTF( "Key '%s'=%d. (%p). Contains %d element(s).\n", key, index, ud, count );
 
-	if ( !fp && count == 1 ) {
-		//It's either a string, integer, float or function
+	if ( count == -1 ) { 
 		return NULL;
+	}
+
+	if ( !fp ) { 
+		//return lt_vta( t, ;
 	}
 	else {
 		if ( !lt_exec_complex( t, index, t->count, &fp_data, fp ) ) {
-			return userdata; 
+			return ud; 
 		}  
 	}
 
@@ -151,13 +154,14 @@ void *get_values ( Table *t, const char *key, void *userdata, int (*fp)(LiteKv *
 }
 
 
-int d = 0;
 int hosts_table_iterator ( LiteKv *kv, int i, void *p ) {
-	char **list = (char **)p;
+	struct fp_iterator *f = (struct fp_iterator *)p;
+	struct host ***hosts = f->userdata;
+	int *rlen = &f->len;
+	int *rdepth = &f->depth;
 	char *name = NULL;
 	
 	if ( kv->key.type == LITE_TXT ) {
-		//Add this key
 		name = kv->key.v.vchar;	
 	}
 	else if ( kv->key.type == LITE_TRM ) {
@@ -171,27 +175,23 @@ int hosts_table_iterator ( LiteKv *kv, int i, void *p ) {
 		fprintf( stderr, "table" );
 	}
 
+	fprintf( stderr, "\n" );
 	return 1;
 }
-
 
 
 //possily a better way to handle these might be a weird const char ** hack
 //char[0] could be the type (since for now there are only a few)
 int b = 0;
 int route_table_iterator ( LiteKv *kv, int i, void *p ) {
-	//struct routeset *r = (struct routeset *)p;
+
 	struct fp_iterator *f = (struct fp_iterator *)p;
-	struct route **routes = (struct route **)f->userdata;
-	int rlen = f->len;
-	int rdepth = f->depth;
+	struct route ***routes = f->userdata;
+	int *rlen = &f->len;
+	int *rdepth = &f->depth;
 	char *name = NULL;
 	char *type = NULL;
   char nbuf[ 64 ] = { 0 };
-
-	//fprintf( stderr, "%p %d %d\n", routes, rlen, rdepth );
-	//getchar();
-	
 
 	//Save the key or move table depth
 	if ( kv->key.type == LITE_TXT )
@@ -201,15 +201,12 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 	else if ( kv->key.type == LITE_TRM ) {
 		//Safest to add a null member to the end of elements
 		//b--;
-		if ( (--b) == 0 ) {
-			ADDITEM( NULL, struct route *, routes, rlen, 0 );  
+		if ( (--(*rdepth)) == 0 )
 			return 0;	
-		}
 		else { 
-			if ( b == 1 ) {
+			if ( (*rdepth) == 1 ) {
 				for ( int i=0; i < sizeof( parent ) / sizeof( char * ); i++ ) {
-					parent[ i ] = NULL;
-					handler[ i ] = NULL;
+					parent[ i ] = NULL, handler[ i ] = NULL;
 				}	
 			}
 		}
@@ -223,25 +220,26 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 
 	if ( kv->value.type == LITE_TXT ) {
 		FPRINTF( "filename: %s\n", kv->value.v.vchar );
-		if ( ( type = handler[ b - 1 ] ) ) {
-			struct route *rr = routes[ rlen - 1 ];
-			struct routehandler *t = malloc( sizeof( struct routehandler ) );
-			if ( !t || !( t->filename = strdup( kv->value.v.vchar ) ) ) 
+		if ( ( type = handler[ (*rdepth) - 1 ] ) ) {
+			struct route *rr = (*routes)[ (*rlen) - 1 ];
+			struct routehandler *h = malloc( sizeof( struct routehandler ) );
+			if ( !h || !( h->filename = strdup( kv->value.v.vchar ) ) ) 
 				return 0;
 			if ( memcmp( "model", type, 3 ) == 0 )
-				t->type = BD_MODEL;
+				h->type = BD_MODEL;
 			else if ( memcmp( "view", type, 3 ) == 0 )
-				t->type = BD_VIEW;
+				h->type = BD_VIEW;
 			else if ( memcmp( "query", type, 3 ) == 0 )
-				t->type = BD_QUERY;
+				h->type = BD_QUERY;
 			else if ( memcmp( "content", type, 3 ) == 0 )
-				t->type = BD_CONTENT_TYPE;
+				h->type = BD_CONTENT_TYPE;
 			else if ( memcmp( "returns", type, 3 ) == 0 )
-				t->type = BD_RETURNS;
+				h->type = BD_RETURNS;
 			else {
 				//This isn't valid, so drop it...
+				//return 0;
 			}
-			ADDITEM( t, struct routetype *, rr->elements, rr->elen, 0 ); 
+			add_item( &rr->elements, h, struct routetype *, &rr->elen );
 		}
 	}
 
@@ -250,65 +248,118 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 		//Only add certain keys, other wise, they're routes...
 		if ( name ) {
 			if( !memstr( keysstr, name, strlen(keysstr) ) ) {
+				int blen = 0;
 				struct route *rr = NULL; 
-				char buf[ 1024 ] = {0};
-				char *par = parent[ b - 1 ];
-				if ( !( rr = malloc( sizeof(struct route) ) ) ) {
+				char *buf = NULL, *par = parent[ b - 1 ];
+
+				if ( !( rr = malloc( sizeof(struct route) ) ) )
 					return 0;
+
+			#if 0
+				for ( char **p = (char *[]){ par ? par : "1","/",name,NULL }; p; p++ ) {
+					( **p != '1' ) ? append_to_char( &buf, &blen, *p ) : 0;	
 				}
-
-				rr->elen = 0;
-				rr->elements = NULL;
-
+			#else
 				if ( !par ) {
-					buf[ 0 ] = '/';
-					memcpy( &buf[ 1 ], name, strlen( name ) );
-					rr->routename = strdup( buf );
+					append_to_char( &buf, &blen, "/" );
+					append_to_char( &buf, &blen, name );
 				}
 				else {
-					int slen = 0;
-					memcpy( buf, par, strlen( par ) );
-					slen += strlen( par );
-					memcpy( &buf[ slen ], "/", 1 );
-					slen += 1;
-					memcpy( &buf[ slen ], name, strlen( name ) );
-					slen += strlen( name );
-					rr->routename = strdup( buf );
+					append_to_char( &buf, &blen, par );
+					append_to_char( &buf, &blen, "/" );
+					append_to_char( &buf, &blen, name );
 				}
-				parent[ b ] = rr->routename;
-				FPRINTF( "Got route name (%s), c. parent (%s), n.parent (%s), saving to: %p->%p\n", name, par, parent[ b ], rr, routes );
-				ADDITEM( rr, struct route *, routes, rlen, 0 );  
-				FPRINTF( "Got route name (%s), c. parent (%s), n.parent (%s), saving to: %p->%p\n", name, par, parent[ b ], rr, routes );
-				c = 0;
+			#endif
+
+				buf[ blen ] = '\0';
+				rr->elen = 0;
+				rr->elements = NULL;
+				rr->routename = buf;
+				parent[ (*rdepth) ] = rr->routename;
+
+				//FPRINTF( "Got route name (%s), saving to: %p->%p\n", name, rr, routes );
+				add_item( routes, rr, struct route *, rlen );
 			}
 			else {
 				FPRINTF( "Got prepared key: %s\n", name );
-				handler[ b ] = strdup( name );
-				//Get the last set one
-				//Mark which one you got somehow...
-				c = 1;
+				handler[ (*rdepth) ] = strdup( name );
 			}
-			b++;
+			(*rdepth)++;
 		}
 	}
-	//Keep track of all the sentinels....
-	//FPRINTF( "Depth: %d\n", b );
-	//getchar();
 	return 1;
 }
 
 
+int get_int_value ( Table *t, const char *key, int notFound ) {
+	int i = lt_geti( t, key );
+	LiteRecord *p = NULL;
+	if ( i == -1 ) {
+		return notFound;
+	}
 
-void * build_hosts ( Table *t ) {
-	//struct route **routes = NULL;
-	get_values( t, "hosts", NULL, hosts_table_iterator );
-	return NULL; 	
+	if (( p = lt_ret( t, LITE_INT, i ))->vint == 0 ) {
+		return notFound;
+	}
+
+	return p->vint;
 }
 
-void * build_routes ( Table *t ) {
+
+char * get_char_value ( Table *t, const char *key ) {
+	int i = lt_geti( t, key );
+	LiteRecord *p = NULL;
+	if ( i == -1 ) {
+		return NULL;
+	}
+
+	if (( p = lt_ret( t, LITE_TXT, i ))->vchar == NULL ) {
+		return NULL;
+	}
+
+	return p->vchar;
+}
+
+
+
+struct host ** build_hosts ( Table *t ) {
+	struct host **hosts = NULL;
+	if ( !get_values( t, "hosts", &hosts, hosts_table_iterator ) ) {
+		return NULL;
+	}
+#if 1
+	while ( hosts && (*hosts) ) {
+		fprintf( stderr, "'%s' => ", (*hosts)->name );
+		hosts++;
+	}
+#endif
+	return hosts; 	
+}
+
+
+struct route ** build_routes ( Table *t ) {
 	struct route **routes = NULL;
-	get_values( t, "routes", routes, route_table_iterator );
-	return NULL; 	
+	if ( !get_values( t, "routes", &routes, route_table_iterator ) ) {
+		return NULL;
+	}
+#if 1
+	while ( routes && (*routes) ) {
+		fprintf( stderr, "'%s' => ", (*routes)->routename );
+		struct routehandler **h = (*routes)->elements;
+		while ( h && *h ) {
+			fprintf( stderr, "%s, ", (*h)->filename );
+			h++;
+		}
+		fprintf( stderr, "\n" );
+		routes++;
+	}
+#endif
+	return routes; 	
 }
 
 
+void free_hosts () {
+}
+
+void free_routes () {
+}

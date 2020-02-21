@@ -57,6 +57,9 @@
 #define add_item(LIST,ELEMENT,SIZE,LEN) \
 	add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 
+#define append_to_char(DEST,DESTLEN,SRC) \
+	append_to_uint8t( (uint8_t **)DEST,DESTLEN,(uint8_t *)SRC,strlen(SRC) )
+
 uint8_t *read_file ( const char *filename, int *len, char *err, int errlen );
 int safeatoi( const char *value );
 char *get_lstr( char **str, char chr, int *lt );
@@ -65,6 +68,7 @@ char *copystr ( uint8_t *src, int len ) ;
 uint8_t *append_to_uint8t ( uint8_t **, int *, uint8_t *, int ); 
 unsigned char * srand_uint8t( uint8_t *, int, uint8_t *, int );
 void *add_item_to_list( void ***, void *, int , int * );
+char *append_strings_to_char (char **dest, int *len, char *delim, ... );
 #endif
 
 
