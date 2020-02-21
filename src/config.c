@@ -13,6 +13,8 @@
 	( NUM == BD_RETURNS ) ? "BD_RETURNS" : "UNKNOWN" 
 
 
+struct fp_iterator { int len, depth; void *userdata; };
+
 //struct route { char *routename, **elements; };
 //struct config { char *item; int (*fp)( char * ); };
 struct config { char *item; int (*fp)( LiteKv *, int, void * ); };
@@ -51,7 +53,6 @@ const char *keysstr =
 ;
 
 int c = 0;
-int b = 0;
 char *parent[100] = { NULL };
 char *handler[100] = { NULL };
 const int BD_VIEW = 41;
@@ -73,10 +74,19 @@ void *get_key ( Table *t, const char *key ) {
 	return NULL;
 }
 
-
-void dump_routes ( struct routeset r ) {
-	
+#if 0
+void dump_routes ( struct routeset **set ) {
+	struct routeset **r = set;
+	while ( *r ) {
+		fprintf( stderr, "%s => ", (*r)->routename );
+		for ( int ii=0; ii < (*r)->elen; ii++ ) {
+			struct routehandler *t = (*r)->elements[ ii ];
+			fprintf( stderr, "\t{ %s=%s }\n", DUMPTYPE(t->type), t->filename );
+		}
+		r++;
+	}	
 }
+#endif
 
 #if 0
 char ** build_filters ( Table *t ) {
@@ -112,13 +122,66 @@ return 0;
 }
 #endif
 
+
+void *get_values ( Table *t, const char *key, void *userdata, int (*fp)(LiteKv *, int, void *) ) {
+	int index = lt_geti( t, key );
+	int count = lt_counti( t, index );
+
+	struct fp_iterator fp_data;
+	memset( &fp_data, 0, sizeof( struct fp_iterator ) );
+	fp_data.userdata = userdata;
+	fp_data.depth = 0;
+	fp_data.len = 0;
+
+	FPRINTF( "Key '%s' = %d.  Contains %d element(s).\n", key, index, count );
+
+	if ( !fp && count == 1 ) {
+		//It's either a string, integer, float or function
+		return NULL;
+	}
+	else {
+		if ( !lt_exec_complex( t, index, t->count, &fp_data, fp ) ) {
+			return userdata; 
+		}  
+	}
+
+	return NULL;
+}
+
+
+int d = 0;
+int hosts_table_iterator ( LiteKv *kv, int i, void *p ) {
+	char **list = (char **)p;
+	char *name = NULL;
+	
+	if ( kv->key.type == LITE_TXT ) {
+		//Add this key
+		name = kv->key.v.vchar;	
+	}
+	else if ( kv->key.type == LITE_TRM ) {
+
+	}
+
+	if ( kv->value.type == LITE_TXT ) {
+		fprintf( stderr, "%s", kv->value.v.vchar );
+	}
+	else if ( kv->value.type == LITE_TBL ) {
+		fprintf( stderr, "table" );
+	}
+
+	return 1;
+}
+
+
+int b = 0;
 int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 	struct routeset *r = (struct routeset *)p;
 
 	//Right side should be a table.
 	//FPRINTF( "Index: %d\n", i );
 	char *name = NULL;
-        char nbuf[ 64 ] = { 0 };	
+  char nbuf[ 64 ] = { 0 };
+
 	if ( kv->key.type == LITE_TXT ) {
 		//FPRINTF( "Left: %s => ", kv->key.v.vchar );
 		name = kv->key.v.vchar;
@@ -127,8 +190,10 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 	else if ( kv->key.type == LITE_TRM ) {
 		//Safest to add a null member to the end of elements
 		//b--;
-		if ( (--b) == 0 )
+		if ( (--b) == 0 ) {
+			ADDITEM( NULL, struct route *, r->routes, r->len, 0 );  
 			return 0;	
+		}
 		else { 
 			if ( b == 1 ) {
 				for ( int i=0; i < sizeof( parent ) / sizeof( char * ); i++ ) {

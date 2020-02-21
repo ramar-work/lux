@@ -5,4 +5,4 @@
 #include "util.h"
 #endif
 
-void *getkey ( Table *t, const char *key );
+void *get_values ( Table *t, const char *key, void *userdata, int (*fp)(LiteKv *, int, void *) );
