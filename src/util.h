@@ -53,7 +53,9 @@
 #define mrand_letters(BUFLEN) \
 	(char *)srand_uint8t( (uint8_t *)"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", \
 		sizeof("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), malloc(BUFLEN), BUFLEN )
-#endif
+
+#define add_item(LIST,ELEMENT,SIZE,LEN) \
+	add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 
 uint8_t *read_file ( const char *filename, int *len, char *err, int errlen );
 int safeatoi( const char *value );
@@ -62,6 +64,7 @@ char *msg_get_value ( const char *value, const char *chrs, uint8_t *msg, int len
 char *copystr ( uint8_t *src, int len ) ;
 uint8_t *append_to_uint8t ( uint8_t **, int *, uint8_t *, int ); 
 unsigned char * srand_uint8t( uint8_t *, int, uint8_t *, int );
-//unsigned char * mrand_uint8t( uint8_t *, int, int );
+void *add_item_to_list( void ***, void *, int , int * );
+#endif
 
 

@@ -176,4 +176,31 @@ uint8_t *append_to_uint8t ( uint8_t **dest, int *len, uint8_t *src, int srclen )
 	*len += srclen;
 	return *dest;
 }
- 
+
+
+//Add to series
+void * add_item_to_list( void ***list, void *element, int size, int * len ) {
+#if 0
+	fprintf( stderr, "list => %p, %d, %d\n", *list, (*len), (*len) + 2 );
+#endif
+
+	//Reallocate
+	if (( (*list) = realloc( (*list), size * ( (*len) + 2 ) )) == NULL ) {
+		FPRINTF( "Failed to reallocate block from %d to %d\n", size, size * ((*len) + 2) ); 
+		return NULL;
+	}
+
+#if 0
+	fprintf( stderr, 
+		"Successfully reallocated block to size %d\n", size * ((*len) + 2) ); 
+	fprintf( stderr, "list => %p, %d, %d, %d\n", *list, (*len), (*len) + 1, size * ((*len) + 2 ) );
+#endif
+
+	(*list)[ *len ] = element; 
+	(*list)[ (*len) + 1 ] = NULL; 
+	(*len) += 1; 
+
+	return list;
+}
+
+

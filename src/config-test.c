@@ -32,12 +32,12 @@ int main (int argc, char *argv[]) {
 
 	lt_dump( t );
 
-
 	//struct route **hostlist = NULL;
 	//get_values( t, "hosts", (void *)hostlist, host_table_iterator );
 
-	struct route **routelist = NULL;
-	get_values( t, "routes", (void *)routelist, route_table_iterator );
+	//struct route **routelist = NULL;
+	//get_values( t, "routes", (void *)routelist, route_table_iterator );
+	build_routes( t );
 
 #if 0	
 	//Loop through the keys specified and get something

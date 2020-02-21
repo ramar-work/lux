@@ -62,6 +62,7 @@ const int BD_CONTENT_TYPE = 44;
 const int BD_RETURNS = 45;
 
 
+
 void *get_key ( Table *t, const char *key ) {
 	int index = lt_geti( t, key );
 	int count = lt_counti( t, index );
@@ -123,6 +124,7 @@ return 0;
 #endif
 
 
+
 void *get_values ( Table *t, const char *key, void *userdata, int (*fp)(LiteKv *, int, void *) ) {
 	int index = lt_geti( t, key );
 	int count = lt_counti( t, index );
@@ -173,25 +175,34 @@ int hosts_table_iterator ( LiteKv *kv, int i, void *p ) {
 }
 
 
+
+//possily a better way to handle these might be a weird const char ** hack
+//char[0] could be the type (since for now there are only a few)
 int b = 0;
 int route_table_iterator ( LiteKv *kv, int i, void *p ) {
-	struct routeset *r = (struct routeset *)p;
-
-	//Right side should be a table.
-	//FPRINTF( "Index: %d\n", i );
+	//struct routeset *r = (struct routeset *)p;
+	struct fp_iterator *f = (struct fp_iterator *)p;
+	struct route **routes = (struct route **)f->userdata;
+	int rlen = f->len;
+	int rdepth = f->depth;
 	char *name = NULL;
+	char *type = NULL;
   char nbuf[ 64 ] = { 0 };
 
-	if ( kv->key.type == LITE_TXT ) {
-		//FPRINTF( "Left: %s => ", kv->key.v.vchar );
+	//fprintf( stderr, "%p %d %d\n", routes, rlen, rdepth );
+	//getchar();
+	
+
+	//Save the key or move table depth
+	if ( kv->key.type == LITE_TXT )
 		name = kv->key.v.vchar;
-	}
-	//If it's a number, it could be something else...
+	/*else if ( kv->key.type == LITE_INT || LITE_FLT )
+		name = kv->key.v.vchar;*/
 	else if ( kv->key.type == LITE_TRM ) {
 		//Safest to add a null member to the end of elements
 		//b--;
 		if ( (--b) == 0 ) {
-			ADDITEM( NULL, struct route *, r->routes, r->len, 0 );  
+			ADDITEM( NULL, struct route *, routes, rlen, 0 );  
 			return 0;	
 		}
 		else { 
@@ -203,19 +214,20 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 			}
 		}
 	}
+	#if 0
 	else {
 		FPRINTF( "got some other type of key: %s\n", lt_typename( kv->key.type ) ); 
 		//snprintf( nbuf, sizeof(nbuf) - 1, "%d", 
 	}
+	#endif
 
 	if ( kv->value.type == LITE_TXT ) {
-		//The other side should be either string or function
-		char *type = handler[ b - 1];
-		FPRINTF( "filename: %s, type: %s\n", kv->value.v.vchar, type ); 
-		if ( type ) {
-			struct route *rr = r->routes[ r->len - 1 ];
+		FPRINTF( "filename: %s\n", kv->value.v.vchar );
+		if ( ( type = handler[ b - 1 ] ) ) {
+			struct route *rr = routes[ rlen - 1 ];
 			struct routehandler *t = malloc( sizeof( struct routehandler ) );
-			t->filename = strdup( kv->value.v.vchar ); 
+			if ( !t || !( t->filename = strdup( kv->value.v.vchar ) ) ) 
+				return 0;
 			if ( memcmp( "model", type, 3 ) == 0 )
 				t->type = BD_MODEL;
 			else if ( memcmp( "view", type, 3 ) == 0 )
@@ -238,11 +250,16 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 		//Only add certain keys, other wise, they're routes...
 		if ( name ) {
 			if( !memstr( keysstr, name, strlen(keysstr) ) ) {
-				struct route *rr = malloc( sizeof(struct route) );
+				struct route *rr = NULL; 
 				char buf[ 1024 ] = {0};
 				char *par = parent[ b - 1 ];
+				if ( !( rr = malloc( sizeof(struct route) ) ) ) {
+					return 0;
+				}
+
 				rr->elen = 0;
 				rr->elements = NULL;
+
 				if ( !par ) {
 					buf[ 0 ] = '/';
 					memcpy( &buf[ 1 ], name, strlen( name ) );
@@ -259,8 +276,9 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 					rr->routename = strdup( buf );
 				}
 				parent[ b ] = rr->routename;
-				//FPRINTF( "Got route name (%s), c. parent (%s), n.parent (%s)\n", name, par, parent[ b ] );
-				ADDITEM( rr, struct route *, r->routes, r->len, 0 );  
+				FPRINTF( "Got route name (%s), c. parent (%s), n.parent (%s), saving to: %p->%p\n", name, par, parent[ b ], rr, routes );
+				ADDITEM( rr, struct route *, routes, rlen, 0 );  
+				FPRINTF( "Got route name (%s), c. parent (%s), n.parent (%s), saving to: %p->%p\n", name, par, parent[ b ], rr, routes );
 				c = 0;
 			}
 			else {
@@ -278,4 +296,19 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 	//getchar();
 	return 1;
 }
+
+
+
+void * build_hosts ( Table *t ) {
+	//struct route **routes = NULL;
+	get_values( t, "hosts", NULL, hosts_table_iterator );
+	return NULL; 	
+}
+
+void * build_routes ( Table *t ) {
+	struct route **routes = NULL;
+	get_values( t, "routes", routes, route_table_iterator );
+	return NULL; 	
+}
+
 
