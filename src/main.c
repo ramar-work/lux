@@ -429,30 +429,32 @@ int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 }
 
 
-void h_err ( ) {
-
-}
-
-
-
 int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
 	char err[ 2048 ];
 	memset( err, 0, sizeof( err ) );
 
-	fprintf( stderr, "Error occurred: %s", message );
-
 	if ( !http_set_status( entity, status ) ) {
+		fprintf( stderr, "SET STATUS FAILED!" );
+		return 0;
+	}
+
+	if ( !http_set_ctype( entity, strdup( "text/html" ) ) ) {
+		fprintf( stderr, "SET CONTENT FAILED!" );
 		return 0;
 	}
 
 	if ( !http_set_content( entity, (uint8_t *)message, strlen( message ) ) ) {
+		fprintf( stderr, "SET CONTENT FAILED!" );
 		return 0;
 	}
 
 	if ( !http_finalize_response( entity, err, sizeof(err) ) ) {
+		fprintf( stderr, "FINALIZE FAILED!: %s", err );
 		return 0;
 	}
 
+	fprintf(stderr, "msg: " );
+	write( 2, entity->msg, entity->mlen );
 	return 0;
 }
 
@@ -460,7 +462,8 @@ int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
 int h_proc ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	char err[2048] = {0};
 	lua_State *L = luaL_newstate();
-	Table *t = NULL; 
+	Table *t = NULL;
+	memset( req, 0, sizeof(struct HTTPBody) );
 
 	//After this conversion takes place, destroy the environment
 	if ( !lua_exec_file( L, "www/config.lua", err, sizeof(err) ) ) {
@@ -498,6 +501,7 @@ int h_proc ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 #else
 	char *msg = strdup( "All is well." );
 	http_set_status( res, 200 );
+	http_set_ctype( res, strdup( "text/html" ));
 	http_set_content_text( res, msg );
 #endif
 	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
@@ -891,7 +895,7 @@ int main (int argc, char *argv[]) {
 				//...
 			}
 
-fprintf( stderr, "msg & mlen: " ); write( 2, rs.msg, rs.mlen ); getchar();
+//fprintf( stderr, "msg & mlen: " ); write( 2, rs.msg, rs.mlen ); getchar();
 
 			//Write a new message	
 		#if 0
