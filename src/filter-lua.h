@@ -3,6 +3,7 @@
 #include "util.h"
 #include "luabind.h"
 #include "config.h"
+#include "render.h"
 #include "router.h"
 
 #ifndef FILTER_LUA_H

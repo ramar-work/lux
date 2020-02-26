@@ -33,12 +33,13 @@ const char *keysstr =
 //int c = 0;
 char *parent[100] = { NULL };
 char *handler[100] = { NULL };
+#if 0
 static const int BD_VIEW = 41;
 static const int BD_MODEL = 42;
 static const int BD_QUERY = 43;
 static const int BD_CONTENT_TYPE = 44;
 static const int BD_RETURNS = 45;
-
+#endif
 
 char *get_route_key_type ( int num ) {
 	return \

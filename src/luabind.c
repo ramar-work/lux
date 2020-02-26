@@ -341,3 +341,172 @@ int table_to_lua (lua_State *L, int index, Table *tt) {
 }
 
 
+int lua_writetable( lua_State *L, int *pos, int ti ) {
+	lua_pushnil( L );
+	while ( lua_next( L, *pos ) != 0 ) {
+		//Set the current index
+		int t = lua_type( L, -2 );
+
+	#if 1
+		//Copy the index and rotate the top and bottom
+		lua_pushnil( L );
+		lua_copy( L, -3, lua_gettop( L ) );
+	//lua_stackdump( L );
+		lrotate( L, -2, -1 );
+	#else
+		//There must be a way to do this that will run on older Luas
+	#endif
+
+		//Now, setting the table works about the same as popping
+		lua_settable( L, ti );	
+		//lua_stackdump( L );
+	}
+	return 1;
+}
+
+
+
+int lua_aggregate ( lua_State *L ) {
+	//Check that the stack has something on it
+	if ( lua_gettop( L ) == 0 )
+		return 0;
+
+	//Add a table
+	lua_newtable(L);
+	const int tp = lua_gettop( L ); //The top
+	int pos = tp - 1; //The index on the stack I'm at
+	int ti  = 1; //Where the table is on the stack
+	#if 0
+	fprintf(stderr,"Stackdump:\n");
+	fprintf( stderr, "table position is %d\n", ti );
+	fprintf( stderr, "top (const table) is at %d\n", tp );
+	fprintf( stderr, "currently at %d\n", pos );
+	#endif
+
+	//Loop again, but show the value of each key on the stack
+	for ( int pos = tp - 1 ; pos > 0 ; ) {
+		int t = lua_type( L, pos );
+		const char *type = lua_typename( L, t );
+		//fprintf( stderr, "Adding key [%3d] => ", pos );
+
+		//Push a numeric index, since all of this should be in one table.
+		lua_pushnumber( L, ti++ );
+
+		//Write the value into table...
+		if ( t == LUA_TSTRING )
+			lua_pushstring( L, lua_tostring( L, pos ) );	
+		else if ( t == LUA_TFUNCTION )
+			lua_pushcfunction( L, (void *)lua_tocfunction( L, pos ) );
+		else if ( t == LUA_TNUMBER )
+			lua_pushnumber( L, lua_tonumber( L, pos ) );
+		else if ( t == LUA_TBOOLEAN)
+			lua_pushboolean( L, lua_toboolean( L, pos ) );
+		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA ) {
+			void *p = lua_touserdata( L, pos );
+			lua_pushlightuserdata( L, p );
+		}
+	#if 0
+		else if ( t == LUA_TTHREAD )
+			lua_pushthread( L, lua_tothread( L, pos ) );
+		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
+			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, pos ) );
+	#endif
+		else if ( t == LUA_TTABLE ) {
+			int np = tp + 2;
+			lua_newtable( L );
+			lua_writetable( L, &pos, tp + 2 );
+		}
+
+		//fprintf( stderr, "Setting table at index %d\n", tp );
+		//getchar();
+		lua_settable( L, tp );	
+		//lua_stackdump( L );
+		//fprintf( stderr, "\n" );
+		pos--;
+	}
+
+	//Remove all previous elements?
+	for ( int pos = tp - 1 ; pos > 0 ; pos-- ) {
+		lua_remove( L, pos );
+	}
+
+	//Always return one table...
+	//fprintf( stderr, "Aggregated table looks like:\n" );
+	//lua_stackdump( L );
+	return 1;
+}
+
+
+
+//Combine table indexes...?
+int lua_combine ( lua_State *L, char *err, int errlen ) {
+
+	//Check that there are actually tables to combine
+	if ( lua_gettop( L ) == 0 ) {
+		snprintf( err, errlen, "No values are on the Lua stack." );
+		return 0;
+	}
+
+	//Pull all the values from all of the tables and go...
+	lua_newtable(L);
+	for ( int t, cur_index = lua_gettop( L ) - 1 ; cur_index > 0 ; ) {
+
+		//Write the value into table...
+		if ( ( t = lua_type( L, cur_index ) ) == LUA_TSTRING )
+			lua_pushstring( L, lua_tostring( L, cur_index ) );	
+		else if ( t == LUA_TNUMBER )
+			lua_pushnumber( L, lua_tonumber( L, cur_index ) );
+		else if ( t == LUA_TBOOLEAN)
+			lua_pushboolean( L, lua_toboolean( L, cur_index ) );
+		else if ( t == LUA_TTABLE ) {
+			//I need to iterate through all the top level values only
+			lua_pushnil( L );
+			while ( lua_next( L, cur_index ) != 0 ) {
+				char val[ 1024 ] = { 0 };
+				int p = 0;
+				if ( lua_type( L, -2 ) == LUA_TSTRING ) {
+					snprintf( val, sizeof( val ), "%s", lua_tostring( L, -2 ) );
+					lua_settable( L, cur_index + 1 );	
+					lua_pushstring( L, val );
+				}
+				else if ( lua_type( L, -2 ) == LUA_TNUMBER ) {
+					p = lua_tonumber( L, -2 );
+					lua_settable( L, cur_index + 1 );	
+					lua_pushnumber( L, p );
+				}
+				else {
+					//Any deallocs that need to be done should be done...
+					snprintf( err, errlen, "%s", "Lua received key that was neither a string or number." );
+					return 0;
+				}
+			}
+
+			//pop the table off once done (since it should have been copied)
+			lua_remove( L, cur_index );	
+		}
+	#if 1
+		else {
+			snprintf( err, errlen, "%s", "Lua attempted to aggregate a value that was not a string, number or table." );
+			return 0;
+		}
+	#else
+		else if ( t == LUA_TFUNCTION )
+			lua_pushcfunction( L, (void *)lua_tocfunction( L, cur_index ) );
+		else if ( t == LUA_TTHREAD )
+			lua_pushthread( L, lua_tothread( L, cur_index ) );
+		else if ( t == LUA_TNIL ||  t == LUA_TNONE )
+			fprintf( stderr, "(%8s) %p", type, lua_topointer( L, cur_index ) );
+		else if ( t == LUA_TLIGHTUSERDATA || t == LUA_TUSERDATA ) {
+			void *p = lua_touserdata( L, cur_index );
+			lua_pushlightuserdata( L, p );
+		}
+		else {
+			snprintf( err, errlen, "%s", "Lua received key that was neither a string or number." );
+			return 0;
+		}
+	#endif
+		cur_index--;
+	}
+
+	return 1;
+}

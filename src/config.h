@@ -32,6 +32,11 @@ struct host {
 	char *filter;	
 };
 
+static const int BD_VIEW = 41;
+static const int BD_MODEL = 42;
+static const int BD_QUERY = 43;
+static const int BD_CONTENT_TYPE = 44;
+static const int BD_RETURNS = 45;
 
 struct route ** build_routes ( Table *t );
 struct host ** build_hosts ( Table *t );
