@@ -47,7 +47,7 @@ struct HTTPBody request_multipart_text = {
 	.protocol = "HTTP/1.1",
 	.method = "POST",
 	.ctype = "multipart/form-data",
-	.path = "/post",
+	.path = "/beef",
 	.headers = headers,
 	.body = bodies
 };

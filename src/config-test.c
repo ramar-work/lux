@@ -18,16 +18,14 @@ struct keyset individual_config[] = {
 
 void dump_routes ( struct route **set ) {
 	struct route **r = set;
-	fprintf( stderr, "%p => ", r );
+	fprintf( stderr, "%p =>\n", r );
 	while ( r && *r ) {
-		fprintf( stderr, "%p => ", *r );
-#if 0
-		fprintf( stderr, "%s => ", (*r)->routename );
+		fprintf( stderr, "\t%p => ", *r );
+		fprintf( stderr, "%s => \n", (*r)->routename );
 		for ( int ii=0; ii < (*r)->elen; ii++ ) {
 			struct routehandler *t = (*r)->elements[ ii ];
-			fprintf( stderr, "\t{ %s=%s }\n", get_route_key_type(t->type), t->filename );
+			fprintf( stderr, "\t\t{ %s=%s }\n", get_route_key_type(t->type), t->filename );
 		}
-#endif
 		r++;
 	}	
 }

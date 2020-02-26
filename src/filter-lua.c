@@ -14,6 +14,7 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	const char *lconfname = "/config.lua";
 	struct config *config = NULL; 
 	struct config *lconfig = NULL; 
+	struct route **routes = NULL;
 	uint8_t *buf = NULL;
 	int buflen = 0;
 	char lconfpath[ 2048 ] = { 0 };
@@ -65,28 +66,24 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	#endif
 
 		//Check that the path resolves to anything. 404 if not, I suppose
-		struct route **routes = build_routes( c );
-		fprintf( stderr, "%s:%d %p\n", __FILE__, __LINE__, routes );
-		fprintf( stderr, "%s:%d %p\n", __FILE__, __LINE__, *routes );
-		while ( routes ) {
-			fprintf( stderr, "%s:%d %s\n", __FILE__, __LINE__, (*routes)->routename );
-		#if 0
-			if ( !resolve( *routes, rq->path ) ) {
-				snprintf( err, sizeof(err), "Path %s does not resolve.", rq->path );
-				return http_set_error( res, 404, err );
-			}
-		#endif
+		routes = build_routes( c );
+		while ( routes && *routes ) {
+			if ( resolve( (*routes)->routename, req->path ) ) break;
 			routes++;
+		}
+
+		if ( !(*routes) ) {
+			snprintf( err, sizeof(err), "Path %s does not resolve.", req->path );
+			return http_set_error( res, 404, err );
 		}
 	
 	#if 0
+		//Errors can be handled... Don't know how yet...
 		//The required keys need to be pulled out.
 		config_set_path( c, "path" );	
 		config_set_path( c, "db" );	
 		config_set_path( c, "template_engine" );	
 	#endif
-
-		//Errors can be handled... Don't know how yet...
 	}
 #endif
 
@@ -132,8 +129,11 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	lua_stackdump( L );
 	return http_set_error( res, 200, "Lua probably ran fine..." );
 
-	//Route resolution should have already taken place
-	//if ( !resolve( config->path )
+	//Loop through whatever was left of routes...
+	while ( (*routes)->elements && ( *(*routes)->elements ) {
+
+		(*routes)->elements++; 
+	}
 
 #if 0
 	//Try running a few files and see what the stack looks like
