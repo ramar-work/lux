@@ -37,4 +37,5 @@ struct route ** build_routes ( Table *t );
 struct host ** build_hosts ( Table *t );
 int get_int_value ( Table *t, const char *key, int notFound );
 char * get_char_value ( Table *t, const char *key );
+char *get_route_key_type ( int num );
 #endif

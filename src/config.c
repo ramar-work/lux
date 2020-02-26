@@ -5,14 +5,6 @@
 //gcc -ldl -llua -o config vendor/single.o config.c luabind.c && ./config
 #include "config.h"
 
-#define DUMPTYPE(NUM) \
-	( NUM == BD_VIEW ) ? "BD_VIEW" : \
-	( NUM == BD_MODEL ) ? "BD_MODEL" : \
-	( NUM == BD_QUERY ) ? "BD_QUERY" : \
-	( NUM == BD_CONTENT_TYPE ) ? "BD_CONTENT_TYPE" : \
-	( NUM == BD_RETURNS ) ? "BD_RETURNS" : "UNKNOWN" 
-
-
 struct fp_iterator { int len, depth; void *userdata; };
 
 const char *keys[] = {
@@ -41,11 +33,22 @@ const char *keysstr =
 //int c = 0;
 char *parent[100] = { NULL };
 char *handler[100] = { NULL };
-const int BD_VIEW = 41;
-const int BD_MODEL = 42;
-const int BD_QUERY = 43;
-const int BD_CONTENT_TYPE = 44;
-const int BD_RETURNS = 45;
+static const int BD_VIEW = 41;
+static const int BD_MODEL = 42;
+static const int BD_QUERY = 43;
+static const int BD_CONTENT_TYPE = 44;
+static const int BD_RETURNS = 45;
+
+
+char *get_route_key_type ( int num ) {
+	return \
+		( num == BD_VIEW ) ? "BD_VIEW" : \
+		( num == BD_MODEL ) ? "BD_MODEL" : \
+		( num == BD_QUERY ) ? "BD_QUERY" : \
+		( num == BD_CONTENT_TYPE ) ? "BD_CONTENT_TYPE" : \
+		( num == BD_RETURNS ) ? "BD_RETURNS" : "UNKNOWN" 
+	;
+}
 
 void *get_key ( Table *t, const char *key ) {
 	int index = lt_geti( t, key );
@@ -59,19 +62,6 @@ void *get_key ( Table *t, const char *key ) {
 	return NULL;
 }
 
-#if 0
-void dump_routes ( struct routeset **set ) {
-	struct routeset **r = set;
-	while ( *r ) {
-		fprintf( stderr, "%s => ", (*r)->routename );
-		for ( int ii=0; ii < (*r)->elen; ii++ ) {
-			struct routehandler *t = (*r)->elements[ ii ];
-			fprintf( stderr, "\t{ %s=%s }\n", DUMPTYPE(t->type), t->filename );
-		}
-		r++;
-	}	
-}
-#endif
 
 #if 0
 char ** build_filters ( Table *t ) {
@@ -167,6 +157,9 @@ int hosts_table_iterator ( LiteKv *kv, int i, void *p ) {
 //possily a better way to handle these might be a weird const char ** hack
 //char[0] could be the type (since for now there are only a few)
 int b = 0;
+
+int aa = 0;
+int bb = 0;
 int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 
 	struct fp_iterator *f = (struct fp_iterator *)p;
@@ -205,7 +198,11 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 	if ( kv->value.type == LITE_TXT ) {
 		FPRINTF( "filename: %s\n", kv->value.v.vchar );
 		if ( ( type = handler[ (*rdepth) - 1 ] ) ) {
+		#if 1
 			struct route *rr = (*routes)[ (*rlen) - 1 ];
+		#else
+			struct route *rr = routes[ (*rlen) - 1 ];
+		#endif
 			struct routehandler *h = malloc( sizeof( struct routehandler ) );
 			if ( !h || !( h->filename = strdup( kv->value.v.vchar ) ) ) 
 				return 0;
@@ -262,7 +259,11 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 				parent[ (*rdepth) ] = rr->routename;
 
 				//FPRINTF( "Got route name (%s), saving to: %p->%p\n", name, rr, routes );
-				add_item( routes, rr, struct route, rlen );
+			#if 0
+				add_item( routes, rr, struct route *, rlen );
+			#else
+				add_item( routes, rr, struct route *, rlen );
+			#endif
 			}
 			else {
 				FPRINTF( "Got prepared key: %s\n", name );
@@ -323,12 +324,21 @@ struct host ** build_hosts ( Table *t ) {
 
 struct route ** build_routes ( Table *t ) {
 	struct route **routes = NULL;
-	if ( !get_values( t, "routes", &routes, route_table_iterator ) ) {
+	struct fp_iterator fp_data = { 0, 0, &routes };
+	int index;
+
+	if ( (index = lt_geti( t, "routes" )) == -1 ) {
 		return NULL;
 	}
-#if 1
+
+	//TODO: This can fail, so I need to catch it.
+	if ( !lt_exec_complex( t, index, t->count, &fp_data, route_table_iterator ) ) {
+		return routes; 
+	}  
+
+#if 0
 	while ( routes && (*routes) ) {
-		fprintf( stderr, "'%s' => ", (*routes)->routename );
+		fprintf( stderr, "%s, %d: '%s' => ", __FILE__, __LINE__, (*routes)->routename );
 		struct routehandler **h = (*routes)->elements;
 		while ( h && *h ) {
 			fprintf( stderr, "%s, ", (*h)->filename );

@@ -16,14 +16,29 @@ struct keyset global_config[] = {
 struct keyset individual_config[] = {
 };
 
+void dump_routes ( struct route **set ) {
+	struct route **r = set;
+	fprintf( stderr, "%p => ", r );
+	while ( r && *r ) {
+		fprintf( stderr, "%p => ", *r );
+#if 0
+		fprintf( stderr, "%s => ", (*r)->routename );
+		for ( int ii=0; ii < (*r)->elen; ii++ ) {
+			struct routehandler *t = (*r)->elements[ ii ];
+			fprintf( stderr, "\t{ %s=%s }\n", get_route_key_type(t->type), t->filename );
+		}
+#endif
+		r++;
+	}	
+}
 
 //Loads some random files
 int main (int argc, char *argv[]) {
 
 	const char *files[] = {
-		"www/config.lua",  //global config example (won't have routes)
+		//"www/config.lua",  //global config example (won't have routes)
 		"www/def.lua",		 //local config example (will have routes)
-		"www/dafoodsnob/config.lua", //local config example (w/ routes, but no complex models)
+		//"www/dafoodsnob/config.lua", //local config example (w/ routes, but no complex models)
 	};
 
 	for ( int i=0; i < sizeof(files)/sizeof(const char *); i++ ) {
@@ -65,6 +80,7 @@ int main (int argc, char *argv[]) {
 		fprintf( stderr, "(%s).wash: %s\n", f, wash );
 		fprintf( stderr, "(%s).hosts:  %p\n", f, hostlist );
 		fprintf( stderr, "(%s).routes: %p\n", f, routelist );
+		dump_routes( routelist );
 	}
 
 	return 0;
