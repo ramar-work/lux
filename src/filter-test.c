@@ -84,6 +84,7 @@ int main ( int argc, char *argv[] ) {
 	struct filter_test *f = fp;
 	while ( f->name ) {
 		fprintf( stderr, "Running test on filter '%s'\n", f->name );
+
 		//Build some possible requests
 		struct HTTPBody **tb = tests;
 		while ( *tb ) {
@@ -95,14 +96,14 @@ int main ( int argc, char *argv[] ) {
 			config.root_default = f->root;
 
 			//Run the filter on it...
-			int status = f->filter( *tb, &response, &config );
-			fprintf( stderr, !status ? "FAILED:" : "SUCCESS:\n" );
-			if ( !status ) {
-				//If it failed, just write the message to the thing
-				int p = memstrat( response.msg, "\r\n\r\n", response.mlen );
+			if ( f->filter( *tb, &response, &config ) )
+				fprintf( stderr, "SUCCESS:\n" );
+			else {
+				fprintf( stderr, "FAILED:" );
 				fprintf( stderr, " %d %d\n", response.status, response.mlen );
 			}
 			write( 2, response.msg, response.mlen );
+			http_free_response( &response );
 			tb++;
 		}
 		f++;
