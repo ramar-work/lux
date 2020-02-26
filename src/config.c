@@ -15,20 +15,6 @@
 
 struct fp_iterator { int len, depth; void *userdata; };
 
-struct route { 
-	char *routename; 
-	char *parent; 
-	int elen; 
-	struct routehandler { char *filename; int type; } **elements;
-};
-
-struct host {
-	char *name;	
-	char *alias;
-	char *dir;	
-	char *filter;	
-};
-
 const char *keys[] = {
 	"returns"
 ,	"content-type"
@@ -276,7 +262,7 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 				parent[ (*rdepth) ] = rr->routename;
 
 				//FPRINTF( "Got route name (%s), saving to: %p->%p\n", name, rr, routes );
-				add_item( routes, rr, struct route *, rlen );
+				add_item( routes, rr, struct route, rlen );
 			}
 			else {
 				FPRINTF( "Got prepared key: %s\n", name );

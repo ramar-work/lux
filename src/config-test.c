@@ -21,8 +21,9 @@ struct keyset individual_config[] = {
 int main (int argc, char *argv[]) {
 
 	const char *files[] = {
-		//"www/def.lua",
-		"www/config.lua"
+		"www/config.lua",  //global config example (won't have routes)
+		"www/def.lua",		 //local config example (will have routes)
+		"www/dafoodsnob/config.lua", //local config example (w/ routes, but no complex models)
 	};
 
 	for ( int i=0; i < sizeof(files)/sizeof(const char *); i++ ) {

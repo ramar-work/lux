@@ -10,68 +10,107 @@
 //Any processing can be done in the middle.  Since we're in another "thread" anyway
 int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 
-#if 1
-	Table *t = NULL;
-	uint8_t *msg = NULL;
-	int mlen = 0;
+	Table *c = NULL, *t = NULL;
+	const char *lconfname = "/config.lua";
+	struct config *config = NULL; 
+	struct config *lconfig = NULL; 
+	uint8_t *buf = NULL;
+	int buflen = 0;
+	char lconfpath[ 2048 ] = { 0 };
 	char err[ 2048 ] = { 0 };
-	const char *names[] = { "headers", "get", "post" };
-#if 0
-	struct HTTPRecord ***t = { &req->headers, &req->url, &req->body };
-#else
-	struct HTTPRecord **tt[] = { req->headers, req->url, req->body };
-#endif
-#else
-	//...
-	char *err = malloc( 2048 );
-	memset( err, 0, 2048 );
-	struct stat sb =  {0};
+	struct n { const char *name; struct HTTPRecord **records; } **ttt = 
+	(struct n *[]){
+		&(struct n){ "headers", req->headers },
+		&(struct n){ "get", req->url },
+		&(struct n){ "post", req->body },
+		NULL
+	};
 
-	//Check that the directory exists
-	if ( stat( "www", &sb ) == -1 ) {
-		//WRITE_HTTP_500( "Could not locate www/ directory", strerror( errno ) );
-		return 0;
-	}
-
-	//Check for a primary framework file
-	memset( &sb, 0, sizeof( struct stat ) );
-	if ( stat( "www/main.lua", &sb ) == -1 ) {
-		//WRITE_HTTP_500( "Could not find file www/main.lua", strerror( errno ) );
-		return 0;
-	}
-#endif
+	//Check for config (though this is probably already done...)
+	if ( !(config = (struct config *)ctx) )
+		return http_set_error( res, 500, "No global config is present." );
 
 	//Initialize Lua environment and add a global table
-	//FPRINTF( "Initializing Lua env.\n" );
 	lua_State *L = luaL_newstate();
 	luaL_openlibs( L );
-	lua_newtable( L ); 
 
-	//Put all of the HTTP data on the stack
+#if 1
+	//Pick up the local Lua config
+	snprintf( lconfpath, sizeof( lconfpath ), "%s%s", config->path, lconfname );  
+	if ( !lua_exec_file( L, lconfpath, err, sizeof( err ) ) )
+		return http_set_error( res, 500, err );
+
+	if ( !( c = malloc( sizeof(Table) ) ) || !lt_init( c, NULL, 1024 ) )
+		return http_set_error( res, 500, "Failed to allocate config table." );
+
+	if ( !lua_to_table( L, 1, c ) )
+		return http_set_error( res, 500, "Failed to convert config table." );
+
 #if 0
-	while ( **t ) {
-#else
-	for ( int i=0; i < sizeof(t)/sizeof(struct HTTPRecord **); i++ ) {
+	lua_stackdump( L );
+	return http_set_error( res, 200, "Lua stopped after config..." );
 #endif
-		//Add the new name first
-		lua_pushstring( L, names[ i ] ); 
-		lua_newtable( L );
+	if ( c ) {
+		lua_pop( L, 1 );
+		//lua_stackdump( L );
+		//lt_dump( c );
+	#if 0
+		//First, check that we don't have a static path.
+		if ( static ) {
+			if ( !filter_static( rq, rs, ctx ) ) {
+				//filter_static should have prepared this...
+				return 0;
+			}
+		}
+	#endif
 
-		//Add each value
-		struct HTTPRecord **w = tt[i];
-		while ( *w ) {
+		//Check that the path resolves to anything. 404 if not, I suppose
+		struct route **routes = build_routes( c );
+		fprintf( stderr, "%s:%d %p\n", __FILE__, __LINE__, routes );
+		fprintf( stderr, "%s:%d %p\n", __FILE__, __LINE__, *routes );
+		while ( routes ) {
+			fprintf( stderr, "%s:%d %s\n", __FILE__, __LINE__, (*routes)->routename );
 		#if 0
-			lua_pushustrings( L, (*w)->field, (*w)->value, (*w)->size );
-		#else
-			lua_pushstring( L, (*w)->field );
-			lua_pushlstring( L, (char *)(*w)->value, (*w)->size );
+			if ( !resolve( *routes, rq->path ) ) {
+				snprintf( err, sizeof(err), "Path %s does not resolve.", rq->path );
+				return http_set_error( res, 404, err );
+			}
 		#endif
-			lua_settable( L, 3 );
-			w++;
+			routes++;
 		}
 	
-		//Set this table and key as a value in the global table
+	#if 0
+		//The required keys need to be pulled out.
+		config_set_path( c, "path" );	
+		config_set_path( c, "db" );	
+		config_set_path( c, "template_engine" );	
+	#endif
+
+		//Errors can be handled... Don't know how yet...
+	}
+#endif
+
+	return http_set_error( res, 200, "Lua stopped after config..." );
+
+	//Put all of the HTTP data on the stack
+	lua_newtable( L ); 
+	while ( ttt && *ttt ) {
+		lua_pushstring( L, (*ttt)->name ); 
+		//TODO: Nils should probably be nils, not empty tables...
+		lua_newtable( L );
+		while ( (*ttt)->records && (*(*ttt)->records)->field ) {
+			struct HTTPRecord *r = (*(*ttt)->records);
+		#if 0
+			lua_pushustrings( L, r->field, r->value, r->size );
+		#else
+			lua_pushstring( L, r->field );
+			lua_pushlstring( L, (char *)r->value, r->size );
+		#endif
+			lua_settable( L, 3 );
+			(*ttt)->records++;
+		}
 		lua_settable( L, 1 );
+		ttt++;
 	}
 
 	//Push the path as well
@@ -83,12 +122,20 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 #endif
 	lua_settable( L, 1 );
 
+#if 0
 	//Additionally, the framework methods and whatnot are also needed...
 	//lua_set_methods( L, ... );
+#endif
 
 	//Assign this globally
 	lua_setglobal( L, "newenv" );	
+	lua_stackdump( L );
+	return http_set_error( res, 200, "Lua probably ran fine..." );
 
+	//Route resolution should have already taken place
+	//if ( !resolve( config->path )
+
+#if 0
 	//Try running a few files and see what the stack looks like
 #if 0
 	f = <what is on this side?>;
@@ -195,6 +242,7 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 		close(fd);
 		return 0;
 	}
+#endif
 #endif
 
 	return 0;

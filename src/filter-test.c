@@ -68,11 +68,11 @@ struct filter_test {
 };
 
 struct filter_test fp[] = {
+	{ "lua", "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },
+#if 0
 	{ "static", "tests/filters/static/text", "/index.html", filter_static },
 	{ "static", "tests/filters/static/binary", "/aeon.jpg", filter_static },
 	{ "echo", NULL, NULL, filter_echo },
-#if 0
-	{ "lua", filter_lua },
 	{ "memory", filter_memory },
 #endif
 	{ NULL }

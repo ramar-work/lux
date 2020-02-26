@@ -18,6 +18,21 @@ struct config {
 #endif
 };
 
+struct route { 
+	char *routename; 
+	char *parent; 
+	int elen; 
+	struct routehandler { char *filename; int type; } **elements;
+};
+
+struct host {
+	char *name;	
+	char *alias;
+	char *dir;	
+	char *filter;	
+};
+
+
 struct route ** build_routes ( Table *t );
 struct host ** build_hosts ( Table *t );
 int get_int_value ( Table *t, const char *key, int notFound );

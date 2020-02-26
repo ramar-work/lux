@@ -37,7 +37,6 @@ int lua_exec_string( lua_State *L, const char *str, char *err, int errlen ) {
 			len = snprintf( err, errlen, "GC meta-method error: " );
 		else {
 			len = snprintf( err, errlen, "Unknown error occurred: " );
-
 		}
 	
 		errlen -= len;	

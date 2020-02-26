@@ -2,6 +2,8 @@
 #include "mime.h"
 #include "util.h"
 #include "luabind.h"
+#include "config.h"
+#include "router.h"
 
 #ifndef FILTER_LUA_H
 #define FILTER_LUA_H
