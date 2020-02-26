@@ -1,28 +1,38 @@
-int proc_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+#include "filter-echo.h"
+int filter_echo ( struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 
 	//Allocate a big buffer and do work
-	int progress = 0;
-	char *buf = malloc( 6 );
+	char err[ 2048 ] = { 0 };
+	char sbuf[ 4096 ] = { 0 };
+	char *buf = NULL;
 	const char *names[] = { "Headers", "GET", "POST" };
-	struct HTTPRecord **t[] = { rq->headers, rq->url, rq->body };
-	char sbuf[ 4096 ];
-	memset( sbuf, 0, sizeof( sbuf ) );
+	struct HTTPRecord **t[] = { rq->headers, rq->url, rq->body, NULL };
+	struct HTTPRecord ***tt = t;
+	const char urlfmt[] = "<h2>URL</h2>\n%s<br>\n";
+	int buflen = 0; 
+	int progress = 0;
+
+	//Sanity checks
+	if ( !rq->path || !( buflen = (strlen(urlfmt) - 1) + strlen(rq->path) ) )
+		return http_set_error( rs, 500, "Path cannot be zero..." );
 
 	//Reallocate a buffer
-	int suplen = snprintf( sbuf, sizeof(sbuf)-1, "<h2>URL</h2>\n%s<br>\n", rq->path );
-	if ( ( buf = realloc( buf, suplen ) ) == NULL ) {
-		write( fd, http_500_fixed, strlen( http_500_fixed ) );
-		close( fd );
-		return 0;
+	if ( !( buf = realloc( buf, buflen ) ) || !memset( buf, 0, buflen ) )
+		return http_set_error( rs, 500, strerror( errno ) );
+
+	if ( ( buflen = snprintf( buf, buflen, urlfmt, rq->path )) == -1 )
+		return http_set_error( rs, 500, "Failed to zero memory..." );
+
+#if 1
+	//Switch to whiles, b/c it's just easier to follow...
+	while ( **tt ) {
+		//Do something with end str
+		tt++;
 	}
-
-	//Add the URL (paths should never be more than 2048, but ensure this before write)
-	memcpy( &buf[ progress ], sbuf, suplen );
-	progress += suplen;
-
+#else
 	//Loop through all three...
 	for ( int i=0; i < sizeof(t)/sizeof(struct HTTPRecord **); i++ ) {
-		
+#if 0
 		//Define stuff
 		struct HTTPRecord **w = t[i];
 		char *endstr = ( *w ) ? "\n" : "\n-<br>\n";
@@ -68,8 +78,11 @@ int proc_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 			progress += 5;
 			w++;
 		}
+#endif
 	}
+#endif
 
+#if 0
 	//Get the length of the format string and allocate enough for buffer and thing
 	int sendLen = strlen( http_200_custom ) + 6 + progress; //get the length of number 
 	int actualLen = 0, written = 0;
@@ -85,6 +98,7 @@ int proc_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 		close(fd);
 		return 0;
 	}
+#endif
 
 	return 0;
 }

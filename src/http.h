@@ -52,7 +52,6 @@ struct HTTPRecord {
 	int size; 
 };
 
-
 struct HTTPBody {
 	int clen;  //content length
 	int mlen;  //message length (length of the entire received message)
@@ -87,4 +86,5 @@ struct HTTPBody * http_parse_response (struct HTTPBody *, char *, int );
 int http_set_int( int *, int );
 char *http_set_char( char **, const char * );
 void *http_set_record( struct HTTPBody *, struct HTTPRecord ***, int, const char *, uint8_t *, int );
+int http_set_error ( struct HTTPBody *entity, int status, char *message );
 #endif

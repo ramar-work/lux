@@ -61,8 +61,6 @@ const int BD_QUERY = 43;
 const int BD_CONTENT_TYPE = 44;
 const int BD_RETURNS = 45;
 
-
-
 void *get_key ( Table *t, const char *key ) {
 	int index = lt_geti( t, key );
 	int count = lt_counti( t, index );

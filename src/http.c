@@ -737,3 +737,35 @@ void http_free_body ( struct HTTPBody *entity ) {
 	}	
 }
 
+
+int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
+	char err[ 2048 ];
+	memset( err, 0, sizeof( err ) );
+
+	if ( !http_set_status( entity, status ) ) {
+		fprintf( stderr, "SET STATUS FAILED!" );
+		return 0;
+	}
+
+	if ( !http_set_ctype( entity, strdup( "text/html" ) ) ) {
+		fprintf( stderr, "SET CONTENT FAILED!" );
+		return 0;
+	}
+
+	if ( !http_set_content( entity, (uint8_t *)message, strlen( message ) ) ) {
+		fprintf( stderr, "SET CONTENT FAILED!" );
+		return 0;
+	}
+
+	if ( !http_finalize_response( entity, err, sizeof(err) ) ) {
+		fprintf( stderr, "FINALIZE FAILED!: %s", err );
+		return 0;
+	}
+
+#if 0
+	fprintf(stderr, "msg: " );
+	write( 2, entity->msg, entity->mlen );
+#endif
+	return 0;
+}
+

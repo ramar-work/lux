@@ -1,5 +1,6 @@
+#include "filter-dir.h"
 /*dirent.c - a directory handler*/
-int dir_http_handler (HTTP *h, Table *env)
+int filter_dir (HTTP *h, Table *env)
 {
 	char path[PATHLEN] = {0};
 	struct dirent *dir = NULL;
