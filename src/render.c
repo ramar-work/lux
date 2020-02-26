@@ -118,7 +118,7 @@ void destroy_render_table( struct map **map, int maplen ) {
 		fprintf( stderr, "[%3d] => action: %-16s", i, DUMPACTION( item->action ) );
 
 		if ( item->action == RAW ) { 
-			FPRINTF( "Nothing to free..." );
+			FPRINTF( "Nothing to free...\n" );
 		}
 		else if ( item->action == EXECUTE ) {
 			FPRINTF( "Freeing pointer to exec content..." );
@@ -421,11 +421,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 	for ( int i = 0; i < elen; i++ ) {
 		struct map *item = map[ i ];
 		if ( item->action == RAW || item->action == EXECUTE ) {
-		#ifdef DEBUG
-			fprintf( stderr, "%-20s", "RAW" );
-			fprintf( stderr, "len: %3d, ", item->len ); 
-			//ENCLOSE( item->ptr, 0, item->len );
-		#endif
+			FPRINTF( "%-20s, len: %3d", "RAW", item->len );
 			blockLen += item->len;
 			if ( (block = realloc( block, blockLen )) == NULL ) {
 				//NOTE: Teardown properly or you will cry...
@@ -434,12 +430,55 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 			//If I do a memset, where at?
 			memcpy( &block[ blockLen - item->len ], item->ptr, item->len ); 
 		}
+		else if ( item->action == SIMPLE_EXTRACT ) {
+			FPRINTF( "%-20s, len: %3d ", "SIMPLE_EXTRACT", item->len );
+			//rip me out
+			#if 1
+			if ( item->hashList ) {
+				//Get the type and length
+				int hash = **item->hashList;
+				if ( hash > -1 ) {
+					LiteKv *lt = lt_retkv( t, hash );
+				#ifdef DEBUG
+					fprintf( stderr, ", WHAT IS THIS: %p = ", lt ); 
+					if ( lt->value.type == LITE_INT ) {
+						fprintf( stderr, " %d", lt->value.v.vint );
+					}
+					else if ( lt->value.type == LITE_TXT ) {
+						fprintf( stderr, " %s", lt->value.v.vchar );
+					}
+				#endif
+					//NOTE: At this step, nobody should care about types that much...
+					char *ptr = NULL;
+					char nbuf[64] = {0};
+					int itemlen = 0;
+					if ( lt->value.type == LITE_TXT ) {
+						itemlen = strlen( lt->value.v.vchar ); 
+						ptr = lt->value.v.vchar;
+					}
+					else if ( lt->value.type == LITE_INT ) {
+						itemlen = snprintf( nbuf, sizeof( nbuf ) - 1, "%d", lt->value.v.vint );
+						ptr = nbuf;
+					}
+					else {
+						//This is a totally different situation...
+						return NULL;
+					}
+
+					blockLen += itemlen;
+					if ( (block = realloc( block, blockLen )) == NULL ) {
+						return NULL;
+					}
+					memcpy( &block[ blockLen - itemlen ], ptr, itemlen ); 
+				}
+				item->hashList++;
+			}
+			#endif
+			FPRINTF( "\n" );
+		} 
 		else {
 			if ( item->action == LOOP_START ) {
-			#ifdef DEBUG
-				fprintf( stderr, "%-20s", "LOOP_START" );
-				fprintf( stderr, "len: %3d ", item->len );
-			#endif
+				FPRINTF( "%-20s, len: %3d", "LOOP_START", item->len );
 				d++;
 				d->index = i;
 				d->current = 0;
@@ -447,10 +486,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 			} 
 			else if ( item->action == LOOP_END ) {
 				d->current++;
-			#ifdef DEBUG
-				fprintf( stderr, "%-20s", "LOOP_END" );
-				fprintf( stderr, "%d =? %d", d->current, d->childCount );
-			#endif
+				FPRINTF( "%-20s, %d =? %d", "LOOP_END", d->current, d->childCount );
 				if ( d->current == d->childCount ) {
 					d--;
 				}
@@ -459,14 +495,12 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 				}
 			}
 			else if ( item->action == COMPLEX_EXTRACT ) {
-			#ifdef DEBUG
-				fprintf( stderr, "%-20s", "COMPLEX_EXTRACT " );
-			#endif
+				FPRINTF( "%-20s", "COMPLEX_EXTRACT " );
+				//rip me out, i am idential to SIMPLE_EXTRACT'S ROUTINE
+				#if 1
 				if ( item->hashList ) {
-				#ifdef DEBUG
 					//If there is a pointer, it does not move until I get through all three
-					fprintf( stderr, "%d", **item->hashList );
-				#endif
+					FPRINTF( "%d", **item->hashList );
 					//Get the type and length
 					int hash = **item->hashList;
 					if ( hash > -1 ) {
@@ -505,6 +539,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 					}
 					item->hashList++;
 				}
+				#endif
 			}
 		#ifdef DEBUG
 			fprintf( stderr, "\n" );

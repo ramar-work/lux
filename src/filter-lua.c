@@ -1,15 +1,12 @@
 #include "filter-lua.h"
 
+
 #define lua_pushustrings(STATE,KEY,VAL,VLEN) \
 	lua_pushstring( STATE, KEY ) && lua_pushlstring( STATE, (char *)VAL, VLEN )
 
+
 #define lua_pushstrings(STATE,KEY,VAL) \
 	lua_pushstring( STATE, KEY ) && lua_pushlstring( STATE, (char *)VAL, strlen( VAL ))
-
-
-
-
-
 
 
 //filter-lua.c - Run HTTP messages through a Lua handler
@@ -167,12 +164,18 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 				return http_set_error( res, 500, err );
 			}
 
+fprintf( stderr, "SOURCE\n=========\n" );
+write(2,fbuf,flen);
+
 			//Then do the render ( model.? )
 			if ( !( rendered = table_to_uint8t( t, fbuf, flen, &rendered_len ) ) ) {
 				fprintf( stderr, "Failed to render model according to view file: %s\n", fpath );
 				return http_set_error( res, 500, err );
 			}
 
+fprintf( stderr, "RENDERED\n=========\n" );
+write(2,rendered,rendered_len);
+getchar();
 			//Append to the whole message
 			append_to_uint8t( &buf, &buflen, rendered, rendered_len );
 		} 
