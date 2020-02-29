@@ -27,8 +27,6 @@
 
 //Regular Lua utilities
 void lua_stackdump (lua_State *); 
-//void lua_stackclear (lua_State *);
-int lua_aggregate (lua_State *L);
 int lua_combine (lua_State *L, char *err, int errlen);
 
 //Universal hash table utilities

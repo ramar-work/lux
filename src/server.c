@@ -13,7 +13,6 @@
 
 #include "filter-static.h"
 
-
 extern const char http_200_custom[];
 extern const char http_200_fixed[];
 extern const char http_400_custom[];
@@ -24,7 +23,6 @@ extern const char http_500_fixed[];
 const int defport = 2000;
 int arg_verbose = 0;
 int arg_debug = 0;
-
 
 //send (sends a message, may take many times)
 int t_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
