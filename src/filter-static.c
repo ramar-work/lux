@@ -1,15 +1,13 @@
 #include "filter-static.h"
 
-#if 0
-int send_basic(int fd, char *err) {
-	fprintf( stderr, "%s\n", err );
-	if ( write( fd, http_200_fixed, strlen( http_200_fixed ) ) == -1 ) {
-		fprintf(stderr, "Couldn't write all of message..." );
-		close(fd);
-		return 0;
-	}
-	return 1;
-}
+#define FILTER_STATIC_DEBUG
+
+#ifndef FILTER_STATIC_DEBUG
+ #define FILTER_STATIC_PRINT(...)
+#else
+ #define FILTER_STATIC_PRINT(...) \
+	fprintf( stderr, "[%s:%d]", __FILE__, __LINE__ ); \
+	fprintf( stderr, __VA_ARGS__ )
 #endif
 
 char *getExtension ( char *filename ) {
@@ -62,33 +60,36 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	
 	//Check for the file 
 	if ( stat( fpath, &sb ) == -1 ) {
-		snprintf( err, sizeof( err ), "FILE STAT ERROR: %s: %s.", strerror( errno ), fpath );
+		//snprintf( err, sizeof( err ), "FILE STAT ERROR: %s: %s.", strerror( errno ), fpath );
+		snprintf( err, sizeof( err ), "%s: %s.", strerror( errno ), fpath );
 		return http_set_error( rs, 404, err );
 	}
 
 	//Check for the file 
 	if ( ( fd = open( fpath, O_RDONLY ) ) == -1 ) {
-		snprintf( err, sizeof( err ), "FILE OPEN ERROR: %s: %s.", strerror( errno ), fpath );
+		//snprintf( err, sizeof( err ), "FILE OPEN ERROR: %s: %s.", strerror( errno ), fpath );
+		snprintf( err, sizeof( err ), "%s: %s.", strerror( errno ), fpath );
 		//depends on type of problem (permission, corrupt, etc)
 		return http_set_error( rs, 500, err );
 	}
 
 	//Allocate a buffer
 	if ( !( content = malloc( ++sb.st_size ) ) || !memset( content, 0, sb.st_size ) ) {
-		snprintf( err, sizeof( err ), "COULD NOT ALLOCATE SPACE FOR FILE: %s\n", strerror( errno ) );
+		snprintf( err, sizeof( err ), "Could not allocate space for file: %s\n", strerror( errno ) );
+FILTER_STATIC_PRINT( err );
 		return http_set_error( rs, 500, err );
 	}
 
 	//Read the entire file into memory, b/c we'll probably have space 
 	if ( ( size = read( fd, content, sb.st_size - 1 )) == -1 ) {
-		snprintf( err, sizeof( err ), "COULD NOT READ ALL FILE %s: %s.", fpath, strerror( errno ) );
+		snprintf( err, sizeof( err ), "Could not read all of file %s: %s.", fpath, strerror( errno ) );
 		free( content );
 		return http_set_error( rs, 500, err );
 	}
 
 	//This should have happened before...
 	if ( close( fd ) == -1 ) {
-		snprintf( err, sizeof( err ), "COULD NOT CLOSE FILE %s: %s\n", fpath, strerror( errno ) );
+		snprintf( err, sizeof( err ), "Could not close file %s: %s\n", fpath, strerror( errno ) );
 		free( content );
 		return http_set_error( rs, 500, err );
 	}

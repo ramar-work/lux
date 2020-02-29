@@ -4,6 +4,9 @@
 #include "filter-echo.h"
 #include "filter-lua.h"
 
+#define TESTCASE( NAME, METHOD, PATH, HEADERS, BODIES, TEXTHTML ) \
+	{ #NAME, { TEXTHTML, METHOD, PATH, HTTP_11, .headers=HEADERS, .body=BODIES } }
+
 struct HTTPRecord *headers[] = {
 	&(struct HTTPRecord){ "X-Case-Contact", NULL, (uint8_t *)"Lydia", 5 },
 	&(struct HTTPRecord){ "ETag", NULL, (uint8_t *)"dd323d9asdf", 11 },
@@ -18,56 +21,38 @@ struct HTTPRecord *bodies[] = {
 	&(struct HTTPRecord){ NULL }
 };
 
+char X_APP_WWW[] = "application/x-www-form-urlencoded";
+char MULTIPART[] = "multipart/form-data";
+char TEXTHTML[] = "text/html";
+char HTTP_11[] = "HTTP/1.1";
 
-//I'd rather use a parse, but building directly and moving it is better
-struct HTTPBody request_body_get_nopath = {
-	.protocol = "HTTP/1.1",
-	.method = "GET",
-	.path = "/",
-	.ctype = "text/html"
+
+struct Test {
+	const char *name;
+	struct HTTPBody request;
+} testsp[] = {
+#if 0
+	TESTCASE(root, "GET", "/", NULL, NULL, TEXTHTML),
+	TESTCASE(level1url, "GET", "/ashera", NULL, NULL, TEXTHTML),
+	TESTCASE(level2url, "GET", "/ashera/two", NULL, NULL, TEXTHTML),
+#endif
+	TESTCASE(404_never_find_me, "GET", "/you-will-never-find-me", NULL, NULL, TEXTHTML),
+	TESTCASE(static_file_missing, "GET", "/static/not_found.jpg", NULL, NULL, TEXTHTML),
+	TESTCASE(static_file_present, "GET", "/static/handtinywhite.gif", NULL, NULL, TEXTHTML),
+	TESTCASE(multipart_post, "POST", "/beef", headers, bodies, MULTIPART),
+#if 0
+	TESTCASE(appxwww_post, "POST", "/nope", headers, bodies, X_APP_WWW),
+#endif
+	{ NULL }
 };
 
-struct HTTPBody request_body_with_path = {
-	.protocol = "HTTP/1.1",
-	.method = "GET",
-	.path = "/ashera",
-	.ctype = "text/html"
-};
-
-struct HTTPBody request_application_x_www_url_formencoded = {
-	.protocol = "HTTP/1.1",
-	.method = "POST",
-	.path = "/useless-post",
-	.ctype = "application/x-www-form-urlencoded",
-	.headers = headers, 
-	.body = bodies
-};
-
-struct HTTPBody request_multipart_text = { 
-	.protocol = "HTTP/1.1",
-	.method = "POST",
-	.ctype = "multipart/form-data",
-	.path = "/beef",
-	.headers = headers,
-	.body = bodies
-};
-
-struct HTTPBody *tests[] = {
-	(struct HTTPBody *)&request_body_get_nopath,
-	(struct HTTPBody *)&request_body_with_path,
-	(struct HTTPBody *)&request_application_x_www_url_formencoded,
-	(struct HTTPBody *)&request_multipart_text,
-	NULL
-};
 
 struct filter_test {
 	const char *name, *path, *root;
 	int (*filter)( struct HTTPBody *, struct HTTPBody *, void * ); 
 	uint8_t *expected;
 	int len;
-};
-
-struct filter_test fp[] = {
+} fp[] = {
 	{ "lua", "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },
 #if 0
 	{ "static", "tests/filters/static/text", "/index.html", filter_static },
@@ -83,28 +68,33 @@ int main ( int argc, char *argv[] ) {
 
 	struct filter_test *f = fp;
 	while ( f->name ) {
-		fprintf( stderr, "Running test on filter '%s'\n", f->name );
-
-		//Build some possible requests
-		struct HTTPBody **tb = tests;
-		while ( *tb ) {
-			fprintf( stderr, "%s\n", (*tb)->method );
+		fprintf( stderr, "Running tests against filter '%s'\n", f->name );
+		struct Test *test = testsp;
+		while ( test->name ) {
 			char err[2048] = { 0 };
 			struct HTTPBody response = { 0 };
-			struct config config = { 0 };
-			config.path = f->path;
-			config.root_default = f->root;
+			struct config config = { .path = f->path, .root_default = f->root };
+			fprintf( stderr, "============\n" );
+			fprintf( stderr, "[ Test name: %-13s ]: ", test->name );
 
 			//Run the filter on it...
-			if ( f->filter( *tb, &response, &config ) )
-				fprintf( stderr, "SUCCESS:\n" );
+			//TODO: The messages here make no sense unless you create 
+			//expected responses and compare them.
+			if ( f->filter( &test->request, &response, &config ) )
+				;//fprintf( stderr, "SUCCESS:\n" );
 			else {
-				fprintf( stderr, "FAILED:" );
-				fprintf( stderr, " %d %d\n", response.status, response.mlen );
+				;//fprintf( stderr, "FAILED" );
+				//fprintf( stderr, " %d %d\n", response.status, response.mlen );
 			}
-			write( 2, response.msg, response.mlen );
+
+			//Optionally show the finished message?
+			if ( 1 ) {	
+				fprintf( stderr, "\nMessage contents:\n" );
+				write( 2, response.msg, response.mlen );
+			}
+			fprintf( stderr, "\n===========\n" );
 			http_free_response( &response );
-			tb++;
+			test++;
 		}
 		f++;
 	}

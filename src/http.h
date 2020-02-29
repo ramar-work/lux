@@ -53,17 +53,17 @@ struct HTTPRecord {
 };
 
 struct HTTPBody {
+	char *ctype; //content type ptr
+	char *method;
+	char *path;
+	char *protocol;
+	char *host;
+	char *boundary;
+ 	uint8_t *msg;
 	int clen;  //content length
 	int mlen;  //message length (length of the entire received message)
 	int	hlen;  //header length
 	int status; //what was this?
-	char *ctype; //content type ptr
-	char *method;
-	char *protocol;
-	char *path;
-	char *host;
-	char *boundary;
- 	uint8_t *msg;
 #if 0
 	//This may make things more efficient
 	struct HTTPRecord **values;

@@ -1,5 +1,15 @@
 #include "filter-lua.h"
+#include "filter-static.h"
 
+#define FILTER_LUA_DEBUG
+
+#ifndef FILTER_LUA_DEBUG
+ #define FILTER_LUA_PRINT(...)
+#else
+ #define FILTER_LUA_PRINT(...) \
+	fprintf( stderr, "[%s:%d]", __FILE__, __LINE__ ); \
+	fprintf( stderr, __VA_ARGS__ )
+#endif
 
 #define lua_pushustrings(STATE,KEY,VAL,VLEN) \
 	lua_pushstring( STATE, KEY ) && lua_pushlstring( STATE, (char *)VAL, VLEN )
@@ -7,6 +17,47 @@
 
 #define lua_pushstrings(STATE,KEY,VAL) \
 	lua_pushstring( STATE, KEY ) && lua_pushlstring( STATE, (char *)VAL, strlen( VAL ))
+
+#if 0
+struct config_key_handler { 
+	const char *name;
+	int (*fp)( Table *t, void *p );
+	void *p;
+};
+
+//easiest way is loop through and find the key and return it
+//it should handle functions too...
+struct config_key_handler {
+/*{ name,     variable,   function } */
+	{ "static", static_dir, get_char_key },
+	{ "routes", static_dir, build_routes },
+	{ "static", static_dir },
+	{ "static", static_dir },
+	{ "static", static_dir },
+};
+#endif
+
+
+//All of the keys I need to parse will go here for now...
+//I'll also just make a config object...
+int parse_config ( Table *t ) {
+	return 0;
+}
+
+
+int check_static( Table *t, const char *path ) {
+	char *statdir = get_char_value( t, "static" );
+
+	if ( !path || !statdir || strlen(path) < strlen(statdir) ) { 
+		return 0;
+	}
+
+	if ( memcmp( statdir, ++path, strlen( statdir ) ) != 0 ) {
+		return 0;
+	} 
+
+	return 1;
+}
 
 
 //filter-lua.c - Run HTTP messages through a Lua handler
@@ -20,6 +71,7 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	struct route **routes = NULL;
 	struct routehandler **handlers = NULL;
 	uint8_t *buf = NULL;
+	char *statdir = NULL;
 	int buflen = 0;
 	char lconfpath[ 2048 ] = { 0 };
 	char err[ 2048 ] = { 0 };
@@ -40,7 +92,9 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	luaL_openlibs( L );
 
 	//Pick up the local Lua config
-	snprintf( lconfpath, sizeof( lconfpath ), "%s%s", config->path, lconfname );  
+	if ( snprintf( lconfpath, sizeof( lconfpath ), "%s%s", config->path, lconfname ) == -1 ) 
+		return http_set_error( res, 500, "Could not get full config path." );
+
 	if ( !lua_exec_file( L, lconfpath, err, sizeof( err ) ) )
 		return http_set_error( res, 500, err );
 
@@ -50,19 +104,13 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	if ( !lua_to_table( L, 1, c )  )
 		return http_set_error( res, 500, "Failed to convert config table." );
 
-	//lua_pop( L, 1 );
-	//lua_stackdump( L );
-	//lt_dump( c );
-#if 0
-	//First, check that we don't have a static path.
-	if ( static ) {
-		if ( !filter_static( rq, rs, ctx ) ) {
-			//filter_static should have prepared this...
-			return 0;
-		}
-	}
-#endif
+	//Clean up the stack after loading config file...
 	lua_pop(L, 1);
+
+	//Check for and serve any static files 
+	//TODO: This should be able to serve a list of files matching a specific type
+	if ( check_static( c, req->path ) )
+		return filter_static( req, res, config );
 
 	//Check that the path resolves to anything. 404 if not, I suppose
 	routes = build_routes( c );
@@ -76,7 +124,6 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 		return http_set_error( res, 404, err );
 	}
 
-	handlers = (*routes)->elements;	
 #if 0
 	//Errors can be handled... Don't know how yet...
 	//The required keys need to be pulled out.
@@ -116,13 +163,14 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	lua_settable( L, 1 );
 
 #if 0
-	//Additionally, the framework methods and whatnot are also needed...
-	//lua_set_methods( L, ... );
-#endif
-
-	//Assign this globally
+	//Set framework methods here...
+	//lua_set_methods( L, "newenv", libs );
+#else
+	//Put whatever is now on the stack in 'newenv'
+	//lua_set_methods( L, "newenv"... );
 	lua_setglobal( L, "newenv" );	
 	lua_stackdump( L );
+#endif
 
 	//Models
 	handlers = (*routes)->elements;
@@ -164,18 +212,12 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 				return http_set_error( res, 500, err );
 			}
 
-fprintf( stderr, "SOURCE\n=========\n" );
-write(2,fbuf,flen);
-
 			//Then do the render ( model.? )
 			if ( !( rendered = table_to_uint8t( t, fbuf, flen, &rendered_len ) ) ) {
 				fprintf( stderr, "Failed to render model according to view file: %s\n", fpath );
 				return http_set_error( res, 500, err );
 			}
 
-fprintf( stderr, "RENDERED\n=========\n" );
-write(2,rendered,rendered_len);
-getchar();
 			//Append to the whole message
 			append_to_uint8t( &buf, &buflen, rendered, rendered_len );
 		} 

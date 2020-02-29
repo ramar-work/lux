@@ -85,15 +85,15 @@ void print_render_table( struct map **map, int maplen ) {
 		struct map *item = map[ i ];
 
 		//Dump the unchanging elements out...
-		fprintf( stderr, "[%3d] => action: %-16s", i, DUMPACTION( item->action ) );
+		FPRINTF( "[%3d] => action: %-16s", i, DUMPACTION( item->action ) );
 
 		if ( item->action == RAW || item->action == EXECUTE ) {
 			uint8_t *p = (uint8_t *)item->ptr;
-			fprintf( stderr, " len: %3d, ", item->len ); 
+			FPRINTF( " len: %3d, ", item->len ); 
 			ENCLOSE( p, 0, item->len );
 		}
 		else {
-			fprintf( stderr, " len: %3d, list: %p => ", item->len, item->hashList );
+			FPRINTF( " len: %3d, list: %p => ", item->len, item->hashList );
 			int **ii = item->hashList;
 			if ( !ii ) 
 				fprintf( stderr , "NULL" );
@@ -115,7 +115,7 @@ void destroy_render_table( struct map **map, int maplen ) {
 		struct map *item = map[ i ];
 
 		//Dump the unchanging elements out...
-		fprintf( stderr, "[%3d] => action: %-16s", i, DUMPACTION( item->action ) );
+		FPRINTF( "[%3d] => action: %-16s", i, DUMPACTION( item->action ) );
 
 		if ( item->action == RAW ) { 
 			FPRINTF( "Nothing to free...\n" );
@@ -388,9 +388,6 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 					//Teardown and destroy
 					return NULL;
 				}
-				fprintf( stderr, "DO RAW COPY OF: " );
-				write( 2, &src[ r.pos ], r.size );
-				write( 2, "\n", 1 );
 		
 				//Set defaults
 				rp->len = r.size;	
@@ -417,7 +414,6 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 	struct dep { int index, current, childCount; } depths[100] = { { 0, 0, 0 } };
 	struct dep *d = depths;
 
-	fprintf( stderr, "RENDER\n======\n" );
 	for ( int i = 0; i < elen; i++ ) {
 		struct map *item = map[ i ];
 		if ( item->action == RAW || item->action == EXECUTE ) {
@@ -567,7 +563,7 @@ uint8_t *table_to_uint8t ( Table *t, const uint8_t *src, int srclen, int *newlen
 	}
 
 	//See the map 
-	print_render_table( map, maplen );
+	//print_render_table( map, maplen );
 
 	//Do the map	
 	if ( !( block = map_to_uint8t( t, map, maplen, &blocklen ) ) ) {

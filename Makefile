@@ -3,7 +3,7 @@ NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
 LDFLAGS = -lgnutls -llua -ldl -lpthread
 CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H -DMT_H
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 -Wno-format-truncation $(LDFLAGS) -DDEBUG_H 
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 -Wno-format-truncation $(LDFLAGS)
 CFLAGS = $(CLANGFLAGS)
 CFLAGS = $(GCCFLAGS)
 CC = clang
@@ -27,7 +27,7 @@ OBJ = ${SRC:.c=.o}
 
 # main
 main: $(OBJ)
-	$(CC) $(CFLAGS) src/main.c -o $(NAME) $(OBJ)
+	$(CC) $(CFLAGS) src/server.c -o $(NAME) $(OBJ)
 	$(CC) $(CFLAGS) src/cli.c -o hcli $(OBJ)
 
 # Object
