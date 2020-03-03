@@ -64,80 +64,16 @@ void *get_key ( Table *t, const char *key ) {
 }
 
 
-#if 0
-char ** build_filters ( Table *t ) {
-}
-
-
-char ** build_hosts ( Table *t ) {
-}
-
-char ** build_routes ( Table *t ) {
-	//Find the routes index, use that as start and move?
-	//struct route **routelist = NULL; //This could be static too... less to clean
-	struct routeset r = { 0, NULL };
-	int routesIndex = lt_geti( t, "routes" );
-	int count = lt_counti( t, routesIndex );
-	FPRINTF( "routes key at: %d\n", routesIndex );
-
-	//Combine the routes and save each combination (strcmbd?)
-	if ( !lt_exec_complex( t, routesIndex, t->count, (void *)&r, buildRoutes ) ) {
-		FPRINTF( "At end of route data.\n" );
-	}
-
-	for ( int i=0; i < r.len; i++ ) {
-		struct route *rr = r.routes[i];
-		fprintf( stderr, "[%d] %s => ", i, rr->routename );
-		fprintf( stderr, "route composed of %d files.\n", rr->elen );
-		for ( int ii=0; ii < rr->elen; ii++ ) {
-			struct routehandler *t = rr->elements[ ii ];
-			fprintf( stderr, "\t{ %s=%s }\n", DUMPTYPE(t->type), t->filename );
-		}
-	}
-return 0;
-}
-#endif
-
-
-
-void *get_values( Table *t, const char *key, void *ud, int (*fp)(LiteKv *, int, void *)) {
-	int index = lt_geti( t, key );
-	int count = lt_counti( t, index );
-
-	struct fp_iterator fp_data;
-	memset( &fp_data, 0, sizeof( struct fp_iterator ) );
-	fp_data.userdata = ud;
-	fp_data.depth = 0;
-	fp_data.len = 0;
-
-	//FPRINTF( "Key '%s'=%d. (%p). Contains %d element(s).\n", key, index, ud, count );
-
-	if ( count == -1 ) { 
-		return NULL;
-	}
-
-	if ( !fp ) { 
-		//return lt_vta( t, ;
-	}
-	else {
-		if ( !lt_exec_complex( t, index, t->count, &fp_data, fp ) ) {
-			return ud; 
-		}  
-	}
-
-	return NULL;
-}
-
-
 int hosts_table_iterator ( LiteKv *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct host ***hosts = f->userdata;
 	int *rlen = &f->len;
 	int *rdepth = &f->depth;
-	char *name = NULL;
+	char *fqdn = NULL;
 	
 	if ( kv->key.type == LITE_TXT ) {
-		name = kv->key.v.vchar;	
+		fqdn = kv->key.v.vchar;	
+		fprintf( stderr, "%s", fqdn );
 	}
 	else if ( kv->key.type == LITE_TRM ) {
 
@@ -161,6 +97,94 @@ int b = 0;
 
 int aa = 0;
 int bb = 0;
+
+
+//Can be refactored to use function pointers, based on what the types are... 
+int host_table_iterator ( LiteKv *kv, int i, void *p ) {
+	struct fp_iterator *f = (struct fp_iterator *)p;
+	struct host ***hosts = f->userdata;
+	int *rlen = &f->len;
+	int *rdepth = &f->depth;
+	char *name = NULL;
+	//TODO: Just save the *host reference in *f?
+fprintf( stderr, "mochachino: %p\n", hosts );
+
+	//Save the key or move table depth
+	if ( kv->key.type == LITE_TXT )
+		name = kv->key.v.vchar;
+	/*else if ( kv->key.type == LITE_INT || LITE_FLT )
+		fqdn = kv->key.v.vchar;*/
+	else if ( kv->key.type == LITE_TRM ) {
+		//Safest to add a null member to the end of elements
+		//b--;
+		if ( (--(*rdepth)) == 0 )
+			return 0;	
+		else { 
+			if ( (*rdepth) == 1 ) {
+				for ( int i=0; i < sizeof( parent ) / sizeof( char * ); i++ ) {
+					parent[ i ] = NULL, handler[ i ] = NULL;
+				}	
+			}
+		}
+	}
+fprintf( stderr, "fqdn is: %s => ", name );
+
+	if ( kv->value.type == LITE_TXT ) {
+fprintf( stderr, "type is text" );
+	}
+	else if ( kv->key.type == LITE_TRM ) {
+		//Get out of a parent...
+	}
+
+
+	if ( kv->value.type == LITE_TBL ) {
+fprintf( stderr, "type is table" );
+//allocate
+struct host * host = malloc( sizeof( struct host ) );
+host->name = strdup( name );
+add_item( hosts, host, struct host *, rlen );
+	}	
+	else if ( kv->value.type == LITE_TXT ) {
+		struct host *host = (*hosts)[ (*rlen) - 1 ];
+		if ( memcmp( "alias", type, 3 ) == 0 )
+		else if ( memcmp( "dir", type, 3 ) == 0 )
+		else if ( memcmp( "filter", type, 3 ) == 0 ) {
+		}	
+	}
+#if 0
+	if ( kv->value.type == LITE_TXT ) {
+		if ( ( type = handler[ (*rdepth) - 1 ] ) ) {
+			struct hosts *rr = (*routes)[ (*rlen) - 1 ];
+			struct routehandler *h = malloc( sizeof( struct routehandler ) );
+			if ( !h || !( h->filename = strdup( kv->value.v.vchar ) ) ) 
+				return 0;
+			if ( memcmp( "alias", type, 3 ) == 0 )
+				h->type = 1;
+			else if ( memcmp( "dir", type, 3 ) == 0 )
+				h->type = 2;
+			else if ( memcmp( "filter", type, 3 ) == 0 )
+				h->type = 3;
+			else if ( memcmp( "content", type, 3 ) == 0 )
+				h->type = BD_CONTENT_TYPE;
+			else if ( memcmp( "returns", type, 3 ) == 0 )
+				h->type = BD_RETURNS;
+			else {
+				//This isn't valid, so drop it...
+				//return 0;
+			}
+			add_item( &rr->elements, h, struct routetype *, &rr->elen );
+		}
+	}
+	else if ( kv->value.type == LITE_TBL ) {
+
+	}
+#endif
+fprintf( stderr, "\n" );
+
+	return 1;
+}
+
+
 int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 
 	struct fp_iterator *f = (struct fp_iterator *)p;
@@ -308,11 +332,42 @@ char * get_char_value ( Table *t, const char *key ) {
 
 
 
+/*
+hosts = {
+	"http://www.blablabla.com" = {
+		dir = "/loud",
+		alias = "alias.blablabla.com", | { "alias.blablabla.com", "..." }
+	}
+}
+
+struct config {
+	{ "*", TABLE, 1 }, // Top level key is FQDN
+	{ "dir", STRING }, // Directory
+	{ "alias", STRING | TABLE }, // 
+	{ NULL }
+}
+
+struct config {
+	{ "host", STRING }, 
+	{ "host", STRING }, 
+	{ "host", STRING }, 
+	{ NULL }
+}
+*/
 struct host ** build_hosts ( Table *t ) {
 	struct host **hosts = NULL;
-	if ( !get_values( t, "hosts", &hosts, hosts_table_iterator ) ) {
+	struct fp_iterator fp_data = { 0, 0, &hosts };
+	int index;
+	if ( (index = lt_geti( t, "hosts" )) == -1 ) {
 		return NULL;
 	}
+
+		fprintf( stderr, "i: %d, host: \t%p => ", index, hosts );
+	if ( !lt_exec_complex( t, index, t->count, &fp_data, host_table_iterator ) ) {
+		return hosts; 
+	}
+		fprintf( stderr, "host: \t%p => ", hosts );
+  
 #if 1
 	while ( hosts && (*hosts) ) {
 		fprintf( stderr, "'%s' => ", (*hosts)->name );
