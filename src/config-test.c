@@ -1,6 +1,9 @@
 #include "luabind.h"
 #include "config.h"
 
+#define TESTDIR "tests/config/"
+
+#if 0
 //this is the best way to set config keys
 struct keyset { const char *name; int (*fp)( void *p ); }; 
 
@@ -15,24 +18,24 @@ struct keyset global_config[] = {
 
 struct keyset individual_config[] = {
 };
+#endif
 
 void dump_hosts ( struct host **set ) {
 	struct host **r = set;
+	fprintf( stderr, "Hosts:\n" );
 	while ( r && *r ) {
-#if 1 
 		fprintf( stderr, "\t%p => ", *r );
-		fprintf( stderr, "%s\n", (*r)->name );
-		fprintf( stderr, "dir = %s\n", (*r)->dir );
-		fprintf( stderr, "alias = %s\n", (*r)->alias );
-		fprintf( stderr, "filter = %s\n", (*r)->filter );
-#endif
+		fprintf( stderr, "%s =>\n", (*r)->name );
+		fprintf( stderr, "\t\tdir = %s\n", (*r)->dir );
+		fprintf( stderr, "\t\talias = %s\n", (*r)->alias );
+		fprintf( stderr, "\t\tfilter = %s\n", (*r)->filter );
 		r++;
 	}
 }
 
 void dump_routes ( struct route **set ) {
 	struct route **r = set;
-	//fprintf( stderr, "%p =>\n", r );
+	fprintf( stderr, "Routes:\n" );
 	while ( r && *r ) {
 		fprintf( stderr, "\t%p => ", *r );
 		fprintf( stderr, "%s => \n", (*r)->routename );
@@ -48,9 +51,9 @@ void dump_routes ( struct route **set ) {
 int main (int argc, char *argv[]) {
 
 	const char *files[] = {
-		"www/config.lua",  //global config example (won't have routes)
-		//"www/def.lua",		 //local config example (will have routes)
-		//"www/dafoodsnob/config.lua", //local config example (w/ routes, but no complex models)
+		TESTDIR "config.lua",  //global config example (won't have routes)
+		TESTDIR "def.lua",		 //local config example (will have routes)
+		TESTDIR "config.lua", //local config example (w/ routes, but no complex models)
 	};
 
 	for ( int i=0; i < sizeof(files)/sizeof(const char *); i++ ) {
@@ -84,11 +87,6 @@ int main (int argc, char *argv[]) {
 
 		//This isn't superflexible now...
 		struct host **hostlist = build_hosts( t );
-		//What if there were no printf.  Just strings? (How sick would that be?)
-		//"Contains hosts: "
-		fprintf( stderr, "Contains hosts:\n" );
-		dump_hosts( hostlist );
-#if 0
 		struct route **routelist = build_routes( t );
 		int item = get_int_value( t, "number", -1 ); 
 		char *wash = get_char_value( t, "wash" );
@@ -96,9 +94,10 @@ int main (int argc, char *argv[]) {
 		fprintf( stderr, "(%s).number: %d\n", f, item );
 		fprintf( stderr, "(%s).wash: %s\n", f, wash );
 		fprintf( stderr, "(%s).hosts:  %p\n", f, hostlist );
+		dump_hosts( hostlist );
 		fprintf( stderr, "(%s).routes: %p\n", f, routelist );
 		dump_routes( routelist );
-#endif
+
 	}
 	return 0;
 }

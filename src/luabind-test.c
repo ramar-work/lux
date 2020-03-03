@@ -66,6 +66,10 @@ int main ( int argc, char *argv[] ) {
 	char err[ 2048 ] = { 0 };
 	int status = 0;
 
+#if 1
+	//I want to test aggregate more heavily
+	//Or should I just give up?
+#else
 	//Load a string, and execute
 	if ( !( status = lua_exec_string( L, string, err, sizeof(err) ) ) ) {
 		fprintf( stderr, "This is an error: %s\n", err );
@@ -93,6 +97,7 @@ int main ( int argc, char *argv[] ) {
 	//Load a bunch of files or strings and aggregate...
 	const char *files[] = { "www/wrong.lua" };
 	//Convert tables back and forth...
+#endif
 
 	return 0;	
 }

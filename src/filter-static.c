@@ -10,6 +10,7 @@
 	fprintf( stderr, __VA_ARGS__ )
 #endif
 
+
 char *getExtension ( char *filename ) {
 	char *extension = &filename[ strlen( filename ) ];
 	int fpathlen = strlen( filename );

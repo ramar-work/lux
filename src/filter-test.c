@@ -31,15 +31,16 @@ struct Test {
 	const char *name;
 	struct HTTPBody request;
 } testsp[] = {
+	TESTCASE(level1url, "GET", "/ashera", NULL, NULL, TEXTHTML),
 #if 0
 	TESTCASE(root, "GET", "/", NULL, NULL, TEXTHTML),
 	TESTCASE(level1url, "GET", "/ashera", NULL, NULL, TEXTHTML),
 	TESTCASE(level2url, "GET", "/ashera/two", NULL, NULL, TEXTHTML),
-#endif
 	TESTCASE(404_never_find_me, "GET", "/you-will-never-find-me", NULL, NULL, TEXTHTML),
 	TESTCASE(static_file_missing, "GET", "/static/not_found.jpg", NULL, NULL, TEXTHTML),
 	TESTCASE(static_file_present, "GET", "/static/handtinywhite.gif", NULL, NULL, TEXTHTML),
 	TESTCASE(multipart_post, "POST", "/beef", headers, bodies, MULTIPART),
+#endif
 #if 0
 	TESTCASE(appxwww_post, "POST", "/nope", headers, bodies, X_APP_WWW),
 #endif
@@ -53,13 +54,17 @@ struct filter_test {
 	uint8_t *expected;
 	int len;
 } fp[] = {
+	{ "lua", "tests/filters/lua/lil-model", "/index.lua", filter_lua },
+	{ "lua", "tests/filters/lua/error-model", "/index.lua", filter_lua },
+	{ "lua", "tests/filters/lua/big-model", "/index.lua", filter_lua },
 #if 0
 	{ "lua", "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },
+
 	{ "static", "tests/filters/static/text", "/index.html", filter_static },
 	{ "static", "tests/filters/static/binary", "/aeon.jpg", filter_static },
 	{ "memory", filter_memory },
-#endif
 	{ "echo", "/", "/", filter_echo },
+#endif
 	{ NULL }
 };
 

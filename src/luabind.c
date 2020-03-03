@@ -406,7 +406,12 @@ int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 		snprintf( err, errlen, "File %s inaccessible: %s.", f, strerror(errno) );
 		return 0;
 	}
-	
+
+	if ( check.st_size == 0 ) {
+		snprintf( err, errlen, "File %s is zero-length.  Nothing to execute.", f );
+		return 0;
+	}
+
 	//Load the string, execute
 	if (( lerr = luaL_loadfile( L, f )) != LUA_OK ) {
 		if ( lerr == LUA_ERRSYNTAX )
@@ -419,7 +424,6 @@ int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 			len = snprintf( err, errlen, "File access error at %s: ", f );
 		else {
 			len = snprintf( err, errlen, "Unknown error occurred at %s: ", f );
-
 		}
 	
 		errlen -= len;	

@@ -1,8 +1,10 @@
 #include "database.h"
 
+#define TESTDIR "tests/database/"
+
 struct dbtest { const char *db, *type, *query; } dbtests[] = {
-	{ "tests/ges.db", "SELECT", "SELECT * FROM general_election LIMIT 2" }
-,	{ "tests/ges.db", "SELECT", "SELECT * FROM general_election LIMIT 10" }
+	{ TESTDIR "ges.db", "SELECT", "SELECT * FROM general_election LIMIT 2" }
+,	{ TESTDIR "ges.db", "SELECT", "SELECT * FROM general_election LIMIT 10" }
 //,	{ "tests/ges.db", "SELECT", "SELECT * FROM general_election LIMIT 10" }
 ,	{ NULL, 0, 0 }
 };

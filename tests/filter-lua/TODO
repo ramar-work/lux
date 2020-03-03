@@ -1,0 +1,9 @@
+Everything here is a test:
+
+
+dafoodsnob - config parsing
+?	lil-model - parse and interpret a simple model (like one file)
+	big-model - parse and interpret a model composed of multiple files (like 2 or 3)
+	xl-model - parse and interpret a model composed of a ridiculous amount of files (like 50+)
+	lua-model - parse and interpret a model composed of a file using Lua standard library stuff
+	db-model - parse & interpret a model composed of db requests with bindings
