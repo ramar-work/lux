@@ -18,20 +18,21 @@ struct keyset individual_config[] = {
 
 void dump_hosts ( struct host **set ) {
 	struct host **r = set;
-		fprintf( stderr, "\t%p => ", set );
 	while ( r && *r ) {
+#if 1 
 		fprintf( stderr, "\t%p => ", *r );
-		fprintf( stderr, "%s => \n", (*r)->name );
-		fprintf( stderr, "%s => \n", (*r)->alias );
-		fprintf( stderr, "%s => \n", (*r)->dir );
-		fprintf( stderr, "%s => \n", (*r)->filter );
+		fprintf( stderr, "%s\n", (*r)->name );
+		fprintf( stderr, "dir = %s\n", (*r)->dir );
+		fprintf( stderr, "alias = %s\n", (*r)->alias );
+		fprintf( stderr, "filter = %s\n", (*r)->filter );
+#endif
 		r++;
 	}
 }
 
 void dump_routes ( struct route **set ) {
 	struct route **r = set;
-	fprintf( stderr, "%p =>\n", r );
+	//fprintf( stderr, "%p =>\n", r );
 	while ( r && *r ) {
 		fprintf( stderr, "\t%p => ", *r );
 		fprintf( stderr, "%s => \n", (*r)->routename );
