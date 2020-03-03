@@ -66,10 +66,12 @@ const int maps[] = {
 	[255] = 0
 };
 
+
 struct parent { 
 	uint8_t *text; 
 	int len, pos, childCount; 
 }; 
+
 
 struct map { 
 	int action; 
@@ -127,12 +129,20 @@ void destroy_render_table( struct map **map, int maplen ) {
 		else {
 			FPRINTF( "Freeing int lists..." );
 			int **ii = item->hashList;
+#if 1
+			while ( ii && *ii ) {
+				fprintf( stderr, "item->intlist: %p\n", *ii );	
+				//free( *ii ); 
+				ii++;
+			}
+#else
 			if ( ii ) {
 				while ( *ii ) {
 					free( *ii );
 					ii++;
 				}
 			}
+#endif
 			FPRINTF( "\n" );
 		}
 		free( item );
@@ -185,11 +195,11 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 				//Extract the first character
 				if ( !maps[ *p ] ) {
 					rp->action = SIMPLE_EXTRACT; 
+					int *h = NULL; 
 					int hash = -1;
 					if ( (hash = lt_get_long_i(t, p, nlen) ) > -1 ) {
-						int *h = malloc( sizeof(int) );
-						memcpy( h, &hash, sizeof( int ) );
-						ADDITEM( h, int *, hashList, hashListLen, NULL ); 
+						( h = malloc( sizeof(int) ) ) && ( *h = hash );
+						add_item( &hashList, h, int *, &hashListLen );
 					}
 				}
 				else {
@@ -222,7 +232,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 							if ( (hash = lt_get_long_i( t, bbuf, blen ) ) > -1 ) {
 								int *h = malloc( sizeof( int ) );
 								memcpy( h, &hash, sizeof( int ) );
-								ADDITEM( h, int *, hashList, hashListLen, NULL ); 
+								add_item( &hashList, h, int *, &hashListLen ); 
 								eCount = lt_counti( t, hash );
 							}
 						}
@@ -257,7 +267,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 								hash = lt_get_long_i(t, bbuf, blen ); 
 								int *h = malloc( sizeof(int) );
 								memcpy( h, &hash, sizeof( int ) );
-								ADDITEM( h, int *, hashList, hashListLen, NULL ); 
+								add_item( &hashList, &h, int *, &hashListLen ); 
 								FPRINTF( "; hash is: %3d, ", hash );	
 							
 								if ( hash > -1 && (cCount = lt_counti( t, hash )) > maxCount ) {
@@ -283,7 +293,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 							np->pos = 0;
 							np->len = alen;
 							np->text = p; 
-							ADDITEM( np, struct parent, pp, pplen, NULL );
+							add_item( &pp, np, struct parent, &pplen );
 							INSIDE++;
 						}
 					}
@@ -331,7 +341,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 									int hh = lt_get_long_i(t, tr, trlen ); 
 									int *h = malloc( sizeof(int) );
 									memcpy( h, &hh, sizeof(int) );	
-									ADDITEM( h, int *, hashList, hashListLen, NULL ); 
+									add_item( &hashList, h, int *, &hashListLen ); 
 									FPRINTF( "string = %s, hash = %3d, ", tr, hh );	
 								}
 
@@ -366,16 +376,17 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 				}
 
 				//Create a new row with what we found.
-				//FPRINTF( "\n@END: Adding new row to template set.  rrlen: %d, pplen: %d.  Got ", rrlen, pplen );
-				//ENCLOSE( rp->ptr, 0, rp->len );
+			#if 1
+				rp->hashList = !hashListLen ? NULL : hashList; 
+			#else
 				if ( !hashListLen )
 					rp->hashList = NULL;
 				else {
 					rp->hashList = hashList; 
-					ADDITEM( NULL, int *, rp->hashList, hashListLen, NULL );
 				}
+			#endif
 				
-				ADDITEM( rp, struct map, rr, rrlen, NULL );
+				add_item( &rr, rp, struct map, &rrlen );
 			}
 		}
 		else {
@@ -397,7 +408,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 				rp->ptr = (uint8_t *)&src[ r.pos ];	
 				
 				//Save a new record
-				ADDITEM(rp, struct map, rr, rrlen, NULL);
+				add_item( &rr, rp, struct map, &rrlen );
 			}	
 		}
 	}

@@ -3,6 +3,8 @@
 #include "../vendor/single.h"
 #include "util.h"
 
+//#define ADDITEM_SWITCH
+
 #define DUMPACTION( NUM ) \
 	( NUM == ACT_ID    ) ? "ACT_ID" : \
 	( NUM == ACT_WILDCARD ) ? "ACT_WILDCARD" : \
@@ -97,13 +99,13 @@ int resolve ( const char *route, const char *uri ) {
 				while ( memwalk( &pp, block, (uint8_t *)mb, map->r.size - 1, strlen(mb) ) ) {
 					char buf[ 1024 ] = {0};
 					memcpy( buf, &block[ pp.pos ], pp.size );
-					ADDITEM( strdup( buf ), char *, e->string, e->len, 0 );
+					add_item( &e->string, strdup( buf ), char *, &e->len );
 					if ( pp.chr == '}' ) {
 						break;
 					}
 				}
 				if ( e->len ) {
-					ADDITEM( NULL, char *, e->string, e->len, 0 );
+					; //What is this?
 				}
 				if ( e->len > 2 && e->type == ACT_ID ) {
 					//fprintf( stderr, "%s\n", e->string[1] ); getchar(); exit(0);
@@ -119,15 +121,13 @@ int resolve ( const char *route, const char *uri ) {
 				e->type = ACT_RAW;
 				char buf[ 1024 ] = {0};
 				memcpy( buf, p, map->r.size );
-				ADDITEM( strdup( buf ), char *, e->string, e->len, 0 );
+				add_item( &e->string, strdup( buf ), char *, &e->len );
 			}
 
 			if ( e->type ) {
-				ADDITEM( e, struct element *, map->list, map->listlen, 0 ); 
+				add_item( &map->list, e, struct element *, &map->listlen );
 			}
 		}
-
-		ADDITEM( NULL, struct element *, map->list, map->listlen, 0 ); 
 #endif
 	}
 

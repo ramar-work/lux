@@ -53,13 +53,13 @@ struct filter_test {
 	uint8_t *expected;
 	int len;
 } fp[] = {
-	{ "lua", "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },
 #if 0
+	{ "lua", "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },
 	{ "static", "tests/filters/static/text", "/index.html", filter_static },
 	{ "static", "tests/filters/static/binary", "/aeon.jpg", filter_static },
-	{ "echo", NULL, NULL, filter_echo },
 	{ "memory", filter_memory },
 #endif
+	{ "echo", "/", "/", filter_echo },
 	{ NULL }
 };
 
