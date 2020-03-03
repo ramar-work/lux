@@ -1,74 +1,57 @@
 #include "luabind.h"
 #include "util.h"
 
-#if 1
-const char *string = "return {" \
-"	-- Choose an engine" \
-"	'template_engine' = 'mustache'," \
-"" \
-"	-- Choose a data source" \
-"	'db' = {" \
-"		main = 'copy'," \
-"		banner = 'banner'" \
-"	}," \
-"" \
-"	-- Logging function" \
-"	'log' = function () do " \
-"" \
-"	end," \
-"" \
-"	-- Layout routes" \
-"	'routes' = {" \
-"" \
-"		-- Standard MVC that loads files with the right name" \
-"		default =    { " \
-"			model = { 'log', 'default' }, " \
-"			view = { 'main/head', 'default', 'main/footer' } " \
-"		}," \
-"" \
-"		-- Do some PDF generation and put it in a folder" \
-"		multi =      { " \
-"			hint =   'Generates multiple PDFs for a student writing all PDFs to a folder and zipping it.'," \
-"			model =  { 'log', 'check', 'view', 'multi' }, " \
-"			view = { 'pdf/multi', 'pdf/confirmation-multi' } " \
-"		}," \
-"" \
-"		-- Do some PDF generation and output a page " \
-"		pdf =        { " \
-"			hint =   'Generates a PDF for a student by aggregating all of the users who have requested student information.'," \
-"			model =  { 'view', 'pdf' }, " \
-"			view = { 'pdf/write', 'pdf/confirmation' } " \
-"		}," \
-"" \
-"" \
-"		-- Put a page behind basic auth" \
-"		admin =      { " \
-"			auth = 'basic'," \
-"			model = { 'admin', 'list' }, " \
-"			view = { 'main/head', 'admin', 'main/footer' } " \
-"		}," \
-"" \
-"" \
-"		-- Route multiple endpoints " \
-"		'save|read|load' =       { " \
-"			model = { 'middleware/date', 'log', 'check', 'pdf', 'save' }, " \
-"			view = { 'main/head', 'save', 'main/footer' } " \
-"		}," \
-"" \
-"	}" \
-"}\n"; 
+#define TESTDIR "tests/luabind/"
+
+#define TESTCASE()
+
+//Start with this weird list to test aggregation
+const char *AGGREGATION[] = {
+	"a",
+	"ab",
+	"abc",
+#if 0
+	(const char *[]){ TESTDIR "boom.lua", NULL },
+	(const char *[]){ TESTDIR "chaka.lua", TESTDIR "laka.lua", NULL },
 #endif
+	NULL
+};
 
 
 int main ( int argc, char *argv[] ) {
 	//Create a Lua environment
-	lua_State *L = luaL_newstate();
 	char err[ 2048 ] = { 0 };
 	int status = 0;
 
 #if 1
 	//I want to test aggregate more heavily
 	//Or should I just give up?
+	const char **agg_tests = AGGREGATION;
+	int a = 1;
+	while ( *agg_tests ) {
+		int status = 0;
+		lua_State *L = luaL_newstate();
+		const char *file = *agg_tests;
+		while ( *file ) {
+			char filename[ 2048 ] = { 0 };
+			snprintf( filename, sizeof(filename), "%s%s%d%c.lua", TESTDIR, "luabind-combine-", a, *file );
+			fprintf( stderr, "%s\n", filename );
+			if ( !lua_exec_file( L, filename, err, sizeof( err ) ) ) {
+				fprintf( stderr,  "error executing file %s: %s\n", filename, err );
+				status = 0;
+				break;
+			}	
+			file++; 
+		}
+#if 1	
+		if ( status && !lua_combine( L, err, sizeof(err) ) ) {
+			fprintf( stderr,  "couldn't combine: %s\n", err );
+		}
+
+		lua_stackdump( L );
+#endif
+		a++, agg_tests++;
+	}
 #else
 	//Load a string, and execute
 	if ( !( status = lua_exec_string( L, string, err, sizeof(err) ) ) ) {

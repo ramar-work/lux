@@ -4,6 +4,8 @@
 #include "filter-echo.h"
 #include "filter-lua.h"
 
+#define TESTDIR "tests/filter-lua/"
+
 #define TESTCASE( NAME, METHOD, PATH, HEADERS, BODIES, TEXTHTML ) \
 	{ #NAME, { TEXTHTML, METHOD, PATH, HTTP_11, .headers=HEADERS, .body=BODIES } }
 
@@ -31,8 +33,7 @@ struct Test {
 	const char *name;
 	struct HTTPBody request;
 } testsp[] = {
-	TESTCASE(level1url, "GET", "/ashera", NULL, NULL, TEXTHTML),
-#if 0
+#if 1
 	TESTCASE(root, "GET", "/", NULL, NULL, TEXTHTML),
 	TESTCASE(level1url, "GET", "/ashera", NULL, NULL, TEXTHTML),
 	TESTCASE(level2url, "GET", "/ashera/two", NULL, NULL, TEXTHTML),
@@ -54,9 +55,9 @@ struct filter_test {
 	uint8_t *expected;
 	int len;
 } fp[] = {
-	{ "lua", "tests/filters/lua/lil-model", "/index.lua", filter_lua },
-	{ "lua", "tests/filters/lua/error-model", "/index.lua", filter_lua },
-	{ "lua", "tests/filters/lua/big-model", "/index.lua", filter_lua },
+	{ "lua", TESTDIR "lil-model", "/index.lua", filter_lua },
+	{ "lua", TESTDIR "error-model", "/index.lua", filter_lua },
+	{ "lua", TESTDIR "big-model", "/index.lua", filter_lua },
 #if 0
 	{ "lua", "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },
 
