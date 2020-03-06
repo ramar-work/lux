@@ -17,7 +17,7 @@ typedef const char * View;
 typedef struct c_route {
 	const char *route;
 	Model models;
-	View views;
+	View * views;
 } Route;
 
 

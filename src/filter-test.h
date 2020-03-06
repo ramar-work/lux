@@ -42,12 +42,13 @@ int filter_test ( const char *fname, Filter filter, struct config *c, struct Tes
 	while ( c->path ) {
 		struct Test *t = tt;
 		while ( t->name ) {
-			const char fmt[] = "[ Test: %-13s, path: %s, URL: %s ]: %s";
+			const char fmt[] = "[ Test: %-13s, path: %s, URL: %s ]: ";
 			char err[2048] = { 0 };
 			struct HTTPBody response = { 0 };
 			int f = filter( &t->request, &response, c );
 			//TODO: Compare against expected response for a good test
-			TPRINTF( fmt, t->name, c->path, t->request.path, f ? "SUCCEEDED" : "FAILED" );
+			TPRINTF( fmt, t->name, c->path, t->request.path );
+			TPRINTF( "%s (%d)", f ? "SUCCEEDED" : "FAILED", response.status );
 		#if 0
 			fprintf( stderr, "\nMessage contents:\n" );
 			write( 2, response.msg, response.mlen );

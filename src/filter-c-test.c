@@ -9,8 +9,8 @@ struct config configs[] = {
 
 struct Test tests[] = {
 	REQUEST(root, "GET", "/", NULL, NULL, TEXTHTML),
-	REQUEST(level1url, "GET", "/ashera", NULL, NULL, TEXTHTML),
-	REQUEST(level2url, "GET", "/ashera/two", NULL, NULL, TEXTHTML),
+	REQUEST(level1url, "GET", "/user", NULL, NULL, TEXTHTML),
+	REQUEST(level2url, "GET", "/user/two", NULL, NULL, TEXTHTML),
 	REQUEST(404_never_find_me, "GET", "/you-will-never-find-me", NULL, NULL, TEXTHTML),
 	REQUEST(static_file_missing, "GET", "/static/not_found.jpg", NULL, NULL, TEXTHTML),
 	REQUEST(static_file_present, "GET", "/static/handtinywhite.gif", NULL, NULL, TEXTHTML),
