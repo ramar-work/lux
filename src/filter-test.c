@@ -3,8 +3,9 @@
 #include "filter-static.h"
 #include "filter-echo.h"
 #include "filter-lua.h"
+#include "filter-c.h"
 
-#define TESTDIR "tests/filter-lua/"
+#define TESTDIR "tests/filter-c/"
 
 #define TESTCASE( NAME, METHOD, PATH, HEADERS, BODIES, TEXTHTML ) \
 	{ #NAME, { TEXTHTML, METHOD, PATH, HTTP_11, .headers=HEADERS, .body=BODIES } }
@@ -33,8 +34,8 @@ struct Test {
 	const char *name;
 	struct HTTPBody request;
 } testsp[] = {
-#if 1
 	TESTCASE(root, "GET", "/", NULL, NULL, TEXTHTML),
+#if 0
 	TESTCASE(level1url, "GET", "/ashera", NULL, NULL, TEXTHTML),
 	TESTCASE(level2url, "GET", "/ashera/two", NULL, NULL, TEXTHTML),
 	TESTCASE(404_never_find_me, "GET", "/you-will-never-find-me", NULL, NULL, TEXTHTML),
@@ -55,10 +56,12 @@ struct filter_test {
 	uint8_t *expected;
 	int len;
 } fp[] = {
+	{ "c", TESTDIR "submarine.local", "/index.html", filter_c },
+#if 0
+
 	{ "lua", TESTDIR "lil-model", "/index.lua", filter_lua },
 	{ "lua", TESTDIR "error-model", "/index.lua", filter_lua },
 	{ "lua", TESTDIR "big-model", "/index.lua", filter_lua },
-#if 0
 	{ "lua", "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },
 
 	{ "static", "tests/filters/static/text", "/index.html", filter_static },

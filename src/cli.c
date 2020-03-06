@@ -110,6 +110,26 @@ int dir_cmd( struct app *layout, char *err, int errlen ) {
 	return 1;
 }
 
+#if 0
+//After compiling an app, test it here with a route and all... (similar to the tests)
+int dltest_cmd ( const char *name ) {
+
+	if ( !( p = dlopen( filename, RTLD_NOW ) ) )
+		return http_set_error( res, 500, "Could not open application." );
+
+	//Execution looks like
+#if 0
+
+#endif
+
+	if ( dlclose( p ) == -1 ) {
+		snprintf( err, sizeof( err ), "Failed to close application: %s\n", strerror( errno ) );
+		return http_set_error( res, 500, err );
+	}
+
+	return 1;
+} 
+#endif
 
 int main (int argc, char *argv[]) {
 	//Process all your options...
