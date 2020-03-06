@@ -45,19 +45,10 @@ int parse_config ( Table *t ) {
 }
 
 
-int check_static( Table *t, const char *path ) {
+int serve_static ( Table *t, const char *path ) {
 	char *statdir = get_char_value( t, "static" );
-
-	if ( !path || !statdir || strlen(path) < strlen(statdir) ) { 
-		return 0;
-	}
-
-	if ( memcmp( statdir, ++path, strlen( statdir ) ) != 0 ) {
-		return 0;
-	} 
-
-	return 1;
-}
+	return check_static_prefix( statdir, path );
+} 
 
 
 //filter-lua.c - Run HTTP messages through a Lua handler
@@ -109,8 +100,13 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 
 	//Check for and serve any static files 
 	//TODO: This should be able to serve a list of files matching a specific type
-	if ( check_static( c, req->path ) )
+#if 1
+	if ( check_static_prefix( get_char_value( c, "static" ), req->path ) )
 		return filter_static( req, res, config );
+#else
+	if ( serve_static( c, req->path ) )
+		return filter_static( req, res, config );
+#endif
 
 	//Check that the path resolves to anything. 404 if not, I suppose
 	routes = build_routes( c );

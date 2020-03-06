@@ -20,6 +20,18 @@ char *getExtension ( char *filename ) {
 	return ( !fpathlen ) ? NULL : extension;
 }
 
+int check_static_prefix( const char *path, const char *prefix ) {
+	if ( !path || !prefix || strlen(path) < strlen(prefix) ) { 
+		return 0;
+	}
+
+	if ( memcmp( prefix, ++path, strlen( prefix ) ) != 0 ) {
+		return 0;
+	} 
+
+	return 1;
+}
+
 
 int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	struct stat sb;

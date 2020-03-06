@@ -1,4 +1,5 @@
 #include "filter-c.h"
+#include "filter-static.h"
 
 #define FILTER_C_DEBUG
 
@@ -12,6 +13,32 @@
 
 #define HOMEDIR "/home/ramar/prj/hypno/"
 
+int resolved ( const char *path, const char **routes ) {
+	while ( routes && *routes ) {
+		if ( resolve( path, *routes ) ) return 1;
+		routes++;
+	}
+	return 0;
+}
+
+const char **copy_routes ( Route *routes ) {
+	const char **routelist = NULL;
+	int len = 0;
+	while ( routes->route ) {
+		add_item( &routelist, (char *)routes->route, const char *, &len );
+		routes++;		
+	}
+	return routelist;
+}
+
+void print_routes ( Route *routes ) {
+	while ( routes->route ) {
+		fprintf(stderr,"\n");
+		FILTER_C_PRINT( "Route '%s'\n", routes->route );
+		routes++;		
+	}
+}
+
 int filter_c ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	Table *c = NULL, *t = NULL;
 	Route *routes = NULL;
@@ -22,9 +49,14 @@ int filter_c ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	char err[ 2048 ] = { 0 };
 	char filename[ 2048 ] = { 0 };
 	struct stat st;
-	
+
+	//Get config	
 	if ( !(config = (struct config *)ctx) ) 
 		return http_set_error( res, 500, "failed to load clobal config." );
+
+	//Static
+	if ( check_static_prefix( req->path, "static" ) )
+		return filter_static( req, res, config );
 
 	//Execute static resources first...
 	FILTER_C_PRINT( "Config ptr at: %p\n", config );
@@ -34,10 +66,12 @@ int filter_c ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 
 	FILTER_C_PRINT( "Loading app at: %s\n", filename );
 
+#if 0
 	if ( stat( filename, &st ) == -1 ) {
 		snprintf( err, sizeof( err ), "Application inaccessible at %s: %s.", filename, strerror(errno) );
 		return http_set_error( res, 500, err ); 
 	}
+#endif
 
 	if ( !( app = dlopen( filename, RTLD_LAZY ) ) ) {
 		snprintf( err, sizeof( err ), "Could not open application: %s.", dlerror() );
@@ -53,13 +87,14 @@ int filter_c ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	}
 
 	FILTER_C_PRINT( "App routes initialized at: %p\n", routes );
-
+	if ( copy_routes( routes ) )
+		print_routes( routes );	
+	
 #if 0
 	//Find the matching route in a list of const char *
-	while ( routes->route ) {
-		FILTER_C_PRINT( "Route %s\n", routes->route );
-		routes++;		
-	}
+	if ( !resolved( config->path, copy_routes( routes ) ) )
+		return http_set_error( res, 404, "Route not resolved." );
+
 
 	//Execute the model(s)
 
