@@ -2,8 +2,8 @@
 NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
 LDFLAGS = -lgnutls -llua -ldl -lpthread
-CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -fsanitize=address -fsanitize-undefined-trap-on-error -Wno-format-security -DDEBUG_H -DMT_H
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -std=c99 -Wno-deprecated-declarations -O2 -Wno-format-truncation $(LDFLAGS)
+CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -Wno-format-security -fsanitize=address -fsanitize-undefined-trap-on-error
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -Wno-format-truncation -Wno-strict-overflow -std=c99 -Wno-deprecated-declarations -O2 -DDEBUG_H
 CFLAGS = $(CLANGFLAGS)
 CFLAGS = $(GCCFLAGS)
 CC = clang
@@ -14,7 +14,7 @@ PORT = 2200
 RANDOM_PORT = 1
 PORT_FILE = /tmp/hypno.port
 BROWSER = chromium
-RECORDS=3
+RECORDS = 3
 
 # Some Linux systems need these, but pkg-config should handle it
 #INCLUDE_DIR=-I/usr/include/lua5.3
@@ -27,17 +27,21 @@ OBJ = ${SRC:.c=.o}
 
 # main
 main: $(OBJ)
-	$(CC) $(CFLAGS) src/server.c -o $(NAME) $(OBJ)
-	$(CC) $(CFLAGS) src/cli.c -o hcli $(OBJ)
+	$(CC) $(LDFLAGS) $(CFLAGS) src/server.c -o $(NAME) $(OBJ) 
+	$(CC) $(LDFLAGS) $(CFLAGS) src/cli.c -o hcli $(OBJ)
 
 # Object
 %.o: %.c 
+ifeq ($(OS),CYGWIN)
 	$(CC) -c -o $@ $< $(CFLAGS)
+else
+	$(CC) -c -o $@ $< $(CFLAGS)
+endif
 
 # A wildcard won't work, but an array might...
 test: $(OBJ) 
 test:
-	for t in $(TESTS); do $(CC) $(CFLAGS) -o bin/$$t src/$${t}-test.c $(OBJ); done
+	for t in $(TESTS); do $(CC) $(LDFLAGS) $(CFLAGS) -o bin/$$t src/$${t}-test.c $(OBJ); done
 
 # Generate some of the bigger vendor depedencies seperately
 deps:

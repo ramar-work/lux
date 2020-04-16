@@ -78,6 +78,10 @@ struct map {
 	int **hashList; 
 	int len; 
 	void *ptr; 
+#ifdef DEBUG_H
+	uint8_t *word;
+	int wordlen;
+#endif
 };
 
 
@@ -95,6 +99,11 @@ void print_render_table( struct map **map, int maplen ) {
 			ENCLOSE( p, 0, item->len );
 		}
 		else {
+		#ifdef DEBUG_H
+			fprintf( stderr, " item: " );
+			( item->word ) ? write( 2, item->word, item->wordlen ) : 0;
+			fprintf( stderr, "," );
+		#endif
 			FPRINTF( " len: %3d, list: %p => ", item->len, item->hashList );
 			int **ii = item->hashList;
 			if ( !ii ) 
@@ -178,7 +187,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 				//Start extraction...
 				BLOCK = BLOCK_END;
 				int nlen = 0;	
-				int **hashList = NULL;
+				//int **hashList = NULL;
 				int hashListLen = 0;
 				uint8_t *p = trim( (uint8_t *)&src[r.pos], " ", r.size, &nlen );
 				struct map *rp = NULL; 
@@ -191,7 +200,10 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 				rp->ptr = NULL; 
 				rp->len = 0; 
 				rp->hashList = NULL; 
-
+#ifdef DEBUG_H
+rp->word = p;
+rp->wordlen = nlen;
+#endif
 				//Extract the first character
 				if ( !maps[ *p ] ) {
 					rp->action = SIMPLE_EXTRACT; 
@@ -199,7 +211,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 					int hash = -1;
 					if ( (hash = lt_get_long_i(t, p, nlen) ) > -1 ) {
 						( h = malloc( sizeof(int) ) ) && ( *h = hash );
-						add_item( &hashList, h, int *, &hashListLen );
+						add_item( &rp->hashList, h, int *, &hashListLen );
 					}
 				}
 				else {
@@ -232,7 +244,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 							if ( (hash = lt_get_long_i( t, bbuf, blen ) ) > -1 ) {
 								int *h = malloc( sizeof( int ) );
 								memcpy( h, &hash, sizeof( int ) );
-								add_item( &hashList, h, int *, &hashListLen ); 
+								add_item( &rp->hashList, h, int *, &hashListLen ); 
 								eCount = lt_counti( t, hash );
 							}
 						}
@@ -259,15 +271,19 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 								blen += numlen;
 								memcpy( &bbuf[ blen ], p, alen );
 								blen += alen;
-							#ifdef DEBUG	
-								//DEBUG: See the string to check for...	
-								//write( 2, "\t\t'", 3 ); write( 2, bbuf, blen ); write( 2, "'", 1 );
-							#endif
-								//Check for the hash
 								hash = lt_get_long_i(t, bbuf, blen ); 
+#if 0
+							#ifdef DEBUG_H
+								//DEBUG: See the string to check for...	
+fprintf(stderr, "%s:%d - Why is hash wrong? - hash is: %d - ", __FILE__, __LINE__, hash );
+								write( 2, "\t\t'", 3 ); write( 2, bbuf, blen ); write( 2, "'", 1 );
+getchar();
+							#endif
+#endif
+								//Check for the hash
 								int *h = malloc( sizeof(int) );
-								memcpy( h, &hash, sizeof( int ) );
-								add_item( &hashList, &h, int *, &hashListLen ); 
+								memcpy( h, &hash, sizeof(int) );
+								add_item( &rp->hashList, h, int *, &hashListLen ); 
 								FPRINTF( "; hash is: %3d, ", hash );	
 							
 								if ( hash > -1 && (cCount = lt_counti( t, hash )) > maxCount ) {
@@ -337,11 +353,20 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 									memcpy( &tr[ trlen ], p, alen );
 									trlen += alen;
 
+									//TODO: Replace me with copy_int or a general copy_ macro
 									//Check for this hash, save each and dump the list...
-									int hh = lt_get_long_i(t, tr, trlen ); 
+									int hh = lt_get_long_i( t, tr, trlen ); 
+#if 0
+							#ifdef DEBUG_H
+								//DEBUG: See the string to check for...	
+fprintf(stderr, "%s:%d - Why is hash wrong? - hash is: %d - ", __FILE__, __LINE__, hh );
+								write( 2, "\t\t'", 3 ); write( 2, tr, trlen ); write( 2, "'", 1 );
+getchar();
+							#endif
+#endif
 									int *h = malloc( sizeof(int) );
 									memcpy( h, &hh, sizeof(int) );	
-									add_item( &hashList, h, int *, &hashListLen ); 
+									add_item( &rp->hashList, h, int *, &hashListLen ); 
 									FPRINTF( "string = %s, hash = %3d, ", tr, hh );	
 								}
 
@@ -375,17 +400,6 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 					}
 				}
 
-				//Create a new row with what we found.
-			#if 1
-				rp->hashList = !hashListLen ? NULL : hashList; 
-			#else
-				if ( !hashListLen )
-					rp->hashList = NULL;
-				else {
-					rp->hashList = hashList; 
-				}
-			#endif
-				
 				add_item( &rr, rp, struct map, &rrlen );
 			}
 		}
@@ -574,15 +588,21 @@ uint8_t *table_to_uint8t ( Table *t, const uint8_t *src, int srclen, int *newlen
 	}
 
 	//See the map 
-	//print_render_table( map, maplen );
-
+	print_render_table( map, maplen );
+//exit(0);
 	//Do the map	
 	if ( !( block = map_to_uint8t( t, map, maplen, &blocklen ) ) ) {
+fprintf( stderr, "%s:%d map_to_uint8t failed.\n", __FILE__, __LINE__ );
 		return NULL;
 	}
 
+
+exit( 0 );
 	//Free the map
 	destroy_render_table( map, maplen );
 	*newlen = blocklen;
 	return block; 
 }
+
+
+
