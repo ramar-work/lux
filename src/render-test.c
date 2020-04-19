@@ -951,7 +951,7 @@ int main (int argc, char *argv[]) {
 			goto die;	
 		}
 
-		//fprintf( stderr, "%p, %d\n", r, rlen ); write( 2, r, rlen );
+		//fprintf( stderr, "%p, %d\n", r, rlen ); write( 2, r, rlen ); getchar();
 		int cmp = memcmp( r, test->cmp, rlen ); 
 		fprintf( stderr, "%s\n", cmp ? "FAILED" : "SUCCESS" );
 die:

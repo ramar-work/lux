@@ -76,16 +76,16 @@ struct parent {
 	int len, pos, childCount; 
 }; 
 
+struct dep { 
+	struct map **index; 
+	int current, childCount; 
+};
 
 struct map { 
 	int action; 
 	int **hashList; 
 	int len; 
 	void *ptr; 
-#ifdef DEBUG_H
-	uint8_t *word;
-	int wordlen;
-#endif
 };
 
 
@@ -106,7 +106,7 @@ void print_render_table( struct map **map ) {
 		else {
 		#ifdef DEBUG_H
 			fprintf( stderr, " item: " );
-			( item->word ) ? write( 2, item->word, item->wordlen ) : 0;
+			//( item->word ) ? write( 2, item->word, item->wordlen ) : 0;
 			fprintf( stderr, "," );
 		#endif
 			FPRINTF( " len: %3d, list: %p => ", item->len, item->hashList );
@@ -164,14 +164,75 @@ void destroy_render_table( struct map **map ) {
 }
 
 
+int * copy_int ( int i ) {
+	int *h = malloc( sizeof ( int ) );
+	memcpy( h, &i, sizeof( int ) );
+	return h; 
+}
 
-//LOOP_START
-//LOOP_END
-//COMPLEX_EXTRACT
-//SIMPLE_EXTRACT
-//EACH_KEY
-//EXECUTE
-//BOOLEAN
+#if 0
+//These are all the standard mappers and extractors...
+void map_loop_start() {
+}
+void map_loop_end() {
+}
+void map_complex_extract() {
+}
+void map_simple_extract() {
+}
+void map_each_key() {
+}
+void map_execute() {
+}
+void map_boolean() {
+}
+
+void extract_loop_start() {
+}
+void extract_loop_end() {
+}
+void extract_complex_extract() {
+}
+void extract_simple_extract() {
+}
+void extract_each_key() {
+}
+void extract_execute() {
+}
+void extract_boolean() {
+}
+#endif
+
+
+
+struct map * init_map () {
+	struct map *rp = malloc( sizeof( struct map ) );
+	if ( !rp ) {
+		//Free and destroy things
+		return NULL;
+	}
+
+	rp->action = 0; 
+	rp->ptr = NULL; 
+	rp->len = 0; 
+	rp->hashList = NULL; 
+	return rp;
+}
+
+
+struct parent * init_parent() {
+	struct parent *np = NULL; 
+	if (( np = malloc( sizeof(struct parent) )) == NULL ) {
+		return NULL;
+	}
+
+	//NOTE: len will contain the number of elements to loop
+	np->childCount = 0;
+	np->pos = 0;
+	np->len = 0;
+	np->text = 0;
+	return np; 
+}
 
 
 //Bitmasking will tell me a lot...
@@ -192,7 +253,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 	//Allocating a list of characters to elements is easiest.
 	while ( memwalk( &r, (uint8_t *)src, (uint8_t *)"{}", srclen, 2 ) ) {
 		//More than likely, I'll always use a multi-byte delimiter
-		if ( r.size == 0 ) { /*&& r.pos > 0 ) {*/
+		if ( r.size == 0 ) {
 			//Check if there is a start or end block
 			if ( r.chr == '{' ) {
 				BLOCK = BLOCK_START;
@@ -205,30 +266,14 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 				int nlen = 0;	
 				int hashListLen = 0;
 				uint8_t *p = trim( (uint8_t *)&src[r.pos], " ", r.size, &nlen );
-				struct map *rp = malloc( sizeof( struct map ) );
-				if ( !rp ) {
-					//Free and destroy things
-					return NULL;
-				}
-
-				rp->action = 0; 
-				rp->ptr = NULL; 
-				rp->len = 0; 
-				rp->hashList = NULL; 
-			#ifdef DEBUG_H
-				rp->word = p;
-				rp->wordlen = nlen;
-			#endif
+				struct map *rp = init_map();
 
 				//Extract the first character
 				if ( !maps[ *p ] ) {
 					rp->action = SIMPLE_EXTRACT; 
-					//int *h = NULL; 
-					int hash = -1;
-					if ( (hash = lt_get_long_i(t, p, nlen) ) > -1 ) {
-						int *h = malloc( sizeof(int) ); 
-						memcpy( h, &hash, sizeof( int ) );
-						add_item( &rp->hashList, h, int *, &hashListLen );
+					int hash = lt_get_long_i( t, p, nlen ); 
+					if ( hash > -1 ) {
+						add_item( &rp->hashList, copy_int( hash ), int *, &hashListLen );
 					}
 				}
 				else {
@@ -236,8 +281,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 					int alen = 0;
 					rp->action = maps[ *p ];
 					p = trim( p, ". #/$`!\t", nlen, &alen );
-					FPRINTF("GOT ACTION %s, and TEXT = ", DUMPACTION(rp->action));
-					ENCLOSE( p, 0, alen );
+					FPRINTF("GOT ACTION %s, and TEXT = ", DUMPACTION(rp->action)); ENCLOSE( p, 0, alen );
 
 					//Figure some things out...
 					if ( rp->action == LOOP_START ) {
@@ -249,33 +293,19 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 						struct parent *cp = NULL;
 
 						//If a parent should exist, copy the parent's text 
-						//TODO: Eventually, numbers shouldn't be necessary on this check
 						if ( !INSIDE ) {
 							//Copy the data
 							memcpy( &bbuf[ blen ], p, alen );
 							blen += alen;
-						
-							FPRINTF( "Checking level[0] table " );	
-							ENCLOSE( bbuf, 0, blen );
-							//This is the only thing, get the hash and end it
-							if ( (hash = lt_get_long_i( t, bbuf, blen ) ) > -1 ) {
-								int *h = malloc( sizeof( int ) );
-								memcpy( h, &hash, sizeof( int ) );
-								add_item( &rp->hashList, h, int *, &hashListLen ); 
+							if ( ( hash = lt_get_long_i(t, bbuf, blen) ) > -1 ) {
+								add_item( &rp->hashList, copy_int( hash ), int *, &hashListLen );
 								eCount = lt_counti( t, hash );
 							}
 						}
 						else {
-							//If there are 3 parents, you need to start at the beginning and come out
-							//Find the MAX count of all the rows that are there... 
-							//This way you'll have the right count everytime...
-							FPRINTF( "Checking level[n+1] table " );	
-
 							//Get a count of the number of elements in the parent.
 							int maxCount = 0;
 							cp = pp[ pplen - 1 ];
-							FPRINTF( "containing %d members.\n", cp->childCount );
-							FPRINTF( "\tParent strings are:\n" ); 
 
 							for ( int i=0, cCount=0; i < cp->childCount; i++ ) {
 								char num[ 64 ] = { 0 };
@@ -290,16 +320,10 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 								memcpy( &bbuf[ blen ], p, alen );
 								blen += alen;
 								hash = lt_get_long_i(t, bbuf, blen );
-
-								//Check for the hash
-								int *h = malloc( sizeof(int) );
-								memcpy( h, &hash, sizeof(int) );
-								add_item( &rp->hashList, h, int *, &hashListLen ); 
-								FPRINTF( "; hash is: %3d, ", hash );	
+								add_item( &rp->hashList, copy_int( hash ), int *, &hashListLen ); 
 							
 								if ( hash > -1 && (cCount = lt_counti( t, hash )) > maxCount ) {
 									maxCount = cCount;	
-									FPRINTF( " child count is: %3d\n", maxCount );	
 								}
 							}
 							eCount = maxCount;
@@ -309,15 +333,9 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 
 						//Find the hash
 						if ( hashListLen ) {
-							//Set up the parent structure
-							struct parent *np = NULL; 
-							if (( np = malloc( sizeof(struct parent) )) == NULL ) {
-								//TODO: Cut out and free things
-							}
-
+							struct parent *np = init_parent(); 
 							//NOTE: len will contain the number of elements to loop
 							np->childCount = eCount;
-							np->pos = 0;
 							np->len = alen;
 							np->text = p; 
 							add_item( &pp, np, struct parent *, &pplen );
@@ -366,10 +384,14 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 
 									//TODO: Replace me with copy_int or a general copy_ macro
 									//Check for this hash, save each and dump the list...
-									int hh = lt_get_long_i( t, tr, trlen ); 
+									int hh = lt_get_long_i( t, tr, trlen );
+#if 1
+									add_item( &rp->hashList, copy_int( hh ), int *, &hashListLen ); 
+#else									
 									int *h = malloc( sizeof(int) );
 									memcpy( h, &hh, sizeof(int) );	
 									add_item( &rp->hashList, h, int *, &hashListLen ); 
+#endif
 									FPRINTF( "string = %s, hash = %3d, ", tr, hh );	
 								}
 
@@ -410,17 +432,18 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 			FPRINTF( "@RAW BLOCK COPY" ); 
 			//We can simply copy if ACTION & BLOCK are 0 
 			if ( !ACTION && !BLOCK ) {
-				//struct map rbb = { 0 };
+#if 1
+				struct map *rp = init_map();
+#else
 				struct map *rp = malloc( sizeof( struct map ) );
 				if ( !rp ) {
 					//Teardown and destroy
 					return NULL;
 				}
-		
+#endif	
 				//Set defaults
 				rp->len = r.size;	
 				rp->action = RAW;
-				rp->hashList = NULL;
 				rp->ptr = (uint8_t *)&src[ r.pos ];	
 				
 				//Save a new record
@@ -436,7 +459,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 
 
 //Didn't I write something to add to a buffer?
-uint8_t **extract_table_value ( LiteKv *lt, uint8_t **ptr, int *len, uint8_t *tmp, int tmplen ) {
+void extract_table_value ( LiteKv *lt, uint8_t **ptr, int *len, uint8_t *t, int tl ) {
 
 	if ( lt->value.type == LITE_TXT ) {
 		*len = strlen( lt->value.v.vchar ); 
@@ -447,18 +470,16 @@ uint8_t **extract_table_value ( LiteKv *lt, uint8_t **ptr, int *len, uint8_t *tm
 		*ptr = lt->value.v.vblob.blob;
 	}
 	else if ( lt->value.type == LITE_INT ) {
-		*len = snprintf( (char *)tmp, tmplen - 1, "%d", lt->value.v.vint );
-		*ptr = (uint8_t *)tmp;
+		*len = snprintf( (char *)t, tl - 1, "%d", lt->value.v.vint );
+		*ptr = (uint8_t *)t;
 	}
 	else {
-		//This is a totally different situation...
-		return NULL;
+		//If for some reason we can't convert, just use a blank value.
+		*len = 0;
+		*ptr = (uint8_t *)"";
 	}
-
-	return ptr;
 }
 
-struct dep { struct map **index; int current, childCount; };
 
 uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 	//Start the writes, by using the structure as is
@@ -467,9 +488,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 	struct dep depths[100] = { { 0, 0, 0 } };
 	struct dep *d = depths;
 
-	//for ( int i = 0; i < elen; i++ ) {
 	while ( *map ) {
-		//struct map *item = map[ i ];
 		struct map *item = *map;
 		int hash = -1;
 
@@ -487,26 +506,8 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 					//NOTE: At this step, nobody should care about types that much...
 					uint8_t *ptr = NULL, nbuf[64] = {0};
 					int itemlen = 0;
-#if 1
-					if ( !extract_table_value( lt, &ptr, &itemlen, nbuf, sizeof(nbuf) ) ) {
-						//What happens
-					}
-#else
-					if ( lt->value.type == LITE_TXT ) {
-						itemlen = strlen( lt->value.v.vchar ); 
-						ptr = lt->value.v.vchar;
-					}
-					else if ( lt->value.type == LITE_INT ) {
-						itemlen = snprintf( nbuf, sizeof( nbuf ) - 1, "%d", lt->value.v.vint );
-						ptr = nbuf;
-					}
-					else {
-						//This is a totally different situation...
-						return NULL;
-					}
-#endif
+					extract_table_value( lt, &ptr, &itemlen, nbuf, sizeof(nbuf) );
 					append_to_uint8t( &block, &blockLen, (uint8_t *)ptr, itemlen );
-					//free( ptr );
 				}
 				item->hashList++;
 			}
@@ -520,7 +521,6 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 				d->current = 0;
 				d->childCount = item->len;
 			}
-		#if 1
 			else if ( item->action == LOOP_END ) {
 				FPRINTF( "%-20s, %d =? %d", "LOOP_END", d->current, d->childCount );
 				if ( ++d->current == d->childCount )
@@ -529,7 +529,6 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 					map = d->index;
 				}
 			}
-		#endif
 			else if ( item->action == COMPLEX_EXTRACT ) {
 				FPRINTF( "%-20s", "COMPLEX_EXTRACT " );
 				//rip me out, i am idential to SIMPLE_EXTRACT'S ROUTINE
@@ -538,40 +537,15 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 					FPRINTF( "List?: %d", **item->hashList );
 					int **list = item->hashList;
 					//Get the type and length
-					if ( ( hash = **item->hashList ) > -1 ) {
+					if ( ( hash = **list ) > -1 ) {
 						LiteKv *lt = lt_retkv( t, hash );
 						//NOTE: At this step, nobody should care about types that much...
 						uint8_t *ptr = NULL, nbuf[ 64 ] = { 0 };
 						int itemlen = 0;
-#if 1
-						if ( !extract_table_value( lt, &ptr, &itemlen, nbuf, sizeof(nbuf) ) ) {
-							//What happens
-						}
-#else
-						uint8_t *ptr = NULL;
-						char nbuf[64] = {0};
-
-						if ( lt->value.type == LITE_TXT ) {
-							itemlen = strlen( lt->value.v.vchar ); 
-							ptr = (uint8_t *)lt->value.v.vchar;
-						}
-						else if ( lt->value.type == LITE_BLB ) {
-							itemlen = lt->value.v.vblob.size; 
-							ptr = lt->value.v.vblob.blob;
-						}
-						else if ( lt->value.type == LITE_INT ) {
-							itemlen = snprintf( nbuf, sizeof( nbuf ) - 1, "%d", lt->value.v.vint );
-							ptr = (uint8_t *)nbuf;
-						}
-						else {
-							//This is a totally different situation...
-							return NULL;
-						}
-#endif
-
+						extract_table_value( lt, &ptr, &itemlen, nbuf, sizeof(nbuf) ); 
 						append_to_uint8t( &block, &blockLen, ptr, itemlen );
 					}
-					item->hashList++;
+					list++; //item->hashList++;
 				}
 			}
 		}
@@ -581,8 +555,6 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 
 	//The final step is to assemble everything...
 	*newlen = blockLen;
-	fprintf( stderr, "blocklen: %d, ", blockLen );
-	fprintf( stderr, "blocklen: %d, ", *newlen );
 	return block;
 }
 
