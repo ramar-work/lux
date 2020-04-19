@@ -541,6 +541,9 @@ struct Test tests[] =
 		 "</body>\n"
 		 "</html>\n"
 	},
+	#endif
+
+	#if 1
 	//one table
 	{
 		SingleTable, "TABLE_SINGLE", "one level table",
@@ -582,8 +585,9 @@ struct Test tests[] =
 		 "</body>\n"
 		 "</html>\n"
 	},
+	#endif
 
-
+	#if 0
 	{
 		DoubleTableAlpha, "TABLE_DOUBLE", "two level table | key value test",
 		//Notice the cities.metadata loop block.  Teset for short and long keys...
@@ -594,12 +598,43 @@ struct Test tests[] =
 		 "</head>\n"
 		 "<body>\n"
 		 "{{# cities }}\n"
-		 "	<h2>{{ .city }}</h2>\n"
+		 "\t<h2>{{ .city }}</h2>\n"
+		 "\t<p>\n"
+		 "\t\t{{ .city }}, {{ .parent_state }} is a city containing {{ .metadata.population }} people.\n" 
+		 "\t</p>\n"
+		 "\t<p>\n"
+		 "\t\t{{ .desc }}\n"
+		 "\t</p>\n"
+		 "\t<table>\n"
+		 "\t<thead>\n"
+		 "\t\t<th>Skyline</th>\n"
+		 "\t\t<th>Population</th>\n"
+		 "\t</thead>\n"
+		 "\t<tbody>\n"
+		 "\t{{# .metadata }}\n"
+		 "\t\t<tr>\n"
+		 "\t\t\t<td>Population: {{ .population }}</td>\n"  
+		 "\t\t\t<td>Claim to Fame: {{ cities.metadata.claim_to_fame }}</td>\n"
+		 "\t\t</tr>\n"
+		 "\t{{/ .metadata }}\n"
+		 "\t</tbody>\n"
+		 "\t</table>\n"
+		 "{{/ cities }}\n"
+		 "</body>\n"
+		 "</html>\n"
+		,
+		.cmp = 
+		 "<html>\n"
+		 "<head>\n"
+		 "</head>\n"
+		 "<body>\n"
+		 "\n"
+		 "	<h2>San Francisco</h2>\n"
 		 "	<p>\n"
-		 "    {{ .city }}, {{ .parent_state }} is a city {{ .metadata.population }} people.\n" 
+		 "    San Francisco, CA is a city full of 870887 people.\n" 
 		 "	</p>\n"
 		 "	<p>\n"
-		 "    {{ .desc }}\n"
+		 "  	There are so many things to see and do in this wonderful town.  Like talk to a billionaire startup founder or super-educated University of Berkeley professors.\n" 
 		 "	</p>\n"
 		 "	<table>\n"
 		 "	<thead>\n"
@@ -607,14 +642,84 @@ struct Test tests[] =
 		 "		<th>Population</th>\n"
 		 "	</thead>\n"
 		 "	<tbody>\n"
-		 "	{{# .metadata }}\n"
 		 "    <tr>\n"
-		 "			<td>Population: {{ .population }}</td>\n"  
-		 "			<td>Claim to Fame: {{ cities.metadata.claim_to_fame }}</td>\n"
+		 "			<td>Population: 870887</td>\n"  
+		 "			<td>Claim to Fame: The Real Silicon Valley</td>\n"
 		 "    </tr>\n"
-		 "	{{/ .metadata }}\n"
 		 "	</tbody>\n"
 		 "	</table>\n"
+		 "\n"
+		 "	<h2>New York</h2>\n"
+		 "	<p>\n"
+		 "    New York is a city full of 8750000 people.\n" 
+		 "	</p>\n"
+		 "	<p>\n"
+		 "    New York, NY is one of the most well-known destinations on earth and home to over 8 million residents.\n"
+		 "	</p>\n"
+		 "	<table>\n"
+		 "	<thead>\n"
+		 "		<th>Skyline</th>\n"
+		 "		<th>Population</th>\n"
+		 "	</thead>\n"
+		 "	<tbody>\n"
+		 "    <tr>\n"
+		 "			<td>Population: 19750000</td>\n"  
+		 "			<td>Claim to Fame: The Greatest City on Earth</td>\n"
+		 "    </tr>\n"
+		 "	</tbody>\n" "	</table>\n"
+		 "\n"
+		 "	<h2>Raleigh</h2>\n"
+		 "	<p>\n"
+		 "    Raleigh, NC is a city full of 350001 people.\n" 
+		 "	</p>\n"
+		 "	<table>\n"
+		 "	<thead>\n"
+		 "		<th>Skyline</th>\n"
+		 "		<th>Population</th>\n"
+		 "	</thead>\n"
+		 "	<tbody>\n"
+		 "    <tr>\n"
+		 "			<td>350001</td>\n"  
+		 "			<td>Silicon Valley of the South</td>\n"
+		 "    </tr>\n"
+		 "	</tbody>\n"
+		 "	</table>\n"
+		 "</body>\n"
+		 "</html>\n"
+	},
+#endif
+	#if 1
+	{
+		DoubleTableAlpha, "TABLE_DOUBLE", "two level table | key value test",
+		//Notice the cities.metadata loop block.  Teset for short and long keys...
+		//"    {{ .city }}, {{ .parent_state }} is a city full of {{ .metadata.population }} people.\n" 
+		.src =
+		 "<html>\n"
+		 "<head>\n"
+		 "</head>\n"
+		 "<body>\n"
+		 "{{# cities }}\n"
+		 "\t<h2>{{ .city }}</h2>\n"
+		 "\t<p>\n"
+		 "\t\t{{ .city }}, {{ .parent_state }} is a city containing {{ .metadata.population }} people.\n" 
+		 "\t</p>\n"
+		 "\t<p>\n"
+		 "\t\t{{ .desc }}\n"
+		 "\t</p>\n"
+		 "\t<table>\n"
+		 "\t<thead>\n"
+		 "\t\t<th>Skyline</th>\n"
+		 "\t\t<th>Population</th>\n"
+		 "\t</thead>\n"
+		 "\t<tbody>\n"
+		 "\t{{# .metadata }}\n"
+		 "\t\t<tr>\n"
+		 "\t\t\t<td>Population: {{ .population }}</td>\n"  
+		 "\t\t\t<td>Claim to Fame: {{ cities.metadata.claim_to_fame }}</td>\n"
+		 "\t\t</tr>\n"
+		 "\t{{/ .metadata }}\n"
+		 "\t</tbody>\n"
+		 "\t</table>\n"
 		 "{{/ cities }}\n"
 		 "</body>\n"
 		 "</html>\n"
@@ -694,7 +799,7 @@ struct Test tests[] =
 		 "{{# cities }}\n"
 		 "	<h2>{{ .city }}</h2>\n"
 		 "	<p>\n"
-		 "    {{ .city }} is a city full of {{ .population }} people.\n" 
+		 "		{{ .city }} is a city full of {{ .population }} people.\n" 
 		 "	</p>\n"
 		 "	<p>\n"
 		 "    {{ .desc }}\n"
@@ -839,19 +944,19 @@ int main (int argc, char *argv[]) {
 		Table *t = convert_lkv( test->kvset );
 		int rlen = 0;
 		uint8_t *r = NULL;
-		//lt_dump( t );
-		
+
 		//Finding the marks is good if there is enough memory to do it
 		if (( r = table_to_uint8t( t, (uint8_t *)test->src, strlen(test->src), &rlen ) ) == NULL ) {
 			fprintf(stderr, "Error rendering template at item: %s\n", test->name );
 			goto die;	
 		}
 
-		write( 2, r, rlen );
+		//fprintf( stderr, "%p, %d\n", r, rlen ); write( 2, r, rlen );
 		int cmp = memcmp( r, test->cmp, rlen ); 
 		fprintf( stderr, "%s\n", cmp ? "FAILED" : "SUCCESS" );
 die:
 		free( r );
+
 		if ( t ) { 
 			lt_free( t );
 			free( t );

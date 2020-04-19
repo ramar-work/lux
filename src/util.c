@@ -173,7 +173,7 @@ uint8_t *append_to_uint8t ( uint8_t **dest, int *len, uint8_t *src, int srclen )
 		return NULL;
 	}
 
-	*len += srclen;
+	(*len) += srclen;
 	return *dest;
 }
 

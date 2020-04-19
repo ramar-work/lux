@@ -1,34 +1,38 @@
 /* ---------------------------------------------------
 render.c 
 
-Test out rendering...
+Expected results
+
 
 TODO / TASKS
 ------------
-- Get proper renders to work...
-- Make it work with nested anything
+- Rewrite to support error messages (print to buffer and call it a day)
+
+- Rewrite so that each of the handlers uses function pointers, will be easier
+	to maintain and add to later.  
+
+- Get nested complex extracts to work (or for that matter, nested anythings)
+
+- Make a cleaner map? for debugging (it's so long, and I can't read it)
 
 
-Stuck on COMPLEX_EXTRACT.
-- !!! Keeping the hashes still helps, so don't get rid of that...
+USAGE
+-----
+The template tag rules look a little like this.  One character will be used
+to determine how the result is extracted.
 
-1.
-- Extend single.c to return a short key or full key from a location
-(this way all of the hashes can be used)
-2.
-- Or just allocate individual strings with what you need at the parent
-	2a.
-	- Generate full strings at the COMPLEX_EXTRACT part
-	- Full strings also have to be generated at LOOP_START
+{{ # xxx }} - LOOP START
+{{ / xxx }} - LOOP END 
+{{ x     }} - SIMPLE EXTRACT
+{{ .     }} - COMPLEX EXTRACT
+{{ $     }} - EACH KEY OR VALUE IN A TABLE 
 
-//{{ # xxx }} - LOOP START
-//{{ / xxx }} - LOOP END 
-//{{ x     }} - SIMPLE EXTRACT
-//{{ .     }} - COMPLEX EXTRACT
-//{{ $     }} - EACH KEY OR VALUE IN A TABLE 
-//{{ `xxx` }} - EXECUTE 
-//{{ !xxx  }} - BOOLEAN? 
-//{{ xxx ? y : z }} - TERNARY
+
+EXPERIMENTAL
+-----------
+{{ !xxx  }} - BOOLEAN? 
+{{ `xxx` }} - EXECUTE 
+{{ xxx ? y : z }} - TERNARY
 
  * --------------------------------------------------- */
 #include "render.h"
@@ -86,12 +90,13 @@ struct map {
 
 
 //Purely for debugging, see what came out
-void print_render_table( struct map **map, int maplen ) {
-	for ( int i=0; i < maplen; i++ ) {
-		struct map *item = map[ i ];
+void print_render_table( struct map **map ) {
+	int i=0;
+	while ( *map ) {
+		struct map *item = *map;
 
 		//Dump the unchanging elements out...
-		FPRINTF( "[%3d] => action: %-16s", i, DUMPACTION( item->action ) );
+		FPRINTF( "[%3d] => action: %-16s", i++, DUMPACTION( item->action ) );
 
 		if ( item->action == RAW || item->action == EXECUTE ) {
 			uint8_t *p = (uint8_t *)item->ptr;
@@ -106,8 +111,9 @@ void print_render_table( struct map **map, int maplen ) {
 		#endif
 			FPRINTF( " len: %3d, list: %p => ", item->len, item->hashList );
 			int **ii = item->hashList;
-			if ( !ii ) 
+			if ( !ii ) {
 				fprintf( stderr , "NULL" );
+			}
 			else {
 				int d=0;
 				while ( *ii ) {
@@ -117,16 +123,20 @@ void print_render_table( struct map **map, int maplen ) {
 			}
 			fprintf( stderr, "\n" );
 		}
+		map++;
 	}
 }
 
 
-void destroy_render_table( struct map **map, int maplen ) {
-	for ( int i=0; i < maplen; i++ ) {
-		struct map *item = map[ i ];
+void destroy_render_table( struct map **map ) {
+
+	//for ( int i=0; i < maplen; i++ ) {
+	int i = 0;
+	while ( *map ) {
+		struct map *item = *map;
 
 		//Dump the unchanging elements out...
-		FPRINTF( "[%3d] => action: %-16s", i, DUMPACTION( item->action ) );
+		FPRINTF( "[%3d] => action: %-16s", i++, DUMPACTION( item->action ) );
 
 		if ( item->action == RAW ) { 
 			FPRINTF( "Nothing to free...\n" );
@@ -138,29 +148,22 @@ void destroy_render_table( struct map **map, int maplen ) {
 		else {
 			FPRINTF( "Freeing int lists..." );
 			int **ii = item->hashList;
-#if 1
 			while ( ii && *ii ) {
 				fprintf( stderr, "item->intlist: %p\n", *ii );	
-				//free( *ii ); 
+				free( *ii ); 
 				ii++;
 			}
-#else
-			if ( ii ) {
-				while ( *ii ) {
-					free( *ii );
-					ii++;
-				}
-			}
-#endif
 			FPRINTF( "\n" );
 		}
 		free( item );
+		map++;
 	}
 }
 
 
 //Bitmasking will tell me a lot...
-struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen ) {
+struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
+
 	int destlen = 0;
 	int ACTION = 0;
 	int BLOCK = 0;
@@ -200,17 +203,20 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen, int *elen 
 				rp->ptr = NULL; 
 				rp->len = 0; 
 				rp->hashList = NULL; 
-#ifdef DEBUG_H
-rp->word = p;
-rp->wordlen = nlen;
-#endif
+			#ifdef DEBUG_H
+				rp->word = p;
+				rp->wordlen = nlen;
+			#endif
+
 				//Extract the first character
 				if ( !maps[ *p ] ) {
 					rp->action = SIMPLE_EXTRACT; 
-					int *h = NULL; 
+					//int *h = NULL; 
 					int hash = -1;
 					if ( (hash = lt_get_long_i(t, p, nlen) ) > -1 ) {
-						( h = malloc( sizeof(int) ) ) && ( *h = hash );
+						int *h = malloc( sizeof(int) ); 
+						//*h = hash;
+						memcpy( h, &hash, sizeof( int ) );
 						add_item( &rp->hashList, h, int *, &hashListLen );
 					}
 				}
@@ -259,7 +265,7 @@ rp->wordlen = nlen;
 							FPRINTF( "containing %d members.\n", cp->childCount );
 							FPRINTF( "\tParent strings are:\n" ); 
 
-							for ( int i=0, cCount=0; i<cp->childCount; i++ ) {
+							for ( int i=0, cCount=0; i < cp->childCount; i++ ) {
 								char num[ 64 ] = { 0 };
 								uint8_t nbuf[ 2048 ] = { 0 };
 								int numlen = snprintf( num, sizeof( num ) - 1, ".%d.", i );	
@@ -321,7 +327,11 @@ getchar();
 						if ( !INSIDE )
 							;
 						else if ( pplen == INSIDE ) {
-							free( pp[ pplen - 1 ] );
+							struct parent **f = &pp[ pplen - 1 ];
+fprintf( stderr, "List: %p %ld\n", f, sizeof( f ) );
+fprintf( stderr, "List: %p %ld\n", *f, sizeof( *f ) );
+fprintf( stderr, "List: %ld\n", sizeof( **f ) );
+							//free( pp[ pplen - 1 ] );
 							pplen--;
 							INSIDE--;
 						}
@@ -427,22 +437,62 @@ getchar();
 		}
 	}
 
-	*elen = rrlen;
+
+
+fprintf( stderr, "Parent list:\n" );
+while ( pp && *pp ) {
+	fprintf( stderr, "%p\n", *pp );
+	pp++;
+}
+exit(0);
+	//*elen = rrlen;
 	return rr;
 }
 
 
-uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
+//Didn't I write something to add to a buffer?
+uint8_t **extract_table_value ( LiteKv *lt, uint8_t **ptr, int *len, uint8_t *tmp, int tmplen ) {
+
+	if ( lt->value.type == LITE_TXT ) {
+		*len = strlen( lt->value.v.vchar ); 
+		*ptr = (uint8_t *)lt->value.v.vchar;
+	}
+	else if ( lt->value.type == LITE_BLB ) {
+		*len = lt->value.v.vblob.size; 
+		*ptr = lt->value.v.vblob.blob;
+	}
+	else if ( lt->value.type == LITE_INT ) {
+		*len = snprintf( (char *)tmp, tmplen - 1, "%d", lt->value.v.vint );
+		*ptr = (uint8_t *)tmp;
+	}
+	else {
+		//This is a totally different situation...
+		return NULL;
+	}
+
+	return ptr;
+}
+
+
+uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 	//Start the writes, by using the structure as is
 	uint8_t *block = NULL;
 	int blockLen = 0;
-	struct dep { int index, current, childCount; } depths[100] = { { 0, 0, 0 } };
+	//struct dep { int index, current, childCount; } depths[100] = { { 0, 0, 0 } };
+	struct dep { struct map **index; int current, childCount; } depths[100] = { { 0, 0, 0 } };
 	struct dep *d = depths;
 
-	for ( int i = 0; i < elen; i++ ) {
-		struct map *item = map[ i ];
+	//for ( int i = 0; i < elen; i++ ) {
+	while ( *map ) {
+		//struct map *item = map[ i ];
+		struct map *item = *map;
+		int hash = -1;
+
 		if ( item->action == RAW || item->action == EXECUTE ) {
 			FPRINTF( "%-20s, len: %3d", "RAW", item->len );
+#if 1
+			append_to_uint8t( &block, &blockLen, item->ptr, item->len );
+#else
 			blockLen += item->len;
 			if ( (block = realloc( block, blockLen )) == NULL ) {
 				//NOTE: Teardown properly or you will cry...
@@ -450,16 +500,16 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 			}
 			//If I do a memset, where at?
 			memcpy( &block[ blockLen - item->len ], item->ptr, item->len ); 
+#endif
 		}
 		else if ( item->action == SIMPLE_EXTRACT ) {
 			FPRINTF( "%-20s, len: %3d ", "SIMPLE_EXTRACT", item->len );
 			//rip me out
-			#if 1
 			if ( item->hashList ) {
 				//Get the type and length
-				int hash = **item->hashList;
-				if ( hash > -1 ) {
+				if ( ( hash = **item->hashList ) > -1 ) {
 					LiteKv *lt = lt_retkv( t, hash );
+#if 0
 				#ifdef DEBUG
 					fprintf( stderr, ", WHAT IS THIS: %p = ", lt ); 
 					if ( lt->value.type == LITE_INT ) {
@@ -469,6 +519,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 						fprintf( stderr, " %s", lt->value.v.vchar );
 					}
 				#endif
+#endif
 					//NOTE: At this step, nobody should care about types that much...
 					char *ptr = NULL;
 					char nbuf[64] = {0};
@@ -486,120 +537,129 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int elen, int *newlen ) {
 						return NULL;
 					}
 
+#if 1
+					append_to_uint8t( &block, &blockLen, (uint8_t *)ptr, itemlen );
+#else
 					blockLen += itemlen;
 					if ( (block = realloc( block, blockLen )) == NULL ) {
 						return NULL;
 					}
 					memcpy( &block[ blockLen - itemlen ], ptr, itemlen ); 
+#endif
 				}
 				item->hashList++;
 			}
-			#endif
 			FPRINTF( "\n" );
-		} 
+		}
 		else {
 			if ( item->action == LOOP_START ) {
 				FPRINTF( "%-20s, len: %3d", "LOOP_START", item->len );
 				d++;
-				d->index = i;
+				d->index = map;
 				d->current = 0;
 				d->childCount = item->len;
-			} 
+			}
+		#if 1
 			else if ( item->action == LOOP_END ) {
-				d->current++;
 				FPRINTF( "%-20s, %d =? %d", "LOOP_END", d->current, d->childCount );
-				if ( d->current == d->childCount ) {
+				if ( ++d->current == d->childCount )
 					d--;
-				}
 				else {
-					i = d->index;
+					map = d->index;
 				}
 			}
+		#endif
 			else if ( item->action == COMPLEX_EXTRACT ) {
 				FPRINTF( "%-20s", "COMPLEX_EXTRACT " );
 				//rip me out, i am idential to SIMPLE_EXTRACT'S ROUTINE
-				#if 1
+#if 1
 				if ( item->hashList ) {
 					//If there is a pointer, it does not move until I get through all three
 					FPRINTF( "%d", **item->hashList );
 					//Get the type and length
-					int hash = **item->hashList;
-					if ( hash > -1 ) {
+					if ( ( hash = **item->hashList ) > -1 ) {
 						LiteKv *lt = lt_retkv( t, hash );
-					#ifdef DEBUG
-						fprintf( stderr, ", WHAT IS THIS: %p = ", lt ); 
-						if ( lt->value.type == LITE_INT ) {
-							fprintf( stderr, " %d", lt->value.v.vint );
-						}
-						else if ( lt->value.type == LITE_TXT ) {
-							fprintf( stderr, " %s", lt->value.v.vchar );
-						}
-					#endif
+						fprintf( stderr, ", WHAT IS THIS: %p => %s\n", lt, lt_typename( lt->value.type ) ); 
 						//NOTE: At this step, nobody should care about types that much...
-						char *ptr = NULL;
-						char nbuf[64] = {0};
+						uint8_t *ptr = NULL, nbuf[ 64 ] = { 0 };
 						int itemlen = 0;
+#if 1
+						if ( !extract_table_value( lt, &ptr, &itemlen, nbuf, sizeof(nbuf) ) ) {
+							//What happens
+						}
+#else
+						uint8_t *ptr = NULL;
+						char nbuf[64] = {0};
+
 						if ( lt->value.type == LITE_TXT ) {
 							itemlen = strlen( lt->value.v.vchar ); 
-							ptr = lt->value.v.vchar;
+							ptr = (uint8_t *)lt->value.v.vchar;
+						}
+						else if ( lt->value.type == LITE_BLB ) {
+							itemlen = lt->value.v.vblob.size; 
+							ptr = lt->value.v.vblob.blob;
 						}
 						else if ( lt->value.type == LITE_INT ) {
 							itemlen = snprintf( nbuf, sizeof( nbuf ) - 1, "%d", lt->value.v.vint );
-							ptr = nbuf;
+							ptr = (uint8_t *)nbuf;
 						}
 						else {
 							//This is a totally different situation...
 							return NULL;
 						}
+#endif
 
+#if 1
+						append_to_uint8t( &block, &blockLen, ptr, itemlen );
+#else
 						blockLen += itemlen;
 						if ( (block = realloc( block, blockLen )) == NULL ) {
 							return NULL;
 						}
-						memcpy( &block[ blockLen - itemlen ], ptr, itemlen ); 
+						memcpy( &block[ blockLen - itemlen ], ptr, itemlen );
+#endif
 					}
 					item->hashList++;
 				}
-				#endif
+#endif
 			}
-		#ifdef DEBUG
-			fprintf( stderr, "\n" );
-		#endif
 		}
+		fprintf( stderr, "%d, \n", blockLen );
+		map++;
 	}
 
 	//The final step is to assemble everything...
 	*newlen = blockLen;
+	fprintf( stderr, "blocklen: %d, ", blockLen );
+	fprintf( stderr, "blocklen: %d, ", *newlen );
 	return block;
 }
 
 
 
 uint8_t *table_to_uint8t ( Table *t, const uint8_t *src, int srclen, int *newlen ) {
-	//Define shit...
+
 	struct map **map = NULL;
 	uint8_t *block = NULL;
 	int blocklen = 0;
-	int maplen = 0;
 
 	//Convert T to a map
-	if ( !( map = table_to_map( t, src, srclen, &maplen ) ) ) {
+	if ( !( map = table_to_map( t, src, srclen ) ) ) {
 		return NULL;
 	}
-
+#if 0
 	//See the map 
-	print_render_table( map, maplen );
-//exit(0);
+	//print_render_table( map );
+
 	//Do the map	
-	if ( !( block = map_to_uint8t( t, map, maplen, &blocklen ) ) ) {
-fprintf( stderr, "%s:%d map_to_uint8t failed.\n", __FILE__, __LINE__ );
+	if ( !( block = map_to_uint8t( t, map, &blocklen ) ) ) {
+//fprintf( stderr, "%s:%d block len is: %d.\n", __FILE__, __LINE__, blocklen );
+//fprintf( stderr, "%s:%d map_to_uint8t failed.\n", __FILE__, __LINE__ );
 		return NULL;
 	}
-
-
-exit( 0 );
+#endif
 	//Free the map
-	destroy_render_table( map, maplen );
+	destroy_render_table( map );
 	*newlen = blocklen;
 	return block; 
 }
