@@ -429,6 +429,8 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 		}
 	}
 
+	//Destroy the parent list
+	free( pp );
 	return rr;
 }
 
