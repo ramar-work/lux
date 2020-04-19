@@ -129,9 +129,9 @@ void print_render_table( struct map **map ) {
 
 
 void destroy_render_table( struct map **map ) {
-
-	//for ( int i=0; i < maplen; i++ ) {
 	int i = 0;
+	struct map **top = map;
+
 	while ( *map ) {
 		struct map *item = *map;
 
@@ -153,12 +153,25 @@ void destroy_render_table( struct map **map ) {
 				free( *ii ); 
 				ii++;
 			}
+			free( item->hashList );
 			FPRINTF( "\n" );
 		}
 		free( item );
 		map++;
 	}
+
+	free( top );
 }
+
+
+
+//LOOP_START
+//LOOP_END
+//COMPLEX_EXTRACT
+//SIMPLE_EXTRACT
+//EACH_KEY
+//EXECUTE
+//BOOLEAN
 
 
 //Bitmasking will tell me a lot...
@@ -190,11 +203,10 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 				//Start extraction...
 				BLOCK = BLOCK_END;
 				int nlen = 0;	
-				//int **hashList = NULL;
 				int hashListLen = 0;
 				uint8_t *p = trim( (uint8_t *)&src[r.pos], " ", r.size, &nlen );
-				struct map *rp = NULL; 
-				if ( !(rp = malloc( sizeof( struct map ) )) ) {
+				struct map *rp = malloc( sizeof( struct map ) );
+				if ( !rp ) {
 					//Free and destroy things
 					return NULL;
 				}
@@ -215,7 +227,6 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 					int hash = -1;
 					if ( (hash = lt_get_long_i(t, p, nlen) ) > -1 ) {
 						int *h = malloc( sizeof(int) ); 
-						//*h = hash;
 						memcpy( h, &hash, sizeof( int ) );
 						add_item( &rp->hashList, h, int *, &hashListLen );
 					}
@@ -256,7 +267,8 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 						}
 						else {
 							//If there are 3 parents, you need to start at the beginning and come out
-							//Find the MAX count of all the rows that are there... This way you'll have the right count everytime...
+							//Find the MAX count of all the rows that are there... 
+							//This way you'll have the right count everytime...
 							FPRINTF( "Checking level[n+1] table " );	
 
 							//Get a count of the number of elements in the parent.
@@ -277,15 +289,8 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 								blen += numlen;
 								memcpy( &bbuf[ blen ], p, alen );
 								blen += alen;
-								hash = lt_get_long_i(t, bbuf, blen ); 
-#if 0
-							#ifdef DEBUG_H
-								//DEBUG: See the string to check for...	
-fprintf(stderr, "%s:%d - Why is hash wrong? - hash is: %d - ", __FILE__, __LINE__, hash );
-								write( 2, "\t\t'", 3 ); write( 2, bbuf, blen ); write( 2, "'", 1 );
-getchar();
-							#endif
-#endif
+								hash = lt_get_long_i(t, bbuf, blen );
+
 								//Check for the hash
 								int *h = malloc( sizeof(int) );
 								memcpy( h, &hash, sizeof(int) );
@@ -315,7 +320,7 @@ getchar();
 							np->pos = 0;
 							np->len = alen;
 							np->text = p; 
-							add_item( &pp, np, struct parent, &pplen );
+							add_item( &pp, np, struct parent *, &pplen );
 							INSIDE++;
 						}
 					}
@@ -327,11 +332,7 @@ getchar();
 						if ( !INSIDE )
 							;
 						else if ( pplen == INSIDE ) {
-							struct parent **f = &pp[ pplen - 1 ];
-fprintf( stderr, "List: %p %ld\n", f, sizeof( f ) );
-fprintf( stderr, "List: %p %ld\n", *f, sizeof( *f ) );
-fprintf( stderr, "List: %ld\n", sizeof( **f ) );
-							//free( pp[ pplen - 1 ] );
+							free( pp[ pplen - 1 ] );
 							pplen--;
 							INSIDE--;
 						}
@@ -366,14 +367,6 @@ fprintf( stderr, "List: %ld\n", sizeof( **f ) );
 									//TODO: Replace me with copy_int or a general copy_ macro
 									//Check for this hash, save each and dump the list...
 									int hh = lt_get_long_i( t, tr, trlen ); 
-#if 0
-							#ifdef DEBUG_H
-								//DEBUG: See the string to check for...	
-fprintf(stderr, "%s:%d - Why is hash wrong? - hash is: %d - ", __FILE__, __LINE__, hh );
-								write( 2, "\t\t'", 3 ); write( 2, tr, trlen ); write( 2, "'", 1 );
-getchar();
-							#endif
-#endif
 									int *h = malloc( sizeof(int) );
 									memcpy( h, &hh, sizeof(int) );	
 									add_item( &rp->hashList, h, int *, &hashListLen ); 
@@ -410,7 +403,7 @@ getchar();
 					}
 				}
 
-				add_item( &rr, rp, struct map, &rrlen );
+				add_item( &rr, rp, struct map *, &rrlen );
 			}
 		}
 		else {
@@ -426,26 +419,16 @@ getchar();
 		
 				//Set defaults
 				rp->len = r.size;	
-				//rp->hash = -2;
 				rp->action = RAW;
 				rp->hashList = NULL;
 				rp->ptr = (uint8_t *)&src[ r.pos ];	
 				
 				//Save a new record
-				add_item( &rr, rp, struct map, &rrlen );
+				add_item( &rr, rp, struct map *, &rrlen );
 			}	
 		}
 	}
 
-
-
-fprintf( stderr, "Parent list:\n" );
-while ( pp && *pp ) {
-	fprintf( stderr, "%p\n", *pp );
-	pp++;
-}
-exit(0);
-	//*elen = rrlen;
 	return rr;
 }
 
@@ -490,17 +473,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 
 		if ( item->action == RAW || item->action == EXECUTE ) {
 			FPRINTF( "%-20s, len: %3d", "RAW", item->len );
-#if 1
 			append_to_uint8t( &block, &blockLen, item->ptr, item->len );
-#else
-			blockLen += item->len;
-			if ( (block = realloc( block, blockLen )) == NULL ) {
-				//NOTE: Teardown properly or you will cry...
-				return NULL;
-			}
-			//If I do a memset, where at?
-			memcpy( &block[ blockLen - item->len ], item->ptr, item->len ); 
-#endif
 		}
 		else if ( item->action == SIMPLE_EXTRACT ) {
 			FPRINTF( "%-20s, len: %3d ", "SIMPLE_EXTRACT", item->len );
@@ -509,17 +482,6 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 				//Get the type and length
 				if ( ( hash = **item->hashList ) > -1 ) {
 					LiteKv *lt = lt_retkv( t, hash );
-#if 0
-				#ifdef DEBUG
-					fprintf( stderr, ", WHAT IS THIS: %p = ", lt ); 
-					if ( lt->value.type == LITE_INT ) {
-						fprintf( stderr, " %d", lt->value.v.vint );
-					}
-					else if ( lt->value.type == LITE_TXT ) {
-						fprintf( stderr, " %s", lt->value.v.vchar );
-					}
-				#endif
-#endif
 					//NOTE: At this step, nobody should care about types that much...
 					char *ptr = NULL;
 					char nbuf[64] = {0};
@@ -537,15 +499,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 						return NULL;
 					}
 
-#if 1
 					append_to_uint8t( &block, &blockLen, (uint8_t *)ptr, itemlen );
-#else
-					blockLen += itemlen;
-					if ( (block = realloc( block, blockLen )) == NULL ) {
-						return NULL;
-					}
-					memcpy( &block[ blockLen - itemlen ], ptr, itemlen ); 
-#endif
 				}
 				item->hashList++;
 			}
@@ -579,7 +533,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 					//Get the type and length
 					if ( ( hash = **item->hashList ) > -1 ) {
 						LiteKv *lt = lt_retkv( t, hash );
-						fprintf( stderr, ", WHAT IS THIS: %p => %s\n", lt, lt_typename( lt->value.type ) ); 
+						//fprintf( stderr, ", WHAT IS THIS: %p => %s\n", lt, lt_typename( lt->value.type ) ); 
 						//NOTE: At this step, nobody should care about types that much...
 						uint8_t *ptr = NULL, nbuf[ 64 ] = { 0 };
 						int itemlen = 0;
@@ -609,15 +563,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 						}
 #endif
 
-#if 1
 						append_to_uint8t( &block, &blockLen, ptr, itemlen );
-#else
-						blockLen += itemlen;
-						if ( (block = realloc( block, blockLen )) == NULL ) {
-							return NULL;
-						}
-						memcpy( &block[ blockLen - itemlen ], ptr, itemlen );
-#endif
 					}
 					item->hashList++;
 				}
