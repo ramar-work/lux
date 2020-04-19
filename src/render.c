@@ -458,13 +458,13 @@ uint8_t **extract_table_value ( LiteKv *lt, uint8_t **ptr, int *len, uint8_t *tm
 	return ptr;
 }
 
+struct dep { struct map **index; int current, childCount; };
 
 uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 	//Start the writes, by using the structure as is
 	uint8_t *block = NULL;
 	int blockLen = 0;
-	//struct dep { int index, current, childCount; } depths[100] = { { 0, 0, 0 } };
-	struct dep { struct map **index; int current, childCount; } depths[100] = { { 0, 0, 0 } };
+	struct dep depths[100] = { { 0, 0, 0 } };
 	struct dep *d = depths;
 
 	//for ( int i = 0; i < elen; i++ ) {
@@ -485,9 +485,13 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 				if ( ( hash = **item->hashList ) > -1 ) {
 					LiteKv *lt = lt_retkv( t, hash );
 					//NOTE: At this step, nobody should care about types that much...
-					char *ptr = NULL;
-					char nbuf[64] = {0};
+					uint8_t *ptr = NULL, nbuf[64] = {0};
 					int itemlen = 0;
+#if 1
+					if ( !extract_table_value( lt, &ptr, &itemlen, nbuf, sizeof(nbuf) ) ) {
+						//What happens
+					}
+#else
 					if ( lt->value.type == LITE_TXT ) {
 						itemlen = strlen( lt->value.v.vchar ); 
 						ptr = lt->value.v.vchar;
@@ -500,8 +504,9 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 						//This is a totally different situation...
 						return NULL;
 					}
-
+#endif
 					append_to_uint8t( &block, &blockLen, (uint8_t *)ptr, itemlen );
+					//free( ptr );
 				}
 				item->hashList++;
 			}
@@ -528,14 +533,13 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 			else if ( item->action == COMPLEX_EXTRACT ) {
 				FPRINTF( "%-20s", "COMPLEX_EXTRACT " );
 				//rip me out, i am idential to SIMPLE_EXTRACT'S ROUTINE
-#if 1
 				if ( item->hashList ) {
 					//If there is a pointer, it does not move until I get through all three
-					FPRINTF( "%d", **item->hashList );
+					FPRINTF( "List?: %d", **item->hashList );
+					int **list = item->hashList;
 					//Get the type and length
 					if ( ( hash = **item->hashList ) > -1 ) {
 						LiteKv *lt = lt_retkv( t, hash );
-						//fprintf( stderr, ", WHAT IS THIS: %p => %s\n", lt, lt_typename( lt->value.type ) ); 
 						//NOTE: At this step, nobody should care about types that much...
 						uint8_t *ptr = NULL, nbuf[ 64 ] = { 0 };
 						int itemlen = 0;
@@ -569,7 +573,6 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 					}
 					item->hashList++;
 				}
-#endif
 			}
 		}
 		fprintf( stderr, "%d, \n", blockLen );
@@ -595,17 +598,17 @@ uint8_t *table_to_uint8t ( Table *t, const uint8_t *src, int srclen, int *newlen
 	if ( !( map = table_to_map( t, src, srclen ) ) ) {
 		return NULL;
 	}
-#if 0
+
+#if 1
 	//See the map 
-	//print_render_table( map );
+	print_render_table( map );
 
 	//Do the map	
 	if ( !( block = map_to_uint8t( t, map, &blocklen ) ) ) {
-//fprintf( stderr, "%s:%d block len is: %d.\n", __FILE__, __LINE__, blocklen );
-//fprintf( stderr, "%s:%d map_to_uint8t failed.\n", __FILE__, __LINE__ );
 		return NULL;
 	}
 #endif
+
 	//Free the map
 	destroy_render_table( map );
 	*newlen = blocklen;
