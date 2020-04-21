@@ -11,6 +11,7 @@ struct config {
 	const char *path;
 	const char *root_default;
 	struct route **routes;
+	struct host **hosts;
 #if 1
 	//Questionable as to whether or not I'll need these...
 	void *ssl;
@@ -30,6 +31,7 @@ struct host {
 	char *alias;
 	char *dir;	
 	char *filter;	
+	char *root_default;	
 };
 
 static const int BD_VIEW = 41;

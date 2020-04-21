@@ -5,6 +5,6 @@
 #ifndef FILTER_DIR_H
 #define FILTER_DIR_H
 
-int filter_dir ( struct HTTPBody *, struct HTTPBody *, void * );
+int filter_dirent ( struct HTTPBody *, struct HTTPBody *, void * );
 
 #endif

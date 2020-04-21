@@ -1,7 +1,7 @@
-#include "filter-dir.h"
+#include "filter-dirent.h"
 /*dirent.c - a directory handler*/
-int filter_dir (HTTP *h, Table *env)
-{
+int filter_dirent ( struct HTTPBody *req, struct HTTPBody *res, void *p ) {
+#if 0
 	char path[PATHLEN] = {0};
 	struct dirent *dir = NULL;
 	struct stat st;
@@ -97,5 +97,6 @@ int filter_dir (HTTP *h, Table *env)
 
 	//Free everything
 	//render_free( &r );
+#endif
 	return 1;
 }

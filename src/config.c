@@ -56,7 +56,7 @@ void *get_key ( Table *t, const char *key ) {
 	return NULL;
 }
 
-
+#if 0
 int hosts_table_iterator ( LiteKv *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct host ***hosts = f->userdata;
@@ -82,7 +82,7 @@ int hosts_table_iterator ( LiteKv *kv, int i, void *p ) {
 	fprintf( stderr, "\n" );
 	return 1;
 }
-
+#endif
 
 //possily a better way to handle these might be a weird const char ** hack
 //char[0] could be the type (since for now there are only a few)
@@ -103,6 +103,7 @@ int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 		"alias" \
 		"dir" \
 		"filter" \
+		"root_default" \
 		"hosts" \
 	;
 
@@ -115,7 +116,7 @@ int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 		else if ( !memstr( keysstr, name = kv->key.v.vchar, strlen( keysstr ) ) ) { 
 			struct host * host = malloc( sizeof( struct host ) );
 			memset( host, 0, sizeof( struct host ) );
-			host->name = kv->key.v.vchar; 
+			host->name = strdup( kv->key.v.vchar ); 
 			add_item( hosts, host, struct host *, rlen );
 		}
 	}
@@ -126,9 +127,10 @@ int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 	else if ( kv->value.type == LITE_TXT && kv->key.type == LITE_TXT ) { 
 		struct host *host = (*hosts)[ (*rlen) - 1 ];
 		char *key = kv->key.v.vchar;
-		strcmp( key, "dir" ) == 0 ? host->dir = kv->value.v.vchar : 0;
-		strcmp( key, "alias" ) == 0 ? host->alias = kv->value.v.vchar : 0 ;
-		strcmp( key, "filter" ) == 0 ? host->filter = kv->value.v.vchar : 0;
+		strcmp( key, "dir" ) == 0 ? host->dir = strdup( kv->value.v.vchar ) : 0;
+		strcmp( key, "alias" ) == 0 ? host->alias = strdup( kv->value.v.vchar ) : 0 ;
+		strcmp( key, "root_default" ) == 0 ? host->root_default = strdup( kv->value.v.vchar ) : 0 ;
+		strcmp( key, "filter" ) == 0 ? host->filter = strdup( kv->value.v.vchar ) : 0;
 	}
 	return 1;
 }

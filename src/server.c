@@ -12,6 +12,35 @@
 #include "ssl.h"
 
 #include "filter-static.h"
+#include "filter-dirent.h"
+#include "filter-echo.h"
+#include "filter-lua.h"
+#include "filter-c.h"
+
+struct filter {
+	const char *name;
+	int (*filter)( struct HTTPBody *, struct HTTPBody *, void * );
+};
+
+struct senderrecvr { 
+	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
+	int (*proc)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	int (*write)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	int (*pre)( int, struct HTTPBody *, struct HTTPBody *, void * );
+	int (*post)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	void *readf;
+	void *writef;
+}; 
+
+struct filter filters[] = {
+	{ "static", filter_static }
+, { "dirent", filter_dirent }
+, { "echo", filter_echo }
+, { "lua", filter_lua }
+, { "c", filter_c }
+, { NULL }
+};
+
 
 extern const char http_200_custom[];
 extern const char http_200_fixed[];
@@ -23,6 +52,7 @@ extern const char http_500_fixed[];
 const int defport = 2000;
 int arg_verbose = 0;
 int arg_debug = 0;
+
 
 //send (sends a message, may take many times)
 int t_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
@@ -73,13 +103,14 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 		memset( buf2, 0, size );
 
 		//Read functions...
-		if ( !sess )
+		if ( !sess ) {
 			rd = recv( fd, buf2, size, MSG_DONTWAIT );
+		}
 		else {
 			gnutls_session_t *ss = (gnutls_session_t *)sess;
-			rd = gnutls_record_recv( *ss, buf2, size );
-			if ( rd > 0 ) 
+			if ( ( rd = gnutls_record_recv( *ss, buf2, size ) ) > 0 ) {
 				fprintf(stderr, "SSL might be fine... got %d from gnutls_record_recv\n", rd );
+			}
 			else if ( rd == GNUTLS_E_REHANDSHAKE ) {
 				fprintf(stderr, "SSL got handshake reauth request..." );
 				//TODO: There should be a seperate function that handles this.
@@ -427,57 +458,167 @@ int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 }
 
 
+struct host * find_host ( struct host **hosts, char *hostname ) {
+	char host[ 2048 ] = { 0 };
+	int pos = memchrat( hostname, ':', strlen( hostname ) );
+	memcpy( host, hostname, ( pos > -1 ) ? pos : strlen(hostname) );
+FPRINTF( "selected hostname: %s\n", host );
+	while ( hosts && *hosts ) {
+		struct host *req = *hosts;
+FPRINTF( "hostname: %s\n", req->name );
+		if ( req->name && strcmp( req->name, host ) == 0 )  {
+			return req;	
+		}
+		if ( req->alias && strcmp( req->alias, host ) == 0 ) {
+			return req;	
+		}
+		hosts++;
+	}
+	return NULL;
+} 
 
-int h_proc ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
-	char err[2048] = {0};
+
+struct filter * check_filter ( struct filter *filters, char *name ) {
+	while ( filters ) {
+		struct filter *f = filters;
+		if ( f->name && strcmp( f->name, name ) == 0 ) {
+			return f;
+		}
+		filters++;
+	}
+	return NULL;
+}
+
+
+//Need to throw lots in here...
+struct config * build_config ( char *err, int errlen ) {
+
+	const char *funct = "build_config";
+	struct config *config = NULL; 
 	lua_State *L = luaL_newstate();
 	Table *t = NULL;
-	memset( req, 0, sizeof(struct HTTPBody) );
+
+	if ( ( config = malloc( sizeof ( struct config ) ) ) == NULL ) {
+		snprintf( err, errlen, "Could not initialize memory at %s", funct );
+		return NULL;
+	}
 
 	//After this conversion takes place, destroy the environment
 	if ( !lua_exec_file( L, "www/config.lua", err, sizeof(err) ) ) {
+		goto freeres;
+		return NULL;
+	}
+
+	//Allocate a table for the configuration
+	if ( !(t = malloc(sizeof(Table))) || !lt_init( t, NULL, 2048 ) ) {
+		snprintf( err, errlen, "Could not initialize Table at %s\n", funct );
+		goto freeres;
+		return NULL;
+	}
+
+	//Convert configuration into a table
+	if ( !lua_to_table( L, 1, t ) ) {
+		snprintf( err, errlen, "Failed to convert Lua config data to table.\n" );
+		goto freeres;
+		return NULL;
+	}
+
+	//Build hosts
+	if ( ( config->hosts = build_hosts( t ) ) == NULL ) {
+		//Build hosts fails with null, I think...
+		snprintf( err, errlen, "Failed to bulid hosts table.\n" );
+		goto freeres;
+		return NULL;
+	}
+#if 0
+	//This is the global root default
+	if ( ( config->root_default = get_char_value( t, "root_default" ) ) ) {
+		config->root_default = strdup( config->root_default );
+	} 
+#endif
+freeres:
+	//Destroy lua_State and the tables...
+	lt_free( t );
+	free( t );
+	//free lua_State
+	return config;
+}
+
+
+
+int check_dir ( struct host *host, char *err, int errlen ) {
+	//Check that log dir is accessible and writeable (or exists) - send 500 if not 
+	struct stat sb;
+	if ( !host->dir ) {
+		snprintf( err, errlen, "Directory for host '%s' does not exist.", host->name );
+		return 0;
+	}
+
+	//This check belongs within the filter...	
+	if ( stat( host->dir, &sb ) == -1 ) {
+		const char *fmt = "Log directory for host '%s' not accessible: %s.";
+		snprintf( err, errlen, fmt, host->dir, strerror(errno) );
+		return 0;
+	}
+
+	if ( access( host->dir, W_OK ) == -1 ) {
+		const char *fmt = "Log directory for host '%s' not writeable: %s.";
+		snprintf( err, errlen, fmt, host->name, strerror(errno) );
+		return 0;
+	}
+	return 1;
+}
+
+
+int h_proc ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
+	char err[2048] = {0};
+	Table *t = NULL;
+	struct host *host = NULL;
+	struct config *config = NULL;
+	struct filter *filter = NULL;
+
+	//With no default host, throw this 
+	if ( !req->host ) {
+		char *e = "No host header specified.";
+		FPRINTF( e );
 		return http_set_error( res, 500, err ); 
 	}
 
-	if ( !(t = malloc(sizeof(Table))) || !lt_init( t, NULL, 2048 ) ) {
-		snprintf( err, sizeof(err), "%s\n", "Could not initialize memory at h_proc" );
+	if (( config = build_config( err, sizeof(err) )) == NULL ) {
+		return http_set_error( res, 500, err );
+	}  
+
+	if ( !( host = find_host( config->hosts, req->host ) ) ) {
+		snprintf( err, sizeof(err), "Could not find host '%s'.", req->host );
+		return http_set_error( res, 404, err ); 
+	}
+
+	if ( !( filter = check_filter( filters, !host->filter ? "static" : host->filter ) ) ) {
+		snprintf( err, sizeof( err ), "Filter '%s' not supported", host->filter );
 		return http_set_error( res, 500, err ); 
+	}
+
+	if ( host->dir && !check_dir( host, err, sizeof(err) ) ) {
+		return http_set_error( res, 500, err ); 
+	}
+
+	FPRINTF( "Root default of host '%s' is: %s\n", host->name, host->root_default );
+	//Finally, now we can evalute the filter and the route.
+	if ( !filter->filter( req, res, host ) ) {
+		return 0;
 	}
 
 #if 1
-	//Check that server supports host - send 404 if not
-	//build_hosts_list	
-
-	//Check filter - send 500 if not there or if not supported
-	//?
-
-	//Get the host's table... then 
-
-	// - Check that log dir is writeable - send 500 if not
-
-	// - Check that the requested dir is readable - send 500 if not
-
-	// - Populate any data structures that may be needed
-#else
-	if ( req->host && strcmp( req->host, "machine.com" ) ) == 0 ) {
-		
-	}   
-#endif
-
-#if 0
-	// Run the filter...
-	// filter( req, res, userdata );
-#else
 	char *msg = strdup( "All is well." );
 	http_set_status( res, 200 );
 	http_set_ctype( res, strdup( "text/html" ));
 	http_set_content_text( res, msg );
-#endif
 	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
-		fprintf( stderr, "%s\n", err );
+		fprintf( stderr, "[%s:%d] %s\n", __FILE__, __LINE__, err );
 		http_set_error( res, 500, err ); 
 		return 0;
 	}
+#endif
 	return 1;
 }
 
@@ -525,20 +666,11 @@ struct values {
 	char *user;
 }; 
 
-struct senderrecvr { 
-	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
-	int (*proc)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
-	int (*write)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
-	int (*pre)( int, struct HTTPBody *, struct HTTPBody *, void * );
-	int (*post)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
-	void *readf;
-	void *writef;
-} sr[] = {
+struct senderrecvr sr[] = {
 	{ h_read, h_proc, h_write }
 , { t_read, NULL, t_write  }
 ,	{ NULL }
 };
-
 
 
 int help () {
@@ -864,7 +996,7 @@ int main (int argc, char *argv[]) {
 				//...
 			}
 
-//fprintf( stderr, "msg & mlen: " ); write( 2, rs.msg, rs.mlen ); getchar();
+//FPRINTF("PROC RAN..., Status was: %d", status );FPRINTF( "msg & mlen: " ); write( 2, rs.msg, rs.mlen ); getchar();
 
 			//Write a new message	
 		#if 0
