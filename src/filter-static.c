@@ -25,11 +25,9 @@ int check_static_prefix( const char *path, const char *prefix ) {
 	if ( !path || !prefix || strlen(path) < strlen(prefix) ) { 
 		return 0;
 	}
-
 	if ( memcmp( prefix, ++path, strlen( prefix ) ) != 0 ) {
 		return 0;
 	} 
-
 	return 1;
 }
 
@@ -88,14 +86,14 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	}
 
 	//Allocate a buffer
-	if ( !( content = malloc( ++sb.st_size ) ) || !memset( content, 0, sb.st_size ) ) {
+	if ( !( content = malloc( sb.st_size ) ) || !memset( content, 0, sb.st_size ) ) {
 		const char fmt[] = "Could not allocate space for file: %s\n";
 		snprintf( err, sizeof( err ), fmt, strerror( errno ) );
 		return http_set_error( rs, 500, err );
 	}
 
 	//Read the entire file into memory, b/c we'll probably have space 
-	if ( ( size = read( fd, content, sb.st_size - 1 )) == -1 ) {
+	if ( ( size = read( fd, content, sb.st_size )) == -1 ) {
 		const char fmt[] = "Could not read all of file %s: %s.";
 		snprintf( err, sizeof( err ), fmt, fpath, strerror( errno ) );
 		free( content );
@@ -114,11 +112,12 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	http_set_status( rs, 200 );
 	http_set_ctype( rs, mimetype );
 	http_set_content( rs, content, size ); 
+
 	if ( !http_finalize_response( rs, err, sizeof( err ) ) ) {
 		free( content );
 		return http_set_error( rs, 500, err );
 	}
 
-	free( content );
+	//free( content );
 	return 1;
 }

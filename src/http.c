@@ -580,23 +580,6 @@ struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, i
 	char http_header_buf[ 2048 ] = { 0 };
 	char http_header_fmt[] = "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n";
 
-	#if 0
-	fprintf( stderr, "%p\n", entity );
-	fprintf( stderr, "headerlist: %p\n", entity->headers );
-	if ( entity->headers && entity->headers[0] ) {
-		fprintf( stderr, "header (1e): %p %p\n", entity->headers[0], *(entity->headers) );
-		fprintf( stderr, "size: %d\n", (*entity->headers)->size );
-		fprintf( stderr, "value: %p\n", (*entity->headers)->value );
-	}
-
-	fprintf( stderr, "bodylist:   %p\n", entity->body );
-	if ( entity->body && (*entity->body) ) {
-		fprintf( stderr, "body (1e): %p %p\n", entity->body[0], *(entity->body) );
-		fprintf( stderr, "%d\n", (*entity->body)->size );
-		fprintf( stderr, "%p\n", (*entity->body)->value );
-	}
-	#endif
-
 	if ( !entity->headers && !entity->body ) {
 		snprintf( err, errlen, "%s", "No headers or body specified with response." );
 		return NULL;
@@ -647,10 +630,18 @@ struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, i
 		return NULL;
 	}
 
-	if ( !append_to_uint8t( &msg, &msglen, (*entity->body)->value, (*entity->body)->size ) ) {
+#if 1
+	int esize = (*entity->body)->size;
+FPRINTF( "ENTITY WRITE: %p %d\n", (*entity->body)->value, esize );
+	for ( int i=0; i < esize; i++ ) {
+FPRINTF( "ENTITY: %2c\n", (*entity->body)->value[ i ] );
+	}
+
+	if ( !append_to_uint8t( &msg, &msglen, (*entity->body)->value, esize ) ) {
 		snprintf( err, errlen, "%s", "Could not add content to message." );
 		return NULL;
 	}
+#endif
 
 	entity->msg = msg;
 	entity->mlen = msglen;

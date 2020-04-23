@@ -608,7 +608,10 @@ int h_proc ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 		return 0;
 	}
 
-#if 1
+	//print_httpbody( res );	
+	//The thing needs to be freed 
+
+#if 0
 	char *msg = strdup( "All is well." );
 	http_set_status( res, 200 );
 	http_set_ctype( res, strdup( "text/html" ));
@@ -750,6 +753,10 @@ int main (int argc, char *argv[]) {
 
 	//Set all of the socket stuff
 	struct sockAbstr su;
+#if 1
+	int *port = !values.port ? (int *)&defport : &values.port;
+	populate_tcp_socket( &su, port );
+#else
 	su.addrsize = sizeof(struct sockaddr);
 	su.buffersize = 1024;
 	su.opened = 0;
@@ -761,6 +768,7 @@ int main (int argc, char *argv[]) {
 	su.reuse = SO_REUSEADDR;
 	su.port = !values.port ? (int *)&defport : &values.port;
 	su.ssl_ctx = NULL;
+#endif
 
 	if ( arg_debug ) {
 		print_socket( &su ); 
@@ -996,8 +1004,6 @@ int main (int argc, char *argv[]) {
 				//...
 			}
 
-//FPRINTF("PROC RAN..., Status was: %d", status );FPRINTF( "msg & mlen: " ); write( 2, rs.msg, rs.mlen ); getchar();
-
 			//Write a new message	
 		#if 0
 			if (( status = f->write( fd, &rq, &rs, &session )) == -1 ) {
@@ -1006,6 +1012,9 @@ int main (int argc, char *argv[]) {
 		#endif
 				//...
 			}
+
+			//Free this and close the file
+			http_free_body( &rs );
 
 			if ( close( fd ) == -1 ) {
 				fprintf( stderr, "Couldn't close child socket. %s\n", strerror(errno) );

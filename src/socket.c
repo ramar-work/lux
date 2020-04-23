@@ -134,19 +134,17 @@ void print_socket ( struct sockAbstr *sa ) {
 }
 
 
-struct sockAbstr * populate_socket ( struct sockAbstr *sa ) {
+struct sockAbstr * populate_socket ( struct sockAbstr *sa, int protocol, int socktype, int *port ) {
 	sa->addrsize = sizeof(struct sockaddr);
 	sa->buffersize = 1024;
 	sa->opened = 0;
 	sa->backlog = 500;
 	sa->waittime = 5000;
-	sa->protocol = IPPROTO_TCP;
-	sa->socktype = SOCK_STREAM;
-	//sa->protocol = IPPROTO_UDP;
-	//sa->sockettype = SOCK_DGRAM;
+	sa->protocol = protocol;
+	sa->socktype = socktype;
 	sa->iptype = PF_INET;
 	sa->reuse = SO_REUSEADDR;
-	//sa->port = !values.port ? (int *)&defport : &values.port;
+	sa->port = port;
 	sa->ssl_ctx = NULL;
 	return sa;
 }
