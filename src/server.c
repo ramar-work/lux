@@ -1,6 +1,5 @@
 /*let's try this again.  It seems never to work like it should...*/
 #include "../vendor/single.h"
-#include <gnutls/gnutls.h>
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -411,23 +410,36 @@ int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	int try = 0;
 
 	while ( 1 ) { 
+		FPRINTF( "Attempting to send %d bytes.", total );
 		if (( sent = send( fd, &rs->msg[ pos ], total, MSG_DONTWAIT )) == -1 ) {
 			if ( errno == EBADF )
 				0; //TODO: Can't close a most-likely closed socket.  What do you do?
-			else if ( errno == ECONNREFUSED )
-				close(fd);
-			else if ( errno == EFAULT )
-				close(fd);
-			else if ( errno == EINTR )
-				close(fd);
-			else if ( errno == EINVAL )
-				close(fd);
-			else if ( errno == ENOMEM )
-				close(fd);
-			else if ( errno == ENOTCONN )
-				close(fd);
-			else if ( errno == ENOTSOCK )
-				close(fd);
+			else if ( errno == ECONNREFUSED ) {
+				FPRINTF( "Connection refused." );
+				return -1;//close(fd);
+			}
+			else if ( errno == EFAULT ) {
+				FPRINTF( "EFAULT." );
+				return -1;//close(fd);
+			}
+			else if ( errno == EINTR ) {
+				FPRINTF( "EINTR." );
+				return -1;//close(fd);
+			}
+			else if ( errno == EINVAL ) {
+				FPRINTF( "EINVAL." );
+				return -1;//close(fd);
+			}
+			else if ( errno == ENOMEM ) {
+				FPRINTF( "Out of memory." );
+				return -1;//close(fd);
+			}
+			else if ( errno == ENOTCONN ) {
+				return -1;//close(fd);
+			}
+			else if ( errno == ENOTSOCK ) {
+				return -1;//close(fd);
+			}
 			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				if ( ++try == 2 ) {
 				 #ifdef HTTP_VERBOSE
@@ -445,8 +457,10 @@ int h_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 				//this would just be some uncaught condition...
 			}
 		}
+		else if ( total == 0 ) {
+			break;
+		}
 		else if ( sent == 0 ) {
-
 		}
 		else {
 			//continue resending...
@@ -540,8 +554,25 @@ freeres:
 	//Destroy lua_State and the tables...
 	lt_free( t );
 	free( t );
-	//free lua_State
+	lua_close( L );
 	return config;
+}
+
+
+void free_config( struct config *config ) {
+	struct host **hosts = config->hosts;
+	while ( hosts && *hosts ) {
+		struct host *h = *hosts;
+		( h->name ) ? free( h->name ) : 0;
+		( h->alias ) ? free( h->alias ) : 0 ;
+		( h->dir ) ? free( h->dir ) : 0;
+		( h->filter ) ? free( h->filter ) : 0 ;
+		( h->root_default ) ? free( h->root_default ) : 0;
+		free( h );
+		hosts++;
+	}
+	free( config->hosts );
+	free( config );
 }
 
 
@@ -610,6 +641,7 @@ int h_proc ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 
 	//print_httpbody( res );	
 	//The thing needs to be freed 
+	free_config( config );
 
 #if 0
 	char *msg = strdup( "All is well." );
@@ -703,12 +735,6 @@ void print_options ( struct values *v ) {
 
 
 
-const char *fqdn[] = {
-	"localhost",
-	NULL
-};
-
-
 int main (int argc, char *argv[]) {
 	struct values values = { 0 };
 	char err[ 2048 ] = { 0 };
@@ -753,108 +779,24 @@ int main (int argc, char *argv[]) {
 
 	//Set all of the socket stuff
 	struct sockAbstr su;
-#if 1
 	int *port = !values.port ? (int *)&defport : &values.port;
 	populate_tcp_socket( &su, port );
-#else
-	su.addrsize = sizeof(struct sockaddr);
-	su.buffersize = 1024;
-	su.opened = 0;
-	su.backlog = 500;
-	su.waittime = 5000;
-	su.protocol = IPPROTO_TCP; // || IPPROTO_UDP
-	su.socktype = SOCK_STREAM; // || SOCK_DGRAM
-	su.iptype = PF_INET;
-	su.reuse = SO_REUSEADDR;
-	su.port = !values.port ? (int *)&defport : &values.port;
-	su.ssl_ctx = NULL;
-#endif
 
 	if ( arg_debug ) {
 		print_socket( &su ); 
 	}
 
-#if 1
 	if ( !open_listening_socket( &su, err, sizeof(err) ) ) {
 		fprintf( stderr, "%s\n", err );
 		close_listening_socket( &su, err, sizeof(err) );
 		return 0;
 	}
-#else
-	//Create the socket body
-	struct sockaddr_in t;
-	memset( &t, 0, sizeof( struct sockaddr_in ) );
-	struct sockaddr_in *sa = &t;
-	sa->sin_family = su.iptype; 
-	sa->sin_port = htons( *su.port );
-	(&sa->sin_addr)->s_addr = htonl( INADDR_ANY );
-
-	//Open the socket (non-blocking, preferably)
-	int status;
-	if (( su.fd = socket( su.iptype, su.socktype, su.protocol )) == -1 ) {
-		fprintf( stderr, "Couldn't open socket! Error: %s\n", strerror( errno ) );
-		return 0;
-	}
-
-	#if 0
-	//Set timeout, reusable bit and any other options 
-	struct timespec to = { .tv_sec = 2 };
-	if ( setsockopt(su.fd, SOL_SOCKET, SO_REUSEADDR, &to, sizeof(to)) == -1 ) {
-		// su.free(sock);
-		su.err = errno;
-		return (0, "Could not reopen socket.");
-	}
-	#endif
-	if ( fcntl( su.fd, F_SETFD, O_NONBLOCK ) == -1 ) {
-		fprintf( stderr, "fcntl error: %s\n", strerror(errno) ); 
-		return 0;
-	}
-
-	if (( status = bind( su.fd, (struct sockaddr *)&t, sizeof(struct sockaddr_in))) == -1 ) {
-		fprintf( stderr, "Couldn't bind socket to address! Error: %s\n", strerror( errno ) );
-		return 0;
-	}
-
-	if (( status = listen( su.fd, su.backlog) ) == -1 ) {
-		fprintf( stderr, "Couldn't listen for connections! Error: %s\n", strerror( errno ) );
-		return 0;
-	}
-
-	//Mark open flag.
-	su.opened = 1;
-#endif
 
 	//Handle SSL here
-	#if 0 
-	gnutls_certificate_credentials_t x509_cred = NULL;
-  gnutls_priority_t priority_cache;
-	const char *cafile, *crlfile, *certfile, *keyfile;
 	#if 0
-	cafile = 
-	crlfile = 
-	#endif
-	#if 0
-	//These should always be loaded, and there will almost always be a series
-	certfile = 
-	keyfile = 
-	#else
-#define MPATH "/home/ramar/prj/hypno/certs/collinsdesign.net"
-	//Hardcode these for now.
-	certfile = MPATH "/collinsdesign_net.crt";
-	keyfile = MPATH "/server.key";
-	#endif
-	//Obviously, this is great for debugging TLS errors...
-	//gnutls_global_set_log_function( tls_log_func );
-	gnutls_global_init();
-	gnutls_certificate_allocate_credentials( &x509_cred );
-	//find the certificate authority to use
-	//gnutls_certificate_set_x509_trust_file( x509_cred, cafile, GNUTLS_X509_FMT_PEM );
-	//is this for password-protected cert files? I'm so lost...
-	//gnutls_certificate_set_x509_crl_file( x509_cred, crlfile, GNUTLS_X509_FMT_PEM );
-	//this ought to work with server.key and certfile
-	gnutls_certificate_set_x509_key_file( x509_cred, certfile, keyfile, GNUTLS_X509_FMT_PEM );
-	//gnutls_certificate_set_ocsp_status_request( x509_cred, OCSP_STATUS_FiLE, 0 );
-	gnutls_priority_init( &priority_cache, NULL, NULL );
+	struct gnutls_abstr g;
+	open_ssl_context( &g );
+	//Initialize SSL?
 	#endif
 
 	//If I could open a socket and listen successfully, then write the PID
@@ -917,14 +859,17 @@ int main (int argc, char *argv[]) {
 		}
 	#endif
 
+	#if 1
 		//Dump the client info and the child fd
 		if ( 1 ) {
 			struct sockaddr_in *cin = (struct sockaddr_in *)&addrinfo;
 			char *ip = inet_ntoa( cin->sin_addr );
 			fprintf( stderr, "Got request from: %s on new file: %d\n", ip, fd );	
 		}
+		//Logging happens here...
+	#endif
 
-
+	#if 0
 		//Fork and go crazy
 		pid_t cpid = fork();
 		if ( cpid == -1 ) {
@@ -940,43 +885,8 @@ int main (int argc, char *argv[]) {
 			}
 		}
 		else if ( cpid ) {
-			//TODO: Somewhere in here, a signal needs to run that allows this thing to die.
-			//TODO: Handle read and write errno cases 
-			#if 0
-			//SSL again
-			gnutls_session_t session, *sptr = NULL;
-			if ( values.ssl ) {
-				gnutls_init( &session, GNUTLS_SERVER );
-				gnutls_priority_set( session, priority_cache );
-				gnutls_credentials_set( session, GNUTLS_CRD_CERTIFICATE, x509_cred );
-				//NOTE: I need to do this b/c clients aren't expected to send a certificate with their request
-				gnutls_certificate_server_set_request( session, GNUTLS_CERT_IGNORE ); 
-				gnutls_handshake_set_timeout( session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT ); 
-				//Bind the current file descriptor to GnuTLS instance.
-				gnutls_transport_set_int( session, fd );
-				//Do the handshake here
-				//TODO: I write nothing that looks like this, please refactor it...
-				int success = 0;
-				do {
-					success = gnutls_handshake( session );
-				} while ( success == GNUTLS_E_AGAIN || success == GNUTLS_E_INTERRUPTED );	
-				if ( success < 0 ) {
-					close( fd );
-					gnutls_deinit( session );
-					//TODO: Log all handshake failures.  Still don't know where.
-					fprintf( stderr, "%s\n", "SSL handshake failed." );
-					continue;
-				}
-				fprintf( stderr, "%s\n", "SSL handshake successful." );
-				sptr = &session;
-			}
-			#endif
-
-			//Somewhere in here, I'll have to find routes, parse conf, etc
-			//
-			//What site is this asking for? (Host header)
-			//Where is said site on a filesystem?
-
+			//Building config may need to take place here...
+	#endif
 			//All the processing occurs here.
 			struct HTTPBody rq = { 0 }; 
 			struct HTTPBody rs = { 0 };
@@ -1004,6 +914,7 @@ int main (int argc, char *argv[]) {
 				//...
 			}
 
+#if 1
 			//Write a new message	
 		#if 0
 			if (( status = f->write( fd, &rq, &rs, &session )) == -1 ) {
@@ -1012,29 +923,26 @@ int main (int argc, char *argv[]) {
 		#endif
 				//...
 			}
-
+#endif
+FPRINTF( "write should be done." );
 			//Free this and close the file
 			http_free_body( &rs );
+			http_free_body( &rq );
+		break;
 
+		#if 0
 			if ( close( fd ) == -1 ) {
 				fprintf( stderr, "Couldn't close child socket. %s\n", strerror(errno) );
 				return 1;
 			}
 		}
+		#endif
 	}
 
-#if 1
 	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
-		fprintf( stderr, "%s\n", err );
+		fprintf( stderr, "Couldn't close parent socket. Error: %s\n", err );
 		return 1;
 	}
-#else
-	//Close the server process.
-	if ( close( su.fd ) == -1 ) {
-		fprintf( stderr, "Couldn't close socket! Error: %s\n", strerror( errno ) );
-		return 0;
-	}
-#endif
 
 	return 0;
 }

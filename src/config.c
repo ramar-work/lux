@@ -116,6 +116,10 @@ int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 		else if ( !memstr( keysstr, name = kv->key.v.vchar, strlen( keysstr ) ) ) { 
 			struct host * host = malloc( sizeof( struct host ) );
 			memset( host, 0, sizeof( struct host ) );
+			host->alias = NULL;
+			host->dir = NULL;
+			host->filter = NULL;
+			host->root_default = NULL;
 			host->name = strdup( kv->key.v.vchar ); 
 			add_item( hosts, host, struct host *, rlen );
 		}

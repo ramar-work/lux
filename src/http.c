@@ -255,7 +255,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 				b->value = t;
 				b->size = set.size;
 				//ADDITEM( b, struct HTTPRecord, entity->url, len, NULL );
-				add_item( entity->url, b, struct HTTPRecord, &len );
+				add_item( entity->url, b, struct HTTPRecord *, &len );
 			}
 		}
 		//ADDITEM( NULL, struct HTTPRecord, entity->url, len, NULL );
@@ -289,7 +289,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 				b->value = t;
 				b->size = set.size - 1;
 				//ADDITEM( b, struct HTTPRecord, entity->headers, len, NULL );
-				add_item( entity->headers, b, struct HTTPRecord, &len );
+				add_item( entity->headers, b, struct HTTPRecord *, &len );
 			}
 		}
 	}
@@ -343,7 +343,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 					b->value = ++m;
 					b->size = set.size;
 					//ADDITEM( b, struct HTTPRecord, entity->body, len, NULL );
-					add_item( entity->body, b, struct HTTPRecord, &len );
+					add_item( entity->body, b, struct HTTPRecord *, &len );
 					b = NULL;
 				}
 			}
@@ -410,8 +410,10 @@ struct HTTPBody * http_parse_response ( struct HTTPBody *entity, char *err, int 
 	entity->body = NULL;
 	entity->url = NULL;
 	entity->protocol = get_lstr( &header, ' ', &pLen ); 
-	entity->status = safeatoi( get_lstr( &header, ' ', &pLen ) );
-	char *status_text = get_lstr( &header, ' ', &pLen );
+	char *status = get_lstr( &header, ' ', &pLen );
+	entity->status = safeatoi( status );
+	free( status );
+	//char *status_text = get_lstr( &header, ' ', &pLen );
 	entity->hlen = hdLen; 
 	entity->host = msg_get_value( "Host: ", "\r", entity->msg, hdLen );
 
@@ -630,18 +632,18 @@ struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, i
 		return NULL;
 	}
 
-#if 1
 	int esize = (*entity->body)->size;
+#if 0
 FPRINTF( "ENTITY WRITE: %p %d\n", (*entity->body)->value, esize );
 	for ( int i=0; i < esize; i++ ) {
 FPRINTF( "ENTITY: %2c\n", (*entity->body)->value[ i ] );
 	}
+#endif
 
 	if ( !append_to_uint8t( &msg, &msglen, (*entity->body)->value, esize ) ) {
 		snprintf( err, errlen, "%s", "Could not add content to message." );
 		return NULL;
 	}
-#endif
 
 	entity->msg = msg;
 	entity->mlen = msglen;
@@ -699,22 +701,14 @@ void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int 
 
 
 void http_free_body ( struct HTTPBody *entity ) {
-	//Free anything that has most likely been cloned
-	char **items = (char *[]){
-		entity->path
-	, entity->method
-	, entity->protocol
-	, entity->path
-	, entity->host
-	, entity->boundary
-	, NULL
-	};
-	
-	while ( *items ) {
-		if ( *items ) free( *items );
-		items++;
-	}
+	//Free all of the header info
+	entity->path ? free( entity->path ) : 0;
+	entity->method ? free( entity->method ) : 0;
+	entity->protocol ? free( entity->protocol ) : 0;
+	entity->host ? free( entity->host ) : 0;
+	entity->boundary ? free( entity->boundary ) : 0;
 
+#if 0
 	//Free ** lists
 	struct HTTPRecord ***lists = (struct HTTPRecord **[]){
 	  entity->headers
@@ -728,6 +722,18 @@ void http_free_body ( struct HTTPBody *entity ) {
 		fprintf( stderr, "List 2: %p\n", **lists );
 		lists++;
 	}
+#else
+	struct HTTPRecord **e[] = { entity->headers, entity->url, entity->body };
+	for ( int i = 0; i < 3; i++ ) {
+		struct HTTPRecord **list = e[ i ];
+		while ( list && *list ) {
+			free( (*list)->value );
+			free( (*list) );
+			list++;
+		}
+		free( e[i] );
+	}
+#endif
 
 	//Free big message buffer
 	if ( entity->msg ) {
