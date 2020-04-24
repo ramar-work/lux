@@ -87,4 +87,5 @@ int http_set_int( int *, int );
 char *http_set_char( char **, const char * );
 void *http_set_record( struct HTTPBody *, struct HTTPRecord ***, int, const char *, uint8_t *, int );
 int http_set_error ( struct HTTPBody *entity, int status, char *message );
+
 #endif

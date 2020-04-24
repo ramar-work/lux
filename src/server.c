@@ -93,6 +93,7 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 	int mult = 0;
 	int try=0;
 	const int size = 32767;	
+	char err[ 2048 ] = {0};
 
 	//Read first
 	while ( 1 ) {
@@ -126,32 +127,43 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 			}
 		}
 
-		//read into new buffer
-		//TODO: Yay!  This works great on Arch!  But let's see what about Win, OSX and BSD
+		//Read into a static buffer
 		if ( rd == -1 ) {
 			//A subsequent call will tell us a lot...
 			fprintf(stderr, "Couldn't read all of message...\n" );
 			whatsockerr( errno );
-			if ( 0 )
+#if 0
+			if ( 0 ) {
 				0;
+			}
 			//ssl stuff has to go first...
-			else if ( errno == EBADF )
+			else if ( errno == EBADF ) {
 				0; //TODO: Can't close a most-likely closed socket.  What do you do?
-			else if ( errno == ECONNREFUSED )
-				close(fd);
-			else if ( errno == EFAULT )
-				close(fd);
-			else if ( errno == EINTR )
-				close(fd);
-			else if ( errno == EINVAL )
-				close(fd);
-			else if ( errno == ENOMEM )
-				close(fd);
-			else if ( errno == ENOTCONN )
-				close(fd);
-			else if ( errno == ENOTSOCK )
-				close(fd);
-			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+			}
+			else if ( errno == ECONNREFUSED ) {
+				return http_set_error( rs, 500, strerror( errno ) );
+			}
+			else if ( errno == EFAULT ) {
+				return http_set_error( rs, 500, strerror( errno ) );
+			}
+			else if ( errno == EINTR ) {
+				return http_set_error( rs, 500, strerror( errno ) );
+			}
+			else if ( errno == EINVAL ) {
+				return http_set_error( rs, 500, strerror( errno ) );
+			}
+			else if ( errno == ENOMEM ) {
+				return http_set_error( rs, 500, strerror( errno ) );
+			}
+			else if ( errno == ENOTCONN ) {
+				return http_set_error( rs, 500, strerror( errno ) );
+			}
+			else if ( errno == ENOTSOCK ) {
+				return http_set_error( rs, 500, strerror( errno ) );
+			}
+			else 
+#endif
+			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				if ( ++try == 2 ) {
 				 #ifdef HTTP_VERBOSE
 					fprintf(stderr, "Tried three times to read from socket. We're done.\n" );
@@ -160,13 +172,14 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 					fprintf(stderr, "%p\n", buf );
 					//rq->msg = buf;
 					break;
-			}
+				}
 			 #ifdef HTTP_VERBOSE
 				fprintf(stderr, "Tried %d times to read from socket. Trying again?.\n", try );
 			 #endif
 			}
 			else {
 				//this would just be some uncaught condition...
+				return http_set_error( rs, 500, strerror( errno ) );
 			}
 		}
 		else if ( rd == 0 ) {
@@ -187,217 +200,29 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 		else {
 			//realloc manually and read
 			if ((buf = realloc( buf, bfsize )) == NULL ) {
-				fprintf(stderr, "Couldn't allocate buffer..." );
-				close(fd);
-				return 0;
+				return http_set_error( rs, 500, "Could not allocate read buffer." ); 
 			}
 
 			//Copy new data and increment bytes read
 			memset( &buf[ bfsize - size ], 0, size ); 
+#if 0
 			fprintf(stderr, "buf: %p\n", buf );
 			fprintf(stderr, "buf2: %p\n", buf2 );
 			fprintf(stderr, "pos: %d\n", bfsize - size );
+#endif
 			memcpy( &buf[ bfsize - size ], buf2, rd ); 
 			rq->mlen += rd;
 			rq->msg = buf; //TODO: You keep resetting this, only needs to be done once...
 
 			//show read progress and data received, etc.
-			if ( 1 ) {
-				fprintf( stderr, "Recvd %d bytes on fd %d\n", rd, fd ); 
-			}
+			FPRINTF( "Recvd %d bytes on fd %d\n", rd, fd ); 
 		}
 	}
 
-#if 1
-	char err[ 2048 ] = {0};
-	if ( !http_parse_response( rq, err, sizeof(err) ) ) {
-		//close( fd );
-		return 0;
+	if ( !http_parse_request( rq, err, sizeof(err) ) ) {
+		return http_set_error( rs, 500, err ); 
 	}
-#else
-	//Prepare the rest of the request
-	char *header = (char *)rq->msg;
-	int pLen = memchrat( rq->msg, '\n', rq->mlen ) - 1;
-	const int flLen = pLen + strlen( "\r\n" );
-	int hdLen = memstrat( rq->msg, "\r\n\r\n", rq->mlen );
-
-	//Initialize the remainder of variables 
-	rq->headers = NULL;
-	rq->body = NULL;
-	rq->url = NULL;
-	rq->method = get_lstr( &header, ' ', &pLen );
-	rq->path = get_lstr( &header, ' ', &pLen );
-	rq->protocol = get_lstr( &header, ' ', &pLen ); 
-	rq->hlen = hdLen; 
-	rq->host = msg_get_value( "Host: ", "\r", rq->msg, hdLen );
-
-	//The protocol parsing can happen here...
-	if ( strcmp( rq->method, "HEAD" ) == 0 )
-		;
-	else if ( strcmp( rq->method, "GET" ) == 0 )
-		;
-	else if ( strcmp( rq->method, "POST" ) == 0 ) {
-		rq->clen = safeatoi( msg_get_value( "Content-Length: ", "\r", rq->msg, hdLen ) );
-		rq->ctype = msg_get_value( "Content-Type: ", ";\r", rq->msg, hdLen );
-		rq->boundary = msg_get_value( "boundary=", "\r", rq->msg, hdLen );
-		//rq->mlen = hdLen; 
-		//If clen is -1, ... hmmm.  At some point, I still need to do the rest of the work. 
-	}
-
-	if ( 0 )  {
-		print_httpbody( rq );	
-	}
-
-	//Define records for each type here...
-	//struct HTTPRecord **url=NULL, **headers=NULL, **body=NULL;
-	int len = 0;
-	Mem set;
-	memset( &set, 0, sizeof( Mem ) );
-
-	//Always process the URL (specifically GET vars)
-	if ( strlen( rq->path ) == 1 ) {
-		ADDITEM( NULL, struct HTTPRecord, rq->url, len, 0 );
-	}
-	else {
-		int index = 0;
-		while ( strwalk( &set, rq->path, "?&" ) ) {
-			uint8_t *t = (uint8_t *)&rq->path[ set.pos ];
-			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
-			memset( b, 0, sizeof( struct HTTPRecord ) );
-			int at = memchrat( t, '=', set.size );
-			if ( !b || at == -1 || !set.size ) 
-				;
-			else {
-				int klen = at;
-				b->field = copystr( t, klen );
-				klen += 1, t += klen, set.size -= klen;
-				b->value = t;
-				b->size = set.size;
-				ADDITEM( b, struct HTTPRecord, rq->url, len, 0 );
-			}
-		}
-		ADDITEM( NULL, struct HTTPRecord, rq->url, len, 0 );
-	}
-
-
-	//Always process the headers
-	memset( &set, 0, sizeof( Mem ) );
-	len = 0;
-	uint8_t *h = &rq->msg[ flLen - 1 ];
-	while ( memwalk( &set, h, (uint8_t *)"\r", rq->hlen, 1 ) ) {
-		//Break on newline, and extract the _first_ ':'
-		uint8_t *t = &h[ set.pos - 1 ];
-		if ( *t == '\r' ) {  
-			int at = memchrat( t, ':', set.size );
-			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
-			memset( b, 0, sizeof( struct HTTPRecord ) );
-			if ( !b || at == -1 || at > 127 )
-				;
-			else {
-				at -= 2, t += 2;
-				b->field = copystr( t, at );
-				at += 2 /*Increment to get past ': '*/, t += at, set.size -= at;
-				b->value = t;
-				b->size = set.size - 1;
-			#if 0
-				DUMP_RIGHT( b->value, b->size );
-			#endif
-				ADDITEM( b, struct HTTPRecord, rq->headers, len, 0 );
-			}
-		}
-	}
-	ADDITEM( NULL, struct HTTPRecord, rq->headers, len, 0 );
-
-	//Always process the body 
-	memset( &set, 0, sizeof( Mem ) );
-	len = 0;
-	uint8_t *p = &rq->msg[ rq->hlen + strlen( "\r\n" ) ];
-	int plen = rq->mlen - rq->hlen;
-	
-	//TODO: If this is a xfer-encoding chunked msg, rq->clen needs to get filled in when done.
-	if ( strcmp( "POST", rq->method ) != 0 ) {
-		ADDITEM( NULL, struct HTTPRecord, rq->body, len, 0 );
-	}
-	else {
-		struct HTTPRecord *b = NULL;
-		#if 0
-		DUMP_RIGHT( p, rq->mlen - rq->hlen ); 
-		#endif
-		//TODO: Bitmasking is 1% more efficient, go for it.
-		int name=0, value=0, index=0;
-
-		//url encoded is a little bit different.  no real reason to use the same code...
-		if ( strcmp( rq->ctype, "application/x-www-form-urlencoded" ) == 0 ) {
-			//NOTE: clen is up by two to assist our little tokenizer...
-			while ( memwalk( &set, p, (uint8_t *)"\n=&", rq->clen + 2, 3 ) ) {
-				uint8_t *m = &p[ set.pos - 1 ];  
-				if ( *m == '\n' || *m == '&' ) {
-					b = malloc( sizeof( struct HTTPRecord ) );
-					memset( b, 0, sizeof( struct HTTPRecord ) ); 
-					//TODO: Should be checking that allocation was successful
-					b->field = copystr( ++m, set.size );
-				}
-				else if ( *m == '=' ) {
-					b->value = ++m;
-					b->size = set.size;
-					ADDITEM( b, struct HTTPRecord, rq->body, len, 0 );
-					b = NULL;
-				}
-			}
-		}
-		else {
-			while ( memwalk( &set, p, (uint8_t *)"\r:=;", rq->clen, 4 ) ) {
-				//TODO: If we're being technical, set.pos - 1 can point to a negative index.  
-				//However, as long as headers were sent (and 99.99999999% of the time they will be)
-				//this negative index will point to valid allocated memory...
-				uint8_t *m = &p[ set.pos - 1 ];  
-				if ( memcmp( m, "; name=", 7 ) == 0 )
-					name = 1;
-				//"\r\n\r\n"
-				else if ( memcmp( m, "\r\n\r\n", 4 ) == 0 && !value )
-					value = 1;
-				else if ( memcmp( m, "\r\n-", 3 ) == 0 && !value ) {
-					b = malloc( sizeof( struct HTTPRecord ) );
-					memset( b, 0, sizeof( struct HTTPRecord ) ); 
-				}
-				else if ( memcmp( m, "\r\n", 2 ) == 0 && value == 1 ) {
-					m += 2;
-					b->value = m;//++t;
-					b->size = set.size - 1;
-					ADDITEM( b, struct HTTPRecord, rq->body, len, 0 );
-					value = 0;
-					b = NULL;
-				}
-				else if ( *m == '=' && name == 1 ) {
-					//fprintf( stderr, "copying name field... pass %d\n", ++index );
-					int size = *(m + 1) == '"' ? set.size - 2 : set.size;
-				#if 1
-					m += ( *(m + 1) == '"' ) ? 2 : 1 ;
-				#else
-					int ptrinc = *(m + 1) == '"' ? 2 : 1;
-					m += ptrinc;
-				#endif
-					b->field = copystr( m, size );
-					name = 0;
-				}
-			}
-		}
-
-		//Add a terminator element
-		ADDITEM( NULL, struct HTTPRecord, rq->body, len, 0 );
-		//This MAY help in handling malformed messages...
-		( b && (!b->field || !b->value) ) ? free( b ) : 0;
-
-		if ( 0 ) {
-			fprintf( stderr, "BODY got:\n" );
-			print_httprecords( rq->body );
-		}
-	}
-
-	//for testing, this should stay here...
-	//close(fd);
-#endif
-	return 0;
+	return 1;
 }
 
 
@@ -909,12 +734,13 @@ int main (int argc, char *argv[]) {
 				//what to do with the response...
 			}
 
+print_httpbody( &rq );
 			//Generate a new message	
+			//If status was successful, then do this...
 			if ( f->proc && ( status = f->proc( fd, &rq, &rs, NULL )) == -1 ) {
 				//...
 			}
 
-#if 1
 			//Write a new message	
 		#if 0
 			if (( status = f->write( fd, &rq, &rs, &session )) == -1 ) {
@@ -923,14 +749,14 @@ int main (int argc, char *argv[]) {
 		#endif
 				//...
 			}
-#endif
-FPRINTF( "write should be done." );
+FPRINTF( "Write complete.\n" );
 			//Free this and close the file
 			http_free_body( &rs );
 			http_free_body( &rq );
-		break;
 
-		#if 0
+		#if 1
+		break;
+		#else
 			if ( close( fd ) == -1 ) {
 				fprintf( stderr, "Couldn't close child socket. %s\n", strerror(errno) );
 				return 1;

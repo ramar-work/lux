@@ -180,10 +180,210 @@ void print_httpbody ( struct HTTPBody *r ) {
 
 
 
+static struct HTTPRecord * init_record() {
+	struct HTTPRecord *record = NULL;
+	record = malloc( sizeof( struct HTTPRecord ) );
+	if ( !record ) {
+		return NULL;
+	}
+	memset( record, 0, sizeof( struct HTTPRecord ) );
+	return record;
+}
 
-//Parse an HTTP request
-struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int errlen ) {
 
+
+static struct HTTPRecord ** parse_url( struct HTTPBody *entity, char *err, int errlen ) {
+	Mem set;
+	memset( &set, 0, sizeof( Mem ) );
+	int len = 0;
+
+	//Always process the URL (specifically GET vars)
+	if ( strlen( entity->path ) == 1 ) {
+		entity->url = NULL;
+	}
+	else {
+		int index = 0;
+		while ( strwalk( &set, entity->path, "?&" ) ) {
+			uint8_t *t = (uint8_t *)&entity->path[ set.pos ];
+#if 1
+			int at = 0;
+			struct HTTPRecord *b = NULL; 
+			if ( !( b = init_record() ) ) {
+				snprintf( err, errlen, "[%s:%d] Memory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
+				return NULL;
+			} 
+#else	
+			struct HTTPRecord *b = NULL;
+			if ( !(b = malloc( sizeof( struct HTTPRecord ) )) ) {
+				snprintf( err, errlen, "[%s:%d] Memory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
+				( entity->path ) ? free( entity->path ) : 0;
+				( entity->method ) ? free( entity->method ) : 0;
+				( entity->protocol ) ? free( entity->protocol ) : 0;
+				return NULL;
+			}
+			memset( b, 0, sizeof( struct HTTPRecord ) );
+#endif
+			if ( !b || (at = memchrat( t, '=', set.size )) == -1 || !set.size ) 
+				;
+			else {
+				int klen = at;
+				b->field = copystr( t, klen );
+				klen += 1, t += klen, set.size -= klen;
+				b->value = t;
+				b->size = set.size;
+				add_item( &entity->url, b, struct HTTPRecord *, &len );
+			}
+		}
+	}
+	return NULL;
+}
+
+static struct HTTPRecord ** parse_headers( struct HTTPBody *entity, char *err, int errlen ) {
+	//Always process the headers
+	Mem set;
+	memset( &set, 0, sizeof( Mem ) );
+	int len = 0;
+	int flLen = 0;
+
+	uint8_t *h = &entity->msg[ flLen - 1 ];
+	while ( memwalk( &set, h, (uint8_t *)"\r", entity->hlen, 1 ) ) {
+		//Break on newline, and extract the _first_ ':'
+		uint8_t *t = &h[ set.pos - 1 ];
+		if ( *t == '\r' ) {  
+			int at = memchrat( t, ':', set.size );
+			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
+			if ( !b ) {
+				snprintf( err, errlen, "[%s:%d] Memory allocation failure at header parsing: %s", __FILE__, __LINE__, entity->method );
+#if 0
+				( entity->path ) ? free( entity->path ) : 0;
+				( entity->method ) ? free( entity->method ) : 0;
+				( entity->protocol ) ? free( entity->protocol ) : 0;
+#endif
+				return NULL;
+			}
+			memset( b, 0, sizeof( struct HTTPRecord ) );
+			if ( !b || at == -1 || at > 127 )
+				;
+			else {
+				at -= 2, t += 2;
+				b->field = copystr( t, at );
+FPRINTF( "b->field '%s'\n", b->field );
+				at += 2 /*Increment to get past ': '*/, t += at, set.size -= at;
+				b->value = t;
+				b->size = set.size - 1;
+				//ADDITEM( b, struct HTTPRecord, entity->headers, len, NULL );
+				add_item( &entity->headers, b, struct HTTPRecord *, &len );
+			}
+		}
+	}
+	return NULL;
+}
+
+static struct HTTPRecord ** parse_body( struct HTTPBody *entity, char *err, int errlen ) {
+	//Always process the body 
+	Mem set;
+	memset( &set, 0, sizeof( Mem ) );
+	int len = 0;
+	uint8_t *p = &entity->msg[ entity->hlen + strlen( "\r\n" ) ];
+	int plen = entity->mlen - entity->hlen;
+	
+	//TODO: If this is a xfer-encoding chunked msg, entity->clen needs to get filled in when done.
+	if ( strcmp( "POST", entity->method ) != 0 ) {
+		entity->body = NULL;
+		//ADDITEM( NULL, struct HTTPRecord, entity->body, len, NULL );
+	}
+	else {
+		struct HTTPRecord *b = NULL;
+		//TODO: Bitmasking is 1% more efficient, go for it.
+		int name=0, value=0, index=0;
+
+		//Check the content-type and die if it's wrong
+		if ( !entity->ctype ) {
+			snprintf( err, errlen, "[%s:%d] No content-type given for method %s.", __FILE__, __LINE__, entity->method);
+			( entity->path ) ? free( entity->path ) : 0;
+			( entity->method ) ? free( entity->method ) : 0;
+			( entity->protocol ) ? free( entity->protocol ) : 0;
+			return NULL;
+		}
+		if ( memcmp( entity->ctype, "appli", 5 ) != 0 && memcmp( entity->ctype, "multi", 5 ) != 0 ) {
+			//Free headers and what not
+			snprintf( err, errlen, "[%s:%d] Unsupported content-type '%s' for method %s.", __FILE__, __LINE__, entity->ctype , entity->method );
+			( entity->path ) ? free( entity->path ) : 0;
+			( entity->method ) ? free( entity->method ) : 0;
+			( entity->protocol ) ? free( entity->protocol ) : 0;
+			return NULL;
+		} 
+
+		//url encoded is a little bit different.  no real reason to use the same code...
+		if ( strcmp( entity->ctype, "application/x-www-form-urlencoded" ) == 0 ) {
+			//NOTE: clen is up by two to assist our little tokenizer...
+			while ( memwalk( &set, p, (uint8_t *)"\n=&", entity->clen + 2, 3 ) ) {
+				uint8_t *m = &p[ set.pos - 1 ];  
+				if ( *m == '\n' || *m == '&' ) {
+					b = malloc( sizeof( struct HTTPRecord ) );
+					memset( b, 0, sizeof( struct HTTPRecord ) ); 
+					//TODO: Should be checking that allocation was successful
+					b->field = copystr( ++m, set.size );
+				}
+				else if ( *m == '=' ) {
+					b->value = ++m;
+					b->size = set.size;
+					//ADDITEM( b, struct HTTPRecord, entity->body, len, NULL );
+					add_item( &entity->body, b, struct HTTPRecord *, &len );
+					b = NULL;
+				}
+			}
+		}
+		else {
+			while ( memwalk( &set, p, (uint8_t *)"\r:=;", entity->clen, 4 ) ) {
+				//TODO: If we're being technical, set.pos - 1 can point to a negative index.  
+				//However, as long as headers were sent (and 99.99999999% of the time they will be)
+				//this negative index will point to valid allocated memory...
+				uint8_t *m = &p[ set.pos - 1 ];  
+				if ( memcmp( m, "; name=", 7 ) == 0 )
+					name = 1;
+				//"\r\n\r\n"
+				else if ( memcmp( m, "\r\n\r\n", 4 ) == 0 && !value )
+					value = 1;
+				else if ( memcmp( m, "\r\n-", 3 ) == 0 && !value ) {
+					b = malloc( sizeof( struct HTTPRecord ) );
+					memset( b, 0, sizeof( struct HTTPRecord ) ); 
+				}
+				else if ( memcmp( m, "\r\n", 2 ) == 0 && value == 1 ) {
+					m += 2;
+					b->value = m;//++t;
+					b->size = set.size - 1;
+					//ADDITEM( b, struct HTTPRecord, entity->body, len, NULL );
+					add_item( &entity->body, b, struct HTTPRecord *, &len );
+					value = 0;
+					b = NULL;
+				}
+				else if ( *m == '=' && name == 1 ) {
+					//fprintf( stderr, "copying name field... pass %d\n", ++index );
+					int size = *(m + 1) == '"' ? set.size - 2 : set.size;
+				#if 1
+					m += ( *(m + 1) == '"' ) ? 2 : 1 ;
+				#else
+					int ptrinc = *(m + 1) == '"' ? 2 : 1;
+					m += ptrinc;
+				#endif
+					b->field = copystr( m, size );
+					name = 0;
+				}
+			}
+		}
+
+		//Add a terminator element
+		//ADDITEM( NULL, struct HTTPRecord, entity->body, len, NULL );
+		//This MAY help in handling malformed messages...
+		( b && (!b->field || !b->value) ) ? free( b ) : 0;
+	}
+	return NULL;
+}
+
+
+//Marks the important parts of an HTTP request
+static struct HTTPBody * stake_body ( struct HTTPBody *entity, char *err, int errlen ) {
 	//Prepare the rest of the request
 	char *header = (char *)entity->msg;
 	int pLen = memchrat( entity->msg, '\n', entity->mlen ) - 1;
@@ -206,7 +406,55 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 	else if ( strcmp( entity->method, "GET" ) == 0 )
 		;
 	else if ( strcmp( entity->method, "POST" ) == 0 || strcmp( entity->method, "PUT" ) ) {
-		entity->clen = safeatoi( msg_get_value( "Content-Length: ", "\r", entity->msg, hdLen ) );
+		char *clen = msg_get_value( "Content-Length: ", "\r", entity->msg, hdLen ); 
+		entity->clen = safeatoi( clen );
+		entity->ctype = msg_get_value( "Content-Type: ", ";\r", entity->msg, hdLen );
+		entity->boundary = msg_get_value( "boundary=", "\r", entity->msg, hdLen );
+		//entity->mlen = hdLen; 
+		//If clen is -1, ... hmmm.  At some point, I still need to do the rest of the work. 
+		free( clen );
+	}
+	else {
+		snprintf( err, errlen, "Unsupported method requested: %s", entity->method );
+		return NULL;
+	}
+	return entity;	
+}
+
+
+//Parse an HTTP request
+struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int errlen ) {
+
+#if 1
+	FPRINTF( "Calling stake_body( ... )\n" );
+	if ( !stake_body( entity, err, errlen ) ) {
+		return NULL;
+	}
+#else
+	//Prepare the rest of the request
+	char *header = (char *)entity->msg;
+	int pLen = memchrat( entity->msg, '\n', entity->mlen ) - 1;
+	const int flLen = pLen + strlen( "\r\n" );
+	int hdLen = memstrat( entity->msg, "\r\n\r\n", entity->mlen );
+
+	//Initialize the remainder of variables 
+	entity->headers = NULL;
+	entity->body = NULL;
+	entity->url = NULL;
+	entity->method = get_lstr( &header, ' ', &pLen );
+	entity->path = get_lstr( &header, ' ', &pLen );
+	entity->protocol = get_lstr( &header, ' ', &pLen ); 
+	entity->hlen = hdLen; 
+	entity->host = msg_get_value( "Host: ", "\r", entity->msg, hdLen );
+
+	//The protocol parsing can happen here...
+	if ( strcmp( entity->method, "HEAD" ) == 0 )
+		;
+	else if ( strcmp( entity->method, "GET" ) == 0 )
+		;
+	else if ( strcmp( entity->method, "POST" ) == 0 || strcmp( entity->method, "PUT" ) ) {
+		char *clen = msg_get_value( "Content-Length: ", "\r", entity->msg, hdLen ); 
+		entity->clen = safeatoi( clen );
 		entity->ctype = msg_get_value( "Content-Type: ", ";\r", entity->msg, hdLen );
 		entity->boundary = msg_get_value( "boundary=", "\r", entity->msg, hdLen );
 		//entity->mlen = hdLen; 
@@ -214,14 +462,23 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 	}
 	else {
 		snprintf( err, errlen, "[%s:%d] Unsupported method requested: %s", __FILE__, __LINE__, entity->method );
+#if 0
 		( entity->path ) ? free( entity->path ) : 0;
 		( entity->method ) ? free( entity->method ) : 0;
 		( entity->protocol ) ? free( entity->protocol ) : 0;
+#endif
 		return NULL;
 	}
+#endif
 
+#if 0
+#if 1
+	FPRINTF( "Calling parse_url( ... )\n" );
+	if ( !parse_url( entity, err, errlen ) ) {
+		return NULL;
+	}
+#else
 	//Define records for each type here...
-	//struct HTTPRecord **url=NULL, **headers=NULL, **body=NULL;
 	int len = 0;
 	Mem set;
 	memset( &set, 0, sizeof( Mem ) );
@@ -229,13 +486,19 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 	//Always process the URL (specifically GET vars)
 	if ( strlen( entity->path ) == 1 ) {
 		entity->url = NULL;
-		//add_item( entity->url, NULL, len, NULL ); 
-		//ADDITEM( NULL, struct HTTPRecord, entity->url, len, NULL );
 	}
 	else {
 		int index = 0;
 		while ( strwalk( &set, entity->path, "?&" ) ) {
 			uint8_t *t = (uint8_t *)&entity->path[ set.pos ];
+#if 1
+			int at = 0;
+			struct HTTPRecord *b = NULL; 
+			if ( !( b = init_record() ) ) {
+				snprintf( err, errlen, "[%s:%d] Memory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
+				return NULL;
+			} 
+#else	
 			struct HTTPRecord *b = NULL;
 			if ( !(b = malloc( sizeof( struct HTTPRecord ) )) ) {
 				snprintf( err, errlen, "[%s:%d] Memory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
@@ -245,8 +508,8 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 				return NULL;
 			}
 			memset( b, 0, sizeof( struct HTTPRecord ) );
-			int at = memchrat( t, '=', set.size );
-			if ( !b || at == -1 || !set.size ) 
+#endif
+			if ( !b || (at = memchrat( t, '=', set.size )) == -1 || !set.size ) 
 				;
 			else {
 				int klen = at;
@@ -254,14 +517,19 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 				klen += 1, t += klen, set.size -= klen;
 				b->value = t;
 				b->size = set.size;
-				//ADDITEM( b, struct HTTPRecord, entity->url, len, NULL );
-				add_item( entity->url, b, struct HTTPRecord *, &len );
+				add_item( &entity->url, b, struct HTTPRecord *, &len );
 			}
 		}
-		//ADDITEM( NULL, struct HTTPRecord, entity->url, len, NULL );
 	}
+#endif
 
 
+#if 1
+	FPRINTF( "Calling parse_headers( ... )\n" );
+	if ( !parse_headers( entity, err, errlen ) ) {
+		return NULL;
+	}
+#else
 	//Always process the headers
 	memset( &set, 0, sizeof( Mem ) );
 	len = 0;
@@ -271,8 +539,8 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 		uint8_t *t = &h[ set.pos - 1 ];
 		if ( *t == '\r' ) {  
 			int at = memchrat( t, ':', set.size );
-			struct HTTPRecord *b = NULL;
-			if ( !(b = malloc( sizeof( struct HTTPRecord ) )) ) {
+			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
+			if ( !b ) {
 				snprintf( err, errlen, "[%s:%d] Memory allocation failure at header parsing: %s", __FILE__, __LINE__, entity->method );
 				( entity->path ) ? free( entity->path ) : 0;
 				( entity->method ) ? free( entity->method ) : 0;
@@ -285,16 +553,25 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 			else {
 				at -= 2, t += 2;
 				b->field = copystr( t, at );
+FPRINTF( "b->field '%s'\n", b->field );
 				at += 2 /*Increment to get past ': '*/, t += at, set.size -= at;
 				b->value = t;
 				b->size = set.size - 1;
 				//ADDITEM( b, struct HTTPRecord, entity->headers, len, NULL );
-				add_item( entity->headers, b, struct HTTPRecord *, &len );
+				add_item( &entity->headers, b, struct HTTPRecord *, &len );
 			}
 		}
 	}
-	//ADDITEM( NULL, struct HTTPRecord, entity->headers, len, NULL );
+#endif
 
+
+
+#if 1
+	FPRINTF( "Calling parse_body( ... )\n" );
+	if ( !parse_body( entity, err, errlen ) ) {
+		return NULL;
+	}
+#else
 	//Always process the body 
 	memset( &set, 0, sizeof( Mem ) );
 	len = 0;
@@ -343,7 +620,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 					b->value = ++m;
 					b->size = set.size;
 					//ADDITEM( b, struct HTTPRecord, entity->body, len, NULL );
-					add_item( entity->body, b, struct HTTPRecord *, &len );
+					add_item( &entity->body, b, struct HTTPRecord *, &len );
 					b = NULL;
 				}
 			}
@@ -368,7 +645,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 					b->value = m;//++t;
 					b->size = set.size - 1;
 					//ADDITEM( b, struct HTTPRecord, entity->body, len, NULL );
-					add_item( entity->body, b, struct HTTPRecord, &len );
+					add_item( &entity->body, b, struct HTTPRecord *, &len );
 					value = 0;
 					b = NULL;
 				}
@@ -392,7 +669,11 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 		//This MAY help in handling malformed messages...
 		( b && (!b->field || !b->value) ) ? free( b ) : 0;
 	}
+#endif
+#endif
 
+	FPRINTF( "Dump http body." );
+print_httpbody( entity );
 	return entity;
 } 
 
@@ -723,11 +1004,13 @@ void http_free_body ( struct HTTPBody *entity ) {
 		lists++;
 	}
 #else
-	struct HTTPRecord **e[] = { entity->headers, entity->url, entity->body };
-	for ( int i = 0; i < 3; i++ ) {
+	struct HTTPRecord **e[] = { entity->headers/*, entity->url, entity->body*/ };
+	for ( int i = 0; i < sizeof(e)/sizeof(struct HTTPRecord **); i++ ) {
 		struct HTTPRecord **list = e[ i ];
 		while ( list && *list ) {
-			free( (*list)->value );
+FPRINTF( "list->field '%s'\n", (*list)->field );
+			(*list)->field ? free( (void *)(*list)->field ) : 0;
+			(*list)->value ? free( (*list)->value ) : 0;
 			free( (*list) );
 			list++;
 		}

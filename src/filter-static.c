@@ -50,6 +50,7 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	}
 
 	//Stop / requests when dealing with static servers
+FPRINTF( "rq->path is %s\n", rq->path );
 	if ( !rq->path || ( strlen( rq->path ) == 1 && *rq->path == '/' ) ) {
 		//Check for a default page (like index.html, which comes from config)
 		if ( !config->root_default ) {
@@ -62,6 +63,7 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	if ( snprintf( fpath, sizeof(fpath) - 1, "%s%s", config->dir, fname ) == -1 ) {
 		return http_set_error( rs, 500, "Full filepath probably truncated." );
 	}
+FPRINTF( "full path is %s\n", fpath );
 
 	//Crudely check the extension before serving.
 	mimetype = mimetype_default;

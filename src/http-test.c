@@ -337,6 +337,55 @@ const uint8_t image_jpeg_body[] =
 	"\r\n\r\n"
 	""
 ;
+
+
+struct HTTPBody head_body_result ={
+};
+struct HTTPBody head_body_missing_protocol_result ={
+};
+struct HTTPBody get_body_missing_path_result ={
+};
+struct HTTPBody get_body_missing_headers_result ={
+};
+struct HTTPBody get_body_extra_long_path_result ={
+};
+struct HTTPBody get_body_1_result ={
+};
+struct HTTPBody get_body_2_result ={
+};
+struct HTTPBody get_body_3_result ={
+};
+struct HTTPBody get_body_4_result ={
+};
+struct HTTPBody get_body_5_result ={
+};
+struct HTTPBody get_body_6_result ={
+};
+struct HTTPBody post_body_1_result ={
+};
+struct HTTPBody put_body_result ={
+};
+struct HTTPBody text_html_body_result ={
+};
+struct HTTPBody text_plain_body_result ={
+};
+struct HTTPBody zero_length_body_result ={
+};
+struct HTTPBody statusless_body_result ={
+};
+struct HTTPBody eww_body_result ={
+};
+struct HTTPBody headerless_body_result ={
+};
+struct HTTPBody missing_host_body_result ={
+};
+struct HTTPBody missing_content_length_body_result ={
+};
+struct HTTPBody multipart_text_body_result ={
+};
+struct HTTPBody image_jpeg_body_result ={
+};
+
 #endif
 
 struct HTTPBody *requests_received[] = {
@@ -433,10 +482,32 @@ void print_entity( struct HTTPBody *entity ) {
 }
 
 
+#if 0
+//Consider suites of testing
+//A. Generate requests & responses in piecemeal, do you get what's expected?
+//B. Break down the parsing process, does everything break down the way you expect?
+//C. Break down the generation process, does this work the way you expect?
+#endif
+
 
 int main ( int argc, char *argv[] ) {
 	char err[ 2048 ] = { 0 };
-	
+
+#if 0
+	//these are more like unit tests
+	struct HTTPBody **stake_body_tests = requests_received;	
+	while ( stake_body_tests && *stake_body_tests ) {
+		if ( !stake_body( *stake_body_tests, err, sizeof( err ) ) ) {
+			//What happens if we fail?
+			//Some of these SHOULD fail, the code should just know that...
+		}
+		print_httpbody( *stake_body_tests );
+		stake_body_tests++;
+	}
+return 0;
+#endif
+
+#if 0	
 	//Part 1: Test generating requests and responses in piecemeal.
 	struct HTTPBody *this, that;
 	memset( &that, 0, sizeof( struct HTTPBody ) ); 
@@ -466,6 +537,7 @@ int main ( int argc, char *argv[] ) {
 	http_set_textbody( this, "text", "Hello, World" );
 	print_entity( this );
 	free( this );
+#endif
 
 	//Part 2: Test creating responses & requests from assembled data
 	struct test { 
@@ -475,7 +547,7 @@ int main ( int argc, char *argv[] ) {
 		void (*print)( struct HTTPBody * );
 		void (*free)( struct HTTPBody * );
 	} tests[] = {
-		//{ "REQUESTS - PARSE", requests_received, http_parse_request, print_test_request, http_free_body },
+		{ "REQUESTS - PARSE", requests_received, http_parse_request, print_entity, http_free_body },
 		//{ "REQUESTS - PACK",  requests_to_send,  http_finalize_request, print_test_request, NULL },
 #if 0
 		{ "REPSONSES- PARSE", responses_received, http_parse_response, print_test_response, http_free_body },
@@ -491,15 +563,18 @@ int main ( int argc, char *argv[] ) {
 		fprintf( stderr, "%s\n===================\n", tests[i].name );
 		while ( *r ) {
 			memset( err, 0, sizeof(err) );	
+//write( 2, (*r)->msg, (*r)->mlen );
+
+			//Automate this by checking that this member looks the same as the test source 
 			if ( !tests[i].transform( *r, err, sizeof(err) ) ) {
 				fprintf( stderr, "FAILED - %s\n", err );
 				r++;
 				continue;
 			}
 
+#if 0
 			fprintf( stderr, "SUCCESS - " );
 			free( (*r)->msg );
-#if 0
 			if ( tests[i].print ) {
 				tests[i].print( *r );
 			}
