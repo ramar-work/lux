@@ -1,20 +1,50 @@
-/*let's try this again.  It seems never to work like it should...*/
+/* -------------------------------------------------------- *
+server.c
+========
+
+This is the basis of hypno's web server.
+
+USAGE
+- 
+
+BUILDING
+- 
+
+TODO
+- Implement threaded model
+- Write a couple of different types of loggers
+- Add global root default for config.lua
+- Is it useful to move the configuration initialization to a
+  different part of the code.
+ * -------------------------------------------------------- */
 #include "../vendor/single.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-
 #include "luabind.h"
 #include "http.h"
 #include "socket.h"
 #include "util.h"
 #include "ssl.h"
-
 #include "filter-static.h"
 #include "filter-dirent.h"
 #include "filter-echo.h"
 #include "filter-lua.h"
 #include "filter-c.h"
+
+
+int srv_fork ( int fd );
+int srv_thread ( int fd );
+int srv_vanilla ( int fd );
+int srv_test ( int fd );
+int srv_dummy ( int *times );
+int srv_inccount( int *times );
+int h_read ( int, struct HTTPBody *, struct HTTPBody *, void * );
+int h_proc ( int, struct HTTPBody *, struct HTTPBody *, void * );
+int h_write( int, struct HTTPBody *, struct HTTPBody *, void * );
+int t_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx );
+int t_write( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx );
+
 
 struct filter {
 	const char *name;
@@ -36,6 +66,30 @@ struct model {
 	int (*stop)( int * );
 	void *data;
 };
+
+struct values {
+	int port;
+	int ssl;
+	int start;
+	int kill;
+	int fork;
+	char *user;
+}; 
+
+struct model models[] = {
+	{ srv_fork, srv_dummy },	
+	{ srv_thread, srv_dummy },	
+	{ srv_vanilla, srv_dummy },	
+	{ srv_test, srv_inccount },	
+};
+
+
+struct senderrecvr sr[] = {
+	{ h_read, h_proc, h_write }
+, { t_read, NULL, t_write  }
+,	{ NULL }
+};
+
 
 struct filter filters[] = {
 	{ "static", filter_static }
@@ -379,12 +433,14 @@ struct config * build_config ( char *err, int errlen ) {
 		goto freeres;
 		return NULL;
 	}
+
 #if 0
 	//This is the global root default
 	if ( ( config->root_default = get_char_value( t, "root_default" ) ) ) {
 		config->root_default = strdup( config->root_default );
 	} 
 #endif
+
 freeres:
 	//Destroy lua_State and the tables...
 	lt_free( t );
@@ -520,27 +576,6 @@ int ssl_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 	return 0;
 }
-
-
-int f_proc ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
-return 0;
-}
-
-
-struct values {
-	int port;
-	int ssl;
-	int start;
-	int kill;
-	int fork;
-	char *user;
-}; 
-
-struct senderrecvr sr[] = {
-	{ h_read, h_proc, h_write }
-, { t_read, NULL, t_write  }
-,	{ NULL }
-};
 
 
 int help () {
@@ -699,6 +734,9 @@ int srv_fork ( int fd ) {
 	}
 	else if ( cpid ) {
 		srv_generaterequest( fd );
+		if ( close( fd ) == -1 ) {
+			fprintf( stderr, "Child couldn't close its socket." );
+		}
 	}
 	return 1;
 }
@@ -735,7 +773,6 @@ int accept_loop1( struct sockAbstr *su, struct model *srv_type, char *err, int e
 		socklen_t addrlen = sizeof (struct sockaddr);	
 		int fd, status;	
 		
-	#if 1
 		status = srv_accept( su->fd, &addrinfo, &addrlen, &fd, err, errlen );
 		if ( status == AC_EAGAIN || status == AC_EMFILE || status == AC_EEINTR ) {
 			continue;
@@ -744,140 +781,25 @@ int accept_loop1( struct sockAbstr *su, struct model *srv_type, char *err, int e
 			FPRINTF( "accept() failed: %s\n", err );
 			return 0;
 		}
-	#else
-		//Accept a connection if possible...
-		if (( fd = accept( su->fd, &addrinfo, &addrlen )) == -1 ) {
-			//TODO: Need to check if the socket was non-blocking or not...
-			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
-				//This should just try to read again
-				FPRINTF( "Try accept again.\n" );
-				continue;	
-			}
-			else if ( errno == EMFILE || errno == ENFILE ) { 
-				//These both refer to open file limits
-				FPRINTF( "Too many open files, try closing some requests.\n" );
-				continue;	
-			}
-			else if ( errno == EINTR ) { 
-				//In this situation we'll handle signals
-				FPRINTF( "Signal received. (Not coded yet.)\n" );
-				continue;	
-			}
-			else {
-				//All other codes really should just stop. 
-				//If you have other open sockets, they should be closed here.
-				snprintf( err, errlen, "accept() failed: %s\n", strerror( errno ) );
-				return 0;
-			}
-		}
-	#endif
 
 		if ( !srv_setsocketoptions( fd ) ) {
 			//close the connection if something fails here
 			continue;
 		}
 
-	#if 1
 		if ( !srv_writelog( fd, &addrinfo ) ) {
 			//something else happened, but it's not fatal...
 			continue;
 		}
-	#else
-		//Dump the client info and the child fd
-		if ( 1 ) {
-			struct sockaddr_in *cin = (struct sockaddr_in *)&addrinfo;
-			char *ip = inet_ntoa( cin->sin_addr );
-			fprintf( stderr, "Got request from: %s on new file: %d\n", ip, fd );	
-		}
-		//Logging happens here...
-	#endif
 
-#if 1
 		if ( !srv_type->exec( fd ) ) {
 			//This is not technically a failure either...
 		}
-#else
-	#if 0
-		//Fork and go crazy
-		pid_t cpid = fork();
-		if ( cpid == -1 ) {
-			//TODO: There is most likely a reason this didn't work.
-			fprintf( stderr, "Failed to setup new child connection. %s\n", strerror(errno) );
-		}
-		else if ( cpid == 0 ) {
-			//TODO: The parent should probably log some important info here.	
-			fprintf(stderr, "in parent...\n" );
-			//Close the file descriptor here?
-			if ( close( fd ) == -1 ) {
-				fprintf( stderr, "Parent couldn't close socket." );
-			}
-		}
-		else if ( cpid ) {
-			//Building config may need to take place here...
-	#endif
-			//All the processing occurs here.
-			struct HTTPBody rq = { 0 }; 
-			struct HTTPBody rs = { 0 };
-			struct senderrecvr *f = &sr[ 0 ]; 
-			int status = 0;
-		#if 0
-			//TODO: This doesn't seem quite optimal, but I'm doing it.
-			struct SSLContext ssl = {
-				.read = gnutls_record_recv
-			, .write = gnutls_record_send
-			, .data = (void *)&rq
-			}; 
-		#endif
-			//Read the message	
-		#if 0
-			if (( status = f->read( fd, &rq, &rs, sptr )) == -1 ) {
-		#else
-			if (( status = f->read( fd, &rq, &rs, NULL )) == -1 ) {
-		#endif
-				//what to do with the response...
-			}
-
-print_httpbody( &rq );
-			//Generate a new message	
-			//If status was successful, then do this...
-			if ( f->proc && ( status = f->proc( fd, &rq, &rs, NULL )) == -1 ) {
-				//...
-			}
-
-			//Write a new message	
-		#if 0
-			if (( status = f->write( fd, &rq, &rs, &session )) == -1 ) {
-		#else
-			if (( status = f->write( fd, &rq, &rs, NULL )) == -1 ) {
-		#endif
-				//...
-			}
-FPRINTF( "Write complete.\n" );
-			//Free this and close the file
-			http_free_body( &rs );
-			http_free_body( &rq );
-
-		#if 1
-		break;
-		#else
-			if ( close( fd ) == -1 ) {
-				fprintf( stderr, "Couldn't close child socket. %s\n", strerror(errno) );
-				return 1;
-			}
-		}
-		#endif
-#endif
 	}
 	return 1;
 }
 
 
-struct model models[] = {
-	{ srv_fork, srv_dummy },	
-	{ srv_thread, srv_dummy },	
-	{ srv_vanilla, srv_dummy },	
-	{ srv_test, srv_inccount },	
-};
 
 
 //We can also choose to daemonize the server or not.
