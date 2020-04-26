@@ -31,6 +31,12 @@ struct senderrecvr {
 	void *writef;
 }; 
 
+struct model {
+	int (*exec)( int );
+	int (*stop)( int * );
+	void *data;
+};
+
 struct filter filters[] = {
 	{ "static", filter_static }
 , { "dirent", filter_dirent }
@@ -47,6 +53,10 @@ extern const char http_400_custom[];
 extern const char http_400_fixed[];
 extern const char http_500_custom[];
 extern const char http_500_fixed[];
+
+const int AC_EAGAIN = 2;
+const int AC_EMFILE = 3;
+const int AC_EEINTR = 4;
 
 const int defport = 2000;
 int arg_verbose = 0;
@@ -559,132 +569,220 @@ void print_options ( struct values *v ) {
 }
 
 
-
-int main (int argc, char *argv[]) {
-	struct values values = { 0 };
-	char err[ 2048 ] = { 0 };
-
-	if ( argc < 2 ) {
-		return help();
-	}
+int srv_accept( int parent, struct sockaddr *addrinfo, socklen_t *addrlen, int *child, char *err, int errlen ) {
 	
-	while ( *argv ) {
-		if ( strcmp( *argv, "--start" ) == 0 ) 
-			values.start = 1;
-		else if ( strcmp( *argv, "--kill" ) == 0 ) 
-			values.kill = 1;
-		else if ( strcmp( *argv, "--ssl" ) == 0 ) 
-			values.ssl = 1;
-		else if ( strcmp( *argv, "--daemonize" ) == 0 ) 
-			values.fork = 1;
-		else if ( strcmp( *argv, "--debug" ) == 0 ) 
-			arg_debug = 1;
-		else if ( strcmp( *argv, "--port" ) == 0 ) {
-			argv++;
-			if ( !*argv ) {
-				fprintf( stderr, "Expected argument for --port!" );
-				return 0;
-			} 
-			values.port = atoi( *argv );
+	//Accept a connection if possible...
+	if (( *child = accept( parent, addrinfo, addrlen )) == -1 ) {
+		//TODO: Need to check if the socket was non-blocking or not...
+		if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+			//This should just try to read again
+			FPRINTF( "Try accept again.\n" );
+			return AC_EAGAIN;	
 		}
-		else if ( strcmp( *argv, "--user" ) == 0 ) {
-			argv++;
-			if ( !*argv ) {
-				fprintf( stderr, "Expected argument for --user!" );
-				return 0;
-			} 
-			values.user = strdup( *argv );
+		else if ( errno == EMFILE || errno == ENFILE ) { 
+			//These both refer to open file limits
+			FPRINTF( "Too many open files, try closing some requests.\n" );
+			return AC_EMFILE;	
 		}
-		argv++;
+		else if ( errno == EINTR ) { 
+			//In this situation we'll handle signals
+			FPRINTF( "Signal received. (Not coded yet.)\n" );
+			return AC_EEINTR;	
+		}
+		else {
+			//All other codes really should just stop. 
+			snprintf( err, errlen, "accept() failed: %s\n", strerror( errno ) );
+			return 0;
+		}
 	}
+	return 1;
+}  
 
-	if ( arg_debug ) {
-		print_options( &values );
-	}
 
-	//Set all of the socket stuff
-	struct sockAbstr su;
-	int *port = !values.port ? (int *)&defport : &values.port;
-	populate_tcp_socket( &su, port );
-
-	if ( arg_debug ) {
-		print_socket( &su ); 
-	}
-
-	if ( !open_listening_socket( &su, err, sizeof(err) ) ) {
-		fprintf( stderr, "%s\n", err );
-		close_listening_socket( &su, err, sizeof(err) );
+//Sets all socket options in one place
+int srv_setsocketoptions ( int fd ) {
+	if ( fcntl( fd, F_SETFD, O_NONBLOCK ) == -1 ) {
+		FPRINTF( "fcntl error at child socket: %s\n", strerror(errno) ); 
 		return 0;
 	}
+	return 1;
+}
 
-	//Handle SSL here
-	#if 0
-	struct gnutls_abstr g;
-	open_ssl_context( &g );
-	//Initialize SSL?
-	#endif
 
-	//If I could open a socket and listen successfully, then write the PID
-	#if 0
-	if ( values.fork ) {
-		pid_t pid = fork();
-		if ( pid == -1 ) {
-			fprintf( stderr, "Failed to daemonize server process: %s", strerror(errno) );
-			return 0;
-		}
-		else if ( !pid ) {
-			//Close the parent?
-			return 0;
-		}
-		else if ( pid ) {
-			int len, fd = 0;
-			char buf[64] = { 0 };
+//Serves as a logging function for now.
+int srv_writelog ( int fd, struct sockaddr *addrinfo ) {
+	struct sockaddr_in *cin = (struct sockaddr_in *)addrinfo;
+	char *ip = inet_ntoa( cin->sin_addr );
+	fprintf( stderr, "Got request from: %s on new file: %d\n", ip, fd );	
+	return 1;
+}
 
-			if ( (fd = open( pidfile, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR )) == -1 )
-				return ERRL( "Failed to access PID file: %s.", strerror(errno));
 
-			len = snprintf( buf, 63, "%d", pid );
 
-			//Write the pid down
-			if (write( fd, buf, len ) == -1)
-				return ERRL( "Failed to log PID: %s.", strerror(errno));
-		
-			//The parent exited successfully.
-			if ( close(fd) == -1 )
-				return ERRL( "Could not close parent socket: %s", strerror(errno));
-			return SUC_PARENT;
+//Handles generating a request
+int srv_generaterequest ( int fd ) {
+	//TODO: Building config may need to take place here...
+	struct HTTPBody rq, rs;
+	struct senderrecvr *f = &sr[ 0 ]; 
+	int status = 0;
+	memset( &rq, 0, sizeof( struct HTTPBody ) );
+	memset( &rs, 0, sizeof( struct HTTPBody ) );
+#if 1
+	void *session = NULL;
+#else
+	//TODO: This doesn't seem quite optimal, but I'm doing it.
+	struct SSLContext ssl = {
+		.read = gnutls_record_recv
+	, .write = gnutls_record_send
+	, .data = (void *)&rq
+	}; 
+#endif
+
+	//Read the message
+	if (( status = f->read( fd, &rq, &rs, session )) == -1 ) {
+	}
+	FPRINTF( "Read complete.\n" );
+
+	//Dump the body?
+	print_httpbody( &rq );
+
+	//Generate a message	
+	if ( f->proc && ( status = f->proc( fd, &rq, &rs, NULL )) == -1 ) {
+	}
+	FPRINTF( "Proc complete.\n" );
+
+	//Write a new message	
+	if (( status = f->write( fd, &rq, &rs, session )) == -1 ) {
+	}
+	FPRINTF( "Write complete.\n" );
+
+	//Free this and close the file
+	http_free_body( &rs );
+	http_free_body( &rq );
+
+	if ( close( fd ) == -1 ) {
+		fprintf( stderr, "Couldn't close child socket. %s\n", strerror(errno) );
+		return 1;
+	}
+
+	FPRINTF( "Deallocation complete.\n" );
+	return 1;
+}
+
+
+int srv_dummy ( int *times ) {
+	return 0;
+}
+
+int srv_inccount( int *times ) {
+	(*times) += 1;
+	return ( *times > 1 );
+}
+
+
+//Use forks
+int srv_fork ( int fd ) {
+	//Fork and go crazy
+	pid_t cpid = fork();
+	if ( cpid == -1 ) {
+		//TODO: There is most likely a reason this didn't work.
+		fprintf( stderr, "Failed to setup new child connection. %s\n", strerror(errno) );
+		return 0;
+	}
+	else if ( cpid == 0 ) {
+		//TODO: The parent should probably log some important info here.	
+		fprintf(stderr, "in parent...\n" );
+		//Close the file descriptor here?
+		if ( close( fd ) == -1 ) {
+			fprintf( stderr, "Parent couldn't close socket." );
 		}
 	}
-	#endif
+	else if ( cpid ) {
+		srv_generaterequest( fd );
+	}
+	return 1;
+}
 
 
-	//Let's start the accept loop here...
-	for ( ;; ) {
+//Use threads
+int srv_thread ( int fd ) {
+	return 0;
+}
+
+
+//Use no means of concurrency
+int srv_vanilla ( int fd ) {
+	srv_generaterequest( fd );
+	return 1;
+}
+
+
+//Use no means of concurrency and assume that the process is done after one iteration
+int srv_test( int fd ) {
+	srv_generaterequest( fd );
+	return 1;
+}
+
+
+//Loop should be extracted out
+int accept_loop1( struct sockAbstr *su, struct model *srv_type, char *err, int errlen ) {
+
+	//This can have one global variable that controls how long the loop runs...
+	int times = 0;
+	for ( ; !srv_type->stop( &times ) ; ) {
 		//Client address and length?
 		struct sockaddr addrinfo;	
 		socklen_t addrlen = sizeof (struct sockaddr);	
-		int fd;	
-
-		//Accept a connection if possible...
-		if (( fd = accept( su.fd, &addrinfo, &addrlen )) == -1 ) {
-			//TODO: Need to check if the socket was non-blocking or not...
-			if ( 0 )
-				; 
-			else {
-				fprintf( stderr, "Accept ran into trouble: %s\n", strerror( errno ) );
-				continue;
-			}
+		int fd, status;	
+		
+	#if 1
+		status = srv_accept( su->fd, &addrinfo, &addrlen, &fd, err, errlen );
+		if ( status == AC_EAGAIN || status == AC_EMFILE || status == AC_EEINTR ) {
+			continue;
 		}
-
-	#if 0
-		//Make the new socket non-blocking too...
-		if ( fcntl( fd, F_SETFD, O_NONBLOCK ) == -1 ) {
-			fprintf( stderr, "fcntl error at child socket: %s\n", strerror(errno) ); 
+		else if ( !status ) {
+			FPRINTF( "accept() failed: %s\n", err );
 			return 0;
+		}
+	#else
+		//Accept a connection if possible...
+		if (( fd = accept( su->fd, &addrinfo, &addrlen )) == -1 ) {
+			//TODO: Need to check if the socket was non-blocking or not...
+			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				//This should just try to read again
+				FPRINTF( "Try accept again.\n" );
+				continue;	
+			}
+			else if ( errno == EMFILE || errno == ENFILE ) { 
+				//These both refer to open file limits
+				FPRINTF( "Too many open files, try closing some requests.\n" );
+				continue;	
+			}
+			else if ( errno == EINTR ) { 
+				//In this situation we'll handle signals
+				FPRINTF( "Signal received. (Not coded yet.)\n" );
+				continue;	
+			}
+			else {
+				//All other codes really should just stop. 
+				//If you have other open sockets, they should be closed here.
+				snprintf( err, errlen, "accept() failed: %s\n", strerror( errno ) );
+				return 0;
+			}
 		}
 	#endif
 
+		if ( !srv_setsocketoptions( fd ) ) {
+			//close the connection if something fails here
+			continue;
+		}
+
 	#if 1
+		if ( !srv_writelog( fd, &addrinfo ) ) {
+			//something else happened, but it's not fatal...
+			continue;
+		}
+	#else
 		//Dump the client info and the child fd
 		if ( 1 ) {
 			struct sockaddr_in *cin = (struct sockaddr_in *)&addrinfo;
@@ -694,6 +792,11 @@ int main (int argc, char *argv[]) {
 		//Logging happens here...
 	#endif
 
+#if 1
+		if ( !srv_type->exec( fd ) ) {
+			//This is not technically a failure either...
+		}
+#else
 	#if 0
 		//Fork and go crazy
 		pid_t cpid = fork();
@@ -763,6 +866,127 @@ FPRINTF( "Write complete.\n" );
 			}
 		}
 		#endif
+#endif
+	}
+	return 1;
+}
+
+
+struct model models[] = {
+	{ srv_fork, srv_dummy },	
+	{ srv_thread, srv_dummy },	
+	{ srv_vanilla, srv_dummy },	
+	{ srv_test, srv_inccount },	
+};
+
+
+//We can also choose to daemonize the server or not.
+//But is this too complicated?
+#if 0
+int daemonizer() {
+	//If I could open a socket and listen successfully, then write the PID
+	#if 0
+	if ( values.fork ) {
+		pid_t pid = fork();
+		if ( pid == -1 ) {
+			fprintf( stderr, "Failed to daemonize server process: %s", strerror(errno) );
+			return 0;
+		}
+		else if ( !pid ) {
+			//Close the parent?
+			return 0;
+		}
+		else if ( pid ) {
+			int len, fd = 0;
+			char buf[64] = { 0 };
+
+			if ( (fd = open( pidfile, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR )) == -1 )
+				return ERRL( "Failed to access PID file: %s.", strerror(errno));
+
+			len = snprintf( buf, 63, "%d", pid );
+
+			//Write the pid down
+			if (write( fd, buf, len ) == -1)
+				return ERRL( "Failed to log PID: %s.", strerror(errno));
+		
+			//The parent exited successfully.
+			if ( close(fd) == -1 )
+				return ERRL( "Could not close parent socket: %s", strerror(errno));
+			return SUC_PARENT;
+		}
+	}
+	#endif
+}
+#endif
+
+int main (int argc, char *argv[]) {
+	struct values values = { 0 };
+	char err[ 2048 ] = { 0 };
+
+	if ( argc < 2 ) {
+		return help();
+	}
+	
+	while ( *argv ) {
+		if ( strcmp( *argv, "--start" ) == 0 ) 
+			values.start = 1;
+		else if ( strcmp( *argv, "--kill" ) == 0 ) 
+			values.kill = 1;
+		else if ( strcmp( *argv, "--ssl" ) == 0 ) 
+			values.ssl = 1;
+		else if ( strcmp( *argv, "--daemonize" ) == 0 ) 
+			values.fork = 1;
+		else if ( strcmp( *argv, "--debug" ) == 0 ) 
+			arg_debug = 1;
+		else if ( strcmp( *argv, "--port" ) == 0 ) {
+			argv++;
+			if ( !*argv ) {
+				fprintf( stderr, "Expected argument for --port!" );
+				return 0;
+			} 
+			values.port = atoi( *argv );
+		}
+		else if ( strcmp( *argv, "--user" ) == 0 ) {
+			argv++;
+			if ( !*argv ) {
+				fprintf( stderr, "Expected argument for --user!" );
+				return 0;
+			} 
+			values.user = strdup( *argv );
+		}
+		argv++;
+	}
+
+	if ( arg_debug ) {
+		print_options( &values );
+	}
+
+	//Set all of the socket stuff
+	struct sockAbstr su;
+	int *port = !values.port ? (int *)&defport : &values.port;
+	populate_tcp_socket( &su, port );
+
+	if ( arg_debug ) {
+		print_socket( &su ); 
+	}
+
+	if ( !open_listening_socket( &su, err, sizeof(err) ) ) {
+		fprintf( stderr, "%s\n", err );
+		close_listening_socket( &su, err, sizeof(err) );
+		return 0;
+	}
+
+	//Handle SSL here
+	#if 0
+	struct gnutls_abstr g;
+	open_ssl_context( &g );
+	//Initialize SSL?
+	#endif
+
+	//What kinds of problems can occur here?
+	if ( !accept_loop1( &su, &models[3], err, sizeof(err) ) ) {
+		fprintf( stderr, "Server failed. Error: %s\n", err );
+		return 1;
 	}
 
 	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
