@@ -10,6 +10,20 @@
 #define AC_EMFILE 31
 #define AC_EEINTR 41
 
+#if 1
+	//#define CAFILE   "/etc/ssl/certs/ca-certificates.crt"
+	#define FPATH "tlshelp/"
+	#define KEYFILE  FPATH "x509-server-key.pem"
+	#define CERTFILE FPATH "x509-server.pem"
+	#define CAFILE   FPATH "x509-ca.pem"
+	#define CRLFILE  FPATH "crl.pem"
+#else
+	#define FPATH "tlshelp/collinshosting-final/"
+	#define KEYFILE  FPATH "x509-collinshosting-key.pem"
+	#define CERTFILE FPATH "x509-collinshosting-server.pem"
+	#define CAFILE   FPATH "collinshosting_com.ca-bundle"
+	#define CRLFILE  FPATH "crl.pem"
+#endif
 
 struct filter {
 	const char *name;
