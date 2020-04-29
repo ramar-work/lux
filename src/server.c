@@ -31,27 +31,24 @@ TODO
 #include "filter-echo.h"
 #include "filter-lua.h"
 #include "filter-c.h"
-//#include "ssl-gnutls.h"
-//#include "ssl-axtls.h"
-//#include "ssl-nossl.h"
+#include "ssl-gnutls.h"
 #include "server.h"
 
+#define CTXTYPE 1
 
-#define CTXTYPE 0
-
-int proc_ctx ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *);
-int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *);
-int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *);
-void free_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *);
-int accept_notls ( struct sockAbstr *su, int *child, char *err, int errlen );
-int read_static ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *);
-int write_static ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *);
+int pctx ( int, struct HTTPBody *, struct HTTPBody *, void *);
+void create_notls ( void **p ); 
+int read_notls ( int, struct HTTPBody *, struct HTTPBody *, void *);
+int write_notls ( int, struct HTTPBody *, struct HTTPBody *, void *);
+void free_notls ( int, struct HTTPBody *, struct HTTPBody *, void *);
+int accept_notls ( struct sockAbstr *, int *, void *, char *, int );
+int read_static ( int, struct HTTPBody *, struct HTTPBody *, void *);
+int write_static ( int, struct HTTPBody *, struct HTTPBody *, void *);
 
 struct senderrecvr sr[] = {
-	{ proc_ctx, read_notls, write_static, accept_notls, free_notls /*, read_notls, write_notls */ }
-//SSL could use this...
-//, { h_read, h_proc, h_write /*, read_gnutls, write_gnutls, create_gnutls, */ }
-, { NULL, read_static, write_static  }
+	{ pctx, read_notls, write_notls, accept_notls, free_notls, create_notls }
+, { pctx, read_gnutls, write_gnutls, accept_gnutls, free_notls, create_gnutls }
+, { NULL, read_static, write_static, accept_notls, free_notls  }
 ,	{ NULL }
 };
 
@@ -77,9 +74,12 @@ const int defport = 2000;
 int arg_verbose = 0;
 int arg_debug = 0;
 
+//No-op
+void create_notls ( void **p ) { ; }
 
 //Accepts new connections
-int accept_notls ( struct sockAbstr *su, int *child, char *err, int errlen ) {
+int accept_notls ( struct sockAbstr *su, int *child, void *p, char *err, int errlen ) {
+	su->addrlen = sizeof (struct sockaddr);	
 	//Accept a connection if possible...
 	if (( *child = accept( su->fd, &su->addrinfo, &su->addrlen )) == -1 ) {
 		//TODO: Need to check if the socket was non-blocking or not...
@@ -230,45 +230,56 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 //Write
 int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	FPRINTF( "Write started...\n" );
-#if 1
-	//if ( 1 ) write( 2, rq->msg, rq->mlen );
 	int sent = 0;
 	int total = rs->mlen;
 	int pos = 0;
 	int try = 0;
 
-	while ( 1 ) { 
-		FPRINTF( "Attempting to send %d bytes...\n", total );
-		//Consider using a pointer and a buffer...
-		//since read and write have to be rewritten...
-		//ctx->write( fd, ctx->userdata, &rs->msg[ pos ], total );
-		if ( !sent ) {
-			//This is an error...
-			FPRINTF( "Some kind of socket write error occurred.\n" );
+	for ( ;; ) {	
+		sent = send( fd, &rs->msg[ pos ], total, MSG_DONTWAIT );
+		FPRINTF( "Bytes sent: %d\n", sent );
+		if ( sent == 0 ) {
+			FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", rs->mlen );
+			return 1;
 		}
-		else if ( sent == WR_EAGAIN ) {
-			if ( ++try == 2 ) {
-				FPRINTF( "Tried three times to read from socket. We're done.\n" );
-				FPRINTF( "rs->mlen: %d\n", rs->mlen );
-				//rq->msg = buf;
-				break;
-			}
-			FPRINTF( "Tried %d times to read from socket. Trying again?.\n", try );
+		else if ( sent > -1 ) {
+			//continue resending...
+			pos += sent;
+			total -= sent;	
 		}
-		else {
-			if ( total == 0 ) {
-				break;
-			}
-			else if ( sent == 0 ) {
+		else /*if ( sent == -1 )*/ {
+			//TODO: Can't close a most-likely closed socket.  What do you do?
+			if ( errno == EBADF )
+				return 0;
+			else if ( errno == ECONNREFUSED )
+				return 0;
+			else if ( errno == EFAULT )
+				return 0;
+			else if ( errno == EINTR )
+				return 0;
+			else if ( errno == EINVAL )
+				return 0;
+			else if ( errno == ENOMEM )
+				return 0;
+			else if ( errno == ENOTCONN )
+				return 0;
+			else if ( errno == ENOTSOCK )
+				return 0;
+			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				if ( ++try == 2 ) {
+					FPRINTF( "Tried three times to write to socket. We're done.\n" );
+					FPRINTF( "rs->mlen: %d\n", rs->mlen );
+					//rq->msg = buf;
+					return 0;	
+				}
+				FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
 			}
 			else {
-				//continue resending...
-				pos += sent;
-				total -= sent;	
+				//this would just be some uncaught condition...
+				FPRINTF( "Caught some unknown condition.\n" );
 			}
 		}
 	}
-#endif
 	FPRINTF( "Write complete.\n" );
 	return 1;
 }
@@ -407,7 +418,7 @@ int check_dir ( struct host *host, char *err, int errlen ) {
 
 
 //Generate a response via one of the selected filters
-int proc_ctx ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *p ) {
+int pctx ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *p ) {
 	FPRINTF( "Proc started...\n" );
 	char err[2048] = {0};
 	Table *t = NULL;
@@ -491,18 +502,17 @@ int srv_writelog ( int fd, struct sockAbstr *su ) {
 int accept_loop1( struct sockAbstr *su, char *err, int errlen ) {
 
 	//Initialize
-	struct senderrecvr *ctx = &sr[ 0 ];	
-
+	struct senderrecvr *ctx = &sr[ CTXTYPE ];	
+	ctx->init( &ctx->data );
+	
 	//This can have one global variable
-	int times = 0;
-	for ( ; ; ) {
+	for ( ;; ) {
 		//Client address and length?
-		su->addrlen = sizeof (struct sockaddr);	
 		int fd, status;	
 		pid_t cpid; 
 
 		//Accept
-		status = ctx->accept( su, &fd, err, errlen );
+		status = ctx->accept( su, &fd, ctx->data, err, errlen );
 
 		//SSL problems need to be caught here
 		if ( status == AC_EAGAIN || status == AC_EMFILE || status == AC_EEINTR ) {
@@ -515,7 +525,8 @@ int accept_loop1( struct sockAbstr *su, char *err, int errlen ) {
 
 		//close the connection if something fails here
 		if ( !srv_setsocketoptions( fd ) ) {
-			continue;
+			FPRINTF( "socket %d could not be marked as non-blocking\n", fd );
+			return 0;
 		}
 
 		//If something bad happens when writing logs, what could it be?
@@ -541,22 +552,30 @@ int accept_loop1( struct sockAbstr *su, char *err, int errlen ) {
 			struct HTTPBody rq = {0}, rs = {0};
 			int status = 0;
 
+			//Do any per-request initialization here.
+			//ctx->pre( fd, &rq, &rs, ctx );
+
 			//Read the message
-			ctx->read( fd, &rq, &rs, ctx );
+			ctx->read( fd, &rq, &rs, ctx->data );
 			print_httpbody( &rq ); //Dump the request 
 
 			//Generate a message	
-			ctx->proc && ctx->proc( fd, &rq, &rs, ctx ); 
+			ctx->proc && ctx->proc( fd, &rq, &rs, ctx->data ); 
 
 			//Write a new message	
-			ctx->write( fd, &rq, &rs, ctx );
+			ctx->write( fd, &rq, &rs, ctx->data );
 			print_httpbody( &rs ); //Dump the request 
 
 			//Close out
-			ctx->free( fd, &rq, &rs, ctx );
-			exit( 0 );
+			ctx->free( fd, &rq, &rs, ctx->data );
+			//ctx->post( fd, &rq, &rs, ctx );
+			//_exit( 0 );
+			return 1; 
 		}
 	}
+
+	//Destroy anything that should have been long running.
+	//ctx->free( &ctx->data );
 	return 1;
 }
 

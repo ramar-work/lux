@@ -15,30 +15,18 @@ struct filter {
 	int (*filter)( struct HTTPBody *, struct HTTPBody *, void * );
 };
 
-#if 0
-struct rwctx {
-	const char *name;
-	void * (*create)();	
-	int (*accept)( struct sockAbstr *, int *, char *, int );
-	int (*read)( int, void *, uint8_t *, int  );	
-	int (*write)( int, void *, uint8_t *, int  );
-	void (*destroy)( void *ctx );	
-	void *userdata;
-};
-#endif
-
 struct senderrecvr { 
 	int (*proc)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
 	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
 	int (*write)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
-	int (*accept)( struct sockAbstr *, int *, char *, int );
-#if 0
-	int (*sread)( int, void *, uint8_t *, int  );	
-	int (*swrite)( int, void *, uint8_t *, int  );
-#endif
+	int (*accept)( struct sockAbstr *, int *, void *, char *, int );
 	void (*free)( int, struct HTTPBody *, struct HTTPBody *, void * );
+	void (*init)( void ** );
+#if 0 
 	int (*pre)( int, struct HTTPBody *, struct HTTPBody *, void * );
 	int (*post)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+#endif
+	void *data;
 }; 
 
 struct model {

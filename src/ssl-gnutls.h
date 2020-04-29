@@ -17,11 +17,11 @@ struct gnutls_abstr {
 	const char *keyfile;
 };
 
-void * create_gnutls();
-int accept_gnutls ( struct sockAbstr *, int *, char *, int );
-int read_gnutls( int, void *, uint8_t *, int );	
-int write_gnutls( int, void *, uint8_t *, int  );	
-void destroy_gnutls( void * );
+int accept_gnutls ( struct sockAbstr *, int *, void *, char *, int );
+int read_gnutls ( int, struct HTTPBody *, struct HTTPBody *, void *);
+int write_gnutls ( int, struct HTTPBody *, struct HTTPBody *, void *);
+void free_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *);
+void create_gnutls( void ** );
 
 
 int handshake_gnutls( void *, int );

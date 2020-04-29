@@ -221,12 +221,14 @@ struct sockAbstr * open_listening_socket ( struct sockAbstr *sa, char *err, int 
 struct sockAbstr * close_listening_socket ( struct sockAbstr *sa, char *err, int errlen ) {
 	if ( close( sa->fd ) == -1 ) {
 		snprintf( err, errlen, "Could not close socket file %d: %s\n", sa->fd, strerror(errno) ); 
-		return sa;
+		free( sa->sin );
+		sa->sin = NULL;
+		return NULL;
 	}
 
 	free( sa->sin );
 	sa->sin = NULL;
-	return NULL;
+	return sa;
 }
 
 
