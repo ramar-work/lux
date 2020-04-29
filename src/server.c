@@ -5,17 +5,35 @@ server.c
 This is the basis of hypno's web server.
 
 USAGE
-- 
+-----
+These are the options:
+  --start            Start new servers             
+  --debug            Set debug rules               
+  --kill             Test killing a server         
+  --fork             Daemonize the server          
+  --config <arg>     Use this file for configuration
+  --port <arg>       Set a differnt port           
+  --ssl              Use ssl or not..              
+  --user <arg>       Choose a user to start as     
+
 
 BUILDING
-- 
+--------
+Lua is a necessity because of the configuration parsing. 
+
+Running make is all we need for now on Linux and OSX.  Windows
+will need some additional help and Cygwin as well.
+
 
 TODO
+----
 - Implement threaded model
 - Write a couple of different types of loggers
 - Add global root default for config.lua
 - Is it useful to move the configuration initialization to a
   different part of the code.
+- Add an option to show a parsed config
+
  * -------------------------------------------------------- */
 #include "../vendor/single.h"
 #include <lua.h>
@@ -37,6 +55,8 @@ TODO
 
 #define CTXTYPE 1
 
+#define eprintf(...) fprintf( stderr, "%s: ", "hypno" ) && fprintf( stderr, __VA_ARGS__ ) && fprintf( stderr, "\n" )
+
 int pctx ( int, struct HTTPBody *, struct HTTPBody *, void *);
 
 struct senderrecvr sr[] = {
@@ -55,7 +75,6 @@ struct filter filters[] = {
 , { NULL }
 };
 
-
 extern const char http_200_custom[];
 extern const char http_200_fixed[];
 extern const char http_400_custom[];
@@ -63,9 +82,11 @@ extern const char http_400_fixed[];
 extern const char http_500_custom[];
 extern const char http_500_fixed[];
 
+char *configfile = NULL;
 const int defport = 2000;
 int arg_verbose = 0;
 int arg_debug = 0;
+
 
 //Find a host
 struct host * find_host ( struct host **hosts, char *hostname ) {
@@ -113,7 +134,7 @@ struct config * build_config ( char *err, int errlen ) {
 	}
 
 	//After this conversion takes place, destroy the environment
-	if ( !lua_exec_file( L, "www/config.lua", err, sizeof(err) ) ) {
+	if ( !lua_exec_file( L, configfile, err, sizeof(err) ) ) {
 		goto freeres;
 		return NULL;
 	}
@@ -368,9 +389,13 @@ int help () {
 	fprintf( stderr, fmt, "debug", "set debug rules" );
 	fprintf( stderr, fmt, "kill", "test killing a server" );
 	fprintf( stderr, fmt, "fork", "daemonize the server" );
+	fprintf( stderr, fmt, "config <arg>", "use this file for configuration" );
 	fprintf( stderr, fmt, "port <arg>", "set a differnt port" );
 	fprintf( stderr, fmt, "ssl", "use ssl or not.." );
 	fprintf( stderr, fmt, "user <arg>", "choose a user to start as" );
+#if 0
+	fprintf( stderr, fmt, "dir <arg>", "Use this directory to serve from" );
+#endif
 	return 0;	
 }
 
@@ -382,6 +407,7 @@ void print_options ( struct values *v ) {
 	fprintf( stderr, "%10s: %d\n", "kill", v->kill );	
 	fprintf( stderr, "%10s: %d\n", "port", v->port );	
 	fprintf( stderr, "%10s: %d\n", "fork", v->fork );	
+	fprintf( stderr, "%10s: %s\n", "config", v->config );	
 	fprintf( stderr, "%10s: %s\n", "user", v->user );	
 	fprintf( stderr, "%10s: %s\n", "ssl", v->ssl ? "true" : "false" );	
 }
@@ -429,6 +455,8 @@ int daemonizer() {
 int main (int argc, char *argv[]) {
 	struct values values = { 0 };
 	char err[ 2048 ] = { 0 };
+	struct sockAbstr su;
+	int *port = NULL; 
 
 	if ( argc < 2 ) {
 		return help();
@@ -445,10 +473,18 @@ int main (int argc, char *argv[]) {
 			values.fork = 1;
 		else if ( strcmp( *argv, "--debug" ) == 0 ) 
 			arg_debug = 1;
+		else if ( strcmp( *argv, "--config" ) == 0 ) {
+			argv++;
+			if ( !*argv ) {
+				eprintf( "Expected argument for --config!" );
+				return 0;
+			}
+			values.config = *argv;
+		}
 		else if ( strcmp( *argv, "--port" ) == 0 ) {
 			argv++;
 			if ( !*argv ) {
-				fprintf( stderr, "Expected argument for --port!" );
+				eprintf( "Expected argument for --port!" );
 				return 0;
 			}
 			//TODO: This should be safeatoi 
@@ -457,7 +493,7 @@ int main (int argc, char *argv[]) {
 		else if ( strcmp( *argv, "--user" ) == 0 ) {
 			argv++;
 			if ( !*argv ) {
-				fprintf( stderr, "Expected argument for --user!" );
+				eprintf( "Expected argument for --user!" );
 				return 0;
 			} 
 			values.user = strdup( *argv );
@@ -470,29 +506,54 @@ int main (int argc, char *argv[]) {
 	}
 
 	//Set all of the socket stuff
-	struct sockAbstr su;
-	int *port = !values.port ? (int *)&defport : &values.port;
-	populate_tcp_socket( &su, port );
-
-	if ( arg_debug ) {
-		print_socket( &su ); 
+	if ( !values.port )
+		port = (int *)&defport;
+	else {
+		port = &values.port;
 	}
 
-	if ( !open_listening_socket( &su, err, sizeof(err) ) ) {
-		fprintf( stderr, "%s\n", err );
-		close_listening_socket( &su, err, sizeof(err) );
-		return 0;
+	//Pull in a configuration
+	if ( values.config ) {
+		configfile = values.config;
 	}
-
-	//What kinds of problems can occur here?
-	if ( !accept_loop1( &su, err, sizeof(err) ) ) {
-		fprintf( stderr, "Server failed. Error: %s\n", err );
+	else {
+		eprintf( "No configuration specified." );
 		return 1;
 	}
 
-	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
-		fprintf( stderr, "Couldn't close parent socket. Error: %s\n", err );
-		return 1;
+	//Start a server
+	if ( values.start ) {
+	#if 0
+		if ( values.fork ) {
+			//start a fork...
+		}
+	#endif
+		//Populate the parent socket AND dump the configuration if you need it.
+		if ( populate_tcp_socket( &su, port ) && arg_debug ) {
+			print_socket( &su ); 
+		}
+
+		if ( !open_listening_socket( &su, err, sizeof(err) ) ) {
+			eprintf( "%s", err );
+			close_listening_socket( &su, err, sizeof(err) );
+			return 0;
+		}
+
+		//What kinds of problems can occur here?
+		if ( !accept_loop1( &su, err, sizeof(err) ) ) {
+			eprintf( "Server loop failed. Error: %s", err );
+			return 1;
+		}
+
+		if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
+			eprintf( "Couldn't close parent socket. Error: %s", err );
+			return 1;
+		}
+
+	}
+
+	if ( values.kill ) {
+
 	}
 
 	return 0;

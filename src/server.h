@@ -57,6 +57,7 @@ struct values {
 	int kill;
 	int fork;
 	char *user;
+	char *config;
 };
 
 #endif 
