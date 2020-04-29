@@ -145,7 +145,7 @@ struct sockAbstr * populate_socket ( struct sockAbstr *sa, int protocol, int soc
 	sa->iptype = PF_INET;
 	sa->reuse = SO_REUSEADDR;
 	sa->port = port;
-	sa->ssl_ctx = NULL;
+	sa->ctx = NULL;
 	return sa;
 }
 

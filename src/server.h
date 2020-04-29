@@ -1,17 +1,13 @@
 #include "http.h"
 
-int srv_fork ( int fd );
-int srv_thread ( int fd );
-int srv_vanilla ( int fd );
-int srv_test ( int fd );
-int srv_dummy ( int *times );
-int srv_inccount( int *times );
-int srv_1kiter( int *times );
-int h_read ( int, struct HTTPBody *, struct HTTPBody *, void * );
-int h_proc ( int, struct HTTPBody *, struct HTTPBody *, void * );
-int h_write( int, struct HTTPBody *, struct HTTPBody *, void * );
-int t_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx );
-int t_write( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx );
+#ifndef SERVER_H
+#define SERVER_H
+
+#define RD_EAGAIN 88
+#define WR_EAGAIN 89
+#define AC_EAGAIN 21
+#define AC_EMFILE 31
+#define AC_EEINTR 41
 
 
 struct filter {
@@ -19,18 +15,34 @@ struct filter {
 	int (*filter)( struct HTTPBody *, struct HTTPBody *, void * );
 };
 
+#if 0
+struct rwctx {
+	const char *name;
+	void * (*create)();	
+	int (*accept)( struct sockAbstr *, int *, char *, int );
+	int (*read)( int, void *, uint8_t *, int  );	
+	int (*write)( int, void *, uint8_t *, int  );
+	void (*destroy)( void *ctx );	
+	void *userdata;
+};
+#endif
+
 struct senderrecvr { 
-	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
 	int (*proc)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
 	int (*write)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	int (*accept)( struct sockAbstr *, int *, char *, int );
+#if 0
+	int (*sread)( int, void *, uint8_t *, int  );	
+	int (*swrite)( int, void *, uint8_t *, int  );
+#endif
+	void (*free)( int, struct HTTPBody *, struct HTTPBody *, void * );
 	int (*pre)( int, struct HTTPBody *, struct HTTPBody *, void * );
 	int (*post)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
-	void *readf;
-	void *writef;
 }; 
 
 struct model {
-	int (*exec)( int );
+	int (*exec)( int, void * );
 	int (*stop)( int * );
 	void *data;
 };
@@ -42,4 +54,6 @@ struct values {
 	int kill;
 	int fork;
 	char *user;
-}; 
+};
+
+#endif 

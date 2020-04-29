@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include "ssl.h"
 #include "socket.h"
+#include "server.h"
 #include "util.h"
 #include <assert.h>
 
@@ -18,7 +19,9 @@ struct gnutls_abstr {
 
 void * create_gnutls();
 int accept_gnutls ( struct sockAbstr *, int *, char *, int );
-int handshake_gnutls( void *, int );
-int read_gnutls( void * );
-int write_gnutls( void * );
+int read_gnutls( int, void *, uint8_t *, int );	
+int write_gnutls( int, void *, uint8_t *, int  );	
 void destroy_gnutls( void * );
+
+
+int handshake_gnutls( void *, int );

@@ -24,7 +24,7 @@ struct sockAbstr {
 	struct sockaddr_in *sin;	
 	struct sockaddr addrinfo; 
 	socklen_t addrlen;
-	void *ssl_ctx;
+	void *ctx;
 };
 
 int read_from_socket ( int fd, uint8_t **b, void (*readMore)(int *, void *) );

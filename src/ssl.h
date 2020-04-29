@@ -28,17 +28,6 @@ struct SSLContext {
 	int *fd;
 };
 
-struct sslctx {
-	const char *name;
-	void * (*create)();	
-	//int (*handshake)( void *, int );	
-	int (*accept)( struct sockAbstr *, int *, char *, int );
-	int (*read)( void *ctx );	
-	int (*write)( void *ctx );	
-	void (*destroy)( void *ctx );	
-	void *userdata;
-};
-
 //void open_ssl_context( struct gnutls_abstr * );
 
 #endif

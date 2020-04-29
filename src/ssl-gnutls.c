@@ -35,7 +35,7 @@ void * create_gnutls() {
 
 int accept_gnutls ( struct sockAbstr *su, int *child, char *err, int errlen ) {
 	//struct gnutls_abstr *g = (struct gnutls_abstr *)su->ssl_ctx->userdata;
-	struct sslctx *v = su->ssl_ctx;
+	struct rwctx *v = su->ctx;
 	struct gnutls_abstr *g = (struct gnutls_abstr *)v->userdata;
 	 
 
@@ -75,58 +75,20 @@ int accept_gnutls ( struct sockAbstr *su, int *child, char *err, int errlen ) {
 	}
 
 	FPRINTF( "GnuTLS handshake succeeded.\n" );
-exit(0);
 	return 1;
 }
 
 
-
-
-int handshake_gnutls( void *ctx, int fd ) {
-	struct gnutls_abstr *g = (struct gnutls_abstr *)ctx;
-#if 1
-	int success=0;
-	//SSL again
-	gnutls_session_t session, *sptr = NULL;
-	if ( 1 ) {
-		gnutls_init( &g->session, GNUTLS_SERVER );
-		gnutls_priority_set( g->session, g->priority_cache );
-		gnutls_credentials_set( g->session, GNUTLS_CRD_CERTIFICATE, g->x509_cred );
-		//NOTE: I need to do this b/c clients aren't expected to send a certificate with their request
-		gnutls_certificate_server_set_request( g->session, GNUTLS_CERT_IGNORE ); 
-		gnutls_handshake_set_timeout( g->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT ); 
-		//Bind the current file descriptor to GnuTLS instance.
-		gnutls_transport_set_int( g->session, fd );
-		//Do the handshake here
-		//TODO: I write nothing that looks like this, please refactor it...
-		int success = 0;
-		do {
-			success = gnutls_handshake( g->session );
-		} while ( success == GNUTLS_E_AGAIN || success == GNUTLS_E_INTERRUPTED );	
-		if ( success < 0 ) {
-			close( fd );
-			gnutls_deinit( g->session );
-			//TODO: Log all handshake failures.  Still don't know where.
-			FPRINTF( "SSL handshake failed.\n" );
-			//continue;
-		}
-		FPRINTF( "SSL handshake successful.\n" );
-		sptr = &g->session;
-	}
-#endif
-	return 1;
-}
-
-int read_gnutls( void *ctx ) {
+int read_gnutls( int fd, void *ctx, uint8_t *buffer, int size ) {
 	struct gnutls_abstr *g = (struct gnutls_abstr *)ctx;
 #if 1
 	int rd = 0;
 	char buf[ 2048 ];
-	int size = sizeof(buf) - 1;
+	int sz = sizeof(buf) - 1;
 	memset( buf, 0, sizeof( buf ) );
 
 	//gnutls_session_t *ss = (gnutls_session_t *)sess;
-	if ( ( rd = gnutls_record_recv( g->session, buf, size ) ) > 0 ) {
+	if ( ( rd = gnutls_record_recv( g->session, buf, sz ) ) > 0 ) {
 		FPRINTF( "SSL might be fine... got %d from gnutls_record_recv\n", rd );
 	}
 	else if ( rd == GNUTLS_E_REHANDSHAKE ) {
@@ -147,10 +109,95 @@ int read_gnutls( void *ctx ) {
 	return 1;
 }
 
-int write_gnutls( void *ctx ) {
+
+int write_gnutls( int fd, void *ctx, uint8_t *buffer, int size ) {
 	return 1;
 }
+
 
 void destroy_gnutls( void *ctx ) {
 }
 
+#if 0
+int read_gnutls( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
+	FPRINTF( "Read started...\n" );
+#if 1
+	//Read all the data from a socket.
+	unsigned char *buf = malloc( 1 );
+	int mult = 0;
+	int try=0;
+	const int size = 32767;	
+	char err[ 2048 ] = {0};
+
+	//Read first
+	while ( 1 ) {
+		int rd=0;
+		int bfsize = size * (++mult); 
+		unsigned char buf2[ size ]; 
+		memset( buf2, 0, size );
+
+		//Read into a static buffer
+		if ( ( rd = recv( fd, buf2, size, MSG_DONTWAIT ) ) == --1 ) {
+			//A subsequent call will tell us a lot...
+			FPRINTF( "Couldn't read all of message...\n" );
+			//whatsockerr( errno );
+			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				if ( ++try == 2 ) {
+					FPRINTF("Tried three times to read from socket. We're done.\n" );
+					FPRINTF("rq->mlen: %d\n", rq->mlen );
+					FPRINTF("%p\n", buf );
+					//rq->msg = buf;
+					break;
+				}
+				FPRINTF("Tried %d times to read from socket. Trying again?.\n", try );
+			}
+			else {
+				//this would just be some uncaught condition...
+				return http_set_error( rs, 500, strerror( errno ) );
+			}
+		}
+		else if ( rd == 0 ) {
+			//will a zero ALWAYS be returned?
+			rq->msg = buf;
+			break;
+		}
+	#if 0
+		else if ( rd == GNUTLS_E_REHANDSHAKE ) {
+			fprintf(stderr, "SSL got handshake reauth request..." );
+			continue;
+		}
+		else if ( rd == GNUTLS_E_INTERRUPTED || rd == GNUTLS_E_AGAIN ) {
+			fprintf(stderr, "SSL was interrupted...  Try request again...\n" );
+			continue;
+		}
+	#endif
+		else {
+			//realloc manually and read
+			if ((buf = realloc( buf, bfsize )) == NULL ) {
+				return http_set_error( rs, 500, "Could not allocate read buffer." ); 
+			}
+
+			//Copy new data and increment bytes read
+			memset( &buf[ bfsize - size ], 0, size ); 
+#if 0
+			fprintf(stderr, "buf: %p\n", buf );
+			fprintf(stderr, "buf2: %p\n", buf2 );
+			fprintf(stderr, "pos: %d\n", bfsize - size );
+#endif
+			memcpy( &buf[ bfsize - size ], buf2, rd ); 
+			rq->mlen += rd;
+			rq->msg = buf; //TODO: You keep resetting this, only needs to be done once...
+
+			//show read progress and data received, etc.
+			FPRINTF( "Recvd %d bytes on fd %d\n", rd, fd ); 
+		}
+	}
+
+	if ( !http_parse_request( rq, err, sizeof(err) ) ) {
+		return http_set_error( rs, 500, err ); 
+	}
+#endif
+	FPRINTF( "Read complete.\n" );
+	return 1;
+}
+#endif
