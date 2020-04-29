@@ -22,6 +22,8 @@ struct sockAbstr {
 	int family;
 	int *port;
 	struct sockaddr_in *sin;	
+	struct sockaddr addrinfo; 
+	socklen_t addrlen;
 	void *ssl_ctx;
 };
 

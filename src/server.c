@@ -26,19 +26,21 @@ TODO
 #include "socket.h"
 #include "util.h"
 #include "ssl.h"
+#include "ssl-gnutls.h"
+#include "ssl-axtls.h"
 #include "filter-static.h"
 #include "filter-dirent.h"
 #include "filter-echo.h"
 #include "filter-lua.h"
 #include "filter-c.h"
 
-
-int srv_fork ( int fd );
-int srv_thread ( int fd );
-int srv_vanilla ( int fd );
-int srv_test ( int fd );
+int srv_fork ( int, void * );
+int srv_thread ( int, void * );
+int srv_vanilla ( int, void * );
+int srv_test ( int, void * );
 int srv_dummy ( int *times );
 int srv_inccount( int *times );
+int srv_1kiter( int *times );
 int h_read ( int, struct HTTPBody *, struct HTTPBody *, void * );
 int h_proc ( int, struct HTTPBody *, struct HTTPBody *, void * );
 int h_write( int, struct HTTPBody *, struct HTTPBody *, void * );
@@ -62,7 +64,7 @@ struct senderrecvr {
 }; 
 
 struct model {
-	int (*exec)( int );
+	int (*exec)( int, void * );
 	int (*stop)( int * );
 	void *data;
 };
@@ -97,6 +99,15 @@ struct filter filters[] = {
 , { "echo", filter_echo }
 , { "lua", filter_lua }
 , { "c", filter_c }
+, { NULL }
+};
+
+#define SSLTYPE 0
+
+
+struct sslctx sslctx[] = {
+	{ "gnuTLS", create_gnutls, accept_gnutls, read_gnutls, write_gnutls, destroy_gnutls}
+, { "axTLS", create_axtls, NULL, read_axtls, write_axtls, destroy_axtls }
 , { NULL }
 };
 
@@ -151,7 +162,7 @@ int t_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 }
 
 
-int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
+int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *ssl ) {
 	//Read all the data from a socket.
 	unsigned char *buf = malloc( 1 );
 	int mult = 0;
@@ -167,10 +178,14 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 		memset( buf2, 0, size );
 
 		//Read functions...
-		if ( !sess ) {
+		if ( !ssl )
 			rd = recv( fd, buf2, size, MSG_DONTWAIT );
-		}
 		else {
+	#if 1
+			//Handshake is done first, then read
+			//ssl->handshake( ssl->userdata );	
+	#else
+		#if 0
 			gnutls_session_t *ss = (gnutls_session_t *)sess;
 			if ( ( rd = gnutls_record_recv( *ss, buf2, size ) ) > 0 ) {
 				fprintf(stderr, "SSL might be fine... got %d from gnutls_record_recv\n", rd );
@@ -189,6 +204,8 @@ int h_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *sess ) {
 				fprintf(stderr, "SSL got error code: %d, meaning '%s'.\n", rd, gnutls_strerror( rd ) );
 				continue;
 			}
+		#endif
+	#endif
 		}
 
 		//Read into a static buffer
@@ -550,7 +567,7 @@ int h_proc ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 
 
 
-int ssl_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
+int _ssl_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 	//write (write all the data in one call if you fork like this) 
 	if ( write( fd, http_200_fixed, strlen(http_200_fixed)) == -1 ) {
 		fprintf(stderr, "Couldn't write all of message..." );
@@ -563,7 +580,7 @@ int ssl_write ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 
 //read (reads a message)
-int ssl_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
+int _ssl_read ( int fd, struct HTTPBody *rq, struct HTTPBody *rs ) {
 	//read (read all the data in one call if you fork like this)
 	const int size = 100000;
 	unsigned char *rqb = malloc( size );
@@ -604,10 +621,11 @@ void print_options ( struct values *v ) {
 }
 
 
-int srv_accept( int parent, struct sockaddr *addrinfo, socklen_t *addrlen, int *child, char *err, int errlen ) {
+//int srv_accept( int parent, struct sockaddr *addrinfo, socklen_t *addrlen, int *child, char *err, int errlen ) {
+int srv_accept( struct sockAbstr *su, int *child, char *err, int errlen ) {
 	
 	//Accept a connection if possible...
-	if (( *child = accept( parent, addrinfo, addrlen )) == -1 ) {
+	if (( *child = accept( su->fd, &su->addrinfo, &su->addrlen )) == -1 ) {
 		//TODO: Need to check if the socket was non-blocking or not...
 		if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
 			//This should just try to read again
@@ -645,36 +663,28 @@ int srv_setsocketoptions ( int fd ) {
 
 
 //Serves as a logging function for now.
-int srv_writelog ( int fd, struct sockaddr *addrinfo ) {
+int srv_writelog ( int fd, struct sockAbstr *su ) {
+#if 0
 	struct sockaddr_in *cin = (struct sockaddr_in *)addrinfo;
 	char *ip = inet_ntoa( cin->sin_addr );
 	fprintf( stderr, "Got request from: %s on new file: %d\n", ip, fd );	
+#endif
 	return 1;
 }
 
 
 
 //Handles generating a request
-int srv_generaterequest ( int fd ) {
+int srv_generaterequest ( int fd, void *ctx ) {
 	//TODO: Building config may need to take place here...
 	struct HTTPBody rq, rs;
 	struct senderrecvr *f = &sr[ 0 ]; 
 	int status = 0;
 	memset( &rq, 0, sizeof( struct HTTPBody ) );
 	memset( &rs, 0, sizeof( struct HTTPBody ) );
-#if 1
-	void *session = NULL;
-#else
-	//TODO: This doesn't seem quite optimal, but I'm doing it.
-	struct SSLContext ssl = {
-		.read = gnutls_record_recv
-	, .write = gnutls_record_send
-	, .data = (void *)&rq
-	}; 
-#endif
 
 	//Read the message
-	if (( status = f->read( fd, &rq, &rs, session )) == -1 ) {
+	if (( status = f->read( fd, &rq, &rs, ctx )) == -1 ) {
 	}
 	FPRINTF( "Read complete.\n" );
 
@@ -682,12 +692,12 @@ int srv_generaterequest ( int fd ) {
 	print_httpbody( &rq );
 
 	//Generate a message	
-	if ( f->proc && ( status = f->proc( fd, &rq, &rs, NULL )) == -1 ) {
+	if ( f->proc && ( status = f->proc( fd, &rq, &rs, ctx )) == -1 ) {
 	}
 	FPRINTF( "Proc complete.\n" );
 
 	//Write a new message	
-	if (( status = f->write( fd, &rq, &rs, session )) == -1 ) {
+	if (( status = f->write( fd, &rq, &rs, ctx )) == -1 ) {
 	}
 	FPRINTF( "Write complete.\n" );
 
@@ -696,7 +706,7 @@ int srv_generaterequest ( int fd ) {
 	http_free_body( &rq );
 
 	if ( close( fd ) == -1 ) {
-		fprintf( stderr, "Couldn't close child socket. %s\n", strerror(errno) );
+		FPRINTF( "Couldn't close child socket. %s\n", strerror(errno) );
 		return 1;
 	}
 
@@ -714,50 +724,54 @@ int srv_inccount( int *times ) {
 	return ( *times > 1 );
 }
 
+int srv_1kiter( int *times ) {
+	(*times) += 1;
+	return ( *times == 1000 );
+}
+
+
 
 //Use forks
-int srv_fork ( int fd ) {
+int srv_fork ( int fd, void *ctx ) {
 	//Fork and go crazy
 	pid_t cpid = fork();
 	if ( cpid == -1 ) {
 		//TODO: There is most likely a reason this didn't work.
-		fprintf( stderr, "Failed to setup new child connection. %s\n", strerror(errno) );
+		FPRINTF( "Failed to setup new child connection. %s\n", strerror(errno) );
 		return 0;
 	}
 	else if ( cpid == 0 ) {
-		//TODO: The parent should probably log some important info here.	
-		fprintf(stderr, "in parent...\n" );
+		//TODO: Logging ought to happen here.
+		FPRINTF( "In parent...\n" );
 		//Close the file descriptor here?
 		if ( close( fd ) == -1 ) {
-			fprintf( stderr, "Parent couldn't close socket." );
+			FPRINTF( "Parent couldn't close socket.\n" );
 		}
 	}
 	else if ( cpid ) {
-		srv_generaterequest( fd );
-		if ( close( fd ) == -1 ) {
-			fprintf( stderr, "Child couldn't close its socket." );
-		}
+		srv_generaterequest( fd, ctx );
+		exit( 0 );
 	}
 	return 1;
 }
 
 
 //Use threads
-int srv_thread ( int fd ) {
+int srv_thread ( int fd, void *ctx ) {
 	return 0;
 }
 
 
 //Use no means of concurrency
-int srv_vanilla ( int fd ) {
-	srv_generaterequest( fd );
+int srv_vanilla ( int fd, void *ctx ) {
+	srv_generaterequest( fd, ctx );
 	return 1;
 }
 
 
 //Use no means of concurrency and assume that the process is done after one iteration
-int srv_test( int fd ) {
-	srv_generaterequest( fd );
+int srv_test( int fd, void *ctx ) {
+	srv_generaterequest( fd, ctx );
 	return 1;
 }
 
@@ -765,15 +779,26 @@ int srv_test( int fd ) {
 //Loop should be extracted out
 int accept_loop1( struct sockAbstr *su, struct model *srv_type, char *err, int errlen ) {
 
-	//This can have one global variable that controls how long the loop runs...
+	//If SSL is asked for, initialize it...
+	struct sslctx *ssl = &sslctx[ SSLTYPE ];
+	ssl->userdata = ssl->create();
+	su->ssl_ctx = ssl;
+
+	//This can have one global variable
 	int times = 0;
 	for ( ; !srv_type->stop( &times ) ; ) {
 		//Client address and length?
-		struct sockaddr addrinfo;	
-		socklen_t addrlen = sizeof (struct sockaddr);	
+		su->addrlen = sizeof (struct sockaddr);	
 		int fd, status;	
-		
-		status = srv_accept( su->fd, &addrinfo, &addrlen, &fd, err, errlen );
+
+		//This should return a bit different...	
+		if ( !ssl ) 
+			status = srv_accept( su, &fd, err, errlen );
+		else {
+			status = ssl->accept( su, &fd, err, errlen );
+		}
+
+		//SSL problems need to be caught here
 		if ( status == AC_EAGAIN || status == AC_EMFILE || status == AC_EEINTR ) {
 			continue;
 		}
@@ -787,13 +812,15 @@ int accept_loop1( struct sockAbstr *su, struct model *srv_type, char *err, int e
 			continue;
 		}
 
-		if ( !srv_writelog( fd, &addrinfo ) ) {
+		if ( !srv_writelog( fd, su ) ) {
 			//something else happened, but it's not fatal...
 			continue;
 		}
 
-		if ( !srv_type->exec( fd ) ) {
+		if ( !srv_type->exec( fd, su->ssl_ctx ) ) {
 			//This is not technically a failure either...
+			//Something went wrong, so at this point a message should be generated 
+			FPRINTF( "Executor ran into an error.\n" );
 		}
 	}
 	return 1;
@@ -865,7 +892,8 @@ int main (int argc, char *argv[]) {
 			if ( !*argv ) {
 				fprintf( stderr, "Expected argument for --port!" );
 				return 0;
-			} 
+			}
+			//TODO: This should be safeatoi 
 			values.port = atoi( *argv );
 		}
 		else if ( strcmp( *argv, "--user" ) == 0 ) {
@@ -898,15 +926,8 @@ int main (int argc, char *argv[]) {
 		return 0;
 	}
 
-	//Handle SSL here
-	#if 0
-	struct gnutls_abstr g;
-	open_ssl_context( &g );
-	//Initialize SSL?
-	#endif
-
 	//What kinds of problems can occur here?
-	if ( !accept_loop1( &su, &models[3], err, sizeof(err) ) ) {
+	if ( !accept_loop1( &su, &models[0], err, sizeof(err) ) ) {
 		fprintf( stderr, "Server failed. Error: %s\n", err );
 		return 1;
 	}
