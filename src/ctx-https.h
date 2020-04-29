@@ -1,7 +1,6 @@
 #include "../vendor/single.h"
 #include <gnutls/gnutls.h>
 #include <stddef.h>
-#include "ssl.h"
 #include "socket.h"
 #include "server.h"
 #include "util.h"
@@ -22,6 +21,3 @@ int read_gnutls ( int, struct HTTPBody *, struct HTTPBody *, void *);
 int write_gnutls ( int, struct HTTPBody *, struct HTTPBody *, void *);
 void free_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *);
 void create_gnutls( void ** );
-
-
-int handshake_gnutls( void *, int );
