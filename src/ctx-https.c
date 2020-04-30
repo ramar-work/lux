@@ -3,47 +3,36 @@
 #define CHECK(x) assert((x)>=0)
 
 void create_gnutls( void **p ) {
-	struct gnutls_abstr *g;
+	//Initialize GnuTLS globally
+	CHECK( gnutls_global_init() );
+	//Log TLS errors with this...
+	//gnutls_global_set_log_function( tls_log_func );
+}
 
-	if ( !( g = malloc( sizeof(struct gnutls_abstr)) ) ) { 
+int post_gnutls ( int fd, void *config, void **p ) {
+	return 0;
+}
+
+int pre_gnutls ( int fd, void *config, void **p ) {
+
+	//Allocate a structure for the request process
+	struct gnutls_abstr *g;
+	int ret;
+	int size = sizeof( struct gnutls_abstr );
+	if ( !( g = malloc( size ))  || !memset( g, 0, size ) ) { 
 		FPRINTF( "Failed to allocate space for gnutls_abstr\n" );
-		return;
+		return 0;
 	}
 
-	memset( g, 0, sizeof( struct gnutls_abstr ) );
+	//Set the credentials of the current site...
 	g->x509_cred = NULL;
 	g->cafile = strdup( CAFILE ); 
 	//g->crlfile = strdup( CRLFILE ); 
 	g->certfile = strdup( CERTFILE );
 	g->keyfile = strdup( KEYFILE ); 
 	g->priority_cache = NULL;
-	//Log TLS errors with this...
-	//gnutls_global_set_log_function( tls_log_func );
-	CHECK( gnutls_global_init() );
-#if 0
-	CHECK( gnutls_certificate_allocate_credentials( &g->x509_cred) );
-	//find the certificate authority to use
-	CHECK( gnutls_certificate_set_x509_trust_file( g->x509_cred, g->cafile, GNUTLS_X509_FMT_PEM ) );
-	//is this for password-protected cert files? I'm so lost...
-	//gnutls_certificate_set_x509_crl_file( x509_cred, g->crlfile, GNUTLS_X509_FMT_PEM );
-	//this ought to work with server.key and certfile
-	CHECK( gnutls_certificate_set_x509_key_file( g->x509_cred, g->certfile, g->keyfile, GNUTLS_X509_FMT_PEM ) );
-	//gnutls_certificate_set_ocsp_status_request( x509_cred, OCSP_STATUS_FiLE, 0 );
-	CHECK( gnutls_priority_init( &g->priority_cache, NULL, NULL ) );
-#endif
-	FPRINTF( "gnutls struct: %p\n", g );
-	*p = g;
-	FPRINTF( "gnutls struct: %p\n", *p );
-}
 
-
-int accept_gnutls ( struct sockAbstr *su, int *child, void *p, char *err, int errlen ) {
-	struct gnutls_abstr *g = (struct gnutls_abstr *)p;
-	int ret;
-	//struct rwctx *v = su->ctx;
-	//struct gnutls_abstr *g = (struct gnutls_abstr *)p->userdata;
-	
-	//set up gnutls
+	//Set up the rest of the credential data
 	CHECK( gnutls_certificate_allocate_credentials( &g->x509_cred) );
 	//find the certificate authority to use
 	CHECK( gnutls_certificate_set_x509_trust_file( g->x509_cred, g->cafile, GNUTLS_X509_FMT_PEM ) );
@@ -60,6 +49,32 @@ int accept_gnutls ( struct sockAbstr *su, int *child, void *p, char *err, int er
 	gnutls_certificate_server_set_request( g->session, GNUTLS_CERT_IGNORE ); 
 	gnutls_handshake_set_timeout( g->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT ); 
 
+	//Do the actual handshake with an open file descriptor
+  gnutls_transport_set_int( g->session, fd );
+	do {
+		ret = gnutls_handshake( g->session );
+	}
+	while ( ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED );	
+
+	if ( ret < 0 ) {
+		gnutls_deinit( g->session );
+		FPRINTF( "GnuTLS handshake failed: %s\n", gnutls_strerror( ret ) );
+		//This isn't a fatal error... but what do I return?
+		return 0;	
+	}
+
+	FPRINTF( "GnuTLS handshake succeeded.\n" );
+	FPRINTF( "gnutls struct: %p\n", g );
+	*p = g;
+	FPRINTF( "gnutls struct: %p\n", *p );
+	return 1;
+}
+
+#if 0
+int accept_gnutls ( struct sockAbstr *su, int *child, void *p, char *err, int errlen ) {
+	struct gnutls_abstr *g = (struct gnutls_abstr *)p;
+	int ret;
+	
 	//Seems like this could be very slow...
 	if (( *child = accept( su->fd, &su->addrinfo, &su->addrlen )) == -1 ) {
 		//TODO: Need to check if the socket was non-blocking or not...
@@ -104,7 +119,7 @@ int accept_gnutls ( struct sockAbstr *su, int *child, void *p, char *err, int er
 	FPRINTF( "GnuTLS handshake succeeded.\n" );
 	return 1;
 }
-
+#endif
 
 int read_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	FPRINTF( "Read started...\n" );

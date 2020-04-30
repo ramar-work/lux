@@ -1,6 +1,4 @@
 return {
-	number = 777,
-	wash = 32423, 
 	hosts = {
 		-- A static host
 		["localhost"] = { 
@@ -13,6 +11,9 @@ return {
 		["collinshosting.com"] = { 
 			dir = "tests/filter-static/text",
 			root_default = "/index.html",
+			ca_bundle = "",
+			cert_file = "",
+			keyfile = "",
 			filter = "static"
 		},
 
@@ -33,8 +34,6 @@ return {
 		-- Perhaps use this for SSL tests
 		["porsche.local"] = { 
 			alias = "porsche.lk",
-			ca_cert = "",
-			keyfile = "",
 			root_default = "/index.html",
 			dir = "tests/filter-static/text",
 			filter = "static"

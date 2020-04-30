@@ -53,27 +53,9 @@ TODO
 #include "ctx-test.h"
 #include "server.h"
 
-#define CTXTYPE 1
+#define CTXTYPE 0
 
 #define eprintf(...) fprintf( stderr, "%s: ", "hypno" ) && fprintf( stderr, __VA_ARGS__ ) && fprintf( stderr, "\n" )
-
-int pctx ( int, struct HTTPBody *, struct HTTPBody *, void *);
-
-struct senderrecvr sr[] = {
-	{ pctx, read_notls, write_notls, accept_notls, free_notls, create_notls }
-, { pctx, read_gnutls, write_gnutls, accept_gnutls, free_notls, create_gnutls }
-, { NULL, read_static, write_static, accept_notls, free_notls  }
-,	{ NULL }
-};
-
-struct filter filters[] = {
-	{ "static", filter_static }
-, { "dirent", filter_dirent }
-, { "echo", filter_echo }
-, { "lua", filter_lua }
-, { "c", filter_c }
-, { NULL }
-};
 
 extern const char http_200_custom[];
 extern const char http_200_fixed[];
@@ -86,6 +68,25 @@ char *configfile = NULL;
 const int defport = 2000;
 int arg_verbose = 0;
 int arg_debug = 0;
+int pctx ( int, struct HTTPBody *, struct HTTPBody *, struct config *, void *);
+
+
+struct senderrecvr sr[] = {
+	{ pctx, read_notls, write_notls, create_notls }
+, { pctx, read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls }
+//, { NULL, read_static, write_static, free_notls  }
+,	{ NULL }
+};
+
+
+struct filter filters[] = {
+	{ "static", filter_static }
+, { "dirent", filter_dirent }
+, { "echo", filter_echo }
+, { "lua", filter_lua }
+, { "c", filter_c }
+, { NULL }
+};
 
 
 //Find a host
@@ -122,6 +123,7 @@ struct filter * check_filter ( struct filter *filters, char *name ) {
 
 //Build global configuration
 struct config * build_config ( char *err, int errlen ) {
+	FPRINTF( "Configuration parsing started...\n" );
 
 	const char *funct = "build_config";
 	struct config *config = NULL; 
@@ -129,7 +131,7 @@ struct config * build_config ( char *err, int errlen ) {
 	Table *t = NULL;
 
 	if ( ( config = malloc( sizeof ( struct config ) ) ) == NULL ) {
-		snprintf( err, errlen, "Could not initialize memory at %s", funct );
+		snprintf( err, errlen, "Could not initialize memory when parsing config at: %s\n", configfile );
 		return NULL;
 	}
 
@@ -141,7 +143,7 @@ struct config * build_config ( char *err, int errlen ) {
 
 	//Allocate a table for the configuration
 	if ( !(t = malloc(sizeof(Table))) || !lt_init( t, NULL, 2048 ) ) {
-		snprintf( err, errlen, "Could not initialize Table at %s\n", funct );
+		snprintf( err, errlen, "Could not initialize table when parsing config at: %s\n", configfile );
 		goto freeres;
 		return NULL;
 	}
@@ -156,7 +158,7 @@ struct config * build_config ( char *err, int errlen ) {
 	//Build hosts
 	if ( ( config->hosts = build_hosts( t ) ) == NULL ) {
 		//Build hosts fails with null, I think...
-		snprintf( err, errlen, "Failed to bulid hosts table.\n" );
+		snprintf( err, errlen, "Failed to bulid hosts table from: %s\n", configfile );
 		goto freeres;
 		return NULL;
 	}
@@ -173,10 +175,12 @@ freeres:
 	lt_free( t );
 	free( t );
 	lua_close( L );
+	FPRINTF( "Configuration parsing complete.\n" );
 	return config;
 }
 
 
+//Destroy our config file.
 void free_config( struct config *config ) {
 	struct host **hosts = config->hosts;
 	while ( hosts && *hosts ) {
@@ -220,12 +224,12 @@ int check_dir ( struct host *host, char *err, int errlen ) {
 
 
 //Generate a response via one of the selected filters
-int pctx ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *p ) {
+int pctx ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct config *config, void *p ) {
 	FPRINTF( "Proc started...\n" );
 	char err[2048] = {0};
 	Table *t = NULL;
 	struct host *host = NULL;
-	struct config *config = NULL;
+	//struct config *config = NULL;
 	struct filter *filter = NULL;
 
 	//With no default host, throw this 
@@ -234,11 +238,11 @@ int pctx ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *p ) {
 		FPRINTF( e );
 		return http_set_error( res, 500, err ); 
 	}
-
+#if 0
 	if (( config = build_config( err, sizeof(err) )) == NULL ) {
 		return http_set_error( res, 500, err );
 	}  
-
+#endif
 	if ( !( host = find_host( config->hosts, req->host ) ) ) {
 		snprintf( err, sizeof(err), "Could not find host '%s'.", req->host );
 		return http_set_error( res, 404, err ); 
@@ -261,7 +265,7 @@ int pctx ( int fd, struct HTTPBody *req, struct HTTPBody *res, void *p ) {
 
 	//print_httpbody( res );	
 	//The thing needs to be freed 
-	free_config( config );
+	//free_config( config );
 
 #if 0
 	char *msg = strdup( "All is well." );
@@ -300,6 +304,45 @@ int srv_writelog ( int fd, struct sockAbstr *su ) {
 }
 
 
+//Start the request by allocating things we'll always need.
+int srv_start( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config **config ) {
+	FPRINTF( "Initial server allocation started...\n" );
+	//Build a config
+	char err[2048] = {0};
+	if (( *config = build_config( err, sizeof(err) )) == NULL ) {
+		//return http_set_error( res, 500, err );
+		//Kill the context
+		//Close the file
+		//Show me what happened and kill it...
+		return 0;
+	}
+  
+	FPRINTF( "Initial server allocation complete.\n" );
+	return 1;
+}
+
+
+//End the request by deallocating all of the things
+int srv_end( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config *config ) {
+	FPRINTF( "Deallocation started...\n" );
+
+	//Close the file first
+	if ( close( fd ) == -1 ) {
+		FPRINTF( "Couldn't close child socket. %s\n", strerror(errno) );
+	}
+
+	//Free the HTTP body 
+	http_free_body( rs );
+	http_free_body( rq );
+
+	//Destroy config...
+	//free_config( config );
+
+	FPRINTF( "Deallocation complete.\n" );
+	return 0;
+}
+
+
 //Loop should be extracted out
 int accept_loop1( struct sockAbstr *su, char *err, int errlen ) {
 
@@ -313,16 +356,29 @@ int accept_loop1( struct sockAbstr *su, char *err, int errlen ) {
 		int fd, status;	
 		pid_t cpid; 
 
-		//Accept
-		status = ctx->accept( su, &fd, ctx->data, err, errlen );
-
-		//SSL problems need to be caught here
-		if ( status == AC_EAGAIN || status == AC_EMFILE || status == AC_EEINTR ) {
-			continue;
-		}
-		else if ( !status ) {
-			FPRINTF( "accept() failed: %s\n", err );
-			return 0;
+		//Accept a connection.
+		if (( fd = accept( su->fd, &su->addrinfo, &su->addrlen )) == -1 ) {
+			//TODO: Need to check if the socket was non-blocking or not...
+			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				//This should just try to read again
+				FPRINTF( "Try accept again.\n" );
+				continue;	
+			}
+			else if ( errno == EMFILE || errno == ENFILE ) { 
+				//These both refer to open file limits
+				FPRINTF( "Too many open files, try closing some requests.\n" );
+				continue;	
+			}
+			else if ( errno == EINTR ) { 
+				//In this situation we'll handle signals
+				FPRINTF( "Signal received. (Not coded yet.)\n" );
+				continue;	
+			}
+			else {
+				//All other codes really should just stop. 
+				snprintf( err, errlen, "accept() failed: %s\n", strerror( errno ) );
+				return 0;
+			}
 		}
 
 		//close the connection if something fails here
@@ -352,25 +408,31 @@ int accept_loop1( struct sockAbstr *su, char *err, int errlen ) {
 		}
 		else if ( cpid ) {
 			struct HTTPBody rq = {0}, rs = {0};
+			struct config *config = NULL;
+			char err[2048] = {0};
 			int status = 0;
 
+			//Parse our configuration here...
+			status = srv_start( fd, &rq, &rs, &config );
+
 			//Do any per-request initialization here.
-			//ctx->pre( fd, &rq, &rs, ctx );
+			ctx->pre && ( status = ctx->pre( fd, config, &ctx->data ) );
 
 			//Read the message
-			ctx->read( fd, &rq, &rs, ctx->data );
+			status && ctx->read( fd, &rq, &rs, ctx->data );
 			print_httpbody( &rq ); //Dump the request 
 
 			//Generate a message	
-			ctx->proc && ctx->proc( fd, &rq, &rs, ctx->data ); 
+			status && ctx->proc && ctx->proc( fd, &rq, &rs, config, ctx->data ); 
 
-			//Write a new message	
+			//Write a new message	(should almost ALWAYS run)
 			ctx->write( fd, &rq, &rs, ctx->data );
 			print_httpbody( &rs ); //Dump the request 
 
-			//Close out
-			ctx->free( fd, &rq, &rs, ctx->data );
-			//ctx->post( fd, &rq, &rs, ctx );
+			//Per-request shut down goes here.
+			ctx->post && ctx->post( fd, config, &ctx->data );
+			//ctx->free( fd, &rq, &rs, ctx->data );
+			srv_end( fd, &rq, &rs, config );
 			//_exit( 0 );
 			return 1; 
 		}

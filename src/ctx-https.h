@@ -16,8 +16,8 @@ struct gnutls_abstr {
 	const char *keyfile;
 };
 
-int accept_gnutls ( struct sockAbstr *, int *, void *, char *, int );
+int pre_gnutls ( int, void *, void ** );
+int post_gnutls ( int, void *, void ** );
 int read_gnutls ( int, struct HTTPBody *, struct HTTPBody *, void *);
 int write_gnutls ( int, struct HTTPBody *, struct HTTPBody *, void *);
-void free_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *);
 void create_gnutls( void ** );

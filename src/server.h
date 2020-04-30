@@ -1,5 +1,6 @@
 #include "http.h"
 #include "socket.h"
+#include "config.h"
 
 #ifndef SERVER_H
 #define SERVER_H
@@ -31,15 +32,20 @@ struct filter {
 };
 
 struct senderrecvr { 
-	int (*proc)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+	int (*proc)( int, struct HTTPBody *, struct HTTPBody *, struct config *, void * ); 
 	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
 	int (*write)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
-	int (*accept)( struct sockAbstr *, int *, void *, char *, int );
-	void (*free)( int, struct HTTPBody *, struct HTTPBody *, void * );
 	void (*init)( void ** );
-#if 0 
-	int (*pre)( int, struct HTTPBody *, struct HTTPBody *, void * );
-	int (*post)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
+#if 0
+	void (*free)( int, struct HTTPBody *, struct HTTPBody *, void * );
+#else
+	void (*free)( int, struct HTTPBody *, struct HTTPBody *, void * );
+#endif
+	int (*pre)( int, void *, void ** );
+#if 0
+	int (*post)( int, void *, void ** ); 
+#else
+	int (*post)( int, void *, void ** ); 
 #endif
 	void *data;
 }; 

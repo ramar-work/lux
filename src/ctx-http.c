@@ -3,41 +3,11 @@
 //No-op
 void create_notls ( void **p ) { ; }
 
-//Accepts new connections
-int accept_notls ( struct sockAbstr *su, int *child, void *p, char *err, int errlen ) {
-	su->addrlen = sizeof (struct sockaddr);	
-	//Accept a connection if possible...
-	if (( *child = accept( su->fd, &su->addrinfo, &su->addrlen )) == -1 ) {
-		//TODO: Need to check if the socket was non-blocking or not...
-		if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
-			//This should just try to read again
-			FPRINTF( "Try accept again.\n" );
-			return AC_EAGAIN;	
-		}
-		else if ( errno == EMFILE || errno == ENFILE ) { 
-			//These both refer to open file limits
-			FPRINTF( "Too many open files, try closing some requests.\n" );
-			return AC_EMFILE;	
-		}
-		else if ( errno == EINTR ) { 
-			//In this situation we'll handle signals
-			FPRINTF( "Signal received. (Not coded yet.)\n" );
-			return AC_EEINTR;	
-		}
-		else {
-			//All other codes really should just stop. 
-			snprintf( err, errlen, "accept() failed: %s\n", strerror( errno ) );
-			return 0;
-		}
-	}
-	return 1;
-}
-
 
 //Read a message that the server will use later.
 int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	FPRINTF( "Read started...\n" );
-#if 1
+
 	//Read all the data from a socket.
 	unsigned char *buf = malloc( 1 );
 	int mult = 0;
@@ -47,8 +17,7 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 
 	//Read first
 	for ( ;; ) {	
-		int rd=0;
-		int bfsize = size * (++mult); 
+		int rd, bfsize = size * (++mult); 
 		unsigned char buf2[ size ]; 
 		memset( buf2, 0, size );
 
@@ -59,9 +28,9 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 			//whatsockerr( errno );
 			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				if ( ++try == 2 ) {
-					FPRINTF("Tried three times to read from socket. We're done.\n" );
-					FPRINTF("rq->mlen: %d\n", rq->mlen );
-					FPRINTF("%p\n", buf );
+					FPRINTF( "Tried three times to read from socket. We're done.\n" );
+					FPRINTF( "rq->mlen: %d\n", rq->mlen );
+					FPRINTF( "%p\n", buf );
 					//rq->msg = buf;
 					break;
 				}
@@ -97,7 +66,7 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	if ( !http_parse_request( rq, err, sizeof(err) ) ) {
 		return http_set_error( rs, 500, err ); 
 	}
-#endif
+
 	FPRINTF( "Read complete.\n" );
 	return 1;
 }
@@ -106,10 +75,8 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 //Write
 int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	FPRINTF( "Write started...\n" );
-	int sent = 0;
+	int sent = 0, pos = 0, try = 0;
 	int total = rs->mlen;
-	int pos = 0;
-	int try = 0;
 
 	for ( ;; ) {	
 		sent = send( fd, &rs->msg[ pos ], total, MSG_DONTWAIT );
@@ -123,7 +90,7 @@ int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 			pos += sent;
 			total -= sent;	
 		}
-		else /*if ( sent == -1 )*/ {
+		else {
 			//TODO: Can't close a most-likely closed socket.  What do you do?
 			if ( errno == EBADF )
 				return 0;
@@ -161,7 +128,7 @@ int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 }
 
 
-
+#if 0
 //Destroy anything
 void free_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	FPRINTF( "Deallocation started...\n" );
@@ -177,5 +144,5 @@ void free_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 
 	FPRINTF( "Deallocation complete.\n" );
 }
-
+#endif
 
