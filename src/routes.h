@@ -18,7 +18,8 @@ struct route {
 };
 
 struct route ** build_routes ( Table * );
-void free_routes ( struct route ** );
 int route_table_iterator ( LiteKv *, int, void * );
+void free_routes ( struct route ** );
+void dump_routes ( struct route ** );
 
 #endif

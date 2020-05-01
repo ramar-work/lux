@@ -40,6 +40,7 @@ endif
 
 # A wildcard won't work, but an array might...
 test: $(OBJ) 
+test: CFLAGS+=-DTEST_H
 test:
 	for t in $(TESTS); do $(CC) $(LDFLAGS) $(CFLAGS) -o bin/$$t src/$${t}-test.c $(OBJ); done
 
@@ -56,7 +57,7 @@ tlscli:
 tlssvr:
 	$(CC) $(CFLAGS) -DSQROOGE_H -o sx vendor/single.c tlssvr.c -lgnutls
 
-# clean - Get rid of the crap
+# clean - Get rid of object files and tests 
 clean:
 	-@find src/ -maxdepth 1 -type f -name "*.o" | xargs rm
 	-@find bin/ -maxdepth 1 -type f | xargs rm

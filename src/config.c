@@ -5,22 +5,38 @@
 #include "config.h"
 
 
+//free the table
+void free_t( Table *t ) {
+	if ( t ) {
+		lt_free( t );
+		free( t );
+	}
+}
+
+
 //Build global configuration
 struct config * build_config ( char *file, char *err, int errlen ) {
 	FPRINTF( "Configuration parsing started...\n" );
 
-	const char *funct = "build_config";
 	struct config *config = NULL; 
-	lua_State *L = luaL_newstate();
 	Table *t = NULL;
+	lua_State *L = NULL;
 
-	if ( ( config = malloc( sizeof ( struct config ) ) ) == NULL ) {
+	//Allocate Lua
+	if ( ( L = luaL_newstate() ) == NULL ) {
+		snprintf( err, errlen, "Could not initialize Lua environment.\n" );
+		return NULL;
+	}
+
+	//Allocate config
+	if ( ( config = malloc(sizeof(struct config)) ) == NULL ) {
 		snprintf( err, errlen, "Could not initialize memory when parsing config at: %s\n", file );
 		return NULL;
 	}
 
 	//After this conversion takes place, destroy the environment
-	if ( !lua_exec_file( L, file, err, sizeof(err) ) ) {
+	if ( !lua_exec_file( L, file, err, errlen ) ) {
+		free( config );
 		goto freeres;
 		return NULL;
 	}
@@ -28,6 +44,15 @@ struct config * build_config ( char *file, char *err, int errlen ) {
 	//Allocate a table for the configuration
 	if ( !(t = malloc(sizeof(Table))) || !lt_init( t, NULL, 2048 ) ) {
 		snprintf( err, errlen, "Could not initialize table when parsing config at: %s\n", file );
+		free( config );
+		goto freeres;
+		return NULL;
+	}
+
+	//Check the stack and make sure that it's a table.
+	if ( !lua_istable( L, 1 ) ) {
+		snprintf( err, errlen, "Configuration is not a table.\n" );
+		free( config );
 		goto freeres;
 		return NULL;
 	}
@@ -35,6 +60,7 @@ struct config * build_config ( char *file, char *err, int errlen ) {
 	//Convert configuration into a table
 	if ( !lua_to_table( L, 1, t ) ) {
 		snprintf( err, errlen, "Failed to convert Lua config data to table.\n" );
+		free( config );
 		goto freeres;
 		return NULL;
 	}
@@ -54,12 +80,12 @@ struct config * build_config ( char *file, char *err, int errlen ) {
 	} 
 #endif
 
-freeres:
 	//Destroy lua_State and the tables...
-	lt_free( t );
-	free( t );
+freeres:
+	free_t( t );
 	lua_close( L );
 	FPRINTF( "Configuration parsing complete.\n" );
+	FPRINTF( "config is: %p\n", config );
 	return config;
 }
 
@@ -96,21 +122,18 @@ char * get_char_value ( Table *t, const char *key ) {
 }
 
 
-
 //Destroy our config file.
 void free_config( struct config *config ) {
-	struct host **hosts = config->hosts;
-	while ( hosts && *hosts ) {
-		struct host *h = *hosts;
-		( h->name ) ? free( h->name ) : 0;
-		( h->alias ) ? free( h->alias ) : 0 ;
-		( h->dir ) ? free( h->dir ) : 0;
-		( h->filter ) ? free( h->filter ) : 0 ;
-		( h->root_default ) ? free( h->root_default ) : 0;
-		free( h );
-		hosts++;
+	if ( config->hosts ) {
+		free_hosts( config->hosts );	
 	}
-	free( config->hosts );
 	free( config );
 }
+
+
+//Add a configuration function...
+void * add_config (struct config *config, void **(cexec)(Table *), void(cfree)(void **)) {
+	return NULL;
+}
+
 

@@ -3,6 +3,18 @@
 
 //Free hosts list
 void free_hosts ( struct host ** hosts ) {
+	struct host **hl = hosts;
+	while ( hl && *hl ) {
+		struct host *h = *hl;
+		( h->name ) ? free( h->name ) : 0;
+		( h->alias ) ? free( h->alias ) : 0 ;
+		( h->dir ) ? free( h->dir ) : 0;
+		( h->filter ) ? free( h->filter ) : 0 ;
+		( h->root_default ) ? free( h->root_default ) : 0;
+		free( *hl );
+		hl++;
+	}
+	free( hosts );
 }
 
 
@@ -17,8 +29,8 @@ int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 		"alias" \
 		"dir" \
 		"filter" \
-		"root_default" \
 		"hosts" \
+		"root_default" \
 	;
 
 	//Save the key or move table depth
@@ -43,12 +55,12 @@ int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 	if ( kv->value.type == LITE_TBL )
 		(*rdepth)++;
 	else if ( kv->value.type == LITE_TXT && kv->key.type == LITE_TXT ) { 
-		struct host *host = (*hosts)[ (*rlen) - 1 ];
 		char *key = kv->key.v.vchar;
-		strcmp( key, "dir" ) == 0 ? host->dir = strdup( kv->value.v.vchar ) : 0;
+		struct host *host = (*hosts)[ (*rlen) - 1 ];
 		strcmp( key, "alias" ) == 0 ? host->alias = strdup( kv->value.v.vchar ) : 0 ;
-		strcmp( key, "root_default" ) == 0 ? host->root_default = strdup( kv->value.v.vchar ) : 0 ;
+		strcmp( key, "dir" ) == 0 ? host->dir = strdup( kv->value.v.vchar ) : 0;
 		strcmp( key, "filter" ) == 0 ? host->filter = strdup( kv->value.v.vchar ) : 0;
+		strcmp( key, "root_default" ) == 0 ? host->root_default = strdup( kv->value.v.vchar ) : 0 ;
 	}
 	return 1;
 }
@@ -99,8 +111,8 @@ struct host ** build_hosts ( Table *t ) {
 
 
 //Debug host list
-void dump_hosts ( struct host **set ) {
-	struct host **r = set;
+void dump_hosts ( struct host **hosts ) {
+	struct host **r = hosts;
 	fprintf( stderr, "Hosts:\n" );
 	while ( r && *r ) {
 		fprintf( stderr, "\t%p => ", *r );

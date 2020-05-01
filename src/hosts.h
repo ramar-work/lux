@@ -14,7 +14,8 @@ struct host {
 
 struct host ** build_hosts ( Table * );
 struct host * find_host ( struct host **, char * );
-void free_hosts ( struct host ** );
 int host_table_iterator ( LiteKv *, int, void * );
+void free_hosts ( struct host ** );
+void dump_hosts ( struct host ** );
 
 #endif

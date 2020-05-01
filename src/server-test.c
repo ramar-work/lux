@@ -3,6 +3,7 @@
 #include "socket.h"
 #define PORT 2020
 
+#if 0
 //Runs the server loop
 int server_loop ( int type ) {
 	struct sockAbstr su;
@@ -18,15 +19,15 @@ int server_loop ( int type ) {
 		return 0;
 	}
 
-	//Accept
-	if ( !( fd = handle_accept( &su, err, sizeof( err )) ) ) {
-		fprintf( stderr, "%s\n", err );
-		return 0;
+	//Accept the connection
+	if ( !accept_listening_socket( &su, &fd, err, errlen ) ) {
+		FPRINTF( "socket %d could not be marked as non-blocking\n", fd );
+		continue;
 	}
 
 	//Handle the request
-	if ( !handle_tcp_socket( fd, ctx ) ) {
-		fprintf( stderr, "Error in TCP socket handling.\n" );
+	if ( !srv_response( fd, ctx ) ) {
+		fprintf( stderr, "Error in response generation.\n" );
 		return 0;
 	}
 
@@ -38,6 +39,7 @@ int server_loop ( int type ) {
 
 	return 1;
 }
+#endif
 
 
 
@@ -45,7 +47,7 @@ int main (int argc, char *argv[]) {
 
 	//All of the different contexts should get tested here (if it frees its' fine)
 	//The filter should be the most basic thing there is...
-	server_loop( 0 );
+	//server_loop( 0 );
 
 	return 0;
 }
