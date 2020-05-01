@@ -21,13 +21,13 @@ RECORDS = 3
 #LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 
 # Not sure why these don't always work...
-TESTS = config database http luabind render router util filter-c filter-static
-SRC = vendor/single.c vendor/sqlite3.c src/config.c src/database.c src/http.c src/luabind.c src/mime.c src/render.c src/router.c src/socket.c src/filter-echo.c src/filter-dirent.c src/filter-static.c src/filter-lua.c src/filter-c.c src/util.c src/luaext.c src/ctx-http.c src/ctx-https.c src/ctx-test.c #src/xml.c src/json.c src/dirent-filter.c
+TESTS = config database http luabind render router util server #filter-static #filter-c
+SRC = vendor/single.c vendor/sqlite3.c src/config.c src/hosts.c src/routes.c src/database.c src/http.c src/luabind.c src/mime.c src/render.c src/router.c src/socket.c src/util.c src/luaext.c src/ctx-http.c src/ctx-https.c src/ctx-test.c src/filter-static.c src/server.c #src/filter-echo.c src/filter-dirent.c src/filter-lua.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
 
 # main
 main: $(OBJ)
-	$(CC) $(LDFLAGS) $(CFLAGS) src/server.c -o $(NAME) $(OBJ) 
+	$(CC) $(LDFLAGS) $(CFLAGS) src/main.c -o $(NAME) $(OBJ) 
 	$(CC) $(LDFLAGS) $(CFLAGS) src/cli.c -o hcli $(OBJ)
 
 # Object

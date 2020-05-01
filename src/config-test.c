@@ -1,51 +1,10 @@
 #include "luabind.h"
 #include "config.h"
+#include "hosts.h"
+#include "routes.h"
 
 #define TESTDIR "tests/config/"
 
-#if 0
-//this is the best way to set config keys
-struct keyset { const char *name; int (*fp)( void *p ); }; 
-
-struct keyset global_config[] = {
-#if 1
-	NULL
-#else
-	{ 
-#endif
-};
-
-
-struct keyset individual_config[] = {
-};
-#endif
-
-void dump_hosts ( struct host **set ) {
-	struct host **r = set;
-	fprintf( stderr, "Hosts:\n" );
-	while ( r && *r ) {
-		fprintf( stderr, "\t%p => ", *r );
-		fprintf( stderr, "%s =>\n", (*r)->name );
-		fprintf( stderr, "\t\tdir = %s\n", (*r)->dir );
-		fprintf( stderr, "\t\talias = %s\n", (*r)->alias );
-		fprintf( stderr, "\t\tfilter = %s\n", (*r)->filter );
-		r++;
-	}
-}
-
-void dump_routes ( struct route **set ) {
-	struct route **r = set;
-	fprintf( stderr, "Routes:\n" );
-	while ( r && *r ) {
-		fprintf( stderr, "\t%p => ", *r );
-		fprintf( stderr, "%s => \n", (*r)->routename );
-		for ( int ii=0; ii < (*r)->elen; ii++ ) {
-			struct routehandler *t = (*r)->elements[ ii ];
-			fprintf( stderr, "\t\t{ %s=%s }\n", get_route_key_type(t->type), t->filename );
-		}
-		r++;
-	}	
-}
 
 //Loads some random files
 int main (int argc, char *argv[]) {

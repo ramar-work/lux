@@ -232,6 +232,34 @@ struct sockAbstr * close_listening_socket ( struct sockAbstr *sa, char *err, int
 }
 
 
+struct sockAbstr * accept_listening_socket ( struct sockAbstr *sa, int *fd, char *err, int errlen ) {
+	if (( *fd = accept( sa->fd, &sa->addrinfo, &sa->addrlen ) ) == -1 ) {
+		//TODO: Need to check if the socket was non-blocking or not...
+		if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+			//This should just try to read again
+			snprintf( err, errlen, "Try accept again: %s\n", strerror( errno ) );
+			return NULL;	
+		}
+		else if ( errno == EMFILE || errno == ENFILE ) { 
+			//These both refer to open file limits
+			snprintf( err, errlen, "Too many open files, try closing some requests.\n" );
+			return NULL;
+		}
+		else if ( errno == EINTR ) { 
+			//In this situation we'll handle signals
+			snprintf( err, errlen, "Signal received: %s\n", strerror( errno ) );
+			return NULL;
+		}
+		else {
+			//All other codes really should just stop. 
+			snprintf( err, errlen, "accept() failed: %s\n", strerror( errno ) );
+			return NULL;
+		}
+	}
+	return sa;
+}
+
+
 struct sockAbstr * open_connecting_socket ( struct sockAbstr *sa, char *err, int errlen ) {
 	return NULL;
 }

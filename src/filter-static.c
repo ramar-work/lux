@@ -32,7 +32,7 @@ int check_static_prefix( const char *path, const char *prefix ) {
 }
 
 
-int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
+int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct config *config, struct host *host ) {
 	struct stat sb;
 	int fd = 0;
 	int size = 0;
@@ -43,9 +43,9 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, void *ctx ) {
 	const char *mimetype_default = mmtref( "application/octet-stream" );
 	const char *mimetype = NULL;
 	uint8_t *content = NULL;
-	struct host *config = (struct host *)ctx;
+	//struct host *config = (struct host *)ctx;
 
-	if ( !config->dir ) {
+	if ( !host->dir ) {
 		return http_set_error( rs, 500, "No directory path specified for this site." );
 	}
 
@@ -60,7 +60,7 @@ FPRINTF( "rq->path is %s\n", rq->path );
 	}
 		
 	//Create a fullpath
-	if ( snprintf( fpath, sizeof(fpath) - 1, "%s%s", config->dir, fname ) == -1 ) {
+	if ( snprintf( fpath, sizeof(fpath) - 1, "%s%s", host->dir, fname ) == -1 ) {
 		return http_set_error( rs, 500, "Full filepath probably truncated." );
 	}
 FPRINTF( "full path is %s\n", fpath );

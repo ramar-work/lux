@@ -6,7 +6,7 @@
 #ifndef FILTER_STATIC_H
 #define FILTER_STATIC_H
 
-int filter_static( struct HTTPBody *, struct HTTPBody *, void * );
+int filter_static( struct HTTPBody *, struct HTTPBody *, struct config *, struct host * );
 int check_static_prefix( const char *, const char * );
 
 #endif

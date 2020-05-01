@@ -60,6 +60,11 @@
 #define append_to_char(DEST,DESTLEN,SRC) \
 	append_to_uint8t( (uint8_t **)DEST,DESTLEN,(uint8_t *)SRC,strlen(SRC) )
 
+struct fp_iterator { 
+	int len, depth; 
+	void *userdata; 
+};
+
 uint8_t *read_file ( const char *filename, int *len, char *err, int errlen );
 int safeatoi( const char *value );
 char *get_lstr( char **str, char chr, int *lt );

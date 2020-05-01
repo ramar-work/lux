@@ -35,6 +35,7 @@ struct sockAbstr * open_connecting_socket ( struct sockAbstr *, char *, int );
 struct sockAbstr * close_connecting_socket ( struct sockAbstr *, char *, int );
 struct sockAbstr * open_listening_socket ( struct sockAbstr *, char *, int );
 struct sockAbstr * close_listening_socket ( struct sockAbstr *, char *, int );
+struct sockAbstr * accept_listening_socket ( struct sockAbstr *, int *fd, char *, int );
 struct sockAbstr * set_nonblock_on_socket ( struct sockAbstr *, char *, int );
 struct sockAbstr * set_timeout_on_socket ( struct sockAbstr *, int );
 

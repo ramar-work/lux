@@ -28,11 +28,10 @@
 
 struct filter {
 	const char *name;
-	int (*filter)( struct HTTPBody *, struct HTTPBody *, void * );
+	int (*filter)( struct HTTPBody *, struct HTTPBody *, struct config *, struct host * );
 };
 
 struct senderrecvr { 
-	int (*proc)( int, struct HTTPBody *, struct HTTPBody *, struct config *, void * ); 
 	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
 	int (*write)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
 	void (*init)( void ** );
@@ -47,6 +46,7 @@ struct senderrecvr {
 #else
 	int (*post)( int, void *, void ** ); 
 #endif
+	char *config;
 	void *data;
 }; 
 
@@ -56,14 +56,7 @@ struct model {
 	void *data;
 };
 
-struct values {
-	int port;
-	int ssl;
-	int start;
-	int kill;
-	int fork;
-	char *user;
-	char *config;
-};
-
+int srv_response ( int, struct senderrecvr * );
+int srv_setsocketoptions ( int fd );
+int srv_writelog ( int fd, struct sockAbstr *su );
 #endif 

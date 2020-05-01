@@ -34,7 +34,7 @@ struct Test {
 }; 
 
 
-typedef int (*Filter)(struct HTTPBody *, struct HTTPBody *, void *);
+typedef int (*Filter)(struct HTTPBody *, struct HTTPBody *, struct config *, struct host *);
 
 
 int filter_test ( const char *fname, Filter filter, struct config *c, struct Test *tt ) {
@@ -45,7 +45,7 @@ int filter_test ( const char *fname, Filter filter, struct config *c, struct Tes
 			const char fmt[] = "[ Test: %-13s, path: %s, URL: %s ]: ";
 			char err[2048] = { 0 };
 			struct HTTPBody response = { 0 };
-			int f = filter( &t->request, &response, c );
+			int f = filter( &t->request, &response, c, NULL );
 			//TODO: Compare against expected response for a good test
 			TPRINTF( fmt, t->name, c->path, t->request.path );
 			TPRINTF( "%s (%d)", f ? "SUCCEEDED" : "FAILED", response.status );
