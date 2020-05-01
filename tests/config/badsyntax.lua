@@ -1,7 +1,8 @@
--- B
+-- badsyntax.lua - Try evaluating this
+ttt
 return {
 	number = 777,
-	wash = 32423, 
+	wash = 32423
 	hosts = {
 		["localhost"] = { 
 			dir = "www",
