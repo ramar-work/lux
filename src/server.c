@@ -100,38 +100,37 @@ int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct config *config,
 	char err[2048] = {0};
 	Table *t = NULL;
 	struct host *host = NULL;
-	//struct config *config = NULL;
 	struct filter *filter = NULL;
 
 	//With no default host, throw this 
 	if ( !req->host ) {
-		char *e = "No host header specified.";
-		FPRINTF( e );
+		snprintf( err, sizeof(err), "No host header specified." );
+		FPRINTF( err );
 		return http_set_error( res, 500, err ); 
 	}
-#if 0
-	if (( config = build_config( err, sizeof(err) )) == NULL ) {
-		return http_set_error( res, 500, err );
-	}  
-#endif
+
 	if ( !( host = find_host( config->hosts, req->host ) ) ) {
 		snprintf( err, sizeof(err), "Could not find host '%s'.", req->host );
+		FPRINTF( err );
 		return http_set_error( res, 404, err ); 
 	}
 
 	if ( !( filter = check_filter( ctx->filters, !host->filter ? "static" : host->filter ) ) ) {
 		snprintf( err, sizeof( err ), "Filter '%s' not supported", host->filter );
+		FPRINTF( err );
 		return http_set_error( res, 500, err ); 
 	}
 
 	if ( host->dir && !check_dir( host, err, sizeof(err) ) ) {
+		FPRINTF( err );
 		return http_set_error( res, 500, err ); 
 	}
 
 	FPRINTF( "Root default of host '%s' is: %s\n", host->name, host->root_default );
 	//Finally, now we can evalute the filter and the route.
 	if ( !filter->filter( req, res, config, host ) ) {
-		return 0;
+		//If a filter fails to execute, what does that really mean?
+		return 1;
 	}
 
 	//print_httpbody( res );	
@@ -162,45 +161,6 @@ int srv_writelog ( int fd, struct sockAbstr *su ) {
 	return 1;
 }
 
-#if 0
-//Start the request by allocating things we'll always need.
-int srv_start( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config **config ) {
-	FPRINTF( "Initial server allocation started...\n" );
-	//Build a config
-	char err[2048] = {0};
-	if (( *config = build_config( err, sizeof(err) )) == NULL ) {
-		//return http_set_error( res, 500, err );
-		//Kill the context
-		//Close the file
-		//Show me what happened and kill it...
-		return 0;
-	}
-  
-	FPRINTF( "Initial server allocation complete.\n" );
-	return 1;
-}
-
-
-//End the request by deallocating all of the things
-int srv_end( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config *config ) {
-	FPRINTF( "Deallocation started...\n" );
-
-	//Close the file first
-	if ( close( fd ) == -1 ) {
-		FPRINTF( "Couldn't close child socket. %s\n", strerror(errno) );
-	}
-
-	//Free the HTTP body 
-	http_free_body( rs );
-	http_free_body( rq );
-
-	//Destroy config...
-	//free_config( config );
-
-	FPRINTF( "Deallocation complete.\n" );
-	return 0;
-}
-#endif
 
 //Generate a response
 int srv_response ( int fd, struct senderrecvr *ctx ) {

@@ -490,31 +490,15 @@ void print_entity( struct HTTPBody *entity ) {
 #endif
 
 
-int main ( int argc, char *argv[] ) {
-	char err[ 2048 ] = { 0 };
 
-#if 0
-	//these are more like unit tests
-	struct HTTPBody **stake_body_tests = requests_received;	
-	while ( stake_body_tests && *stake_body_tests ) {
-		if ( !stake_body( *stake_body_tests, err, sizeof( err ) ) ) {
-			//What happens if we fail?
-			//Some of these SHOULD fail, the code should just know that...
-		}
-		print_httpbody( *stake_body_tests );
-		stake_body_tests++;
-	}
-return 0;
-#endif
 
-#if 0	
-	//Part 1: Test generating requests and responses in piecemeal.
-	struct HTTPBody *this, that;
+//Expected is a string, compared with a string
+int run_this ( void *a, void *b ) {
+	struct HTTPBody that;
 	memset( &that, 0, sizeof( struct HTTPBody ) ); 
 	char *hostname = "bob.net";	
 	int stat = 200;
 	char *text = "<h2>Ok</h2>";
-	
 	http_set_int( &(&that)->status, 200 );
 	http_set_char( &(&that)->host, hostname );
 	http_set_record( &that, &(&that)->headers, 0, "ETag", (uint8_t *)"abcdef", strlen( "abcdef" ) );
@@ -523,10 +507,16 @@ return 0;
 	http_set_header( &that, "X-Genius", "Louis Farrakhan" );
 	http_set_textbody( &that, "", text );
 	print_entity( &that );
+}
 
+
+
+//Expected is a string, compared with a string
+int run_else ( void *a, void *b ) {
+	struct HTTPBody *this = NULL;
 	if ( !( this = malloc( sizeof( struct HTTPBody ) ) ) ) {
 		fprintf( stderr, "Couldn't initialize this!" );
-		return 1;
+		return 0;
 	}
 
 	http_set_int( &(this)->status, 500 );
@@ -536,7 +526,34 @@ return 0;
 	http_set_body( this, "binary", (uint8_t *)"none", 4 );
 	http_set_textbody( this, "text", "Hello, World" );
 	print_entity( this );
-	free( this );
+	return 1;
+}
+
+
+//Expected is a request (from a string), compared with a request
+int generate_request ( void *a, void *b ) {
+	return 1;
+}
+
+
+//Expected is a response (from a string), compared with a response
+int generate_response ( void *a, void *b ) {
+	return 1;
+}
+
+
+int main ( int argc, char *argv[] ) {
+	char err[ 2048 ] = { 0 };
+
+	//So, let's make a few different things here.
+	//1. test that static works
+	//2. test that allocated works
+	//3. test that response parsing works
+	//4. test that request parsing works
+	//none should leak
+#if 1	
+	//Part 1: Test generating requests and responses in piecemeal.
+
 #endif
 
 	//Part 2: Test creating responses & requests from assembled data
