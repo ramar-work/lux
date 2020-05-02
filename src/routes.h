@@ -17,9 +17,26 @@ struct route {
 	struct routehandler { char *filename; int type; } **elements;
 };
 
+struct element {
+	int type;
+	int len;
+	int mustbe;
+	char **string;
+};
+
+//This is kind of a useless structure, but there is a lot to keep track of
+struct urimap {
+	const char *name, *routeset;
+	struct element **list;
+	int listlen;
+	Mem r;
+}; 
+
+
 struct route ** build_routes ( Table * );
 int route_table_iterator ( LiteKv *, int, void * );
 void free_routes ( struct route ** );
 void dump_routes ( struct route ** );
+int resolve_routes ( const char *route, const char *uri );
 
 #endif

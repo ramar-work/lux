@@ -41,6 +41,14 @@ TODO
 #include "ctx-https.h"
 #include "server.h"
 #include "socket.h"
+#include "filter-static.h"
+#if 0
+#include "filter-dirent.h"
+#include "filter-echo.h"
+#include "filter-lua.h"
+#include "filter-c.h"
+#endif
+
 
 #define CTXTYPE 0
 
@@ -60,6 +68,17 @@ const int defport = 2000;
 int arg_verbose = 0;
 int arg_debug = 0;
 
+struct filter filters[] = {
+	{ "static", filter_static }
+#if 0
+, { "dirent", filter_dirent }
+, { "echo", filter_echo }
+, { "lua", filter_lua }
+, { "c", filter_c }
+#endif
+, { NULL }
+};
+
 struct senderrecvr sr[] = {
 	{ read_notls, write_notls, create_notls }
 , { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls }
@@ -77,6 +96,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	populate_tcp_socket( &su, &v->port );
 	ctx = &sr[ CTXTYPE ];	
 	ctx->init( &ctx->data );
+	ctx->filters = filters;
 
 	//Open a socket		
 	if ( !open_listening_socket( &su, err, errlen ) ) {

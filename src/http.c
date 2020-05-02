@@ -965,19 +965,32 @@ void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int 
 	}
 
 	//Set the members
-	r->field = k;
-	r->value = v;
-	r->size = vlen;
 	len = entity->boundary[ type ];
-
-	//Reallocate
-	if (( *list = realloc( *list, sizeof( struct HTTPRecord * ) * ( len + 2 ) )) == NULL ) {
+	r->field = strdup( k );
+	r->size = vlen;
+	if ( ( r->value = malloc( vlen ) ) == NULL ) {
+		free( r );
+		free( entity->boundary );
 		return NULL;
 	}
 
-	(*list)[ len ] = r, (*list)[ len + 1 ] = NULL, len++; 
+	memset( r->value, 0, vlen );
+	memcpy( r->value, v, vlen );
+	add_item( list, r, struct HTTPRecord *, &len );
 	entity->boundary[ type ] = len;
 	return r;
+}
+
+
+void http_free_records( struct HTTPRecord **records ) {
+	struct HTTPRecord **r = records;
+	while ( r && *r ) {
+		(*r)->field ? free( (void *)(*r)->field ) : 0;
+		(*r)->value ? free( (*r)->value ) : 0;
+		free( *r );
+		r++;
+	}
+	free( records );
 }
 
 
@@ -988,35 +1001,9 @@ void http_free_body ( struct HTTPBody *entity ) {
 	entity->protocol ? free( entity->protocol ) : 0;
 	entity->host ? free( entity->host ) : 0;
 	entity->boundary ? free( entity->boundary ) : 0;
-
-#if 0
-	//Free ** lists
-	struct HTTPRecord ***lists = (struct HTTPRecord **[]){
-	  entity->headers
-	,	entity->url
-	,	entity->body
-	,	NULL
-	};
-
-	while ( *lists ) {
-		fprintf( stderr, "List 1: %p\n", *lists );
-		fprintf( stderr, "List 2: %p\n", **lists );
-		lists++;
-	}
-#else
-	struct HTTPRecord **e[] = { entity->headers/*, entity->url, entity->body*/ };
-	for ( int i = 0; i < sizeof(e)/sizeof(struct HTTPRecord **); i++ ) {
-		struct HTTPRecord **list = e[ i ];
-		while ( list && *list ) {
-FPRINTF( "list->field '%s'\n", (*list)->field );
-			(*list)->field ? free( (void *)(*list)->field ) : 0;
-			(*list)->value ? free( (*list)->value ) : 0;
-			free( (*list) );
-			list++;
-		}
-		free( e[i] );
-	}
-#endif
+	http_free_records( entity->headers );
+	http_free_records( entity->url );
+	http_free_records( entity->body );
 
 	//Free big message buffer
 	if ( entity->msg ) {

@@ -46,6 +46,7 @@ struct senderrecvr {
 #else
 	int (*post)( int, void *, void ** ); 
 #endif
+	struct filter *filters;
 	char *config;
 	void *data;
 }; 

@@ -32,13 +32,13 @@
 	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, VAL, VLEN )
 	
 #define http_set_content(ENTITY,VAL,VLEN) \
-	http_set_record( ENTITY, &(ENTITY)->body, 1, "", VAL, VLEN )
+	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", VAL, VLEN )
 
 #define http_set_content_text(ENTITY,VAL) \
-	http_set_record( ENTITY, &(ENTITY)->body, 1, "", (uint8_t *)VAL, strlen(VAL) )
+	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", (uint8_t *)VAL, strlen(VAL) )
 
 #define http_set_textbody(ENTITY,KEY,VAL) \
-	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, (uint8_t *)strdup(VAL), strlen((char *)VAL) )
+	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, (uint8_t *)VAL, strlen((char *)VAL) )
 	
 #define http_set_header(ENTITY,KEY,VAL) \
 	http_set_record( ENTITY, &(ENTITY)->headers, 0, KEY, (uint8_t *)VAL, strlen(VAL) )

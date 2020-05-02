@@ -56,18 +56,6 @@ TODO
 #endif
 
 
-struct filter filters[] = {
-	{ "static", filter_static }
-#if 0
-, { "dirent", filter_dirent }
-, { "echo", filter_echo }
-, { "lua", filter_lua }
-, { "c", filter_c }
-#endif
-, { NULL }
-};
-
-
 //Check the validity of a filter
 struct filter * check_filter ( struct filter *filters, char *name ) {
 	while ( filters ) {
@@ -79,8 +67,6 @@ struct filter * check_filter ( struct filter *filters, char *name ) {
 	}
 	return NULL;
 }
-
-
 
 
 //Check that the website's chosen directory is accessible and it's log directory is writeable.
@@ -109,7 +95,7 @@ int check_dir ( struct host *host, char *err, int errlen ) {
 
 
 //Find the chosen host and generate a response via one of the selected filters
-int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct config *config ) {
+int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct config *config, struct senderrecvr *ctx ) {
 	FPRINTF( "Proc started...\n" );
 	char err[2048] = {0};
 	Table *t = NULL;
@@ -133,7 +119,7 @@ int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct config *config 
 		return http_set_error( res, 404, err ); 
 	}
 
-	if ( !( filter = check_filter( filters, !host->filter ? "static" : host->filter ) ) ) {
+	if ( !( filter = check_filter( ctx->filters, !host->filter ? "static" : host->filter ) ) ) {
 		snprintf( err, sizeof( err ), "Filter '%s' not supported", host->filter );
 		return http_set_error( res, 500, err ); 
 	}
@@ -227,19 +213,19 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 	//Parse our configuration here...
 	//status = srv_start( fd, &rq, &rs, &config );
 	if ( !( config = build_config( ctx->config, err, sizeof(err) ) ) ) {
-		FPRINTF( "Could not parse configuration file." );
+		FPRINTF( "Could not parse configuration file at: %s\n", ctx->config );
 		return 0;
 	}	
 
 	//Do any per-request initialization here.
-	ctx->pre && ( status = ctx->pre( fd, config, &ctx->data ) );
+	ctx->pre && ctx->pre( fd, config, &ctx->data );
 
 	//Read the message
-	status && ctx->read( fd, &rq, &rs, ctx->data );
+	status = ctx->read( fd, &rq, &rs, ctx->data );
 	print_httpbody( &rq ); //Dump the request 
 
 	//Generate a message
-	status && ( status = srv_proc( &rq, &rs, config ) );
+	status && ( status = srv_proc( &rq, &rs, config, ctx ) );
 
 	//Write the message	(should almost ALWAYS run)
 	ctx->write( fd, &rq, &rs, ctx->data );
@@ -247,9 +233,6 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 
 	//Per-request shut down goes here.
 	ctx->post && ctx->post( fd, config, &ctx->data );
-	//srv_end( fd, &rq, &rs, config );
-	//Forking may force me to free this in two places
-	//ctx->free( &ctx->data );
 
 	//Close new descriptor
 	if ( close( fd ) == -1 ) {
@@ -259,7 +242,7 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 	//Free everything
 	http_free_body( &rs );
 	http_free_body( &rq );
-	//free_config( config );
+	free_config( config );
 	return 1; 
 
 }
