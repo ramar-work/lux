@@ -10,6 +10,9 @@ struct host {
 	char *dir;	
 	char *filter;	
 	char *root_default;	
+	char *ca_bundle;
+	char *certfile;
+	char *keyfile;
 };
 
 struct host ** build_hosts ( Table * );

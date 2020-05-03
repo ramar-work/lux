@@ -3,123 +3,140 @@
 #define CHECK(x) assert((x)>=0)
 
 void create_gnutls( void **p ) {
-	//Initialize GnuTLS globally
 	CHECK( gnutls_global_init() );
-	//Log TLS errors with this...
 	//gnutls_global_set_log_function( tls_log_func );
 }
 
-int post_gnutls ( int fd, void *config, void **p ) {
+
+void free_gnults( void **p ) {
+	gnutls_global_deinit();
+}
+
+void destroy_gnutls ( struct gnutls_abstr *g ) {
+	gnutls_deinit( g->session );
+	gnutls_priority_deinit( g->priority_cache );
+	gnutls_certificate_free_credentials( g->x509_cred );
+	free( g );
+}
+
+
+int post_gnutls ( int fd, struct config *config, void **p ) {
+	struct gnutls_abstr *g = (struct gnutls_abstr *)*p;
+	destroy_gnutls( g );
 	return 0;
 }
 
-int pre_gnutls ( int fd, void *config, void **p ) {
+
+static int process_credentials ( struct gnutls_abstr *g, struct host **hosts ) {
+	while ( *hosts ) {
+		char *dir = (*hosts)->dir;
+		//each of the files need to be loaded somehow...
+		if ( dir && (*hosts)->certfile  ) {
+			//Make a filename
+			char cert[2048] = {0}, key[2048] = {0}, ca[2048] = {0};
+			snprintf( cert, sizeof(cert), "%s/%s", dir, (*hosts)->certfile );
+			snprintf( key, sizeof(key), "%s/%s", dir, (*hosts)->keyfile );
+			snprintf( ca, sizeof(ca), "%s/%s", dir, (*hosts)->ca_bundle );
+			#if 0
+			FPRINTF( "Attempting to process these certs\n" );
+			FPRINTF( "ca bundle: %s\n", ca );
+			FPRINTF( "cert: %s\n", cert );
+			FPRINTF( "key: %s\n", key );
+			#endif
+
+			//Will this ever be negative?	
+			int cp = gnutls_certificate_set_x509_trust_file( g->x509_cred, ca, GNUTLS_X509_FMT_PEM );
+			if ( cp < 0 ) {
+				FPRINTF( "Could not set trust for '%s': %s\n", (*hosts)->name, gnutls_strerror( cp ) );
+				return 0;
+			}
+			FPRINTF( "Certificates processed: %d\n", cp );
+			int status = gnutls_certificate_set_x509_key_file( g->x509_cred, cert, key, GNUTLS_X509_FMT_PEM );
+			if ( status < 0 ) {
+				FPRINTF( "Could not set certificate for '%s': %s\n", (*hosts)->name, gnutls_strerror( status ) );
+				return 0;
+			}
+		}
+		hosts++;
+	}	
+	return 1;
+}
+
+
+int pre_gnutls ( int fd, struct config *config, void **p ) {
 
 	//Allocate a structure for the request process
 	struct gnutls_abstr *g;
-	int ret;
-	int size = sizeof( struct gnutls_abstr );
+	int ret, size = sizeof( struct gnutls_abstr );
 	if ( !( g = malloc( size ))  || !memset( g, 0, size ) ) { 
 		FPRINTF( "Failed to allocate space for gnutls_abstr\n" );
 		return 0;
 	}
 
-	//Set the credentials of the current site...
-	g->x509_cred = NULL;
-	g->cafile = strdup( CAFILE ); 
-	//g->crlfile = strdup( CRLFILE ); 
-	g->certfile = strdup( CERTFILE );
-	g->keyfile = strdup( KEYFILE ); 
-	g->priority_cache = NULL;
+	//Allocate space for credentials
+	ret = gnutls_certificate_allocate_credentials( &g->x509_cred );
+	if ( ret != GNUTLS_E_SUCCESS ) {
+		FPRINTF( "Failed to allocate GnuTLS credentials structure\n" );
+		return 0;
+	}
+
+	//Get config hosts, and get all the key details
+	//struct host **hosts = config->hosts;
+	if ( !process_credentials( g, config->hosts ) ) {
+		gnutls_certificate_free_credentials( g->x509_cred );
+		free( g );
+		return 0;
+	}
 
 	//Set up the rest of the credential data
-	CHECK( gnutls_certificate_allocate_credentials( &g->x509_cred) );
-	//find the certificate authority to use
-	CHECK( gnutls_certificate_set_x509_trust_file( g->x509_cred, g->cafile, GNUTLS_X509_FMT_PEM ) );
-	//is this for password-protected cert files? I'm so lost...
-	//gnutls_certificate_set_x509_crl_file( x509_cred, g->crlfile, GNUTLS_X509_FMT_PEM );
-	//this ought to work with server.key and certfile
-	CHECK( gnutls_certificate_set_x509_key_file( g->x509_cred, g->certfile, g->keyfile, GNUTLS_X509_FMT_PEM ) );
-	//gnutls_certificate_set_ocsp_status_request( x509_cred, OCSP_STATUS_FiLE, 0 );
-	CHECK( gnutls_priority_init( &g->priority_cache, NULL, NULL ) );
+	g->priority_cache = NULL;
+	ret = gnutls_priority_init( &g->priority_cache, NULL, NULL );
+	if ( ret != GNUTLS_E_SUCCESS ) {
+		FPRINTF( "Failed to set priority: %s\n", gnutls_strerror( ret ) );
+		return 0;
+	}	
 
-	gnutls_init( &g->session, GNUTLS_SERVER | GNUTLS_NONBLOCK );
-	gnutls_priority_set( g->session, g->priority_cache );
-	gnutls_credentials_set( g->session, GNUTLS_CRD_CERTIFICATE, g->x509_cred );
+	ret = gnutls_init( &g->session, GNUTLS_SERVER | GNUTLS_NONBLOCK );
+	if ( ret != GNUTLS_E_SUCCESS ) {
+		FPRINTF( "Failed to initialize new TLS session: %s\n", gnutls_strerror( ret ) );
+		return 0;
+	}
+	
+	ret = gnutls_priority_set( g->session, g->priority_cache );
+	if ( ret != GNUTLS_E_SUCCESS ) {
+		FPRINTF( "Failed to set priority: %s\n", gnutls_strerror( ret ) );
+		return 0;
+	}
+	
+	ret = gnutls_credentials_set( g->session, GNUTLS_CRD_CERTIFICATE, g->x509_cred );
+	if ( ret != GNUTLS_E_SUCCESS ) {
+		FPRINTF( "Failed to set credentials: %s\n", gnutls_strerror( ret ) );
+		return 0;
+	}
+
+	//Set a few more details for our current session.	
 	gnutls_certificate_server_set_request( g->session, GNUTLS_CERT_IGNORE ); 
 	gnutls_handshake_set_timeout( g->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT ); 
+  gnutls_transport_set_int( g->session, fd );
 
 	//Do the actual handshake with an open file descriptor
-  gnutls_transport_set_int( g->session, fd );
 	do {
 		ret = gnutls_handshake( g->session );
 	}
 	while ( ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED );	
 
 	if ( ret < 0 ) {
-		gnutls_deinit( g->session );
+		destroy_gnutls( g );
 		FPRINTF( "GnuTLS handshake failed: %s\n", gnutls_strerror( ret ) );
 		//This isn't a fatal error... but what do I return?
 		return 0;	
 	}
 
 	FPRINTF( "GnuTLS handshake succeeded.\n" );
-	FPRINTF( "gnutls struct: %p\n", g );
 	*p = g;
-	FPRINTF( "gnutls struct: %p\n", *p );
 	return 1;
 }
 
-#if 0
-int accept_gnutls ( struct sockAbstr *su, int *child, void *p, char *err, int errlen ) {
-	struct gnutls_abstr *g = (struct gnutls_abstr *)p;
-	int ret;
-	
-	//Seems like this could be very slow...
-	if (( *child = accept( su->fd, &su->addrinfo, &su->addrlen )) == -1 ) {
-		//TODO: Need to check if the socket was non-blocking or not...
-		if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
-			//This should just try to read again
-			FPRINTF( "Try accept again.\n" );
-			return AC_EAGAIN;	
-		}
-		else if ( errno == EMFILE || errno == ENFILE ) { 
-			//These both refer to open file limits
-			FPRINTF( "Too many open files, try closing some requests.\n" );
-			return AC_EMFILE;	
-		}
-		else if ( errno == EINTR ) { 
-			//In this situation we'll handle signals
-			FPRINTF( "Signal received. (Not coded yet.)\n" );
-			return AC_EEINTR;	
-		}
-		else {
-			//All other codes really should just stop. 
-			snprintf( err, errlen, "accept() failed: %s\n", strerror( errno ) );
-			return 0;
-		}
-	}
-
-	//Handshake?
-  gnutls_transport_set_int( g->session, *child );
-	do {
-		ret = gnutls_handshake( g->session );
-	}
-	while ( ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED );	
-
-	if ( ret < 0 ) {
-		//close( *child );
-		//*child = 0;
-		gnutls_deinit( g->session );
-		FPRINTF( "GnuTLS handshake failed: %s\n", gnutls_strerror( ret ) );
-		//This isn't a fatal error...
-		return AC_EAGAIN;	
-	}
-
-	FPRINTF( "GnuTLS handshake succeeded.\n" );
-	return 1;
-}
-#endif
 
 int read_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	FPRINTF( "Read started...\n" );
@@ -257,6 +274,4 @@ int write_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 }
 
 
-void destroy_gnutls( void *ctx ) {
-}
 

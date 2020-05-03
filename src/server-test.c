@@ -79,10 +79,10 @@ struct filter filters[] = {
 
 //Contexts should be tested out most any way you can
 struct senderrecvr contexts[] = {
-	{ read_notls, write_notls, create_notls },
+	{ read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls },
 #if 0
+	{ read_notls, write_notls, create_notls },
 	{ read_test, write_test, create_test },
-	{ read_gnutls, write_gnutls, create_gnutls },
 #endif
  	{ NULL }
 };

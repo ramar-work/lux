@@ -80,7 +80,7 @@ struct filter filters[] = {
 
 struct senderrecvr sr[] = {
 	{ read_notls, write_notls, create_notls }
-, { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls }
+, { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls }
 //, { NULL, read_static, write_static, free_notls  }
 ,	{ NULL }
 };
@@ -88,7 +88,7 @@ struct senderrecvr sr[] = {
 //Loop should be extracted out
 int cmd_server ( struct values *v, char *err, int errlen ) {
 	//Define
-	struct sockAbstr su;
+	struct sockAbstr su = {0};
 	struct senderrecvr *ctx = NULL;
 
 	//Initialize
@@ -96,6 +96,13 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	ctx = &sr[ CTXTYPE ];	
 	ctx->init( &ctx->data );
 	ctx->filters = filters;
+	ctx->config = v->config;
+
+	//Die if config is null or file not there 
+	if ( !ctx->config ) {
+		eprintf( "No config specified...\n" );
+		return 0;
+	}
 
 	//Open a socket		
 	if ( !open_listening_socket( &su, err, errlen ) ) {

@@ -507,6 +507,7 @@ int run_this ( void *a, void *b ) {
 	http_set_header( &that, "X-Genius", "Louis Farrakhan" );
 	http_set_textbody( &that, "", text );
 	print_entity( &that );
+return 0;
 }
 
 

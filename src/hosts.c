@@ -10,6 +10,9 @@ void free_hosts ( struct host ** hosts ) {
 		( h->alias ) ? free( h->alias ) : 0 ;
 		( h->dir ) ? free( h->dir ) : 0;
 		( h->filter ) ? free( h->filter ) : 0 ;
+		( h->ca_bundle ) ? free( h->ca_bundle ) : 0 ;
+		( h->certfile ) ? free( h->certfile ) : 0 ;
+		( h->keyfile ) ? free( h->keyfile ) : 0 ;
 		( h->root_default ) ? free( h->root_default ) : 0;
 		free( *hl );
 		hl++;
@@ -31,6 +34,9 @@ int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 		"filter" \
 		"hosts" \
 		"root_default" \
+		"ca_bundle" \
+		"certfile" \
+		"keyfile" \
 	;
 
 	//Save the key or move table depth
@@ -42,10 +48,12 @@ int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 		else if ( !memstr( keysstr, name = kv->key.v.vchar, strlen( keysstr ) ) ) { 
 			struct host * host = malloc( sizeof( struct host ) );
 			memset( host, 0, sizeof( struct host ) );
+		#if 0
 			host->alias = NULL;
 			host->dir = NULL;
 			host->filter = NULL;
 			host->root_default = NULL;
+		#endif
 			host->name = strdup( kv->key.v.vchar ); 
 			add_item( hosts, host, struct host *, rlen );
 		}
@@ -61,6 +69,9 @@ int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 		strcmp( key, "dir" ) == 0 ? host->dir = strdup( kv->value.v.vchar ) : 0;
 		strcmp( key, "filter" ) == 0 ? host->filter = strdup( kv->value.v.vchar ) : 0;
 		strcmp( key, "root_default" ) == 0 ? host->root_default = strdup( kv->value.v.vchar ) : 0 ;
+		strcmp( key, "ca_bundle" ) == 0 ? host->ca_bundle = strdup( kv->value.v.vchar ) : 0;
+		strcmp( key, "certfile" ) == 0 ? host->certfile = strdup( kv->value.v.vchar ) : 0;
+		strcmp( key, "keyfile" ) == 0 ? host->keyfile = strdup( kv->value.v.vchar ) : 0;
 	}
 	return 1;
 }

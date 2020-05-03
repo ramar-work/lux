@@ -35,17 +35,9 @@ struct senderrecvr {
 	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
 	int (*write)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
 	void (*init)( void ** );
-#if 0
-	void (*free)( int, struct HTTPBody *, struct HTTPBody *, void * );
-#else
-	void (*free)( int, struct HTTPBody *, struct HTTPBody *, void * );
-#endif
-	int (*pre)( int, void *, void ** );
-#if 0
-	int (*post)( int, void *, void ** ); 
-#else
-	int (*post)( int, void *, void ** ); 
-#endif
+	void (*free)( void ** );
+	int (*pre)( int, struct config *, void ** );
+	int (*post)( int, struct config *, void ** ); 
 	struct filter *filters;
 	char *config;
 	void *data;

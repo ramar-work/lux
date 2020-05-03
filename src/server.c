@@ -168,7 +168,7 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 	struct HTTPBody rq = {0}, rs = {0};
 	struct config *config = NULL;
 	char err[2048] = {0};
-	int status = 0;
+	int status = 1;
 
 	//Parse our configuration here...
 	//status = srv_start( fd, &rq, &rs, &config );
@@ -178,18 +178,22 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 	}	
 
 	//Do any per-request initialization here.
-	ctx->pre && ctx->pre( fd, config, &ctx->data );
+	ctx->pre && ( status = ctx->pre( fd, config, &ctx->data ) );
+	if ( !status ) {
+		FPRINTF( "Problem in ctx->pre\n" );
+		return 0;	
+	}
 
 	//Read the message
 	status = ctx->read( fd, &rq, &rs, ctx->data );
-	print_httpbody( &rq ); //Dump the request 
+	//print_httpbody( &rq ); //Dump the request 
 
 	//Generate a message
 	status && ( status = srv_proc( &rq, &rs, config, ctx ) );
 
 	//Write the message	(should almost ALWAYS run)
 	ctx->write( fd, &rq, &rs, ctx->data );
-	print_httpbody( &rs ); //Dump the request 
+	//print_httpbody( &rs ); //Dump the request 
 
 	//Per-request shut down goes here.
 	ctx->post && ctx->post( fd, config, &ctx->data );
