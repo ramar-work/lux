@@ -42,10 +42,10 @@ TODO
 #include "server.h"
 #include "socket.h"
 #include "filter-static.h"
+#include "filter-lua.h"
 #if 0
 #include "filter-dirent.h"
 #include "filter-echo.h"
-#include "filter-lua.h"
 #include "filter-c.h"
 #endif
 
@@ -67,16 +67,18 @@ const int defport = 2000;
 int arg_verbose = 0;
 int arg_debug = 0;
 
+
 struct filter filters[] = {
-	{ "static", filter_static }
+	{ "static", filter_static },
+  { "lua", filter_lua },
 #if 0
 , { "dirent", filter_dirent }
 , { "echo", filter_echo }
-, { "lua", filter_lua }
 , { "c", filter_c }
 #endif
-, { NULL }
+  { NULL }
 };
+
 
 struct senderrecvr sr[] = {
 	{ read_notls, write_notls, create_notls }
@@ -84,6 +86,7 @@ struct senderrecvr sr[] = {
 //, { NULL, read_static, write_static, free_notls  }
 ,	{ NULL }
 };
+
 
 //Loop should be extracted out
 int cmd_server ( struct values *v, char *err, int errlen ) {
@@ -93,7 +96,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 	//Initialize
 	populate_tcp_socket( &su, &v->port );
-	ctx = &sr[ CTXTYPE ];	
+	ctx = &sr[ v->ssl ];	
 	ctx->init( &ctx->data );
 	ctx->filters = filters;
 	ctx->config = v->config;

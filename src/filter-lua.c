@@ -45,6 +45,41 @@ int parse_config ( Table *t ) {
 }
 
 
+#if 0
+int execute_models ( struct routehandler *handlers, lua_State *L, char *err, int errlen ) {
+	while ( handlers && *handlers ) {
+		struct routehandler h = *handlers;
+		char f[ 2048 ] = { 0 };
+		snprintf( f, sizeof( f ), "%s/app/%s.lua", host->dir, (*h)->filename );
+#if 1
+		FPRINTF( "model: %s\n", f );
+#else 
+		if ( (*h)->type == BD_MODEL && !lua_exec_file( L, f, err, sizeof(err) ) ) {
+			fprintf( stderr, "Failed to execute model filename: %s\n", filename );
+			return http_set_error( res, 500, err );
+		} 
+#endif
+		handlers++;	
+	}
+	return 1;
+}
+
+
+int execute_views ( struct routehandler *handlers, char *err, int errlen ) {
+	while ( handlers && *handlers ) {
+		char filename[ 2048 ] = { 0 };
+		snprintf( filename, sizeof( filename ), "%s/app/%s.lua", host->dir, (*handlers)->filename );
+		if ( (*handlers)->type == BD_MODEL && !lua_exec_file( L, filename, err, sizeof(err) ) ) {
+			fprintf( stderr, "Failed to execute model filename: %s\n", filename );
+			return http_set_error( res, 500, err );
+		} 
+		handlers++;	
+	}
+}
+#endif
+
+
+
 int serve_static ( Table *t, const char *path ) {
 	char *statdir = get_char_value( t, "static" );
 	return check_static_prefix( statdir, path );
@@ -53,14 +88,15 @@ int serve_static ( Table *t, const char *path ) {
 
 //filter-lua.c - Run HTTP messages through a Lua handler
 //Any processing can be done in the middle.  Since we're in another "thread" anyway
-int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
+int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *config, struct host *host ) {
 
-	Table *c = NULL, *t = NULL;
-	const char *lconfname = "/config.lua";
-	struct config *config = NULL; 
-	struct config *lconfig = NULL; 
-	struct route **routes = NULL;
+#if 0
 	struct routehandler **handlers = NULL;
+#else
+	struct route **routes = NULL;
+	Table *c = NULL, *t = NULL;
+	lua_State *L = NULL;
+	const char *lconfname = "/config.lua";
 	uint8_t *buf = NULL;
 	char *statdir = NULL;
 	int buflen = 0;
@@ -73,45 +109,64 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 		&(struct n){ "post", req->body },
 		NULL
 	};
+#endif
 
 	//Check for config (though this is probably already done...)
-	if ( !(config = (struct config *)ctx) )
+	if ( !config ) {
 		return http_set_error( res, 500, "No global config is present." );
+	}
+
+	if ( !host->dir ) {
+		return http_set_error( res, 500, "No host directory specified." );
+	}
 
 	//Initialize Lua environment and add a global table
-	lua_State *L = luaL_newstate();
+	if ( !( L = luaL_newstate() ) ) {
+		return http_set_error( res, 500, "Could not allocate Lua environment." );
+	}
 	luaL_openlibs( L );
+	FPRINTF( "Initialized Lua environment.\n" );
 
 	//Pick up the local Lua config
-	if ( snprintf( lconfpath, sizeof( lconfpath ), "%s%s", config->path, lconfname ) == -1 ) 
+	if ( snprintf( lconfpath, sizeof( lconfpath ), "%s%s", host->dir, lconfname ) == -1 ) {
 		return http_set_error( res, 500, "Could not get full config path." );
+	}
 
-	if ( !lua_exec_file( L, lconfpath, err, sizeof( err ) ) )
+	FPRINTF( "config path is: %s\n", lconfpath );
+	if ( !lua_exec_file( L, lconfpath, err, sizeof( err ) ) ) {
 		return http_set_error( res, 500, err );
+	}
 
-	if ( !( c = malloc( sizeof(Table) ) ) || !lt_init( c, NULL, 1024 ) )
+	if ( !( c = malloc( sizeof(Table) ) ) || !lt_init( c, NULL, 1024 ) ) {
 		return http_set_error( res, 500, "Failed to allocate config table." );
+	}
 
-	if ( !lua_to_table( L, 1, c )  )
+	if ( !lua_to_table( L, 1, c ) ) {
+		lt_free( c );
+		free( c );
+		lua_close( L );
 		return http_set_error( res, 500, "Failed to convert config table." );
+	}
 
 	//Clean up the stack after loading config file...
 	lua_pop(L, 1);
 
 	//Check for and serve any static files 
 	//TODO: This should be able to serve a list of files matching a specific type
-#if 1
-	if ( check_static_prefix( get_char_value( c, "static" ), req->path ) )
-		return filter_static( req, res, config );
-#else
-	if ( serve_static( c, req->path ) )
-		return filter_static( req, res, config );
-#endif
+	if ( check_static_prefix( get_char_value( c, "static" ), req->path ) ) {
+		return filter_static( req, res, config, host );
+	}
 
 	//Check that the path resolves to anything. 404 if not, I suppose
+	FPRINTF( "Building route map...\n" );
 	routes = build_routes( c );
+	FPRINTF( "Route map %p\n", routes );
+
 	while ( routes && *routes ) {
-		if ( resolve( (*routes)->routename, req->path ) ) break;
+		FPRINTF( "Route: '%s', Path: '%s'\n", (*routes)->routename, req->path );
+		if ( resolve_routes( (*routes)->routename, req->path ) ) {
+			break;
+		}
 		routes++;
 	}
 
@@ -120,6 +175,10 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 		return http_set_error( res, 404, err );
 	}
 
+	FPRINTF( "%p\n", routes );
+	FPRINTF( "%p\n", *routes );
+	FPRINTF( "elements: %p\n", (*routes)->elements );
+#if 0
 #if 0
 	//Errors can be handled... Don't know how yet...
 	//The required keys need to be pulled out.
@@ -168,18 +227,30 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	lua_stackdump( L );
 #endif
 
+#if 0
+	if ( !execute_models( (*routes)->elements, L, err, sizeof(err) ) ) {
+		return http_set_error( res, 500, err );
+	}
+#else
 	//Models
 	handlers = (*routes)->elements;
+	FPRINTF( "evaluating handlers (%p)...\n", handlers );
 	while ( handlers && *handlers ) {
 		char filename[ 2048 ] = { 0 };
-		snprintf( filename, sizeof( filename ), "%s/app/%s.lua", config->path, (*handlers)->filename );
+		snprintf( filename, sizeof( filename ), "%s/app/%s.lua", host->dir, (*handlers)->filename );
+#if 1
+		FPRINTF( "model: %s\n", filename );
+#else
 		if ( (*handlers)->type == BD_MODEL && !lua_exec_file( L, filename, err, sizeof(err) ) ) {
 			fprintf( stderr, "Failed to execute model filename: %s\n", filename );
 			return http_set_error( res, 500, err );
 		} 
+#endif
 		handlers++;	
 	}
+#endif
 
+#if 0
 	//Aggregate all of the model data.
 	if ( !( t = malloc( sizeof( Table )) ) || !lt_init( t, NULL, 2048 ) ) {
 		return http_set_error( res, 500, "Failed to allocate space for results table" );
@@ -219,14 +290,22 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 		} 
 		handlers++;	
 	}
+#endif
+
 
 	http_set_status( res, 200 );
-	http_set_ctype( res, "text/html" );
+	http_set_ctype( res, mmtref( "text/html" ) );
+#if 0
 	http_set_content( res, buf, buflen );
+#else
+	uint8_t bug[] = "<h2>Everything is fine.</h2>";
+	http_set_content( res, bug, sizeof(bug) );
+#endif
 	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
 		return http_set_error( res, 500, err );
 	}
 
-	return http_set_error( res, 200, "Lua probably ran fine..." );
+	//return http_set_error( res, 200, "Lua probably ran fine..." );
+#endif
 	return 1;
 }

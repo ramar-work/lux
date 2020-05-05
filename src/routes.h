@@ -10,11 +10,16 @@ static const int BD_QUERY = 43;
 static const int BD_CONTENT_TYPE = 44;
 static const int BD_RETURNS = 45;
 
+struct routehandler { 
+	char *filename; 
+	int type; 
+}; 
+
 struct route { 
 	char *routename; 
 	char *parent; 
 	int elen; 
-	struct routehandler { char *filename; int type; } **elements;
+	struct routehandler **elements;
 };
 
 struct element {

@@ -32,9 +32,10 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 					FPRINTF( "rq->mlen: %d\n", rq->mlen );
 					FPRINTF( "%p\n", buf );
 					//rq->msg = buf;
+					//return 0;	
 					break;
 				}
-				FPRINTF("Tried %d times to read from socket. Trying again?.\n", try );
+				FPRINTF("Tried %d times to read from socket. Got %d bytes.\n", try, rd );
 			}
 			else {
 				//this would just be some uncaught condition...

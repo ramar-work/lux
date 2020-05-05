@@ -29,6 +29,7 @@ static const int maps[] = {
 	['{'] = ACT_EITHER,
 	[255] = 0
 };
+
 static const char *keys[] = {
 	"returns"
 ,	"content-type"
@@ -40,6 +41,7 @@ static const char *keys[] = {
 ,	"auth"
 ,	NULL
 };
+
 
 //Free route list
 void free_routes ( struct route ** routes ) {
@@ -63,6 +65,7 @@ void free_routes ( struct route ** routes ) {
 }
 
 
+//...
 static void free_urimaps () {
 
 }
@@ -79,6 +82,23 @@ static char *get_route_key_type ( int num ) {
 	;
 }
 
+
+static void print_handler ( char *n, char **a ) {
+	FPRINTF( "%s print\n", n );
+	int i = 0;
+#if 1
+	for ( int i=0; i<12; i++ ) {
+		FPRINTF( "%s[%d]: %s\n", n, i, a[i] );
+	}
+#else
+	while ( a ) {
+		FPRINTF( "handler[%d]: %s\n", ++i, *a );
+		a++;
+	}
+#endif
+}
+
+
 //Build routes list
 struct route ** build_routes ( Table *t ) {
 	struct route **routes = NULL;
@@ -94,15 +114,16 @@ struct route ** build_routes ( Table *t ) {
 		return routes; 
 	}  
 
-#if 0
+#if 1
+FPRINTF( "Elements:\n" );
 	while ( routes && (*routes) ) {
-		fprintf( stderr, "%s, %d: '%s' => ", __FILE__, __LINE__, (*routes)->routename );
+		FPRINTF( "'%s' => ", (*routes)->routename );
 		struct routehandler **h = (*routes)->elements;
 		while ( h && *h ) {
 			fprintf( stderr, "%s, ", (*h)->filename );
 			h++;
 		}
-		fprintf( stderr, "\n" );
+		FPRINTF( "\n" );
 		routes++;
 	}
 #endif
@@ -116,6 +137,7 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 	struct route ***routes = f->userdata;
 	int *rlen = &f->len;
 	int *rdepth = &f->depth;
+	FPRINTF( "Depth is %d\n", *rdepth );
 	char *name = NULL;
 	char *type = NULL;
   char nbuf[ 64 ] = { 0 };
@@ -129,37 +151,48 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 		"hint" \
 		"auth"
 	;
+	FPRINTF( "Got key type (%s) & value type (%s)\n", 
+		lt_typename( kv->key.type ), lt_typename( kv->value.type ) );
 
 	//Save the key or move table depth
-	if ( kv->key.type == LITE_TXT )
+	if ( kv->key.type == LITE_TXT ) {
 		name = kv->key.v.vchar;
-	/*else if ( kv->key.type == LITE_INT || LITE_FLT )
-		name = kv->key.v.vchar;*/
+		//Can I access the handler[ .. ] 
+		FPRINTF( "Got name '%s' at routes\n", name ); 
+	}
+	else if ( kv->key.type == LITE_INT || LITE_FLT ) {
+		//name = kv->key.v.vchar;
+		FPRINTF( "Got numeric id '%d' at routes\n", kv->key.v.vint ); 
+	}
 	else if ( kv->key.type == LITE_TRM ) {
 		//Safest to add a null member to the end of elements
-		//b--;
 		if ( (--(*rdepth)) == 0 )
 			return 0;	
 		else { 
 			if ( (*rdepth) == 1 ) {
 				for ( int i=0; i < sizeof( parent ) / sizeof( char * ); i++ ) {
-					parent[ i ] = NULL, handler[ i ] = NULL;
+					parent[ i ] = NULL; 
+					handler[ i ] = NULL;
 				}	
 			}
 		}
 	}
 
+#if 1
 	if ( kv->value.type == LITE_TXT ) {
-		FPRINTF( "filename: %s\n", kv->value.v.vchar );
+		FPRINTF( "Got filename '%s' at %s\n", kv->value.v.vchar, __func__ );
 		if ( ( type = handler[ (*rdepth) - 1 ] ) ) {
 		#if 1
 			struct route *rr = (*routes)[ (*rlen) - 1 ];
 		#else
 			struct route *rr = routes[ (*rlen) - 1 ];
 		#endif
+			FPRINTF( "Got type key '%s'\n ", type );
 			struct routehandler *h = malloc( sizeof( struct routehandler ) );
-			if ( !h || !( h->filename = strdup( kv->value.v.vchar ) ) ) 
+			if ( !h || !( h->filename = strdup( kv->value.v.vchar ) ) ) {
 				return 0;
+			}
+			memset( h, 0, sizeof(struct routehandler) );
 			if ( memcmp( "model", type, 3 ) == 0 )
 				h->type = BD_MODEL;
 			else if ( memcmp( "view", type, 3 ) == 0 )
@@ -174,8 +207,9 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 				//This isn't valid, so drop it...
 				//return 0;
 			}
-			add_item( &rr->elements, h, struct routetype *, &rr->elen );
+			add_item( &rr->elements, h, struct routehandler *, &rr->elen );
 		}
+		FPRINTF( "Type: %s\n", type );
 	}
 
 	else if ( kv->value.type == LITE_TBL ) {
@@ -185,9 +219,11 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 			if( !memstr( keysstr, name, strlen(keysstr) ) ) {
 				int blen = 0;
 				struct route *rr = NULL; 
-				char *buf = NULL, *par = parent[ b - 1 ];
+				char *buf = NULL; 
+				char *par = parent[ (*rdepth) - 1 ];
 
 				if ( !( rr = malloc( sizeof(struct route) ) ) ) {
+					FPRINTF( "Allocation for new route failed.\n" );
 					return 0;
 				}
 
@@ -207,33 +243,34 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 				}
 			#endif
 
-				buf[ blen ] = '\0';
+				append_to_char( &buf, &blen, " " );
+				buf[ blen - 1 ] = '\0';
 				rr->elen = 0;
 				rr->elements = NULL;
 				rr->routename = buf;
+				FPRINTF( "Got route name (%s), adding to parent index at %d\n", rr->routename, *rdepth ); 
 				parent[ (*rdepth) ] = rr->routename;
-
-				//FPRINTF( "Got route name (%s), saving to: %p->%p\n", name, rr, routes );
-			#if 0
 				add_item( routes, rr, struct route *, rlen );
-			#else
-				add_item( routes, rr, struct route *, rlen );
-			#endif
 			}
 			else {
 				FPRINTF( "Got prepared key: %s\n", name );
 				handler[ (*rdepth) ] = strdup( name );
 			}
 			(*rdepth)++;
+			print_handler( "parent", parent );
+			print_handler( "handler", handler );
 		}
+		FPRINTF( "Moving to next row and %d\n", *rdepth );
 	}
+	getchar();
+#endif
 	return 1;
 }
 
 
 //Return true on whatever resolved?
 int resolve_routes ( const char *route, const char *uri ) {
-
+	FPRINTF( "Checking routes with route = '%s' & uri = '%s'\n", route, uri );
 	struct element **expectedList = NULL;
 	struct element **inputList = NULL;
 	int elistLen = 0;
@@ -241,6 +278,10 @@ int resolve_routes ( const char *route, const char *uri ) {
 
 	//Simply check that everything does what it should
 	if ( strlen(route) == 1 && strlen(uri) == 1 ) {
+		return ( *uri == '/' && *route == '/' );
+	}
+
+	if ( strlen(route) == 2 && strlen(uri) == 1 && route[0] == '/' && route[1] == '/' ) {
 		return ( *uri == '/' && *route == '/' );
 	}
 

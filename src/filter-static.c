@@ -21,6 +21,7 @@ char *getExtension ( char *filename ) {
 }
 
 
+//Check static prefix...
 int check_static_prefix( const char *path, const char *prefix ) {
 	if ( !path || !prefix || strlen(path) < strlen(prefix) ) { 
 		return 0;
@@ -32,6 +33,20 @@ int check_static_prefix( const char *path, const char *prefix ) {
 }
 
 
+//check for disallowed directories.
+//always disallow: misc/ and log/, and any others
+int check_for_disallowed_directories ( const char *path ) {
+	return 1;
+}
+
+
+//Check for disallowed files
+int check_for_disallowed_files ( const char *path ) {
+	return 1;
+}
+
+
+//
 int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct config *config, struct host *host ) {
 	struct stat sb;
 	int fd = 0;
@@ -43,29 +58,29 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct config *con
 	const char *mimetype_default = mmtref( "application/octet-stream" );
 	const char *mimetype = NULL;
 	uint8_t *content = NULL;
-	//struct host *config = (struct host *)ctx;
 
+	//Die if no host directory is specified.
 	if ( !host->dir ) {
 		return http_set_error( rs, 500, "No directory path specified for this site." );
 	}
 
 	//Stop / requests when dealing with static servers
-FPRINTF( "rq->path is %s\n", rq->path );
+	FPRINTF( "rq->path is %s\n", rq->path );
 	if ( !rq->path || ( strlen( rq->path ) == 1 && *rq->path == '/' ) ) {
 		//Check for a default page (like index.html, which comes from config)
-		if ( !config->root_default ) {
+		if ( !host->root_default ) {
 			return http_set_error( rs, 404, "No default root specified for this site." );
 		}
-		fname = (char *)config->root_default; 
+		fname = (char *)host->root_default; 
 	}
 		
 	//Create a fullpath
 	if ( snprintf( fpath, sizeof(fpath) - 1, "%s%s", host->dir, fname ) == -1 ) {
 		return http_set_error( rs, 500, "Full filepath probably truncated." );
 	}
-FPRINTF( "full path is %s\n", fpath );
 
 	//Crudely check the extension before serving.
+	FPRINTF( "Made request for file at path: %s\n", fpath );
 	mimetype = mimetype_default;
 	if ( ( extension = getExtension( fpath ) ) ) {
 		extension++;

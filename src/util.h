@@ -13,10 +13,17 @@
 
 #ifdef DEBUG_H
  #define FPRINTF(...) \
-	fprintf( stderr, "DEBUG: %s[%d]: ", __FILE__, __LINE__ ); \
-	fprintf( stderr, __VA_ARGS__ );
+	fprintf( stderr, "DEBUG: %s[%d]: ", __FILE__, __LINE__ ) && \
+	fprintf( stderr, __VA_ARGS__ )
+
+ #define add_item(LIST,ELEMENT,SIZE,LEN) \
+	fprintf( stderr, "%s[%d]: ", __FILE__, __LINE__ ) && \
+	fprintf( stderr, "Adding a new item %p to list: %p\n", ELEMENT, LIST ) && \
+		add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 #else
  #define FPRINTF(...)
+ #define add_item(LIST,ELEMENT,SIZE,LEN) \
+	add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 #endif
 
 #define ENCLOSE(SRC, POS, LEN) \
@@ -53,9 +60,6 @@
 #define mrand_letters(BUFLEN) \
 	(char *)srand_uint8t( (uint8_t *)"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", \
 		sizeof("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), malloc(BUFLEN), BUFLEN )
-
-#define add_item(LIST,ELEMENT,SIZE,LEN) \
-	fprintf( stderr, "%s,%d: ", __FILE__, __LINE__ ) && add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 
 #define append_to_char(DEST,DESTLEN,SRC) \
 	append_to_uint8t( (uint8_t **)DEST,DESTLEN,(uint8_t *)SRC,strlen(SRC) )

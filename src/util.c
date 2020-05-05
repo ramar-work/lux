@@ -224,7 +224,6 @@ void * add_item_to_list( void ***list, void *element, int size, int * len ) {
 	(*list)[ *len ] = element; 
 	(*list)[ (*len) + 1 ] = NULL; 
 	(*len) += 1; 
-
 	return list;
 }
 

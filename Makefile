@@ -10,7 +10,7 @@ CC = clang
 CC = gcc
 PREFIX = /usr/local
 VERSION = 0.01
-PORT = 2200
+PORT = 2222
 RANDOM_PORT = 1
 PORT_FILE = /tmp/hypno.port
 BROWSER = chromium
@@ -22,7 +22,7 @@ RECORDS = 3
 
 # Not sure why these don't always work...
 TESTS = config database http luabind render routes util server #filter-static #filter-c
-SRC = vendor/single.c vendor/sqlite3.c src/config.c src/hosts.c src/routes.c src/database.c src/http.c src/luabind.c src/mime.c src/render.c src/socket.c src/util.c src/luaext.c src/ctx-http.c src/ctx-https.c src/filter-static.c src/server.c #src/filter-echo.c src/filter-dirent.c src/filter-lua.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
+SRC = vendor/single.c vendor/sqlite3.c src/config.c src/hosts.c src/routes.c src/database.c src/http.c src/luabind.c src/mime.c src/render.c src/socket.c src/util.c src/luaext.c src/ctx-http.c src/ctx-https.c src/filter-static.c src/filter-lua.c src/server.c #src/filter-echo.c src/filter-dirent.c src/filter-lua.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
 
 # main
@@ -42,7 +42,16 @@ endif
 test: $(OBJ) 
 test: CFLAGS+=-DTEST_H
 test:
+	-@test -d bin/ || mkdir bin/
 	for t in $(TESTS); do $(CC) $(LDFLAGS) $(CFLAGS) -o bin/$$t src/$${t}-test.c $(OBJ); done
+
+# Temporary target to kill runaway hypno sessions
+kill:
+	ps aux |grep hypno |awk '{print $$2}' | xargs kill -9
+
+# Temporary target to start a server
+start:
+	valgrind --leak-check=full ./hypno --port $(PORT) --config ../hypno-www/config.lua --start
 
 # Generate some of the bigger vendor depedencies seperately
 deps:
@@ -61,6 +70,7 @@ tlssvr:
 clean:
 	-@find src/ -maxdepth 1 -type f -name "*.o" | xargs rm
 	-@find bin/ -maxdepth 1 -type f | xargs rm
+	-@find -maxdepth 1 -type f -name "vgcore*" | xargs rm
 
 # extra-clean - Get rid of yet more crap
 extra-clean: clean

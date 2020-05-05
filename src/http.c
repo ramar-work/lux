@@ -384,6 +384,11 @@ static struct HTTPRecord ** parse_body( struct HTTPBody *entity, char *err, int 
 
 //Marks the important parts of an HTTP request
 static struct HTTPBody * stake_body ( struct HTTPBody *entity, char *err, int errlen ) {
+
+	//Check that mlen is NOT blank
+	FPRINTF( "Message length at stake body is %d\n", entity->mlen );
+	FPRINTF( "Message ptr at stake body is %p\n", entity->msg );
+
 	//Prepare the rest of the request
 	char *header = (char *)entity->msg;
 	int pLen = memchrat( entity->msg, '\n', entity->mlen ) - 1;

@@ -58,7 +58,7 @@ TODO
 
 //Check the validity of a filter
 struct filter * check_filter ( struct filter *filters, char *name ) {
-	while ( filters ) {
+	while ( filters && filters->name ) {
 		struct filter *f = filters;
 		if ( f->name && strcmp( f->name, name ) == 0 ) {
 			return f;
@@ -71,6 +71,8 @@ struct filter * check_filter ( struct filter *filters, char *name ) {
 
 //Check that the website's chosen directory is accessible and it's log directory is writeable.
 int check_dir ( struct host *host, char *err, int errlen ) {
+	FPRINTF( "Checking directory at %s\n", host->dir );
+
 	//Check that log dir is accessible and writeable (or exists) - send 500 if not 
 	struct stat sb;
 	if ( !host->dir ) {
@@ -104,33 +106,33 @@ int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct config *config,
 
 	//With no default host, throw this 
 	if ( !req->host ) {
-		snprintf( err, sizeof(err), "No host header specified." );
-		FPRINTF( err );
+		char *e = "No host header specified.";
+		FPRINTF( e );
 		return http_set_error( res, 500, err ); 
 	}
-
+#if 0
+	if (( config = build_config( err, sizeof(err) )) == NULL ) {
+		return http_set_error( res, 500, err );
+	}  
+#endif
 	if ( !( host = find_host( config->hosts, req->host ) ) ) {
 		snprintf( err, sizeof(err), "Could not find host '%s'.", req->host );
-		FPRINTF( err );
 		return http_set_error( res, 404, err ); 
 	}
 
 	if ( !( filter = check_filter( ctx->filters, !host->filter ? "static" : host->filter ) ) ) {
 		snprintf( err, sizeof( err ), "Filter '%s' not supported", host->filter );
-		FPRINTF( err );
 		return http_set_error( res, 500, err ); 
 	}
 
 	if ( host->dir && !check_dir( host, err, sizeof(err) ) ) {
-		FPRINTF( err );
 		return http_set_error( res, 500, err ); 
 	}
 
 	FPRINTF( "Root default of host '%s' is: %s\n", host->name, host->root_default );
 	//Finally, now we can evalute the filter and the route.
 	if ( !filter->filter( req, res, config, host ) ) {
-		//If a filter fails to execute, what does that really mean?
-		return 1;
+		return 0;
 	}
 
 	//print_httpbody( res );	
@@ -161,6 +163,45 @@ int srv_writelog ( int fd, struct sockAbstr *su ) {
 	return 1;
 }
 
+#if 0
+//Start the request by allocating things we'll always need.
+int srv_start( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config **config ) {
+	FPRINTF( "Initial server allocation started...\n" );
+	//Build a config
+	char err[2048] = {0};
+	if (( *config = build_config( err, sizeof(err) )) == NULL ) {
+		//return http_set_error( res, 500, err );
+		//Kill the context
+		//Close the file
+		//Show me what happened and kill it...
+		return 0;
+	}
+  
+	FPRINTF( "Initial server allocation complete.\n" );
+	return 1;
+}
+
+
+//End the request by deallocating all of the things
+int srv_end( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config *config ) {
+	FPRINTF( "Deallocation started...\n" );
+
+	//Close the file first
+	if ( close( fd ) == -1 ) {
+		FPRINTF( "Couldn't close child socket. %s\n", strerror(errno) );
+	}
+
+	//Free the HTTP body 
+	http_free_body( rs );
+	http_free_body( rq );
+
+	//Destroy config...
+	//free_config( config );
+
+	FPRINTF( "Deallocation complete.\n" );
+	return 0;
+}
+#endif
 
 //Generate a response
 int srv_response ( int fd, struct senderrecvr *ctx ) {
@@ -168,7 +209,7 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 	struct HTTPBody rq = {0}, rs = {0};
 	struct config *config = NULL;
 	char err[2048] = {0};
-	int status = 1;
+	int status = 0;
 
 	//Parse our configuration here...
 	//status = srv_start( fd, &rq, &rs, &config );
@@ -178,25 +219,24 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 	}	
 
 	//Do any per-request initialization here.
-	ctx->pre && ( status = ctx->pre( fd, config, &ctx->data ) );
-	if ( !status ) {
-		FPRINTF( "Problem in ctx->pre\n" );
-		return 0;	
-	}
+	//ctx->pre && ( status = ctx->pre( fd, config, &ctx->data ) );
 
 	//Read the message
 	status = ctx->read( fd, &rq, &rs, ctx->data );
-	//print_httpbody( &rq ); //Dump the request 
+	print_httpbody( &rq ); //Dump the request 
 
 	//Generate a message
 	status && ( status = srv_proc( &rq, &rs, config, ctx ) );
 
 	//Write the message	(should almost ALWAYS run)
 	ctx->write( fd, &rq, &rs, ctx->data );
-	//print_httpbody( &rs ); //Dump the request 
+	print_httpbody( &rs ); //Dump the request 
 
 	//Per-request shut down goes here.
 	ctx->post && ctx->post( fd, config, &ctx->data );
+	//srv_end( fd, &rq, &rs, config );
+	//Forking may force me to free this in two places
+	//ctx->free( &ctx->data );
 
 	//Close new descriptor
 	if ( close( fd ) == -1 ) {
@@ -206,8 +246,8 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 	//Free everything
 	http_free_body( &rs );
 	http_free_body( &rq );
-	free_config( config );
 	return 1; 
+
 
 }
 
