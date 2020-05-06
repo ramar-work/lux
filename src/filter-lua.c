@@ -161,6 +161,7 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *conf
 	FPRINTF( "Building route map...\n" );
 	routes = build_routes( c );
 	FPRINTF( "Route map %p\n", routes );
+exit(0);
 
 	while ( routes && *routes ) {
 		FPRINTF( "Route: '%s', Path: '%s'\n", (*routes)->routename, req->path );

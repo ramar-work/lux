@@ -41,7 +41,10 @@ struct urimap {
 struct route ** build_routes ( Table * );
 int route_table_iterator ( LiteKv *, int, void * );
 void free_routes ( struct route ** );
-void dump_routes ( struct route ** );
 int resolve_routes ( const char *route, const char *uri );
-
+#ifndef DEBUG_H
+ #define dump_routes(set)
+#else
+void dump_routes ( struct route ** );
+#endif
 #endif

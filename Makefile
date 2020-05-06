@@ -50,8 +50,9 @@ kill:
 	ps aux |grep hypno |awk '{print $$2}' | xargs kill -9
 
 # Temporary target to start a server
+#	valgrind --leak-check=full ./hypno --port $(PORT) --config ../hypno-www/config.lua --start
 start:
-	valgrind --leak-check=full ./hypno --port $(PORT) --config ../hypno-www/config.lua --start
+	./hypno --port $(PORT) --config ../hypno-www/config.lua --start
 
 # Generate some of the bigger vendor depedencies seperately
 deps:
