@@ -10,7 +10,6 @@
 //This seems like a bad idea...
 char *parent[100] = { NULL };
 char *handler[100] = { NULL };
-int b = 0;
 static const int RE_NUMBER = 31;
 static const int RE_STRING = 32;
 static const int RE_ANY    = 33;
@@ -132,6 +131,7 @@ FPRINTF( "Elements:\n" );
 
 
 //Generate a list of routes
+int b = 0;
 int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct route ***routes = f->userdata;
