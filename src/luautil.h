@@ -32,5 +32,5 @@ int lua_combine (lua_State *L, char *err, int errlen);
 //Universal hash table utilities
 int table_to_lua (lua_State *, int, Table *) ;
 int lua_to_table (lua_State *, int, Table *);
-int lua_exec_string( lua_State *L, const char *, char *e, int elen );
-int lua_exec_file( lua_State *L, const char *, char *e, int elen );
+int lua_exec_string( lua_State *, const char *, char *, int );
+int lua_exec_file( lua_State *, const char *, char *, int );

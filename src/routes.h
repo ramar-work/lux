@@ -1,4 +1,5 @@
 #include "../vendor/single.h"
+#include "loader.h"
 #include "util.h"
 
 #ifndef ROUTES_H
@@ -12,11 +13,23 @@ static const int BD_RETURNS = 45;
 
 struct routehandler { 
 	char *filename; 
-	int type; 
+	int type;
 }; 
 
+#if 0
+struct rh {
+	char **models;
+	char **views;
+	char **queries;
+	char *returns;
+	char *auth;
+	char *content;
+	char *a;
+}
+#endif
+
 struct route { 
-	char *routename; 
+	char *name; 
 	char *parent; 
 	int elen; 
 	struct routehandler **elements;

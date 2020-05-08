@@ -1286,29 +1286,26 @@ unsigned char *lt_trim (uint8_t *msg, char *trim, int len, int *nlen) {
 
 
 //Count indices in a table. If index is greater than 1 and the item is a "table", then will return the number of elements in said table
-int lt_counti ( Table *t, int index ) {
+int lt_count_at_index ( Table *t, int index, int type ) {
 	//Return count of all elements
 	if ( index == -1 )
 		return t->count;
-	else if ( index == 0 )
-	{
+	else if ( index == 0 ) {
+		//NOTE: If the first index is not a table, there will always only be one value on the other side.
 		if ( lt_vta( t, index ) != LITE_TBL )
-			return t->count;
-		else 
-		{
+			return 1; //t->count;
+		else {
 			LiteTable *tt = &lt_table_at( t, index );
-			return ( tt ) ? (tt->count - 1) : 0;
+			return ( tt ) ? (tt->count - type) : 0;
 		}
 	}
-	else 
-	{
+	else {
 		//Return one for elements that exist, but aren't tables
 		if ( lt_vta( t, index ) != LITE_TBL )
 			return 1;
-		else 
-		{
+		else {
 			LiteTable *tt = &lt_table_at( t, index );
-			return ( tt ) ? (tt->count - 1) : 0;
+			return ( tt ) ? (tt->count - type) : 0;
 		}
 	}
 	return 0;
@@ -2162,13 +2159,32 @@ int lt_exec_complex (Table *t, int start, int end, void *p, int (*fp)( LiteKv *k
 		return 0;
 	}
 
+#if 0
 	//Loop through each index
-	for (int i=start, status=0; i <= end; i++) {
+	for ( int i=start, status=0; i <= end; i++ ) {
 		//VPRINT( "kv at __lt_dump: %p", (t->head + i ));
 		if ( (status = fp( (t->head + i), i, p )) == 0 ) {
 			return 0;
 		}
 	}
+#else
+	//Loop through each index
+	int i = start;
+	int status = 0;
+	do {
+		if ( (status = fp( (t->head + i), i, p )) == 0 ) {
+			return 0;
+		}
+	} while ( ++i < end );
+#if 0
+	for ( int i=start, status=0; i <= end; i++ ) {
+		//VPRINT( "kv at __lt_dump: %p", (t->head + i ));
+		if ( (status = fp( (t->head + i), i, p )) == 0 ) {
+			return 0;
+		}
+	}
+#endif
+#endif
 	return 1;
 }
 

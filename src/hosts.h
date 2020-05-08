@@ -1,4 +1,5 @@
 #include "../vendor/single.h"
+#include "loader.h"
 #include "util.h"
 
 #ifndef HOSTS_H

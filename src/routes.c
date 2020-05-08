@@ -56,7 +56,7 @@ void free_routes ( struct route ** routes ) {
 		free( *hl );
 #endif
 		//free_elements( (*r)->elements );
-		( (*r)->routename ) ? free( (*r)->routename ) : 0;
+		( (*r)->name ) ? free( (*r)->name ) : 0;
 		free( *r );
 		r++;
 	}
@@ -101,7 +101,7 @@ static void print_handler ( char *n, char **a, const int l ) {
 //Build routes list
 struct route ** build_routes ( Table *t ) {
 	struct route **routes = NULL;
-	struct fp_iterator fp_data = { 0, 0, &routes };
+	struct fp_iterator fp_data = { 0, 0/*, NULL, &routes*/ };
 	int index;
 
 	if ( (index = lt_geti( t, "routes" )) == -1 ) {
@@ -248,8 +248,8 @@ int route_table_iterator ( LiteKv *kv, int i, void *p ) {
 				struct route *rr = malloc( sizeof(struct route) );
 				rr->elen = 0;
 				rr->elements = NULL;
-				rr->routename = buf;
-				parent[ (*rdepth) ] = rr->routename;
+				rr->name = buf;
+				parent[ (*rdepth) ] = rr->name;
 				FPRINTF( "Attempting to add element %p to routes...\n", rr );
 				add_item( routes, rr, struct route *, rlen );
 			}
@@ -466,7 +466,7 @@ void dump_routes ( struct route **set ) {
 	struct route **r = set;
 	FPRINTF( "Elements in routes at %p:\n", set );
 	while ( r && *r ) {
-		FPRINTF( "'%s' => \n", (*r)->routename );
+		FPRINTF( "'%s' => \n", (*r)->name );
 	#if 0
 		for ( int ii=0; ii < (*r)->elen; ii++ ) {
 			struct routehandler *t = (*r)->elements[ ii ];

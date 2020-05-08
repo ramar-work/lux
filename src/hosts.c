@@ -1,6 +1,4 @@
 #include "hosts.h"
-
-
 //Free hosts list
 void free_hosts ( struct host ** hosts ) {
 	struct host **hl = hosts;
@@ -20,7 +18,7 @@ void free_hosts ( struct host ** hosts ) {
 	free( hosts );
 }
 
-
+#if 0
 //Can be refactored to use function pointers, based on what the types are... 
 int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
@@ -75,6 +73,41 @@ int host_table_iterator ( LiteKv *kv, int i, void *p ) {
 	}
 	return 1;
 }
+#endif
+
+
+//A hosts handler
+int host_table_iterator ( LiteKv * kv, int i, void *p ) {
+	struct fp_iterator *f = (struct fp_iterator *)p;
+	struct host ***hosts = f->userdata;
+	Table *st = NULL, *nt = NULL;
+
+	//If current index is a table
+	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
+		struct host *w = malloc( sizeof( struct host ) );
+		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
+		FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count ); 
+		nt = loader_shallow_copy( st, i+1, i+count );
+		memset( w, 0, sizeof(struct host) );
+		const struct rule rules[] = {
+			{ "alias", "s", .v.s = &w->alias },
+			{ "dir", "s", .v.s = &w->dir },
+			{ "filter", "s", .v.s = &w->filter },
+			{ "root_default", "s", .v.s = &w->root_default },
+			{ "ca_bundle", "s", .v.s = &w->ca_bundle },
+			{ "certfile", "s", .v.s = &w->certfile },
+			{ "keyfile", "s", .v.s = &w->keyfile },
+			{ NULL }
+		};
+
+		w->name = strdup( kv->key.v.vchar );
+		//Why would this fail?
+		if ( !loader_run( nt, rules ) ) {
+		}
+		add_item( hosts, w, struct host *, &f->len );
+	}
+	return 1;
+}
 
 
 //Find a host
@@ -99,7 +132,7 @@ struct host * find_host ( struct host **hosts, char *hostname ) {
 //Build hosts list
 struct host ** build_hosts ( Table *t ) {
 	struct host **hosts = NULL;
-	struct fp_iterator fp_data = { 0, 0, &hosts };
+	struct fp_iterator fp_data = { 0, 0, /*NULL,*/ &hosts, host_table_iterator };
 	int index;
 	if ( (index = lt_geti( t, "hosts" )) == -1 ) {
 		return NULL;

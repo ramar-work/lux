@@ -281,6 +281,10 @@ int main (int argc, char *argv[] ) {
  #define lt_rewind(t, pos) \
 	lt_set( t, t->index - pos, 0 )
 #endif
+ #define lt_counti(t, i) \
+	lt_count_at_index( t, i, 1 ) 
+ #define lt_counta(t, i) \
+	lt_count_at_index( t, i, 0 ) 
  #define lt_advance(t, pos) \
 	lt_set( t, pos ) 
  #define lt_rewind(t, pos) \
@@ -1550,7 +1554,7 @@ LiteKv *lt_items_by_index (Table *t, int ind);
 int lt_count_elements ( Table *t, int index );
 //Table *lt_copy (Table *t, int from, int to); 
 int lt_exists (Table *t, int index);
-int lt_counti ( Table *t, int index );
+int lt_count_at_index ( Table *t, int index, int type );
 int lt_countall ( Table *t );
 //Table *lt_within_long ( Table *t, uint8_t *src, int len );
 Table *lt_within_long( Table *st, uint8_t *src, int len );
