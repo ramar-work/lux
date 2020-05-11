@@ -883,6 +883,7 @@ struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, i
 		return NULL;
 	}
 
+FPRINTF( "HTTP BODY ptr: %p, size: %d\n", (*entity->body)->value, (*entity->body)->size ); 
 	if ( (*entity->body) && ( !(*entity->body)->value || !(*entity->body)->size ) ) {
 		snprintf( err, errlen, "%s", "No body length specified with response." );
 		return NULL;
@@ -945,7 +946,7 @@ char * http_set_char( char **k, const char *v ) {
 }
 
 void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int type, const char *k, uint8_t *v, int vlen ) {
-
+FPRINTF( "HTTP BODY: %p %d\n", v, vlen ); 
 	int len = 0;
 	struct HTTPRecord *r = NULL;
 
@@ -955,7 +956,7 @@ void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int 
 	}
 
 	//Block empty arguments
-	if ( !k || !v || vlen < 0 ) {
+	if ( !k || ( !v && vlen < 0 ) ) {
 		return NULL;
 	}
 
@@ -981,7 +982,10 @@ void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int 
 
 	memset( r->value, 0, vlen );
 	memcpy( r->value, v, vlen );
+FPRINTF( "HTTP BODY ptr: %p, size: %d\n", r->value, r->size );
+
 	add_item( list, r, struct HTTPRecord *, &len );
+	//entity->size = vlen;
 	entity->boundary[ type ] = len;
 	return r;
 }

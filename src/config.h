@@ -14,7 +14,7 @@ struct config {
 	const char *root_default;
 	struct route **routes;
 	struct host **hosts;
-#if 1
+#if 0
 	//Questionable as to whether or not I'll need these...
 	void *ssl;
 	int fd;	

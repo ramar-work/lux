@@ -1,9 +1,11 @@
 #include "http.h"
 #include "config.h"
+#include "filter-lua.h"
+#if 0
 #include "filter-static.h"
 #include "filter-echo.h"
-#include "filter-lua.h"
 #include "filter-c.h"
+#endif
 
 #define TESTDIR "tests/filter-c/"
 
@@ -56,10 +58,10 @@ struct filter_test {
 	uint8_t *expected;
 	int len;
 } fp[] = {
-	{ "c", TESTDIR "submarine.local", "/index.html", filter_c },
-#if 0
-
 	{ "lua", TESTDIR "lil-model", "/index.lua", filter_lua },
+#if 0
+	{ "c", TESTDIR "submarine.local", "/index.html", filter_c },
+
 	{ "lua", TESTDIR "error-model", "/index.lua", filter_lua },
 	{ "lua", TESTDIR "big-model", "/index.lua", filter_lua },
 	{ "lua", "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },

@@ -70,8 +70,8 @@ int arg_debug = 0;
 
 struct filter filters[] = {
 	{ "static", filter_static },
-#if 0
   { "lua", filter_lua },
+#if 0
 , { "dirent", filter_dirent }
 , { "echo", filter_echo }
 , { "c", filter_c }

@@ -13,7 +13,7 @@ void free_t( Table *t ) {
 	}
 }
 
-
+#if 0
 //Get integer value from a table
 int get_int_value ( Table *t, const char *key, int notFound ) {
 	int i = lt_geti( t, key );
@@ -44,6 +44,7 @@ char * get_char_value ( Table *t, const char *key ) {
 
 	return p->vchar;
 }
+#endif
 
 
 //Build global configuration

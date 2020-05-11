@@ -3,7 +3,7 @@ NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
 LDFLAGS = -lgnutls -llua -ldl -lpthread
 CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -Wno-format-security -fsanitize=address -fsanitize-undefined-trap-on-error
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -Wno-format-truncation -Wno-strict-overflow -std=c99 -Wno-deprecated-declarations -O2 #-DDEBUG_H
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -Wno-format-truncation -Wno-strict-overflow -std=c99 -Wno-deprecated-declarations -O2 -DDEBUG_H
 CFLAGS = $(CLANGFLAGS)
 CFLAGS = $(GCCFLAGS)
 CC = clang
@@ -21,8 +21,8 @@ RECORDS = 3
 #LD_DIRS=-L/usr/lib/x86_64-linux-gnu
 
 # Not sure why these don't always work...
-TESTS = config database http luabind render routes util server loader 
-SRC = vendor/single.c vendor/sqlite3.c src/config.c src/hosts.c src/routes.c src/database.c src/http.c src/luabind.c src/mime.c src/render.c src/socket.c src/util.c src/luaext.c src/ctx-http.c src/ctx-https.c src/filter-static.c src/server.c src/loader.c #src/filter-echo.c src/filter-dirent.c src/filter-lua.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
+TESTS = config database http luabind render routes util server loader
+SRC = vendor/single.c vendor/sqlite3.c src/config.c src/hosts.c src/routes.c src/database.c src/http.c src/luabind.c src/mime.c src/render.c src/socket.c src/util.c src/luaext.c src/ctx-http.c src/ctx-https.c src/server.c src/loader.c src/mvc.c src/filter-static.c src/filter-lua.c #src/filter-echo.c src/filter-dirent.c src/filter-lua.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
 
 # main
@@ -49,23 +49,22 @@ test:
 kill:
 	ps aux |grep hypno |awk '{print $$2}' | xargs kill -9
 
+# ...
+uu:
+	$(CC) -DSQROOGE_H -o lut -llua lut.c src/util.c src/luautil.c	vendor/single.c
+
 # Temporary target to start a server
-#	valgrind --leak-check=full ./hypno --port $(PORT) --config ../hypno-www/config.lua --start
 start:
 	./hypno --port $(PORT) --config ../hypno-www/config.lua --start
+
+# Temporary target to start a server with Valgrind running
+vstart:
+	valgrind --leak-check=full ./hypno --port $(PORT) --config ../hypno-www/config.lua --start
 
 # Generate some of the bigger vendor depedencies seperately
 deps:
 	$(CC) $(CFLAGS) -o vendor/single.o -c vendor/single.c 
 	$(CC) $(CFLAGS) -o vendor/sqlite3.o -c vendor/sqlite3.c 
-
-# Make an SSL Client
-tlscli:
-	$(CC) $(CFLAGS) -DSQROOGE_H -o cx vendor/single.c tlscli.c -lgnutls
-
-# Make an SSL server that just runs forever... 
-tlssvr:
-	$(CC) $(CFLAGS) -DSQROOGE_H -o sx vendor/single.c tlssvr.c -lgnutls
 
 # clean - Get rid of object files and tests 
 clean:

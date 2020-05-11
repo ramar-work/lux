@@ -582,7 +582,7 @@ uint8_t *table_to_uint8t ( Table *t, const uint8_t *src, int srclen, int *newlen
 #endif
 
 	//Free the map
-	destroy_render_table( map );
+	//destroy_render_table( map );
 	*newlen = blocklen;
 	return block; 
 }
