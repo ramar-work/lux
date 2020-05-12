@@ -13,39 +13,6 @@ void free_t( Table *t ) {
 	}
 }
 
-#if 0
-//Get integer value from a table
-int get_int_value ( Table *t, const char *key, int notFound ) {
-	int i = lt_geti( t, key );
-	LiteRecord *p = NULL;
-	if ( i == -1 ) {
-		return notFound;
-	}
-
-	if (( p = lt_ret( t, LITE_INT, i ))->vint == 0 ) {
-		return notFound;
-	}
-
-	return p->vint;
-}
-
-
-//Get string value from a table
-char * get_char_value ( Table *t, const char *key ) {
-	int i = lt_geti( t, key );
-	LiteRecord *p = NULL;
-	if ( i == -1 ) {
-		return NULL;
-	}
-
-	if (( p = lt_ret( t, LITE_TXT, i ))->vchar == NULL ) {
-		return NULL;
-	}
-
-	return p->vchar;
-}
-#endif
-
 
 //Build global configuration
 struct config * build_config ( char *file, char *err, int errlen ) {

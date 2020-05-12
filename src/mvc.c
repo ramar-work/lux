@@ -16,35 +16,55 @@ static int mvc_array_handler( LiteKv *kv, int i, void *p ) {
 }
 
 
+static struct routeh * create_route ( const char *name ) {
+	struct routeh *route = malloc( sizeof( struct routeh ) );
+	if ( !route ) {
+		return NULL;
+	}
+	memset( route, 0, sizeof( struct routeh ) );
+	route->name = strdup( name );
+	route->mvc = NULL;
+	return route;
+}
+
+
+static struct mvc * create_mvc () {
+	struct mvc *rh = malloc( sizeof( struct mvc ) );
+	memset( rh, 0, sizeof( struct mvc ) );
+	rh->returns = NULL;
+	rh->content = NULL;
+	rh->queries = NULL;
+	return rh;
+}
+
+
 //...
 static int mvc_handler ( LiteKv * kv, int i, void *p ) {
 	FPRINTF( "Invoking routes_handler\n" );
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct routeh ***routes = f->userdata;
 	Table *st = NULL, *nt = NULL;
+
 	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
 		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
 #if 1
+		struct routeh *route = create_route( kv->key.v.vchar );
+		struct mvc *mvc = create_mvc();
+		FPRINTF( "Route name: %s\n", route->name );
+#else
 		struct routeh *route = malloc( sizeof( struct routeh ) );
 		memset( route, 0, sizeof( struct routeh ) );
 		route->name = strdup( kv->key.v.vchar );
 #endif
-		FPRINTF( "Route name: %s\n", kv->key.v.vchar );
 		nt = loader_shallow_copy( st, i+1, i+count );
-		lt_dump( nt );
-
-#if 1
-		//Allocate a routehandler
-		struct mvc *rh = malloc( sizeof( struct mvc ) );
-		memset( rh, 0, sizeof( struct mvc ) );
 
 		const struct rule rules[] = {
 			//Can be string, function or table
-			{ "model", "x", .v.t = (void ***)&rh->models, mvc_array_handler },
-			{ "view", "x", .v.t = (void ***)&rh->views, mvc_array_handler },
-			{ "query", "x", .v.t = (void ***)&rh->queries, mvc_array_handler },
-			{ "returns", "s", .v.s = &rh->returns },
-			{ "content", "s", .v.s = &rh->content },
+			{ "model", "x", .v.t = (void ***)&mvc->models, mvc_array_handler },
+			{ "view", "x", .v.t = (void ***)&mvc->views, mvc_array_handler },
+			{ "query", "x", .v.t = (void ***)&mvc->queries, mvc_array_handler },
+			{ "returns", "s", .v.s = &mvc->returns },
+			{ "content", "s", .v.s = &mvc->content },
 	#if 0
 			{ "auth", "s", .v.s = &w->kk },
 			{ "content-type", "s", .v.s = &w->kk },
@@ -52,11 +72,12 @@ static int mvc_handler ( LiteKv * kv, int i, void *p ) {
 	#endif
 			{ NULL }
 		};
-		
-		if ( !loader_run( nt, rules ) ) {
-		}
-#endif
-		route->mvc = rh; 	
+	
+		//TODO: Loader run should throw something back if a key wasn't found...	
+		loader_run( nt, rules ); 
+		lt_free( nt );
+		free( nt );
+		route->mvc = mvc; 	
 		add_item( routes, route, struct mvc *, &f->len );
 	}
 	FPRINTF( "Done with routes_handler\n" );
@@ -111,3 +132,45 @@ void dump_mvc ( struct mvc *mvc ) {
 	fprintf( stderr, "\n" );
 }
 
+void free_set( char **slist ) {
+	char **list = slist;	
+	#if 0
+	while ( *list ) { 
+		if ( *list ) {
+		FPRINTF( "FREEING %s\n", *list );
+		//ree( *list );
+		}
+		list++;
+	}
+	#endif
+	free( slist );
+}
+
+void free_mvc ( struct mvc *mvc ) {
+	if ( mvc->returns )
+		free( mvc->returns );
+	if ( mvc->content )
+		free( mvc->content );
+#if 0
+	if ( mvc->auth )
+		free( mvc->auth );
+#endif
+	free_set( mvc->models );
+	free_set( mvc->views );
+	free_set( mvc->queries );
+	free( mvc );
+}
+
+
+void free_routeh ( struct routeh **list ) {
+	FPRINTF( "Freeing routeh list\n" );
+	struct routeh **routes = list;
+	while ( routes && *routes ) {
+		FPRINTF( "Freeing route at %s\n", (*routes)->name );
+		free_mvc( (*routes)->mvc );
+		free( (*routes)->name );
+		routes++;
+	}
+	free( list );
+	FPRINTF( "Freeing routeh list\n" );
+}

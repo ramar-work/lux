@@ -23,5 +23,7 @@ struct routeh {
 struct routeh ** build_mvc ( Table *t );
 void dump_routeh ( struct routeh ** );
 void dump_mvc ( struct mvc * );
+void free_mvc ( struct mvc * );
+void free_routeh ( struct routeh ** );
 
 #endif

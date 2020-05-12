@@ -7,10 +7,15 @@
 #include "filter-c.h"
 #endif
 
-#define TESTDIR "tests/filter-c/"
+#define TEST_C_DIR "tests/filter-c/"
+#define TEST_LUA_DIR "tests/filter-lua/"
+#define TEST_STATIC_DIR "tests/filter-static/"
 
 #define TESTCASE( NAME, METHOD, PATH, HEADERS, BODIES, TEXTHTML ) \
 	{ #NAME, { TEXTHTML, METHOD, PATH, HTTP_11, .headers=HEADERS, .body=BODIES } }
+
+#define FILTER( FUNCT, PATH, DFILE ) \
+	{ FUNCT, #FUNCT, PATH, DFILE }
 
 struct HTTPRecord *headers[] = {
 	&(struct HTTPRecord){ "X-Case-Contact", NULL, (uint8_t *)"Lydia", 5 },
@@ -53,18 +58,25 @@ struct Test {
 
 
 struct filter_test {
-	const char *name, *path, *root;
-	int (*filter)( struct HTTPBody *, struct HTTPBody *, void * ); 
+	int (*filter)( 
+		struct HTTPBody *, 
+		struct HTTPBody *, 
+		struct config *, 
+		struct host * 
+	); 
+	const char *name; 
+	const char *path;
+	const char *root;
 	uint8_t *expected;
 	int len;
 } fp[] = {
-	{ "lua", TESTDIR "lil-model", "/index.lua", filter_lua },
+	FILTER( filter_lua, TEST_LUA_DIR "lil-model", "/index.lua" ),
 #if 0
-	{ "c", TESTDIR "submarine.local", "/index.html", filter_c },
+	{ filter_c  , TEST_C_DIR "submarine.local", "/index.html", filter_c },
 
-	{ "lua", TESTDIR "error-model", "/index.lua", filter_lua },
-	{ "lua", TESTDIR "big-model", "/index.lua", filter_lua },
-	{ "lua", "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },
+	{ filter_lua, TEST_LUA_DIR "error-model", "/index.lua", filter_lua },
+	{ filter_lua, TEST_LUA_DIR "big-model", "/index.lua", filter_lua },
+	{ filter_lua, TEST_LUA_DIR "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },
 
 	{ "static", "tests/filters/static/text", "/index.html", filter_static },
 	{ "static", "tests/filters/static/binary", "/aeon.jpg", filter_static },
@@ -84,26 +96,28 @@ int main ( int argc, char *argv[] ) {
 		while ( test->name ) {
 			char err[2048] = { 0 };
 			struct HTTPBody response = { 0 };
-			struct config config = { .path = f->path, .root_default = f->root };
-			fprintf( stderr, "============\n" );
+			struct config config = { .root_default = f->root };
+			struct host host = { .dir = (char *)f->path, .root_default = (char *)f->root };
+
 			fprintf( stderr, "[ Test name: %-13s ]: ", test->name );
 
 			//Run the filter on it...
-			//TODO: The messages here make no sense unless you create 
-			//expected responses and compare them.
-			if ( f->filter( &test->request, &response, &config ) )
+			if ( f->filter( &test->request, &response, &config, &host ) )
 				;//fprintf( stderr, "SUCCESS:\n" );
 			else {
 				;//fprintf( stderr, "FAILED" );
 				//fprintf( stderr, " %d %d\n", response.status, response.mlen );
 			}
 
+#if 0
 			//Optionally show the finished message?
 			if ( 1 ) {	
 				fprintf( stderr, "\nMessage contents:\n" );
 				write( 2, response.msg, response.mlen );
 			}
 			fprintf( stderr, "\n===========\n" );
+#endif
+			//http_free_request( &request );
 			http_free_response( &response );
 			test++;
 		}

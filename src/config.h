@@ -21,10 +21,6 @@ struct config {
 #endif
 };
 
-int get_int_value ( Table *t, const char *key, int notFound );
-char * get_char_value ( Table *t, const char *key );
-char *get_route_key_type ( int num );
-
 struct config * build_config ( char *, char *, int );
 void free_config( struct config * );
 

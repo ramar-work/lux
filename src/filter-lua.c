@@ -14,7 +14,6 @@
 #define lua_pushustrings(STATE,KEY,VAL,VLEN) \
 	lua_pushstring( STATE, KEY ) && lua_pushlstring( STATE, (char *)VAL, VLEN )
 
-
 #define lua_pushstrings(STATE,KEY,VAL) \
 	lua_pushstring( STATE, KEY ) && lua_pushlstring( STATE, (char *)VAL, strlen( VAL ))
 
@@ -25,12 +24,12 @@ static const char viewfmt[] = "%s/view/%s.%s"; //tpl
 
 //Destroy the Lua configuration
 void destroy_luaconf ( struct luaconf *luaconf ) {
+	free_routeh( luaconf->routes );
 	free( luaconf->db );
 	free( luaconf->fqdn );
 	free( luaconf->title );
 	free( luaconf->root_default );
 	free( luaconf->spath );
-	//while ( luaconf->mvc ) or free_mvc( luaconf->mvc );
 	free( luaconf );
 }
 
@@ -46,20 +45,28 @@ static lua_State * lua_load_libs( lua_State **L ) {
 
 
 //All of the keys I need to parse will go here for now...
-struct luaconf * build_luaconf ( lua_State *L, const char *dir, char *err, int errlen ) {
+struct luaconf * build_luaconf ( const char *dir, char *err, int errlen ) {
 	struct luaconf *conf = NULL;
 	char path[2048] = {0};
 	Table *t = NULL;
+	lua_State *L = NULL;
+
+	//
+	if ( !( L = luaL_newstate() ) ) {
+		return NULL;
+	}
 
 	//Build a thing
 	if ( snprintf( path, sizeof( path ), "%s%s", dir, lconfname ) == -1 ) {
 		//return http_set_error( res, 500, "Could not get full config path." );
+		lua_close( L );
 		return NULL;
 	}
 
 	//Allocate
 	FPRINTF( "config path is: %s\n", path );
 	if ( !( t = malloc( sizeof(Table) ) ) || !lt_init( t, NULL, 1024 ) ) {
+		lua_close( L );
 		snprintf( err, errlen, "Failed to allocate heap for configuration." );
 		return NULL; //http_set_error( res, 500, "Failed to allocate config table." );
 	}
@@ -68,6 +75,7 @@ struct luaconf * build_luaconf ( lua_State *L, const char *dir, char *err, int e
 	if ( !lua_exec_file( L, path, err, errlen ) ) {
 		lt_free( t );
 		free( t );
+		lua_close( L );
 		return NULL;
 	}
 
@@ -75,6 +83,7 @@ struct luaconf * build_luaconf ( lua_State *L, const char *dir, char *err, int e
 	if ( !lua_istable( L, 1 ) ) {
 		lt_free( t );
 		free( t );
+		lua_close( L );
 		snprintf( err, errlen, "Configuration is not a table." );
 		return NULL; // http_set_error( res, 500, "Configuration is not a table.\n" );
 	}
@@ -83,6 +92,7 @@ struct luaconf * build_luaconf ( lua_State *L, const char *dir, char *err, int e
 	if ( !lua_to_table( L, 1, t ) ) {
 		lt_free( t );
 		free( t );
+		lua_close( L );
 		snprintf( err, errlen, "Failed to convert config from Lua to table." );
 		return NULL; //http_set_error( res, 500, "Failed to convert config table." );
 	}
@@ -94,6 +104,7 @@ struct luaconf * build_luaconf ( lua_State *L, const char *dir, char *err, int e
 	if ( !( conf = malloc( sizeof( struct luaconf ) ) ) || !memset( conf, 0, sizeof( struct luaconf )) ) {
 		lt_free( t );
 		free( t );
+		lua_close( L );
 		snprintf( err, errlen, "Failed to allocate heap for configuration." );
 		return NULL; //http_set_error( res, 500, "Failed to convert config table." );
 	}
@@ -120,11 +131,11 @@ struct luaconf * build_luaconf ( lua_State *L, const char *dir, char *err, int e
 	FPRINTF( "title: %s\n", conf->title );
 	FPRINTF( "root_default: %s\n", conf->root_default );
 	FPRINTF( "routes:\n" );
-	dump_routeh( conf->routes );
 
 	//Destroy things that aren't needed.
 	lt_free( t );
 	free( t );
+	lua_close( L );
 
 	//Any required things that aren't set should cause us to stop...
 	return conf;
@@ -134,6 +145,7 @@ struct luaconf * build_luaconf ( lua_State *L, const char *dir, char *err, int e
 //Find the active route
 static struct mvc * find_active_route ( struct luaconf *luaconf, const char *path ) {
 	struct routeh **routes = luaconf->routes;
+#if 0
 	while ( routes && *routes ) {
 		FPRINTF( "Route: '%s', Path: '%s'\n", (*routes)->name, path );
 		if ( resolve_routes( (*routes)->name, path ) ) {
@@ -141,7 +153,7 @@ static struct mvc * find_active_route ( struct luaconf *luaconf, const char *pat
 		}
 		routes++;
 	}
-
+#endif
 	struct mvc * mvc = (*routes)->mvc;
 	FPRINTF( "models: %p\n", mvc->models );
 	FPRINTF( "views: %p\n", mvc->views );
@@ -316,23 +328,29 @@ uint8_t * execute_views ( struct luaconf *luaconf, Table *t, int *i, char *err, 
 }
 
 
+static int set_framework_methods() {
+#if 1
+	//Set framework methods here...
+	//lua_set_methods( L, "newenv", libs );
+#else
+	lua_setglobal( L, "newenv" );	
+	lua_stackdump( L );
+#endif
+	return 1;
+}
+
+
 
 //filter-lua.c - Run HTTP messages through a Lua handler
 //Any processing can be done in the middle.  Since we're in another "thread" anyway
 int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *config, struct host *host ) {
 
-#if 0
-	struct routehandler **handlers = NULL;
-	struct route **routes = NULL;
-	char *statdir = NULL;
-#else
 	struct luaconf *luaconf = NULL;
-	Table *t = NULL;
 	lua_State *L = NULL;
 	uint8_t *buf = NULL;
 	int buflen = 0;
 	char err[2048] = {0}, lconfpath[2048] = {0};
-#endif
+	Table *model;
 
 	//Check for config (though this is probably already done...)
 	if ( !config )
@@ -341,224 +359,47 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *conf
 	if ( !host->dir )
 		return http_set_error( res, 500, "No host directory specified." );
 
-#if 1
-	//Initialize Lua environment and add a global table
-	if ( !lua_load_libs( &L ) )
-		return http_set_error( res, 500, "Could not allocate Lua environment." );
-#else
-	if ( !( L = luaL_newstate() ) || !load_libs( L ) )
-		return http_set_error( res, 500, "Could not allocate Lua environment." );
-
-	//This ought to return something...
-	//luaL_openlibs( L );
-	//FPRINTF( "Initialized Lua environment.\n" );
-#endif
-
-#if 0
-	//Pick up the local Lua config
-	if ( snprintf( lconfpath, sizeof( lconfpath ), "%s%s", host->dir, lconfname ) == -1 )
-		return http_set_error( res, 500, "Could not get full config path." );
-#endif
-
 	//Try parsing
-	if ( !( luaconf = build_luaconf( L, host->dir, err, sizeof(err) )) ) {
-		lua_close( L );
+	if ( !( luaconf = build_luaconf( host->dir, err, sizeof(err) )) )
 		return http_set_error( res, 500, "Failed to parse lua config." );
-	}
 
 	//Check for and serve any static files 
 	//TODO: This should be able to serve a list of files matching a specific type
 	if ( check_static_prefix( luaconf->spath, req->path ) ) {
 		destroy_luaconf( luaconf );
-		lua_close( L );
 		return filter_static( req, res, config, host );
 	}
 
-#if 1
+	//...
 	if ( !( luaconf->mvc = find_active_route( luaconf, req->path ) ) ) {
 		destroy_luaconf( luaconf );
-		lua_close( L );
 		snprintf( err, sizeof(err), "Path %s does not resolve.", req->path );
 		return http_set_error( res, 404, err );
 	} 	
-#else
-	//Check that the path resolves to anything. 404 if not, I suppose
-	FPRINTF( "Building route map...\n" );
-	routes = build_routes( c );
-	FPRINTF( "Route map %p\n", routes );
-exit(0);
 
-	while ( routes && *routes ) {
-		FPRINTF( "Route: '%s', Path: '%s'\n", (*routes)->routename, req->path );
-		if ( resolve_routes( (*routes)->routename, req->path ) ) {
-			break;
-		}
-		routes++;
-	}
+	//Load Lua libraries...
+	if ( !lua_load_libs( &L ) )
+		return http_set_error( res, 500, "Could not allocate Lua environment." );
 
-	if ( !(*routes) ) {
-		snprintf( err, sizeof(err), "Path %s does not resolve.", req->path );
-		return http_set_error( res, 404, err );
-	}
-
-	FPRINTF( "%p\n", routes );
-	FPRINTF( "%p\n", *routes );
-	FPRINTF( "elements: %p\n", (*routes)->elements );
-#endif
-
-
-#if 1
+	//Build an environment
 	if ( !build_luaenv( L, req, err, sizeof(err) ) ) {
 		snprintf( err, sizeof(err), "Set error with build_luaenv." );
 		return http_set_error( res, 500, err );
 	}
 
-#if 0
-	//Put all of the HTTP data on the stack
-	FPRINTF( "Dump Lua stack\n" );
-	lua_stackdump( L );
-	FPRINTF( "Dump Lua stack again\n" );
-	lua_setglobal( L, "newenv" );	
-	lua_stackdump( L );
-#endif
-#else
-	lua_newtable( L ); 
-	while ( ttt && *ttt ) {
-		lua_pushstring( L, (*ttt)->name ); 
-		//TODO: Nils should probably be nils, not empty tables...
-		lua_newtable( L );
-		while ( (*ttt)->records && (*(*ttt)->records)->field ) {
-			struct HTTPRecord *r = (*(*ttt)->records);
-		#if 0
-			lua_pushustrings( L, r->field, r->value, r->size );
-		#else
-			lua_pushstring( L, r->field );
-			lua_pushlstring( L, (char *)r->value, r->size );
-		#endif
-			lua_settable( L, 3 );
-			(*ttt)->records++;
-		}
-		lua_settable( L, 1 );
-		ttt++;
-	}
+	if ( !set_framework_methods() )
+		return http_set_error( res, 500, "No errors occurred." );
 
-	//Push the path as well
-#if 0
-	lua_pushstrings( L, "url", req->path );
-#else
-	lua_pushstring( L, "url" );
-	lua_pushstring( L, req->path );
-#endif
-	lua_settable( L, 1 );
-#endif
-
-
-#if 0
-	//Set framework methods here...
-#if 0
-	//lua_set_methods( L, "newenv", libs );
-#else
-	//Put whatever is now on the stack in 'newenv'
-	//lua_set_methods( L, "newenv"... );
-	lua_setglobal( L, "newenv" );	
-	lua_stackdump( L );
-#endif
-#endif
-
-
-#if 1
 	//At this point, server data and libraries are available to Lua, so now run models...
-	Table *model;
-	if ( !( model = execute_models( luaconf, L, err, sizeof(err) ) ) ) {
+	if ( !( model = execute_models( luaconf, L, err, sizeof(err) ) ) )
 		return http_set_error( res, 500, err );
-	}
 
-	lt_dump( model );
-#else
-	//Models
-	handlers = (*routes)->elements;
-	FPRINTF( "evaluating handlers (%p)...\n", handlers );
-	while ( handlers && *handlers ) {
-		char filename[ 2048 ] = { 0 };
-		snprintf( filename, sizeof( filename ), "%s/app/%s.lua", host->dir, (*handlers)->filename );
-#if 1
-		FPRINTF( "model: %s\n", filename );
-#else
-		if ( (*handlers)->type == BD_MODEL && !lua_exec_file( L, filename, err, sizeof(err) ) ) {
-			fprintf( stderr, "Failed to execute model filename: %s\n", filename );
-			return http_set_error( res, 500, err );
-		} 
-#endif
-		handlers++;	
-	}
-#endif
-
-
-#if 0
-	FPRINTF( "Current model?\n" );
-	//Find all elements on the stack
-	FPRINTF( "Lua count: %d\n", lua_gettop( L ) );
-	//For each value on the stack, copy each value into one table
-	//1. { table, string, number, string, number, string }
-	//2. { table, table } 
-	//3. { table, table, table } 
-
-	if ( !combine_models( L, err, sizeof(err) ) ) {
-		return http_set_error( res, 500, err ); 
-	}	
-#endif
-
-
-#if 1
-#if 1
-	if ( !( buf = execute_views( luaconf, model, &buflen, err, sizeof(err) ) ) ) {
+	//Generate some views
+	if ( !( buf = execute_views( luaconf, model, &buflen, err, sizeof(err) ) ) )
 		return http_set_error( res, 500, err );
-	}
-	write(2,buf,buflen);
-#endif
-#else
-	//Aggregate all of the model data.
-	if ( !( t = malloc( sizeof( Table )) ) || !lt_init( t, NULL, 2048 ) ) {
-		return http_set_error( res, 500, "Failed to allocate space for results table" );
-	}
-
-	if ( !lua_combine( L, err, sizeof(err) ) ) {
-		return http_set_error( res, 500, err );
-	}
-
-	if ( !lua_to_table( L, 1, t ) ) {
-		return http_set_error( res, 500, "Failed to re-align Lua data" );
-	}
-
-	//Views
-	handlers = (*routes)->elements;
-	while ( handlers && *handlers ) {
-		if ( (*handlers)->type == BD_VIEW ) { 
-			uint8_t *fbuf, *rendered;
-			int rendered_len = 0, flen = 0;
-			char fpath[ 2048 ] = { 0 };
-			snprintf( fpath, sizeof( fpath ), "%s/views/%s.%s", config->path, (*handlers)->filename, "tpl" );
-
-			//Read the entire file to render in and fail...
-			if ( !( fbuf = read_file( fpath, &flen, err, sizeof( err ) ) ) ) {
-				fprintf( stderr, "Failed to read entire view file: %s\n", fpath );
-				return http_set_error( res, 500, err );
-			}
-
-			//Then do the render ( model.? )
-			if ( !( rendered = table_to_uint8t( t, fbuf, flen, &rendered_len ) ) ) {
-				fprintf( stderr, "Failed to render model according to view file: %s\n", fpath );
-				return http_set_error( res, 500, err );
-			}
-
-			//Append to the whole message
-			append_to_uint8t( &buf, &buflen, rendered, rendered_len );
-		} 
-		handlers++;	
-	}
-#endif
 
 #if 1
+	//Set all of this
 	http_set_ctype( res, mmtref( "text/html" ) );
 	http_set_content( res, buf, buflen );
 #else
@@ -566,12 +407,16 @@ exit(0);
 	http_set_content( res, bug, strlen((char *)bug) ); //, sizeof(bug) );
 #endif
 
-	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
+#if 0
+	if ( !http_finalize_response( res, err, sizeof(err) ) )
 		return http_set_error( res, 500, err );
-	}
+#endif
 
 	//Destroy everything
-	lua_close( L );
+	free( buf );
+	lt_free( model );
+	free( model );
 	destroy_luaconf( luaconf );
+	lua_close( L );
 	return 1;
 }

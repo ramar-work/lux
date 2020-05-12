@@ -2017,7 +2017,7 @@ Table *lt_copy (Table *dest, Table *src, int from, int to, int weak) {
 //Get a key or value somewhere
 void lt_free (Table *t) {	
 	//Free any text keys
-	for ( int ii=0; ii < t->index; ii++ ) {
+	for ( int ii=0; ii < t->count; ii++ ) {
 		LiteKv *k = t->head + ii;
 		( k->key.type == LITE_TXT ) ? free( k->key.v.vchar ), k->key.v.vchar = NULL : 0;
 		( k->value.type == LITE_TXT ) ? free( k->value.v.vchar ), k->value.v.vchar = NULL : 0;
