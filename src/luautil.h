@@ -1,4 +1,5 @@
-#include "../vendor/single.h"
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
 
 #define PRETTY_TABS( ct ) \
 	fprintf( stderr, "%s", &"                    "[ 20 - ct ] );

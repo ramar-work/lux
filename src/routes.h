@@ -1,4 +1,5 @@
-#include "../vendor/single.h"
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
 #include "loader.h"
 #include "util.h"
 

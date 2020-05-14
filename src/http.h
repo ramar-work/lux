@@ -1,4 +1,5 @@
-#include "../vendor/single.h"
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
 #include "util.h"
 #ifndef HTTP_H
 

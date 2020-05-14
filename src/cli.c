@@ -1,5 +1,11 @@
 //cli.c - A way to quickly generate new sites to test Hypno...
-#include "../vendor/single.h"
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <errno.h>
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
 
 #define BASIC_HTML \
 	"<html>\n" \

@@ -227,4 +227,16 @@ void * add_item_to_list( void ***list, void *element, int size, int * len ) {
 	return list;
 }
 
+//Trim any characters 
+unsigned char *trim (uint8_t *msg, char *trim, int len, int *nlen) {
+	//Define stuff
+	uint8_t *m = msg;
+	int nl= len;
+	//Move forwards and backwards to find whitespace...
+	while ( memchr(trim, *(m + ( nl - 1 )), 4) && nl-- ) ; 
+	while ( memchr(trim, *m, 4) && nl-- ) m++;
+	*nlen = nl;
+	return m;
+}
+
 

@@ -1,6 +1,17 @@
-#include "../vendor/single.h"
-#ifndef UTIL_H
+#ifndef _WIN32
+ #define _POSIX_C_SOURCE 200809L
+#endif 
 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <time.h>
+#include <sys/time.h>
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
+
+#ifndef UTIL_H
 #define UTIL_H
 
 #define ADDITEM(TPTR,SIZE,LIST,LEN,FAIL) \
@@ -73,6 +84,7 @@ uint8_t *append_to_uint8t ( uint8_t **, int *, uint8_t *, int );
 unsigned char * srand_uint8t( uint8_t *, int, uint8_t *, int );
 void *add_item_to_list( void ***, void *, int , int * );
 char *append_strings_to_char (char **dest, int *len, char *delim, ... );
+uint8_t *trim (uint8_t *msg, char *trim, int len, int *nlen);
 #endif
 
 

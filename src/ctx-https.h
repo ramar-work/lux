@@ -1,4 +1,5 @@
-#include "../vendor/single.h"
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
 #include <gnutls/gnutls.h>
 #include <stddef.h>
 #include "socket.h"

@@ -1,4 +1,13 @@
-#include "../vendor/single.h"
+#include <netinet/in.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <errno.h>
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
+
 #ifndef SOCKET_H
 #define SOCKET_H
 

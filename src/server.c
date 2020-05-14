@@ -35,7 +35,8 @@ TODO
 - Add an option to show a parsed config
 
  * -------------------------------------------------------- */
-#include "../vendor/single.h"
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>

@@ -1,6 +1,7 @@
 #ifndef RENDER_H
 #define RENDER_H
-#include "../vendor/single.h"
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
 #include "luabind.h"
 #include "util.h"
 #endif

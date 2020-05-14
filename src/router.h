@@ -1,5 +1,6 @@
 //router.h
-#include "../vendor/single.h"
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
 #include "util.h"
 #include "loader.h"
 #include "mvc.h"
