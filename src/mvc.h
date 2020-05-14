@@ -15,15 +15,17 @@ struct mvc {
 	char *content;
 };
 
+#if 0
 struct routeh { 
 	char *name; 
 	struct mvc *mvc;
 };
+#endif
 
 struct routeh ** build_mvc ( Table *t );
-void dump_routeh ( struct routeh ** );
 void dump_mvc ( struct mvc * );
 void free_mvc ( struct mvc * );
+void dump_routeh ( struct routeh ** );
 void free_routeh ( struct routeh ** );
 
 #endif

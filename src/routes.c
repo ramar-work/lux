@@ -459,11 +459,11 @@ int resolve_routes ( const char *route, const char *uri ) {
 
 
 //Debug print route list
-#ifndef DEBUG_H
+#if 0
  #define dump_routes(set)
 #else 
-void dump_routes ( struct route **set ) {
-	struct route **r = set;
+void dump_routes ( struct routeh **set ) {
+	struct routeh **r = set;
 	FPRINTF( "Elements in routes at %p:\n", set );
 	while ( r && *r ) {
 		FPRINTF( "'%s' => \n", (*r)->name );
@@ -472,7 +472,6 @@ void dump_routes ( struct route **set ) {
 			struct routehandler *t = (*r)->elements[ ii ];
 			fprintf( stderr, "\t\t{ %s=%s }\n", get_route_key_type(t->type), t->filename );
 		}
-	#else
 		struct routehandler **h = (*r)->elements;
 		while ( h && *h ) {
 			fprintf( stderr, "%p, ", *h );

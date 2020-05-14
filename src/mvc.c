@@ -2,6 +2,7 @@
 //Models and Views are INCREDIBLY difficult
 //This runs on everything in a set...
 #include "mvc.h"
+#include "router.h"
 
 static int mvc_array_handler( LiteKv *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
@@ -174,3 +175,6 @@ void free_routeh ( struct routeh **list ) {
 	free( list );
 	FPRINTF( "Freeing routeh list\n" );
 }
+
+
+

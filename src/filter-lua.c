@@ -17,6 +17,7 @@
 #define lua_pushstrings(STATE,KEY,VAL) \
 	lua_pushstring( STATE, KEY ) && lua_pushlstring( STATE, (char *)VAL, strlen( VAL ))
 
+
 static const char lconfname[] = "/config.lua";
 static const char modelfmt[] = "%s/app/%s.lua";
 static const char viewfmt[] = "%s/view/%s.%s"; //tpl
@@ -144,8 +145,14 @@ struct luaconf * build_luaconf ( const char *dir, char *err, int errlen ) {
 
 //Find the active route
 static struct mvc * find_active_route ( struct luaconf *luaconf, const char *path ) {
-	struct routeh **routes = luaconf->routes;
-#if 0
+	struct routeh *r, **routes = luaconf->routes;
+
+#if 1
+	if ( !( r = resolve_routeh( routes, path ) ) ) {
+		FPRINTF( "Resolve routes failed to find anything...\n" );
+		return NULL;
+	}
+#else
 	while ( routes && *routes ) {
 		FPRINTF( "Route: '%s', Path: '%s'\n", (*routes)->name, path );
 		if ( resolve_routes( (*routes)->name, path ) ) {
@@ -154,14 +161,14 @@ static struct mvc * find_active_route ( struct luaconf *luaconf, const char *pat
 		routes++;
 	}
 #endif
-	struct mvc * mvc = (*routes)->mvc;
+	struct mvc * mvc = r->mvc;
 	FPRINTF( "models: %p\n", mvc->models );
 	FPRINTF( "views: %p\n", mvc->views );
 	FPRINTF( "queries: %p\n", mvc->queries );
 	FPRINTF( "returns: %s\n", mvc->returns );
 	FPRINTF( "auth: %s\n", mvc->auth );
 	FPRINTF( "content: %s\n", mvc->content );
-	return (*routes)->mvc;
+	return mvc; 
 }
 
 

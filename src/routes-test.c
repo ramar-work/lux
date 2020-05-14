@@ -2,22 +2,26 @@
 //gcc -ldl -lpthread -o router vendor/single.o vendor/sqlite3.o router.c && ./router
 #include "../vendor/single.h"
 #include "util.h"
-#include "routes.h"
+#include "router.h"
 
 //These are static routes
-const char *routes[] = {
-  "/"
-, "/route"
-, "/route/"
-, "/{route,julius}"
-, "/{route,julius}/:id"
-, "/route"
-, "/route/:id"
-, "/route/:id=string"
-, "/route/:id=number"
-, "/:id"
-, "/route/*"
-, "/route/*/jackpot"
+//const char *routes[] = {
+#define ROUTE(v) &(struct routeh){ v }
+
+struct routeh *routes[] = {
+	ROUTE( "/" ),
+	ROUTE( "//" ),
+	ROUTE( "/route" ),
+	ROUTE( "/route/" ),
+	ROUTE( "/{route,julius}" ),
+	ROUTE( "/{route,julius}/:id" ),
+	ROUTE( "/route" ),
+	ROUTE( "/route/:id" ),
+	ROUTE( "/route/:id=string" ),
+	ROUTE( "/route/:id=number" ),
+	ROUTE( "/:id" ),
+	ROUTE( "/route/*" ),
+	ROUTE( "/route/*/jackpot" ),
 #if 0
 //Do I want to handle '?'
 , "/route/?"
@@ -27,10 +31,11 @@ const char *routes[] = {
 //Do I want to handle regular expressions?
 //, "/route/[^a-z]"
 #endif
-, NULL
+	NULL
 };
 
 //These are possible request lines
+//These are the easiest possible tests I've ever written...
 const char *requests[] = {
   "/"
 , "/2"
@@ -51,17 +56,21 @@ const char *requests[] = {
 
 
 int main (int argc, char *argv[]) {
-	//It can be from Lua too, I suppose, which ever is easier...
-	const char **routelist = routes;
-	//We simply want to know whether or not this engine will respond to the request list
-	while ( *routelist ) {
-		const char **requestList = requests;
-		fprintf( stderr,  "Checking against this URI: %s\n", *routelist );
-		while ( *requestList ) {
-			char *r = resolve_routes( *routelist, *requestList ) ? "YES" : "NO";
-			fprintf( stderr, "%20s ?= %-30s: %s\n", *routelist, *requestList, r );
-			requestList++;
+	struct routeh **rlist = routes;
+	struct routeh *resv = NULL;
+	const char **urilist = requests;
+	while ( *urilist ) {
+		fprintf( stderr,  "Checking routes against this URI: %s\n", *urilist );
+		//the best way to do this is to run one at a time...
+		if ( !( resv = resolve_routeh( rlist, *urilist ) ) ) {
+			fprintf( stderr, "Path %s did not resolve.\n", *urilist );		
+			urilist++;
+			continue;
 		}
-		routelist++;
+
+		fprintf( stderr, "Path %s resolved to name: %s\n", *urilist, resv->name );
+		urilist++;
 	}
+
+	return 0;
 }
