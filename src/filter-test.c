@@ -40,7 +40,24 @@ char HTTP_11[] = "HTTP/1.1";
 struct Test {
 	const char *name;
 	struct HTTPBody request;
-} testsp[] = {
+}; 
+
+
+struct Test static_cases[] = {
+	TESTCASE(root, "GET", "/", NULL, NULL, TEXTHTML),
+#if 0
+	TESTCASE(level1url, "GET", "/ashera", NULL, NULL, TEXTHTML),
+	TESTCASE(level2url, "GET", "/ashera/two", NULL, NULL, TEXTHTML),
+	TESTCASE(404_never_find_me, "GET", "/you-will-never-find-me", NULL, NULL, TEXTHTML),
+	TESTCASE(static_file_missing, "GET", "/static/not_found.jpg", NULL, NULL, TEXTHTML),
+	TESTCASE(static_file_present, "GET", "/static/handtinywhite.gif", NULL, NULL, TEXTHTML),
+	TESTCASE(multipart_post, "POST", "/beef", headers, bodies, MULTIPART),
+	TESTCASE(appxwww_post, "POST", "/nope", headers, bodies, X_APP_WWW),
+#endif
+	{ NULL }
+};
+
+struct Test lua_cases[] = {
 	TESTCASE(root, "GET", "/", NULL, NULL, TEXTHTML),
 #if 0
 	TESTCASE(level1url, "GET", "/ashera", NULL, NULL, TEXTHTML),
@@ -55,7 +72,6 @@ struct Test {
 #endif
 	{ NULL }
 };
-
 
 struct filter_test {
 	int (*filter)( 

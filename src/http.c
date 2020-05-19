@@ -1024,6 +1024,7 @@ void http_free_body ( struct HTTPBody *entity ) {
 int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
 	char err[ 2048 ];
 	memset( err, 0, sizeof( err ) );
+	FPRINTF( "status: %d, mlen: %ld, msg: '%s'\n", status, strlen(message), message );
 
 	if ( !http_set_status( entity, status ) ) {
 		fprintf( stderr, "SET STATUS FAILED!" );

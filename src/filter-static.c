@@ -65,7 +65,7 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct config *con
 	}
 
 	//Stop / requests when dealing with static servers
-	FPRINTF( "rq->path is %s\n", rq->path );
+	//FPRINTF( "rq->path is %s\n", rq->path );
 	if ( !rq->path || ( strlen( rq->path ) == 1 && *rq->path == '/' ) ) {
 		//Check for a default page (like index.html, which comes from config)
 		if ( !host->root_default ) {
@@ -80,7 +80,7 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct config *con
 	}
 
 	//Crudely check the extension before serving.
-	FPRINTF( "Made request for file at path: %s\n", fpath );
+	//FPRINTF( "Made request for file at path: %s\n", fpath );
 	mimetype = mimetype_default;
 	if ( ( extension = getExtension( fpath ) ) ) {
 		extension++;
@@ -93,6 +93,12 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct config *con
 	if ( stat( fpath, &sb ) == -1 ) {
 		snprintf( err, sizeof( err ), "%s: %s.", strerror( errno ), fpath );
 		return http_set_error( rs, 404, err );
+	}
+
+	//If the file is zero-length, just kill it there
+	if ( sb.st_size == 0 ) {
+		snprintf( err, sizeof( err ), "File at path: %s is zero-length.", fpath );
+		return http_set_error( rs, 200, err );
 	}
 
 	//Check for the file 

@@ -15,12 +15,6 @@ RANDOM_PORT = 1
 PORT_FILE = /tmp/hypno.port
 BROWSER = chromium
 RECORDS = 3
-
-# Some Linux systems need these, but pkg-config should handle it
-#INCLUDE_DIR=-I/usr/include/lua5.3
-#LD_DIRS=-L/usr/lib/x86_64-linux-gnu
-
-# Not sure why these don't always work...
 TESTS = config database http luabind render routes util server loader filter
 SRC = vendor/sqlite3.c vendor/zhasher.c vendor/zwalker.c src/config.c src/hosts.c src/database.c src/http.c src/luabind.c src/mime.c src/render.c src/socket.c src/util.c src/ctx-http.c src/ctx-https.c src/server.c src/loader.c src/mvc.c src/filter-static.c src/filter-lua.c src/router.c src/luaext.c #src/filter-echo.c src/filter-dirent.c src/filter-lua.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
@@ -49,17 +43,17 @@ test:
 kill:
 	ps aux |grep hypno |awk '{print $$2}' | xargs kill -9
 
-# ...
-uu:
-	$(CC) -DSQROOGE_H -o lut -llua lut.c src/util.c src/luautil.c	vendor/single.c
-
 # Temporary target to start a server
 start:
 	./hypno --port $(PORT) --config ../hypno-www/config.lua --start
 
 # Temporary target to start a server with Valgrind running
 vstart:
-	valgrind --leak-check=full ./hypno --port $(PORT) --config ../hypno-www/config.lua --start
+	valgrind --leak-check=full ./hypno --port $(PORT) --config ../../site/hypno-www/config.lua --start
+
+# Temporary target to start a server
+tstart:
+	./hypno --port $(PORT) --config ../../site/hypno-www/config.lua --start
 
 # Generate some of the bigger vendor depedencies seperately
 deps:
@@ -70,6 +64,7 @@ deps:
 clean:
 	-@find src/ -maxdepth 1 -type f -name "*.o" | xargs rm
 	-@find bin/ -maxdepth 1 -type f | xargs rm
+	-@rm hcli hypno
 	-@find -maxdepth 1 -type f -name "vgcore*" | xargs rm
 
 # extra-clean - Get rid of yet more crap
