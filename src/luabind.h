@@ -2,22 +2,14 @@
 #include "../vendor/zhasher.h"
 #include <errno.h>
 #include <sys/stat.h>
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
 
 #define PRETTY_TABS( ct ) \
 	fprintf( stderr, "%s", &"                    "[ 20 - ct ] );
 
-#if 1
- //This is to handle system Lua or whatever other libraries may be needed.
- #include <lua.h>
- #include <lauxlib.h>
- #include <lualib.h>
-#else
- #include <lua.h>
- #include <lauxlib.h>
- #include <lualib.h>
-#endif
-
-	#define lrotate( l, i1, i2 ) lua_rotate( l, i1, i2 )
+#define lrotate( l, i1, i2 ) lua_rotate( l, i1, i2 )
 #if 0
 #if ( LUA_VERSION_NUM >= 503 )
 	//#error "Lua version is 5.3"

@@ -17,12 +17,19 @@ BROWSER = chromium
 RECORDS = 3
 TESTS = config database http luabind render routes util server loader filter
 SRC = vendor/sqlite3.c vendor/zhasher.c vendor/zwalker.c src/config.c src/hosts.c src/database.c src/http.c src/luabind.c src/mime.c src/render.c src/socket.c src/util.c src/ctx-http.c src/ctx-https.c src/server.c src/loader.c src/mvc.c src/filter-static.c src/filter-lua.c src/router.c src/luaext.c #src/filter-echo.c src/filter-dirent.c src/filter-lua.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
+LIB = src/lua-db.c
 OBJ = ${SRC:.c=.o}
+LIBOBJ = ${LIB:.c=.o}
 
 # main
 main: $(OBJ)
 	$(CC) $(LDFLAGS) $(CFLAGS) src/main.c -o $(NAME) $(OBJ) 
 	$(CC) $(LDFLAGS) $(CFLAGS) src/cli.c -o hcli $(OBJ)
+
+# repl
+repl:
+	$(CC) $(CFLAGS) -fPIC -c src/lua-db.c -o src/lua-db.o
+	$(CC) -shared $(LDFLAGS) $(CFLAGS) -fPIC -o lib$(NAME).so src/lua-db.o
 
 # Object
 %.o: %.c 
