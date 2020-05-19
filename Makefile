@@ -28,8 +28,11 @@ main: $(OBJ)
 
 # repl
 repl:
+	$(CC) $(CFLAGS) -fPIC -c src/database.c -o src/database.o
 	$(CC) $(CFLAGS) -fPIC -c src/lua-db.c -o src/lua-db.o
-	$(CC) -shared $(LDFLAGS) $(CFLAGS) -fPIC -o lib$(NAME).so src/lua-db.o
+	test -f sqlite3.o || $(CC) $(CFLAGS) -fPIC -c vendor/sqlite3.c -o sqlite3.o
+	$(CC) -shared $(LDFLAGS) $(CFLAGS) -fPIC -o lib$(NAME).so src/database.o src/lua-db.o sqlite3.o
+	lua -l libhypno -e 'for i,v in pairs( libhypno.sql("halibut") ) do print(i .. " => " .. tostring(v)) end'
 
 # Object
 %.o: %.c 

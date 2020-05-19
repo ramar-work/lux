@@ -1,6 +1,8 @@
+#include <stdio.h>
+#include <time.h>
+#include "../vendor/zhasher.h"
 #include "database.h"
 #include "luabind.h"
-#include <stdio.h>
 
 #ifndef LUADB_H
 #define LUADB_H
