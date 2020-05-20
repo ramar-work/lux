@@ -29,3 +29,4 @@ int table_to_lua (lua_State *, int, Table *) ;
 int lua_to_table (lua_State *, int, Table *);
 int lua_exec_string( lua_State *L, const char *, char *e, int elen );
 int lua_exec_file( lua_State *L, const char *, char *e, int elen );
+int lua_end( lua_State *L, int status, const char *errmsg );

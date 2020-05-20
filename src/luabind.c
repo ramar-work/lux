@@ -5,11 +5,6 @@
 
 #define obprintf(...)
 
-struct lua_function {
-	const char *name;
-	int ( *function )( lua_State *L );	
-};
-
 #if 0
 //An example Lua function
 static int foo (lua_State *L) {
@@ -27,7 +22,7 @@ static int foo (lua_State *L) {
        lua_pushnumber(L, sum);         /* second result */
        return 2;                   /* number of results */
      }
-#endif
+
 
 //Being able to do these piecemeal might prove to be simpler
 void *lua_set_methods ( lua_State *L, const char *namespace, struct lua_function **f ) {
@@ -42,6 +37,8 @@ void *lua_set_methods ( lua_State *L, const char *namespace, struct lua_function
 	lua_setglobal( L, namespace );
 	return NULL;
 }  
+#endif
+
 
 static void lua_dumptable ( lua_State *L, int *pos, int *sd ) {
 	lua_pushnil( L );
@@ -456,4 +453,40 @@ int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 		return 0;	
 	}
 	return 1;	
+}
+
+
+//Wraps a nice standard return set for Lua values 
+int lua_end ( lua_State *L, int status, const char *errmsg ) {
+	lua_newtable( L );
+	lua_pushstring( L, "status" );
+	lua_pushboolean( L, status );
+	lua_settable( L, 1 );
+
+#if 1
+	//Is it worth it to record the time all the time?
+	const char timefmt[] = "Executed %a, %d %b %Y %H:%M:%S %Z"; 
+	char timestr[256] = {0};
+	time_t t = time( NULL );
+	struct tm *tmp = localtime( &t );
+	if ( !tmp || !strftime( timestr, sizeof(timestr), timefmt, tmp ) ) {
+		;
+	}
+	else {
+		lua_pushstring( L, "time" );
+		lua_pushstring( L, timestr );
+		lua_settable( L, 1 );
+	}
+#endif
+
+	//the value on the other side needs to be something or other
+	if ( !status ) {
+		lua_pushstring( L, "results" );
+		lua_pushboolean( L, 0 );
+		lua_settable( L, 1 );
+		lua_pushstring( L, "error" );
+		lua_pushstring( L, errmsg );
+		lua_settable( L, 1 );
+	}
+	return 1;
 }

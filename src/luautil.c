@@ -212,6 +212,7 @@ int lua_to_table (lua_State *L, int index, Table *t ) {
 
 //Convert Table to Lua table
 int table_to_lua (lua_State *L, int index, Table *tt) {
+	FPRINTF( "Putting Table in Lua\n" );
 	int a = index;
 	LiteKv *kv = NULL;
 	lt_reset( tt );
@@ -226,7 +227,7 @@ int table_to_lua (lua_State *L, int index, Table *tt) {
 		for ( int i=0; i<2; i++ ) {
 			LiteRecord *r = items[i].r; 
 			t = items[i].t;
-			obprintf( stderr, "%s\n", ( i ) ? lt_typename( t ) : lt_typename( t ));
+			FPRINTF( "%s\n", ( i ) ? lt_typename( t ) : lt_typename( t ));
 
 			if ( i ) {
 				if (t == LITE_NUL)
@@ -260,7 +261,7 @@ int table_to_lua (lua_State *L, int index, Table *tt) {
 		lua_loop( L );
 	}
 
-	obprintf( stderr, "Done!\n" );
+	FPRINTF( "Done!\n" );
 	return 1;
 }
 
