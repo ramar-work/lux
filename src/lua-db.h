@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <time.h>
 #include "../vendor/zhasher.h"
-#include "database.h"
+#include "db-sqlite.h"
 #include "luabind.h"
 
 #ifndef LUADB_H

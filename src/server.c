@@ -204,6 +204,37 @@ int srv_end( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config *co
 }
 #endif
 
+
+
+
+
+
+void srv_commonlogformat( struct HTTPBody *rq, struct HTTPBody *rs ) {
+// ip - - [date] "method path protocol" status clen
+	const char fmt[] = 
+		"%s %s %s [%s] \"%s %s %s\" %d %d";
+	const char datefmt[] =
+		"%d/%b/%Y:%H:%M:%S %z";
+	char log[2048] = {0};
+	char date[2048] = {0};
+
+	//Generate the time	
+	time_t t = time(NULL);
+	struct tm *tmp = localtime(&t);
+	strftime( date, sizeof(date), datefmt, tmp );
+
+	//Bugs?
+	char prot[127] = {0};
+	snprintf( prot, strlen(rq->protocol), "%s", rq->protocol );
+
+	//Just print the log for now
+	snprintf( log, sizeof(log), fmt, 
+		"127.0.0.1", "-", "-", date, rq->method, rq->path, prot, rs->status, rs->clen );
+	FPRINTF( "%s\n", log );
+}
+
+
+
 //Generate a response
 int srv_response ( int fd, struct senderrecvr *ctx ) {
 
@@ -224,14 +255,13 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 
 	//Read the message
 	status = ctx->read( fd, &rq, &rs, ctx->data );
-	print_httpbody( &rq ); //Dump the request 
 
 	//Generate a message
 	status && ( status = srv_proc( &rq, &rs, config, ctx ) );
 
 	//Write the message	(should almost ALWAYS run)
 	ctx->write( fd, &rq, &rs, ctx->data );
-	print_httpbody( &rs ); //Dump the request 
+	srv_commonlogformat( &rq, &rs );
 
 	//Per-request shut down goes here.
 	ctx->post && ctx->post( fd, config, &ctx->data );

@@ -1,21 +1,6 @@
 #include "router.h"
 
-#if 1
-enum {
-	RE_NUMBER = 31,
-	RE_STRING,
-	RE_ANY, 
-} RouterAction;
-
-enum {
-	ACT_ID = 34,
-	ACT_WILDCARD,
-	ACT_SINGLE,
-	ACT_EITHER,
-	ACT_RAW,
-} RouterStatus;
-
-#else
+#if 0
 static const int RE_NUMBER = 31;
 static const int RE_STRING = 32;
 static const int RE_ANY    = 33;
@@ -52,6 +37,8 @@ void dump_routehs ( struct routeh **set ) {
 	}	
 }
 
+
+//...
 static struct element * create_element () {
 	struct element *e = NULL;
 
@@ -113,11 +100,12 @@ static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 					break;
 				}
 			}
-			if ( e->len ) {
-				; //What is this?
-			}
-			if ( e->len > 2 && e->type == ACT_ID ) {
-				//fprintf( stderr, "%s\n", e->string[1] ); getchar(); exit(0);
+
+			if ( e->len == 1 ) 
+				e->mustbe = RE_ANY;
+			else if ( e->len > 1 && e->type == ACT_ID ) {
+				//fprintf( stderr, "%s\n", e->string[0] ); getchar(); 
+				//fprintf( stderr, "%s\n", e->string[1] ); getchar();
 				if ( memcmp( e->string[1], "number", 6 ) == 0 ) 
 					e->mustbe = RE_NUMBER;
 				else if ( memcmp( e->string[1], "string", 6 ) == 0 ) {
@@ -139,9 +127,11 @@ static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 	}
 
 	//Set the urimap and save for later...
-	//map = malloc( sizeof( struct urimap ) );
-	if ( !listlen ) 
-		return NULL;
+	if ( !listlen ) {
+		map->name = "/";
+		map->listlen = 0;	
+		map->list = NULL;	
+	}
 	else {
 		map->name = uri;	
 		map->list = list;	
@@ -152,23 +142,24 @@ static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 
 
 #ifdef DEBUG_H
-void compare_urimaps_1 ( struct urimap *map1, struct urimap *map2 ) {
-#if 0
-	//This exists just for debugging purposes...
-	for ( int ri = 0; ri < ( sizeof(urimaps) / sizeof(struct urimap) ); ri++ ) {
-		struct urimap *map = &urimaps[ ri ];
-		struct element **a = map->list;
-		while ( *a ) {
-			FPRINTF( "( string=" ); 
-			char **b = (*a)->string;
-			if ( (*a)->len ) {
-				for ( int i=0; i<(*a)->len; i++ ) { fprintf( stderr, "'%s', ", *b ); b++; }
-			}
-			fprintf( stderr, " action=%s, len=%d )\n", DUMPACTION( (*a)->type ), (*a)->len );
-			a++;
-		}
+void dump_urimap( struct urimap *map ) {
+	if ( !map->listlen ) {
+		return;
 	}
-#endif
+
+	//This exists just for debugging purposes...
+	struct element **a = map->list;
+	while ( *a ) {
+		FPRINTF( "( string=" ); 
+		char **b = (*a)->string;
+		if ( (*a)->len ) {
+			for ( int i=0; i<(*a)->len; i++ ) { fprintf( stderr, "'%s', ", *b ); b++; }
+		}
+		fprintf( stderr, 
+			" action=%s, be=%s, len=%d )\n", 
+			DUMPACTION( (*a)->type ), DUMPMATCH( (*a)->mustbe ), (*a)->len );
+		a++;
+	}
 }
 #endif
 
@@ -178,14 +169,15 @@ int compare_urimaps ( struct urimap *map1, struct urimap *map2 ) {
 	//...
 	struct element **elist = map1->list; 
 	struct element **ilist = map2->list;
-	FPRINTF( "%s %p & %p\n", __func__, elist, ilist );
+	FPRINTF( "%s %p (%d elements) & %p (%d elements)\n", __func__, 
+		elist, map1->listlen, ilist, map2->listlen );
 
 	if ( map1->listlen != map2->listlen ) {
 		FPRINTF( "URI map sizes are different (route = %d, URI = %d).\n", map1->listlen, map2->listlen );
 		return 0;
 	}
 
-#if 0
+#if 1
 	while ( *elist && *ilist ) {
 		int action = (*elist)->type;
 		if ( action == ACT_SINGLE ) {
@@ -194,7 +186,7 @@ int compare_urimaps ( struct urimap *map1, struct urimap *map2 ) {
 			FPRINTF( "len is: %d\n", (*elist)->len );
 			int match = 0;
 			char *ii = (*ilist)->string[0];
-			for ( int i=0; i < ((*elist)->len - 1); i++ ) {
+			for ( int i=0; i < (*elist)->len; i++ ) {
 				char *ee = (*elist)->string[i];
 				FPRINTF( "Checking '%s' & '%s'\n", ii, ee );
 				if ( !ii || !ee ) {
@@ -224,7 +216,7 @@ int compare_urimaps ( struct urimap *map1, struct urimap *map2 ) {
 				FPRINTF( "String passed to ID was empty.\n" );
 				return 0;
 			}
-			if ( (*elist)->mustbe ) {
+			if ( (*elist)->mustbe != RE_ANY ) {
 				while ( *s ) {
 					if ( !memchr( n, *s, nl ) ) {
 						FPRINTF( "parameter '%s' did not pass type check.\n", (*ilist)->string[0] );
@@ -301,20 +293,24 @@ struct routeh * resolve_routeh ( struct routeh **rlist, const char *uri ) {
 
 		//Build URI map for the current route 
 		if ( !build_urimap( &cmap, (*routes)->name ) ) {
-			fprintf( stderr, "Failed to build URI map for route '%s'\n", (*routes)->name );
+			FPRINTF( "Failed to build URI map for route '%s'\n", (*routes)->name );
 			routes++;
 			continue;
 		}
 
+
+#if 1
+		dump_urimap( &cmap );
 		//Can these really match?
-		if ( compare_urimaps( &urimap, &cmap ) ) {
-			fprintf( stderr, "SUCCESS: Route %s resolved against '%s'\n", uri, (*routes)->name );
+		if ( compare_urimaps( &cmap, &urimap ) ) {
+			FPRINTF( "SUCCESS: Route %s resolved against '%s'\n", uri, (*routes)->name );
 			return (*routes);
 		}
 	
 		//Destroy the cmap
 		//free_urimap( &cmap ); 
-		fprintf( stderr, "FAIL: Route %s not resolved against '%s'\n", uri, (*routes)->name );
+		FPRINTF( "FAILURE: Route %s not resolved against '%s'\n", uri, (*routes)->name );
+#endif
 		routes++;
 	}
 

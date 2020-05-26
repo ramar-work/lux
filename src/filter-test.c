@@ -57,14 +57,14 @@ struct Test static_cases[] = {
 	{ NULL }
 };
 
-struct Test lua_cases[] = {
+struct Test cases[] = {
 	TESTCASE(root, "GET", "/", NULL, NULL, TEXTHTML),
-#if 0
-	TESTCASE(level1url, "GET", "/ashera", NULL, NULL, TEXTHTML),
-	TESTCASE(level2url, "GET", "/ashera/two", NULL, NULL, TEXTHTML),
 	TESTCASE(404_never_find_me, "GET", "/you-will-never-find-me", NULL, NULL, TEXTHTML),
 	TESTCASE(static_file_missing, "GET", "/static/not_found.jpg", NULL, NULL, TEXTHTML),
-	TESTCASE(static_file_present, "GET", "/static/handtinywhite.gif", NULL, NULL, TEXTHTML),
+	TESTCASE(static_file_present, "GET", "/static/present.gif", NULL, NULL, TEXTHTML),
+#if 0
+	TESTCASE(level1url, "GET", "/turkey", NULL, NULL, TEXTHTML),
+	TESTCASE(level2url, "GET", "/recipe/2", NULL, NULL, TEXTHTML),
 	TESTCASE(multipart_post, "POST", "/beef", headers, bodies, MULTIPART),
 #endif
 #if 0
@@ -85,37 +85,75 @@ struct filter_test {
 	const char *root;
 	uint8_t *expected;
 	int len;
-} fp[] = {
-	FILTER( filter_lua, TEST_LUA_DIR "lil-model", "/index.lua" ),
+}; 
+
+
+struct filter_test filter_tests[] = {
+	FILTER( filter_lua, TEST_LUA_DIR "bad-config", "/index.lua" ),
+	FILTER( filter_lua, TEST_LUA_DIR "blank-config", "/index.lua" ),
+	//FILTER( filter_lua, TEST_LUA_DIR "split-config", "/index.lua" ),
+	FILTER( filter_lua, TEST_LUA_DIR "error-model", "/index.lua" ),
 #if 0
-	{ filter_c  , TEST_C_DIR "submarine.local", "/index.html", filter_c },
-
-	{ filter_lua, TEST_LUA_DIR "error-model", "/index.lua", filter_lua },
-	{ filter_lua, TEST_LUA_DIR "big-model", "/index.lua", filter_lua },
-	{ filter_lua, TEST_LUA_DIR "tests/filters/lua/dafoodsnob-bad-config", "/index.lua", filter_lua },
-
-	{ "static", "tests/filters/static/text", "/index.html", filter_static },
-	{ "static", "tests/filters/static/binary", "/aeon.jpg", filter_static },
-	{ "memory", filter_memory },
-	{ "echo", "/", "/", filter_echo },
+	FILTER( filter_lua, TEST_LUA_DIR "db-model", "/index.lua" ),
+	FILTER( filter_lua, TEST_LUA_DIR "very-large-config", "/index.lua" ),
+	FILTER( filter_lua, TEST_LUA_DIR "xl-model", "/index.lua" ),
+	FILTER( filter_lua, TEST_LUA_DIR "imggal", "/index.lua" ),
 #endif
 	{ NULL }
 };
 
+#if 0
+struct filter_test filter_tests[] = {
+	//Static filters can go here
+	FILTER( filter_static, TEST_STATIC_DIR "static/text", "/index.html" ),
+	FILTER( filter_static, TEST_STATIC_DIR "static/binary", "/index.html" ),
+	{ NULL }
+};
+#endif
 
+#if 0
+struct filter_test filter_tests[] = {
+	//Memory filters can go here
+	{ "memory", filter_memory },
+	{ NULL }
+};
+#endif
+
+#if 0
+struct filter_test filter_tests[] = {
+	//Echo filters can go here
+	{ "echo", "/", "/", filter_echo },
+	{ NULL }
+};
+#endif
+
+
+//Write a formatted message to some kind of buffer
+void log_buf ( struct HTTPBody *res, char *log, int loglen ) {
+	const char logfmt[] = 
+		"%d, %d, "; 
+	memset( log, 0, loglen );
+	int len = snprintf( log, loglen, logfmt, res->status, res->mlen );
+	memcpy( &log[ len ], res->msg, res->mlen );
+}
+
+
+//Run the tests
 int main ( int argc, char *argv[] ) {
 
-	struct filter_test *f = fp;
+	FILE *file = stderr;
+	struct filter_test *f = filter_tests;
+
 	while ( f->name ) {
 		fprintf( stderr, "Running tests against filter '%s'\n", f->name );
-		struct Test *test = testsp;
+		struct Test *test = cases;
 		while ( test->name ) {
 			char err[2048] = { 0 };
 			struct HTTPBody response = { 0 };
 			struct config config = { .root_default = f->root };
 			struct host host = { .dir = (char *)f->path, .root_default = (char *)f->root };
 
-			fprintf( stderr, "[ Test name: %-13s ]: ", test->name );
+			fprintf( file, "\n[ Test name: %-13s ]: ", test->name );
 
 			//Run the filter on it...
 			if ( f->filter( &test->request, &response, &config, &host ) )
@@ -134,6 +172,12 @@ int main ( int argc, char *argv[] ) {
 			fprintf( stderr, "\n===========\n" );
 #endif
 			//http_free_request( &request );
+			
+			//Writing the message out itself is easier
+			char log[ 2048 ];
+			log_buf( &response, log, sizeof(log) );
+			fprintf( file, log );
+
 			http_free_response( &response );
 			test++;
 		}

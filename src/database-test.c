@@ -1,4 +1,4 @@
-#include "database.h"
+#include "db-sqlite.h"
 
 #define TESTDIR "tests/database/"
 

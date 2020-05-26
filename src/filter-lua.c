@@ -368,7 +368,7 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *conf
 
 	//Try parsing
 	if ( !( luaconf = build_luaconf( host->dir, err, sizeof(err) )) )
-		return http_set_error( res, 500, "Failed to parse lua config." );
+		return http_set_error( res, 500, err );
 
 	//Check for and serve any static files 
 	//TODO: This should be able to serve a list of files matching a specific type
