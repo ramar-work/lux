@@ -11,14 +11,9 @@
 
 struct routeh *routes[] = {
 	ROUTE( "/" ),
-#if 0
 	ROUTE( "//" ),
 	ROUTE( "/route" ),
 	ROUTE( "/route/" ),
-#endif
-	ROUTE( "/{route,julius}" ),
-	ROUTE( "/{route,julius}/:id" ),
-#if 0
 	ROUTE( "/route" ),
 	ROUTE( "/route/:id" ),
 	ROUTE( "/route/:id=string" ),
@@ -26,7 +21,8 @@ struct routeh *routes[] = {
 	ROUTE( "/:id" ),
 	ROUTE( "/route/*" ),
 	ROUTE( "/route/*/jackpot" ),
-#endif
+	ROUTE( "/{route,julius}" ),
+	ROUTE( "/{route,julius}/:id" ),
 #if 0
 //Do I want to handle '?'
 , "/route/?"
@@ -43,17 +39,17 @@ struct routeh *routes[] = {
 //These are the easiest possible tests I've ever written...
 const char *requests[] = {
   "/"
-, "/julius/3"
-#if 0
 , "/2"
 , "/route"
 , "/route/3"
 , "/route/bashful"
 , "/route/bashful/jackpot"
 , "/route/333/jackpot"
+, "/julius/3"
 , "/unresolvable"
 , "/joseph/route/337"
 , "/route/337a"
+#if 0
 , "/route/3"
 #endif
 , NULL
@@ -72,13 +68,11 @@ int main (int argc, char *argv[]) {
 		if ( !( resv = resolve_routeh( rlist, *urilist ) ) ) {
 			fprintf( stderr, "FAIL: Path %s did not resolve.\n", *urilist );		
 			urilist++;
-			getchar();
 			continue;
 		}
 
 		fprintf( stderr, "SUCC: Path %s resolved to name: %s\n", *urilist, resv->name );
 #endif
-		getchar();
 		urilist++;
 	}
 

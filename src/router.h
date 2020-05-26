@@ -22,7 +22,6 @@
 	( NUM == RE_ANY   ) ? "RE_ANY" : \
 	( NUM == RE_NONE ) ? "RE_NONE" : "UNKNOWN" 
 
-#if 1
 typedef enum {
 	RE_NONE = 0,
 	RE_NUMBER = 31,
@@ -38,7 +37,6 @@ typedef enum {
 	ACT_EITHER,
 	ACT_RAW,
 } RouterStatus;
-#endif
 
 struct routeh { 
 	char *name; 
@@ -47,21 +45,15 @@ struct routeh {
 
 struct element {
 	int len;
-#if 1
 	RouterStatus type;
 	RouterAction mustbe;
-#else
-	int type;
-	int mustbe;
-#endif
 	char **string;
 };
 
 struct urimap {
-	const char *name, *routeset;
+	const char *name;
 	int listlen;
 	struct element **list;
-	//Mem r;
 };
 
 #if 0

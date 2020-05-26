@@ -1,9 +1,9 @@
 # This project...
 NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
-LDFLAGS = -lgnutls -llua -ldl -lpthread
+LDFLAGS = -lgnutls -llua -ldl -lpthread -lsqlite3
 CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -Wno-format-security -fsanitize=address -fsanitize-undefined-trap-on-error
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -Wno-format-truncation -Wno-strict-overflow -std=c99 -Wno-deprecated-declarations -Wno-return-local-addr -O2 -DDEBUG_H
+GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -Wno-format-truncation -Wno-strict-overflow -std=c99 -Wno-deprecated-declarations -Wno-return-local-addr -O2 -DSKIPMYSQL_H -DSKIPPGSQL_H -DDEBUG_H
 CFLAGS = $(CLANGFLAGS)
 CFLAGS = $(GCCFLAGS)
 CC = clang
@@ -15,8 +15,8 @@ RANDOM_PORT = 1
 PORT_FILE = /tmp/hypno.port
 BROWSER = chromium
 RECORDS = 3
-TESTS = config database http luabind render routes util server loader filter
-SRC = vendor/sqlite3.c vendor/zhasher.c vendor/zwalker.c src/config.c src/hosts.c src/database.c src/http.c src/luabind.c src/mime.c src/render.c src/socket.c src/util.c src/ctx-http.c src/ctx-https.c src/server.c src/loader.c src/mvc.c src/filter-static.c src/filter-lua.c src/router.c #src/filter-echo.c src/filter-dirent.c src/filter-lua.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
+TESTS = config database filter http loader luabind render router server util
+SRC = vendor/zhasher.c vendor/zwalker.c src/config.c src/hosts.c src/db-sqlite.c src/http.c src/luabind.c src/mime.c src/render.c src/socket.c src/util.c src/ctx-http.c src/ctx-https.c src/server.c src/loader.c src/mvc.c src/filter-static.c src/filter-lua.c src/router.c #src/filter-echo.c src/filter-dirent.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
 LIB = src/lua-db.c
 OBJ = ${SRC:.c=.o}
 LIBOBJ = ${LIB:.c=.o}
@@ -27,13 +27,13 @@ main: $(OBJ)
 	$(CC) $(LDFLAGS) $(CFLAGS) src/cli.c -o hcli $(OBJ)
 
 # repl
+#	test -f sqlite3.o || $(CC) $(CFLAGS) -fPIC -c vendor/sqlite3.c -o shared/sqlite3.o
 repl:
-	$(CC) $(CFLAGS) -fPIC -c src/database.c -o src/database.o
-	$(CC) $(CFLAGS) -fPIC -c vendor/zhasher.c -o zhasher.o
-	$(CC) $(CFLAGS) -fPIC -c src/luabind.c -o src/luabind.o
-	$(CC) $(CFLAGS) -fPIC -c src/lua-db.c -o src/lua-db.o
-	test -f sqlite3.o || $(CC) $(CFLAGS) -fPIC -c vendor/sqlite3.c -o sqlite3.o
-	$(CC) -shared $(LDFLAGS) $(CFLAGS) -fPIC -o lib$(NAME).so src/database.o src/lua-db.o sqlite3.o zhasher.o src/luabind.o
+	$(CC) $(CFLAGS) -fPIC -c src/database.c -o shared/database.o
+	$(CC) $(CFLAGS) -fPIC -c vendor/zhasher.c -o shared/zhasher.o
+	$(CC) $(CFLAGS) -fPIC -c src/luabind.c -o shared/luabind.o
+	$(CC) $(CFLAGS) -fPIC -c src/lua-db.c -o shared/lua-db.o
+	$(CC) -shared $(LDFLAGS) $(CFLAGS) -fPIC -o lib$(NAME).so shared/database.o shared/lua-db.o shared/zhasher.o shared/luabind.o
 	lua -l libhypno - < tests/lua-db/dbtest.lua
  
 # Object

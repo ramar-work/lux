@@ -93,9 +93,10 @@ static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 			Mem pp;
 			memset( &pp, 0, sizeof(Mem) );
 			while ( memwalk( &pp, block, (uint8_t *)mb, r.size - 1, strlen(mb) ) ) {
-				char buf[ 1024 ] = {0};
+				char *b, buf[ 1024 ] = {0};
 				memcpy( buf, &block[ pp.pos ], pp.size );
-				add_item( &e->string, strdup( buf ), char *, &e->len );
+				b = strdup(buf);
+				add_item( &e->string, b, char *, &e->len );
 				if ( pp.chr == '}' ) {
 					break;
 				}
@@ -116,9 +117,10 @@ static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 		else {
 			//This is just some string (I guess the action is RAW)
 			e->type = ACT_RAW;
-			char buf[ 1024 ] = {0};
+			char *b, buf[ 1024 ] = {0};
 			memcpy( buf, p, r.size );
-			add_item( &e->string, strdup( buf ), char *, &e->len );
+			b = strdup( buf );
+			add_item( &e->string, b, char *, &e->len );
 		}
 
 		if ( e->type ) {
@@ -299,37 +301,47 @@ struct routeh * resolve_routeh ( struct routeh **rlist, const char *uri ) {
 		}
 
 
-#if 1
-		dump_urimap( &cmap );
 		//Can these really match?
 		if ( compare_urimaps( &cmap, &urimap ) ) {
 			FPRINTF( "SUCCESS: Route %s resolved against '%s'\n", uri, (*routes)->name );
+			free_urimap( &cmap ); 
+			free_urimap( &urimap ); 
 			return (*routes);
 		}
 	
 		//Destroy the cmap
-		//free_urimap( &cmap ); 
+		free_urimap( &cmap ); 
 		FPRINTF( "FAILURE: Route %s not resolved against '%s'\n", uri, (*routes)->name );
-#endif
 		routes++;
 	}
 
+	free_urimap( &urimap ); 
 	FPRINTF( "resolve_routeh ended...\n" );
 	return NULL;
 }
 
 
 
-void free_urimap ( struct urimap *map ) {
+void free_urimap ( struct urimap *mmap ) {
 	//free string and list
+	if ( !mmap->listlen ) {
+		return;
+	}
+
+	struct urimap *map = mmap;
 	while ( map->list && *map->list ) {
+		//Destroy all allocated strings
 		char **str = (*map->list)->string;
-		while ( *str ) {
+		while ( str && *str ) {
 			FPRINTF( "check and free str: %s\n", *str );
 			free( *str );
 			str++;
 		}
+		free( (*map->list)->string );	
+
+		//Destroy each element
 		free( *map->list );
 		map->list++;
 	}
+	//free( mmap->list );
 }
