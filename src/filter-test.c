@@ -89,9 +89,11 @@ struct filter_test {
 
 
 struct filter_test filter_tests[] = {
+#if 0
 	FILTER( filter_lua, TEST_LUA_DIR "bad-config", "/index.lua" ),
 	FILTER( filter_lua, TEST_LUA_DIR "blank-config", "/index.lua" ),
 	//FILTER( filter_lua, TEST_LUA_DIR "split-config", "/index.lua" ),
+#endif
 	FILTER( filter_lua, TEST_LUA_DIR "error-model", "/index.lua" ),
 #if 0
 	FILTER( filter_lua, TEST_LUA_DIR "db-model", "/index.lua" ),

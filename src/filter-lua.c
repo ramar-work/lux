@@ -130,8 +130,10 @@ struct luaconf * build_luaconf ( const char *dir, char *err, int errlen ) {
 	FPRINTF( "db: %s\n", conf->db );
 	FPRINTF( "fqdn: %s\n", conf->fqdn );
 	FPRINTF( "title: %s\n", conf->title );
+	FPRINTF( "static: %s\n", conf->spath );
 	FPRINTF( "root_default: %s\n", conf->root_default );
 	FPRINTF( "routes:\n" );
+	dump_routeh( conf->routes );
 
 	//Destroy things that aren't needed.
 	lt_free( t );
@@ -145,22 +147,12 @@ struct luaconf * build_luaconf ( const char *dir, char *err, int errlen ) {
 
 //Find the active route
 static struct mvc * find_active_route ( struct luaconf *luaconf, const char *path ) {
-	struct routeh *r, **routes = luaconf->routes;
-
-#if 1
+	struct routeh *r = NULL, **routes = luaconf->routes;
 	if ( !( r = resolve_routeh( routes, path ) ) ) {
 		FPRINTF( "Resolve routes failed to find anything...\n" );
 		return NULL;
 	}
-#else
-	while ( routes && *routes ) {
-		FPRINTF( "Route: '%s', Path: '%s'\n", (*routes)->name, path );
-		if ( resolve_routes( (*routes)->name, path ) ) {
-			break;
-		}
-		routes++;
-	}
-#endif
+
 	struct mvc * mvc = r->mvc;
 	FPRINTF( "models: %p\n", mvc->models );
 	FPRINTF( "views: %p\n", mvc->views );
@@ -168,6 +160,7 @@ static struct mvc * find_active_route ( struct luaconf *luaconf, const char *pat
 	FPRINTF( "returns: %s\n", mvc->returns );
 	FPRINTF( "auth: %s\n", mvc->auth );
 	FPRINTF( "content: %s\n", mvc->content );
+	//dump_mvc( mvc );
 	return mvc; 
 }
 
@@ -372,7 +365,7 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *conf
 
 	//Check for and serve any static files 
 	//TODO: This should be able to serve a list of files matching a specific type
-	if ( check_static_prefix( luaconf->spath, req->path ) ) {
+	if ( check_static_prefix( req->path, luaconf->spath ) ) {
 		destroy_luaconf( luaconf );
 		return filter_static( req, res, config, host );
 	}

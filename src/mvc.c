@@ -11,7 +11,8 @@ static int mvc_array_handler( LiteKv *kv, int i, void *p ) {
 
 	//If table count is one, then it better be a string.
 	if ( ( kt == LITE_INT || kt == LITE_TXT ) && kv->value.type == LITE_TXT ) {
-		add_item( pp, kv->value.v.vchar, char *, &f->len ); 
+		char *val = strdup( kv->value.v.vchar );
+		add_item( pp, val, char *, &f->len ); 
 	}
 	return 1;
 }
