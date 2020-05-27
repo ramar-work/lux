@@ -59,16 +59,14 @@ struct Test static_cases[] = {
 
 struct Test cases[] = {
 	TESTCASE(root, "GET", "/", NULL, NULL, TEXTHTML),
+	TESTCASE(appxwww_post, "POST", "/post", headers, bodies, X_APP_WWW),
+	TESTCASE(multipart_post, "POST", "/post", headers, bodies, MULTIPART),
+#if 0
 	TESTCASE(404_never_find_me, "GET", "/you-will-never-find-me", NULL, NULL, TEXTHTML),
 	TESTCASE(static_file_missing, "GET", "/static/not_found.jpg", NULL, NULL, TEXTHTML),
 	TESTCASE(static_file_present, "GET", "/static/present.gif", NULL, NULL, TEXTHTML),
-#if 0
 	TESTCASE(level1url, "GET", "/turkey", NULL, NULL, TEXTHTML),
 	TESTCASE(level2url, "GET", "/recipe/2", NULL, NULL, TEXTHTML),
-	TESTCASE(multipart_post, "POST", "/beef", headers, bodies, MULTIPART),
-#endif
-#if 0
-	TESTCASE(appxwww_post, "POST", "/nope", headers, bodies, X_APP_WWW),
 #endif
 	{ NULL }
 };
@@ -94,8 +92,9 @@ struct filter_test filter_tests[] = {
 	FILTER( filter_lua, TEST_LUA_DIR "blank-config", "/index.lua" ),
 	//FILTER( filter_lua, TEST_LUA_DIR "split-config", "/index.lua" ),
 #endif
-	FILTER( filter_lua, TEST_LUA_DIR "error-model", "/index.lua" ),
+	FILTER( filter_lua, TEST_LUA_DIR "echo.local", "/index.lua" ),
 #if 0
+	FILTER( filter_lua, TEST_LUA_DIR "error-model", "/index.lua" ),
 	FILTER( filter_lua, TEST_LUA_DIR "db-model", "/index.lua" ),
 	FILTER( filter_lua, TEST_LUA_DIR "very-large-config", "/index.lua" ),
 	FILTER( filter_lua, TEST_LUA_DIR "xl-model", "/index.lua" ),

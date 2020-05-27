@@ -133,7 +133,7 @@ struct luaconf * build_luaconf ( const char *dir, char *err, int errlen ) {
 	FPRINTF( "static: %s\n", conf->spath );
 	FPRINTF( "root_default: %s\n", conf->root_default );
 	FPRINTF( "routes:\n" );
-	dump_routeh( conf->routes );
+	//dump_routeh( conf->routes );
 
 	//Destroy things that aren't needed.
 	lt_free( t );
@@ -179,21 +179,20 @@ static int build_luaenv ( lua_State *L, struct HTTPBody *req, char *err, int err
 		NULL
 	};
 
+fprintf( stderr, "Adding to environment..." );
 	//Loop through all of the headers
 	while ( ttt && *ttt ) {
-		FPRINTF( "Name: %s\n", (*ttt)->name );
+fprintf( stderr, "Name: %s\n", (*ttt)->name );
 		lua_pushstring( L, (*ttt)->name ); 
 		//TODO: Nils should probably be nils, not empty tables...
 		lua_newtable( L );
 		while ( (*ttt)->records && (*(*ttt)->records)->field ) {
+fprintf( stderr, "Adding field %s to Lua\n", (*(*ttt)->records)->field );
 			struct HTTPRecord *r = (*(*ttt)->records);
-		#if 0
-			lua_pushustrings( L, r->field, r->value, r->size );
-		#else
 			FPRINTF( "\t[%s] => %p\n", r->field, r->value );
+			//TODO: Will probably need a size value on these...
 			lua_pushstring( L, r->field );
 			lua_pushlstring( L, (char *)r->value, r->size );
-		#endif
 			lua_settable( L, 3 );
 			(*ttt)->records++;
 		}
