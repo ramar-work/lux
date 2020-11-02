@@ -23,7 +23,7 @@ struct routeh {
 };
 #endif
 
-struct routeh ** build_mvc ( Table *t );
+struct routeh ** build_mvc ( zTable *t );
 void dump_mvc ( struct mvc * );
 void free_mvc ( struct mvc * );
 void dump_routeh ( struct routeh ** );

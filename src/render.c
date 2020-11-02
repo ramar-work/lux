@@ -236,7 +236,7 @@ struct parent * init_parent() {
 
 
 //Bitmasking will tell me a lot...
-struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
+struct map **table_to_map ( zTable *t, const uint8_t *src, int srclen ) {
 
 	int destlen = 0;
 	int ACTION = 0;
@@ -247,8 +247,8 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 	struct parent **pp = NULL;
 	int rrlen = 0;
 	int pplen = 0;
-	Mem r;
-	memset( &r, 0, sizeof( Mem ) );
+	zWalker r;
+	memset( &r, 0, sizeof( zWalker ) );
 
 	//Allocating a list of characters to elements is easiest.
 	while ( memwalk( &r, (uint8_t *)src, (uint8_t *)"{}", srclen, 2 ) ) {
@@ -459,7 +459,7 @@ struct map **table_to_map ( Table *t, const uint8_t *src, int srclen ) {
 
 
 //Didn't I write something to add to a buffer?
-void extract_table_value ( LiteKv *lt, uint8_t **ptr, int *len, uint8_t *t, int tl ) {
+void extract_table_value ( zKeyval *lt, uint8_t **ptr, int *len, uint8_t *t, int tl ) {
 
 	if ( lt->value.type == LITE_TXT ) {
 		*len = strlen( lt->value.v.vchar ); 
@@ -481,7 +481,7 @@ void extract_table_value ( LiteKv *lt, uint8_t **ptr, int *len, uint8_t *t, int 
 }
 
 
-uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
+uint8_t *map_to_uint8t ( zTable *t, struct map **map, int *newlen ) {
 	//Start the writes, by using the structure as is
 	uint8_t *block = NULL;
 	int blockLen = 0;
@@ -502,7 +502,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 			if ( item->hashList ) {
 				//Get the type and length
 				if ( ( hash = **item->hashList ) > -1 ) {
-					LiteKv *lt = lt_retkv( t, hash );
+					zKeyval *lt = lt_retkv( t, hash );
 					//NOTE: At this step, nobody should care about types that much...
 					uint8_t *ptr = NULL, nbuf[64] = {0};
 					int itemlen = 0;
@@ -538,7 +538,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 					int **list = item->hashList;
 					//Get the type and length
 					if ( ( hash = **list ) > -1 ) {
-						LiteKv *lt = lt_retkv( t, hash );
+						zKeyval *lt = lt_retkv( t, hash );
 						//NOTE: At this step, nobody should care about types that much...
 						uint8_t *ptr = NULL, nbuf[ 64 ] = { 0 };
 						int itemlen = 0;
@@ -560,7 +560,7 @@ uint8_t *map_to_uint8t ( Table *t, struct map **map, int *newlen ) {
 
 
 
-uint8_t *table_to_uint8t ( Table *t, const uint8_t *src, int srclen, int *newlen ) {
+uint8_t *table_to_uint8t ( zTable *t, const uint8_t *src, int srclen, int *newlen ) {
 
 	struct map **map = NULL;
 	uint8_t *block = NULL;

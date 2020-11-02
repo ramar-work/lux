@@ -99,7 +99,7 @@ static void print_handler ( char *n, char **a, const int l ) {
 
 
 //Build routes list
-struct route ** build_routes ( Table *t ) {
+struct route ** build_routes ( zTable *t ) {
 	struct route **routes = NULL;
 	struct fp_iterator fp_data = { 0, 0/*, NULL, &routes*/ };
 	int index;
@@ -133,7 +133,7 @@ static const char keysstr[] =
 
 //Generate a list of routes
 int b = 0;
-int route_table_iterator ( LiteKv *kv, int i, void *p ) {
+int route_table_iterator ( zKeyval *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct route ***routes = f->userdata;
 	int *rlen = &f->len;
@@ -294,7 +294,7 @@ int resolve_routes ( const char *route, const char *uri ) {
 	//Loop through all the things...
 	for ( int ri = 0; ri < ( sizeof( urimaps ) / sizeof( struct urimap ) ); ri++ ) {
 		struct urimap *map = &urimaps[ ri ];
-		memset( &map->r, 0, sizeof( Mem ) );
+		memset( &map->r, 0, sizeof( zWalker ) );
 		while ( strwalk( &map->r, map->routeset, "/" ) ) {
 			uint8_t *p = (uint8_t *)&map->routeset[ map->r.pos ];
 
@@ -320,8 +320,8 @@ int resolve_routes ( const char *route, const char *uri ) {
 				e->type = ( maps[ *p ] == ACT_EITHER ) ? ACT_EITHER : ACT_ID;
 				char *mb = ( maps[ *p ] == ACT_EITHER ) ? ",}" : "=";
 				uint8_t *block = p + 1;
-				Mem pp;
-				memset( &pp, 0, sizeof(Mem) );
+				zWalker pp;
+				memset( &pp, 0, sizeof(zWalker) );
 				while ( memwalk( &pp, block, (uint8_t *)mb, map->r.size - 1, strlen(mb) ) ) {
 					char buf[ 1024 ] = {0};
 					memcpy( buf, &block[ pp.pos ], pp.size );

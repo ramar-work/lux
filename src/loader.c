@@ -2,9 +2,9 @@
 #include "loader.h"
 
 //Get integer value from a table
-int loader_get_int_value ( Table *t, const char *key, int notFound ) {
+int loader_get_int_value ( zTable *t, const char *key, int notFound ) {
 	int i = lt_geti( t, key );
-	LiteRecord *p = NULL;
+	zhRecord *p = NULL;
 	if ( i == -1 ) {
 		return notFound;
 	}
@@ -18,9 +18,9 @@ int loader_get_int_value ( Table *t, const char *key, int notFound ) {
 
 
 //Get string value from a table
-char * loader_get_char_value ( Table *t, const char *key ) {
+char * loader_get_char_value ( zTable *t, const char *key ) {
 	int i = lt_geti( t, key );
-	LiteRecord *p = NULL;
+	zhRecord *p = NULL;
 	if ( i == -1 ) {
 		return NULL;
 	}
@@ -34,7 +34,7 @@ char * loader_get_char_value ( Table *t, const char *key ) {
 
 
 //Drop things back to zero
-static int loader_check_eot( LiteKv *kv, int *depth ) {
+static int loader_check_eot( zKeyval *kv, int *depth ) {
 	if ( *depth && kv->key.type == LITE_TRM )
 		(*depth)--;
 	else if ( *depth && kv->value.type == LITE_TBL ){
@@ -53,7 +53,7 @@ static int loader_check_eot( LiteKv *kv, int *depth ) {
 
 
 //Runs on tables...
-static int loader_iterator( LiteKv *kv, int i, void *p ) {
+static int loader_iterator( zKeyval *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 
 #if 1
@@ -81,7 +81,7 @@ static int loader_iterator( LiteKv *kv, int i, void *p ) {
 
 
 //Get an array of things
-void ** loader_get_table_value( Table *t, const char *key, int(*fp)(LiteKv *,int,void *)) {
+void ** loader_get_table_value( zTable *t, const char *key, int(*fp)(zKeyval *,int,void *)) {
 	FPRINTF( "start populating from table.\n" );
 	int i = 0; 
 	void **p = NULL;
@@ -103,10 +103,10 @@ void ** loader_get_table_value( Table *t, const char *key, int(*fp)(LiteKv *,int
 
 
 //Copy iterator
-static int copy_iterator( LiteKv *kv, int i, void *p ) {
+static int copy_iterator( zKeyval *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p; 
-	Table **t = (Table **)f->userdata;
-	FPRINTF( "Table at %s: %p\n", __func__, *t );
+	zTable **t = (zTable **)f->userdata;
+	FPRINTF( "zTable at %s: %p\n", __func__, *t );
 	FPRINTF( "Running copy_iterator.\n" );
 
 	//like earlier, calculate until the depth is zero again
@@ -150,11 +150,11 @@ static int copy_iterator( LiteKv *kv, int i, void *p ) {
 
 
 //Shallow copy
-Table *loader_shallow_copy ( Table *t, int start, int end ) {
+zTable *loader_shallow_copy ( zTable *t, int start, int end ) {
 	//Finally, fp->depth should be zero when done, but starting at one may save time
-	Table *nt = malloc( sizeof ( Table ) );
+	zTable *nt = malloc( sizeof ( zTable ) );
 	lt_init( nt, NULL, 256 );
-	FPRINTF( "Table at %s: %p\n", __func__, nt );
+	FPRINTF( "zTable at %s: %p\n", __func__, nt );
 	struct fp_iterator fp_data = { end - start, 1, &nt, NULL, t };	
 
 	//Copy this
@@ -172,20 +172,20 @@ Table *loader_shallow_copy ( Table *t, int start, int end ) {
 
 #if 0
 //Set found keys
-int loader_set_keys ( Table *t, const struct rule *rule ) {
+int loader_set_keys ( zTable *t, const struct rule *rule ) {
 	return 0;
 }
 
 
 //If a key is necessary, we need to search for it
-int loader_check_keys ( Table *t, const struct rule *rule ) {
+int loader_check_keys ( zTable *t, const struct rule *rule ) {
 	return 0;
 }
 #endif
 
 
 //Loading can be done from just about anything...
-int loader_run ( Table *t, const struct rule *rule ) {
+int loader_run ( zTable *t, const struct rule *rule ) {
 	FPRINTF( "Initializing configuration.\n" );
 
 	while ( rule->key ) {

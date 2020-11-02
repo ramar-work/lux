@@ -25,7 +25,7 @@
  * ------------------------------------------- */
 #include "zwalker.h"
 
-_Bool memstr (const void * a, const void *b, int size) {
+int memstr (const void * a, const void *b, int size) {
 	int32_t ct=0, len = strlen((const char *)b);
 	const uint8_t *aa = (uint8_t *)a;
 	const uint8_t *bb = (uint8_t *)b;
@@ -42,7 +42,7 @@ _Bool memstr (const void * a, const void *b, int size) {
 }
 
 //Return count of occurences of a character in some block.
-int32_t memchrocc (const void *a, const char b, int32_t size) {
+int32_t memchrocc (const void *a, const char b, int size) {
 	_Bool stop=1;
 	int32_t ct=0, occ=-1;
 	uint8_t *aa = (uint8_t *)a;
@@ -57,7 +57,7 @@ int32_t memchrocc (const void *a, const char b, int32_t size) {
 
 
 //Return count of occurences of a string in some block.
-int32_t memstrocc (const void *a, const void *b, int32_t size) {
+int32_t memstrocc (const void *a, const void *b, int size) {
 	_Bool stop=1;
 	int32_t ct=0, occ=0;
 	uint8_t *aa = (uint8_t *)a;
@@ -74,24 +74,19 @@ int32_t memstrocc (const void *a, const void *b, int32_t size) {
 
 
 //Initialize a block of memory
-_Bool memwalk (Mem *mm, uint8_t *data, uint8_t *tokens, int datalen, int toklen) {
-#if 0
-fprintf(stderr, "Inside memwalk: ");
-write(2, data, datalen);
-write(2, "\n", 1);
-#endif
-	int rc    = 0;
-	mm->pos   = mm->next;
-	mm->size  = memtok(&data[mm->pos], tokens, datalen - (mm->next - 1), toklen);
-	if (mm->size == -1) {
-	 mm->size = datalen - mm->next;
+int memwalk (zWalker *w, const uint8_t *data, const uint8_t *tokens, int datalen, int toklen) {
+	int rc = 0;
+	w->pos = w->next;
+	w->size = memtok(&data[w->pos], tokens, datalen - (w->next - 1), toklen);
+	if (w->size == -1) {
+	 w->size = datalen - w->next;
 	}
-	mm->next += mm->size + 1;
-	//rc      = ((mm->size > -1) && (mm->pos <= datalen));
-	rc        = (mm->size > -1);
-	mm->chr   = !rc ? 0 : data[mm->next - 1];
-	mm->pos  += mm->it;
-	mm->size -= mm->it;
+	w->next += w->size + 1;
+	//rc = ((w->size > -1) && (w->pos <= datalen));
+	rc = (w->size > -1);
+	w->chr = !rc ? 0 : data[w->next - 1];
+	w->pos += w->it;
+	w->size -= w->it;
 #if 0
 fprintf(stderr, "rc: %d\n", rc);
 fprintf(stderr, "datalen: %d\n", datalen);
@@ -103,7 +98,7 @@ fprintf(stderr, "mm->size: %d\n", mm->size);
 
 
 //Where exactly is a substr in memory
-int32_t memstrat (const void *a, const void *b, int32_t size)  {
+int32_t memstrat (const void *a, const void *b, int size)  {
 	_Bool stop=1;
 	int32_t ct=0;//, occ=0;
 	uint8_t *aa = (uint8_t *)a;
@@ -121,7 +116,7 @@ int32_t memstrat (const void *a, const void *b, int32_t size)  {
 
 
 //Where exactly is a substr in memory
-int32_t memchrat (const void *a, const char b, int32_t size) {
+int32_t memchrat (const void *a, const char b, int size) {
 	_Bool stop=1;
 	int32_t ct=0;// occ=0;
 	uint8_t *aa = (uint8_t *)a;
@@ -134,8 +129,7 @@ int32_t memchrat (const void *a, const char b, int32_t size) {
 
 
 //Finds the 1st occurence of one char, Keep running until no tokens are found in range...
-int32_t memtok (const void *a, const uint8_t *tokens, int32_t sz, int32_t tsz) 
-{
+int32_t memtok (const void *a, const uint8_t *tokens, int32_t sz, int32_t tsz) {
 	int32_t p=-1,n;
 	
 	for (int i=0; i<tsz; i++)

@@ -114,7 +114,7 @@ struct filter_test filter_tests[] = {
 
 #if 0
 struct filter_test filter_tests[] = {
-	//Memory filters can go here
+	//zWalkerory filters can go here
 	{ "memory", filter_memory },
 	{ NULL }
 };

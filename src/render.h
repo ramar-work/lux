@@ -6,4 +6,4 @@
 #include "util.h"
 #endif
 
-uint8_t *table_to_uint8t ( Table *, const uint8_t *, int, int * );
+uint8_t *table_to_uint8t ( zTable *, const uint8_t *, int, int * );

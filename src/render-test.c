@@ -7,7 +7,7 @@
 /*Max key searches*/
 #define LKV_MAX_SEARCH 10
 
-/*Defines for each key type in a Table*/
+/*Defines for each key type in a zTable*/
 #define LKV_TERM -7
 
 #define LKV_LAST \
@@ -69,7 +69,7 @@ struct block { const char *model, *view; } files[] = {
 /*
 All of these are defined seperately, becuase many will be re-used for the tests.
 */
-LiteKv NoTable[] = {
+zKeyval NozTable[] = {
 	{ TEXT_KEY( "zxy" ), TEXT_VALUE( "def" ) },
 	{ TEXT_KEY( "def" ), INT_VALUE( 342 ) },
 	{ TEXT_KEY( "ghi" ), INT_VALUE( 245 ) },
@@ -85,7 +85,7 @@ LiteKv NoTable[] = {
 
 #if 0
 //
-LiteKv ST[] = {
+zKeyval ST[] = {
 	{ TEXT_KEY( "ashor" )  , TABLE_VALUE( )         },
 		{ INT_KEY( 7043 )    , TEXT_VALUE( "The quick brown fox jumps over the lazy dog." )  },
 		{ INT_KEY( 7002 )    , TEXT_VALUE( "The quick brown fox jumps over the lazy dog another time." )  },
@@ -94,7 +94,7 @@ LiteKv ST[] = {
 };
 
 
-LiteKv MT[] = {
+zKeyval MT[] = {
 	{ INT_KEY( 1 )    , TEXT_VALUE( "Wash the dog." )  },
 	{ TEXT_KEY( "ashor" )  , TABLE_VALUE( )         },
 		{ INT_KEY( 7043 )    , TEXT_VALUE( "The quick brown fox jumps over the lazy dog." )  },
@@ -120,7 +120,7 @@ LiteKv MT[] = {
 #endif
 
 
-LiteKv SingleTable[] = {
+zKeyval SinglezTable[] = {
 	{ TEXT_KEY( "ashor" )  , TABLE_VALUE( )         },
 		{ INT_KEY( 7043 )    , TEXT_VALUE( "The quick brown fox jumps over the lazy dog." )  },
 		{ INT_KEY( 7002 )    , TEXT_VALUE( "The quick brown fox jumps over the lazy dog another time." )  },
@@ -155,7 +155,7 @@ LiteKv SingleTable[] = {
 
 
 
-LiteKv DoubleTableAlpha[] = {
+zKeyval DoublezTableAlpha[] = {
 	{ TEXT_KEY( "cities" )       , TABLE_VALUE( )         },
 		/*Database records look a lot like this*/
 		{ INT_KEY( 0 )       , TABLE_VALUE( )         },
@@ -197,7 +197,7 @@ LiteKv DoubleTableAlpha[] = {
 
 
 
-LiteKv DoubleTableNumeric[] = {
+zKeyval DoublezTableNumeric[] = {
 	{ TEXT_KEY( "cities" )       , TABLE_VALUE( )         },
 		/*Database records look a lot like this*/
 		{ INT_KEY( 0 )       , TABLE_VALUE( )         },
@@ -249,7 +249,7 @@ LiteKv DoubleTableNumeric[] = {
 };
 
 
-LiteKv MultiLevelTable[] = {
+zKeyval MultiLevelzTable[] = {
 	{ TEXT_KEY( "cities" )       , TABLE_VALUE( )         },
 		/*Database records look a lot like this*/
 		{ INT_KEY( 0 )       , TABLE_VALUE( )         },
@@ -326,7 +326,7 @@ LiteKv MultiLevelTable[] = {
 
 
 #if 0
-LiteKv MultiLevelTableExtreme[] = {
+zKeyval MultiLevelzTableExtreme[] = {
 	{ TEXT_KEY( "cities" )       , TABLE_VALUE( )         },
 		/*Database records look a lot like this*/
 		{ INT_KEY( 0 )       , TABLE_VALUE( )         },
@@ -421,7 +421,7 @@ LiteKv MultiLevelTableExtreme[] = {
 #endif
 
 
-int get_count ( LiteKv *kv ) {
+int get_count ( zKeyval *kv ) {
 	int a = 0;
 	while ( *kv->hash != LKV_TERM ) 
 		a ++, kv ++;
@@ -429,9 +429,9 @@ int get_count ( LiteKv *kv ) {
 }
 
 
-Table *convert_lkv ( LiteKv *kv ) {
+zTable *convert_lkv ( zKeyval *kv ) {
 	char buf[ 2048 ];
-	Table *t = malloc( sizeof( Table ) );
+	zTable *t = malloc( sizeof( zTable ) );
 	lt_init( t, NULL, get_count( kv ) );
 
 	while ( *kv->hash != LKV_TERM ) {
@@ -490,18 +490,18 @@ Table *convert_lkv ( LiteKv *kv ) {
 	{ #k, k }
 
 struct Test {
-	LiteKv *kvset;
+	zKeyval *kvset;
 	const char *name, *desc;
 	const char *src, *cmp;
 };
 
 #if 0
 struct Test tests[] = {
-	TEST(NoTable),
-	TEST(SingleTable),
-	TEST(DoubleTableAlpha),
-	TEST(DoubleTableNumeric),
-	TEST(MultiLevelTable),
+	TEST(NozTable),
+	TEST(SinglezTable),
+	TEST(DoublezTableAlpha),
+	TEST(DoublezTableNumeric),
+	TEST(MultiLevelzTable),
 	{ NULL }
 };
 #endif
@@ -514,9 +514,9 @@ struct Test tests[] =
 	//.desc   = A quick description of the test
 	//.renSrc = the input that the test will use for find and replace
 	//.renCmp = the constant to compare against to make sure that rendering worked
-	//.values = the Table to use for values (these tests do not test any parsing)
+	//.values = the zTable to use for values (these tests do not test any parsing)
 	{
-		NoTable, "TABLE_NONE", "Template values with no tables.",
+		NozTable, "TABLE_NONE", "Template values with no tables.",
 		.src =
 		 "<html>\n"
 		 "<head>\n"
@@ -546,7 +546,7 @@ struct Test tests[] =
 	#if 1
 	//one table
 	{
-		SingleTable, "TABLE_SINGLE", "one level table",
+		SinglezTable, "TABLE_SINGLE", "one level table",
 		.src =
 		 "<html>\n"
 		 "<head>\n"
@@ -589,7 +589,7 @@ struct Test tests[] =
 
 	#if 0
 	{
-		DoubleTableAlpha, "TABLE_DOUBLE", "two level table | key value test",
+		DoublezTableAlpha, "TABLE_DOUBLE", "two level table | key value test",
 		//Notice the cities.metadata loop block.  Teset for short and long keys...
 		//"    {{ .city }}, {{ .parent_state }} is a city full of {{ .metadata.population }} people.\n" 
 		.src =
@@ -690,7 +690,7 @@ struct Test tests[] =
 #endif
 	#if 1
 	{
-		DoubleTableAlpha, "TABLE_DOUBLE", "two level table | key value test",
+		DoublezTableAlpha, "TABLE_DOUBLE", "two level table | key value test",
 		//Notice the cities.metadata loop block.  Teset for short and long keys...
 		//"    {{ .city }}, {{ .parent_state }} is a city full of {{ .metadata.population }} people.\n" 
 		.src =
@@ -790,7 +790,7 @@ struct Test tests[] =
 	},
 #endif
 	{
-		DoubleTableNumeric, "two level table", "two level table | key value test",
+		DoublezTableNumeric, "two level table", "two level table | key value test",
 		.src =
 		 "<html>\n"
 		 "<head>\n"
@@ -842,7 +842,7 @@ struct Test tests[] =
 	//If you can't solve it, don't beat yourself up over it.
 	//Either try something else or approach it a different way...
 	{
-		DoubleTableNumeric, "two level table", "two level table | key value test",
+		DoublezTableNumeric, "two level table", "two level table | key value test",
 		.src =
 		 "<html>\n"
 		 "<head>\n"
@@ -891,7 +891,7 @@ struct Test tests[] =
 	},
 	//multi-level tables
 	{
-		MultiLevelTable, "key and value", "key and value",
+		MultiLevelzTable, "key and value", "key and value",
 		.src =
 		 "<html>\n"
 		 "<head>\n"
@@ -941,7 +941,7 @@ int main (int argc, char *argv[]) {
 
 	while ( test->kvset ) {
 		fprintf( stderr, "%s %p\n", test->name, test->kvset );
-		Table *t = convert_lkv( test->kvset );
+		zTable *t = convert_lkv( test->kvset );
 		int rlen = 0;
 		uint8_t *r = NULL;
 

@@ -48,12 +48,12 @@ struct urimap {
 	const char *name, *routeset;
 	struct element **list;
 	int listlen;
-	Mem r;
+	zWalker r;
 }; 
 
 
-struct route ** build_routes ( Table * );
-int route_table_iterator ( LiteKv *, int, void * );
+struct route ** build_routes ( zTable * );
+int route_table_iterator ( zKeyval *, int, void * );
 void free_routes ( struct route ** );
 int resolve_routes ( const char *route, const char *uri );
 #ifndef DEBUG_H

@@ -21,7 +21,7 @@ typedef struct {
 	char  errmsg[ 127 ];
 	#endif 
  #endif
-} Mem ;
+} zWalker;
 
 #define strwalk(a,b,c) \
  memwalk(a, (uint8_t *)b, (uint8_t *)c, strlen(b), strlen((char *)c))
@@ -32,14 +32,14 @@ typedef struct {
  mems.pos = p; \
  mems.it = m; 
 
-_Bool memstr (const void * a, const void *b, int size);
-int32_t memchrocc (const void *a, const char b, int32_t size);
-int32_t memstrocc (const void *a, const void *b, int32_t size);
-int32_t memstrat (const void *a, const void *b, int32_t size);
-int32_t memchrat (const void *a, const char b, int32_t size);
-int32_t memtok (const void *a, const uint8_t *tokens, int32_t rng, int32_t tlen);
-int32_t memmatch (const void *a, const char *tokens, int32_t sz, char delim); 
-char *memstrcpy (char *dest, const uint8_t *src, int32_t len);
-_Bool memwalk (Mem *mm, uint8_t *data, uint8_t *tokens, int datalen, int toklen) ;
+int memstr (const void *, const void *, int);
+int32_t memchrocc (const void *, const char, int);
+int32_t memstrocc (const void *, const void *, int);
+int32_t memstrat (const void *, const void *, int);
+int32_t memchrat (const void *, const char, int);
+int32_t memtok (const void *, const uint8_t *, int32_t, int32_t );
+int32_t memmatch (const void *, const char *, int32_t, char ); 
+char *memstrcpy (char *, const uint8_t *, int32_t );
+int memwalk (zWalker *mm, const uint8_t *, const uint8_t *, int, int ) ;
 
 #endif

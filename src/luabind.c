@@ -155,7 +155,7 @@ void lua_stackdump ( lua_State *L ) {
 
 
 //Convert Lua tables to regular tables
-int lua_to_table (lua_State *L, int index, Table *t ) {
+int lua_to_table (lua_State *L, int index, zTable *t ) {
 	static int sd;
 	lua_pushnil( L );
 	FPRINTF( "Current stack depth: %d\n", sd++ );
@@ -211,21 +211,21 @@ int lua_to_table (lua_State *L, int index, Table *t ) {
 }
 
 
-//Convert Table to Lua table
-int table_to_lua (lua_State *L, int index, Table *tt) {
+//Convert zTable to Lua table
+int table_to_lua (lua_State *L, int index, zTable *tt) {
 	int a = index;
-	LiteKv *kv = NULL;
+	zKeyval *kv = NULL;
 	lt_reset( tt );
 
 	while ( (kv = lt_next( tt )) ) {
-		struct { int t; LiteRecord *r; } items[2] = {
+		struct { int t; zhRecord *r; } items[2] = {
 			{ kv->key.type  , &kv->key.v    },
 			{ kv->value.type, &kv->value.v  } 
 		};
 
 		int t=0;
 		for ( int i=0; i<2; i++ ) {
-			LiteRecord *r = items[i].r; 
+			zhRecord *r = items[i].r; 
 			t = items[i].t;
 			FPRINTF( "%s\n", ( i ) ? lt_typename( t ) : lt_typename( t ));
 
@@ -252,7 +252,7 @@ int table_to_lua (lua_State *L, int index, Table *tt) {
 				break;
 			}
 			else if (t == LITE_BLB) {
-				LiteBlob *bb = &r->vblob;
+				zhBlob *bb = &r->vblob;
 				lua_pushlstring( L, (char *)bb->blob, bb->size );
 			}
 		}
@@ -355,9 +355,11 @@ int lua_exec_string( lua_State *L, const char *str, char *err, int errlen ) {
 		if ( lerr == LUA_ERRSYNTAX )
 			len = snprintf( err, errlen, "Syntax error: " );
 		else if ( lerr == LUA_ERRMEM )
-			len = snprintf( err, errlen, "Memory allocation error: " );
+			len = snprintf( err, errlen, "zWalkerory allocation error: " );
+	#ifdef LUA_53
 		else if ( lerr == LUA_ERRGCMM )
 			len = snprintf( err, errlen, "GC meta-method error: " );
+	#endif
 		else {
 			len = snprintf( err, errlen, "Unknown error occurred: " );
 		}
@@ -374,12 +376,14 @@ int lua_exec_string( lua_State *L, const char *str, char *err, int errlen ) {
 		if ( lerr == LUA_ERRRUN ) 
 			len = snprintf( err, errlen, "Runtime error: " );
 		else if ( lerr == LUA_ERRMEM ) 
-			len = snprintf( err, errlen, "Memory allocation error: " );
+			len = snprintf( err, errlen, "zWalkerory allocation error: " );
 		else if ( lerr == LUA_ERRERR ) 
 			len = snprintf( err, errlen, "Error while running message handler: " );
+	#ifdef LUA_53
 		else if ( lerr == LUA_ERRGCMM ) {
 			len = snprintf( err, errlen, "Error while running __gc metamethod at: " );
 		}
+	#endif
 
 		errlen -= len;	
 		snprintf( &err[ len ], errlen, "%s\n", (char *)lua_tostring( L, -1 ) );
@@ -418,9 +422,11 @@ int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 		if ( lerr == LUA_ERRSYNTAX )
 			len = snprintf( err, errlen, "Syntax error at %s: ", f );
 		else if ( lerr == LUA_ERRMEM )
-			len = snprintf( err, errlen, "Memory allocation error at %s: ", f );
+			len = snprintf( err, errlen, "zWalkerory allocation error at %s: ", f );
+	#ifdef LUA_53
 		else if ( lerr == LUA_ERRGCMM )
 			len = snprintf( err, errlen, "GC meta-method error at %s: ", f );
+	#endif
 		else if ( lerr == LUA_ERRFILE )
 			len = snprintf( err, errlen, "File access error at %s: ", f );
 		else {
@@ -439,12 +445,14 @@ int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 		if ( lerr == LUA_ERRRUN ) 
 			len = snprintf( err, errlen, "Runtime error when executing %s: ", f );
 		else if ( lerr == LUA_ERRMEM ) 
-			len = snprintf( err, errlen, "Memory allocation error at %s: ", f );
+			len = snprintf( err, errlen, "zWalkerory allocation error at %s: ", f );
 		else if ( lerr == LUA_ERRERR ) 
 			len = snprintf( err, errlen, "Error while running message handler for %s: ", f );
+	#ifdef LUA_53
 		else if ( lerr == LUA_ERRGCMM ) {
 			len = snprintf( err, errlen, "Error while running __gc metamethod at %s: ", f );
 		}
+	#endif
 
 		errlen -= len;	
 		snprintf( &err[ len ], errlen, "%s\n", (char *)lua_tostring( L, -1 ) );

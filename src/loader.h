@@ -14,19 +14,19 @@ struct rule {
 		int *i;
 		void ***t;
 	} v;
-	int (*handler)( LiteKv *, int, void * );
+	int (*handler)( zKeyval *, int, void * );
 #endif
 };
 
 struct fp_iterator { 
 	int len, depth; 
 	void *userdata; 
-	int (*exec)( LiteKv *, int, void * );
-	Table *source;
+	int (*exec)( zKeyval *, int, void * );
+	zTable *source;
 };
 
 
-int loader_run ( Table *, const struct rule * ) ;
-Table *loader_shallow_copy( Table *, int start, int end );
+int loader_run ( zTable *, const struct rule * ) ;
+zTable *loader_shallow_copy( zTable *, int start, int end );
 void loader_free( const struct rule * );
 #endif

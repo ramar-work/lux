@@ -18,7 +18,7 @@ struct meg {
 };
 
 
-int homes_handler ( LiteKv * kv, int i, void *p ) {
+int homes_handler ( zKeyval * kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct home ***homes = f->userdata;
 	struct home *home = NULL;
@@ -38,10 +38,10 @@ int homes_handler ( LiteKv * kv, int i, void *p ) {
 }
 
 
-int test_hosts_handler ( LiteKv * kv, int i, void *p ) {
+int test_hosts_handler ( zKeyval * kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct host ***hosts = f->userdata;
-	Table *st = NULL, *nt = NULL;
+	zTable *st = NULL, *nt = NULL;
 	FPRINTF( "Invoking hosts_handler\n" );
 
 	//If current index is a table
@@ -92,7 +92,7 @@ struct routeh {
 
 //Models and Views are INCREDIBLY difficult
 //This runs on everything in a set...
-int mvc_array_handler( LiteKv *kv, int i, void *p ) {
+int mvc_array_handler( zKeyval *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	void ***pp = f->userdata;
 	int kt = kv->key.type;
@@ -106,11 +106,11 @@ int mvc_array_handler( LiteKv *kv, int i, void *p ) {
 
 
 //...
-int test_routes_handler ( LiteKv * kv, int i, void *p ) {
+int test_routes_handler ( zKeyval * kv, int i, void *p ) {
 	FPRINTF( "Invoking routes_handler\n" );
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct routeh ***routes = f->userdata;
-	Table *st = NULL, *nt = NULL;
+	zTable *st = NULL, *nt = NULL;
 	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
 		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
 #if 1
@@ -154,7 +154,7 @@ int test_routes_handler ( LiteKv * kv, int i, void *p ) {
 
 //Tests rules for pulling keys at a top-level.
 //I expect to see one unique key for one unique value (of any type)
-int set_server_rules( Table *t ) {
+int set_server_rules( zTable *t ) {
 	struct meg m;
 	memset( &m, 0, sizeof( struct meg ) );
 
@@ -187,7 +187,7 @@ int set_server_rules( Table *t ) {
 
 
 //Tests rules for pulling multiple keys that are the same.
-int set_host_rules( Table *t ) {
+int set_host_rules( zTable *t ) {
 	struct host **hosts = NULL;
 	const struct rule rules[] = {
 		{ "hosts", "t", .v.t = (void ***)&hosts, test_hosts_handler }, 
@@ -227,7 +227,7 @@ int set_host_rules( Table *t ) {
 
 #if 1
 //...
-int set_route_rules ( Table *t ) {
+int set_route_rules ( zTable *t ) {
 	struct routeh **routes = NULL;
 	const struct rule rules[] = {
 		{ "routes", "t", .v.t = (void ***)&routes, test_routes_handler }, 
@@ -264,7 +264,7 @@ int set_route_rules ( Table *t ) {
 
 #if 0
 //Tests more rules for pulling one unique key per value
-int set_lua_rules ( Table *t ) {
+int set_lua_rules ( zTable *t ) {
 	const struct rule rules[] = {
 		{ "db", "s", .v.s = &host.db }, 
 		{ "title", "s", .v.s = &host.title },  
@@ -291,7 +291,7 @@ int set_lua_rules ( Table *t ) {
 
 struct Test {
 	const char *name;
-	int (*exec)( Table * );	
+	int (*exec)( zTable * );	
 	void *data;
 } tests[] = {
 	{ TESTDIR "server.lua", set_server_rules },
@@ -306,7 +306,7 @@ int main (int argc, char *argv[]) {
 	while ( t->name ) {
 		//Build filename
 		lua_State *L = luaL_newstate();
-		Table *tt = malloc( sizeof(Table) ); 
+		zTable *tt = malloc( sizeof(zTable) ); 
 		char err[ 2048 ] = { 0 };
 		FPRINTF( "Attempting to load file: %s", t->name );
 

@@ -17,9 +17,9 @@ struct host {
 	char *keyfile;
 };
 
-struct host ** build_hosts ( Table * );
+struct host ** build_hosts ( zTable * );
 struct host * find_host ( struct host **, char * );
-int host_table_iterator ( LiteKv *, int, void * );
+int host_table_iterator ( zKeyval *, int, void * );
 void free_hosts ( struct host ** );
 void dump_hosts ( struct host ** );
 

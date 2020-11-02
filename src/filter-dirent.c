@@ -7,7 +7,7 @@ int filter_dirent ( struct HTTPBody *req, struct HTTPBody *res, void *p ) {
 	struct stat st;
 	char *dirname = NULL;
 	DIR *ds = NULL;
-	Table t;
+	zTable t;
 	lt_init( &t, NULL, 1027 );
 
 	if ( !( ds = opendir( dirname ) ) )

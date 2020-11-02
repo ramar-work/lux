@@ -55,8 +55,8 @@ static struct element * create_element () {
 static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 
 	//Set up the memory structure.
-	Mem r;
-	memset( &r, 0, sizeof( Mem ) );
+	zWalker r;
+	memset( &r, 0, sizeof( zWalker ) );
 	//struct urimap *urimap = NULL; 
 	struct element **list = NULL;
 	int listlen = 0;
@@ -90,8 +90,8 @@ static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 			e->type = ( maps[ *p ] == ACT_EITHER ) ? ACT_EITHER : ACT_ID;
 			char *mb = ( maps[ *p ] == ACT_EITHER ) ? ",}" : "=";
 			uint8_t *block = p + 1;
-			Mem pp;
-			memset( &pp, 0, sizeof(Mem) );
+			zWalker pp;
+			memset( &pp, 0, sizeof(zWalker) );
 			while ( memwalk( &pp, block, (uint8_t *)mb, r.size - 1, strlen(mb) ) ) {
 				char *b, buf[ 1024 ] = {0};
 				memcpy( buf, &block[ pp.pos ], pp.size );

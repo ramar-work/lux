@@ -48,7 +48,7 @@ int main ( int argc, char *argv[] ) {
 			fprintf( stderr,  "couldn't combine: %s\n", err );
 		}
 
-		Table *t = malloc( sizeof( Table ) );
+		zTable *t = malloc( sizeof( zTable ) );
 		lt_init( t, NULL, 4096 );
 		lua_to_table( L, 1, t );
 		//lua_stackdump( L );

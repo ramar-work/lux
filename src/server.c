@@ -101,7 +101,7 @@ int check_dir ( struct host *host, char *err, int errlen ) {
 int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct config *config, struct senderrecvr *ctx ) {
 	FPRINTF( "Proc started...\n" );
 	char err[2048] = {0};
-	Table *t = NULL;
+	zTable *t = NULL;
 	struct host *host = NULL;
 	struct filter *filter = NULL;
 

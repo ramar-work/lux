@@ -6,7 +6,7 @@
 
 
 //free the table
-void free_t( Table *t ) {
+void free_t( zTable *t ) {
 	if ( t ) {
 		lt_free( t );
 		free( t );
@@ -19,7 +19,7 @@ struct config * build_config ( char *file, char *err, int errlen ) {
 	FPRINTF( "Configuration parsing started...\n" );
 
 	struct config *config = NULL; 
-	Table *t = NULL;
+	zTable *t = NULL;
 	lua_State *L = NULL;
 
 	//Allocate Lua
@@ -42,7 +42,7 @@ struct config * build_config ( char *file, char *err, int errlen ) {
 	}
 
 	//Allocate a table for the configuration
-	if ( !(t = malloc(sizeof(Table))) || !lt_init( t, NULL, 2048 ) ) {
+	if ( !(t = malloc(sizeof(zTable))) || !lt_init( t, NULL, 2048 ) ) {
 		snprintf( err, errlen, "Could not initialize table when parsing config at: %s\n", file );
 		free_t( t );
 		free( config );
@@ -103,7 +103,7 @@ void free_config( struct config *config ) {
 
 
 //Add a configuration function...
-void * add_config (struct config *config, void **(cexec)(Table *), void(cfree)(void **)) {
+void * add_config (struct config *config, void **(cexec)(zTable *), void(cfree)(void **)) {
 	return NULL;
 }
 

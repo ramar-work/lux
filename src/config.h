@@ -8,7 +8,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-void *get_values ( Table *t, const char *key, void *userdata, int (*fp)(LiteKv *, int, void *) );
+void *get_values ( zTable *t, const char *key, void *userdata, int (*fp)(zKeyval *, int, void *) );
 
 struct config {
 	const char *path;

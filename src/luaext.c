@@ -13,7 +13,7 @@ int luaopen_libhypno( lua_State *L ) {
 }
 
 int lua_execdb( lua_State *L ) {
-	Table *t;
+	zTable *t;
 	sqlite3 *ptr;
 	char err[ 2048 ] = {0};
 	const char *db_name = lua_tostring( L, 1 );

@@ -53,14 +53,14 @@ void *db_close( void **ptr, char *err, int errlen ) {
 }
 
 
-Table *db_exec( void *ptr, const char *query, void **records, char *err, int errlen ) { 
+zTable *db_exec( void *ptr, const char *query, void **records, char *err, int errlen ) { 
 	int columnCount = 0, status = 0;
-	Table *t = NULL;
+	zTable *t = NULL;
 	sqlite3_stmt *stmt = NULL;
 	const char *unused = NULL;
 	const char *columns[ 127 ] = { 0 };
 
-	if ( !( t = malloc( sizeof( Table ) ) ) || !lt_init( t, NULL, 1024 ) ) {
+	if ( !( t = malloc( sizeof( zTable ) ) ) || !lt_init( t, NULL, 1024 ) ) {
 		snprintf( err, errlen, "%s\n", "COULD NOT ALLOCATE SPACE FOR TABLE!" ); 
 		return NULL;
 	}
@@ -135,7 +135,7 @@ Table *db_exec( void *ptr, const char *query, void **records, char *err, int err
 }
 
 
-Table * db_to_table ( const char *filename, const char *query ) {
+zTable * db_to_table ( const char *filename, const char *query ) {
 	return 0;
 }
 

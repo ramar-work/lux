@@ -10,7 +10,7 @@
 
 int filter_c ( struct HTTPBody *, struct HTTPBody *, void * );
 
-typedef Table * ( *Model )( struct HTTPBody *req, struct HTTPBody *res, int len );
+typedef zTable * ( *Model )( struct HTTPBody *req, struct HTTPBody *res, int len );
 
 typedef const char * View;
 

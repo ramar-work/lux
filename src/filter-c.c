@@ -60,7 +60,7 @@ void print_routes ( Route *routes ) {
 
 
 int filter_c ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
-	Table *model = NULL;
+	zTable *model = NULL;
 	Route *routelist, *route = NULL;
 	const char *apppath = "/app/app.so"; //or "/app.so"
 	void *app = NULL;

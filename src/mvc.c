@@ -4,7 +4,7 @@
 #include "mvc.h"
 #include "router.h"
 
-static int mvc_array_handler( LiteKv *kv, int i, void *p ) {
+static int mvc_array_handler( zKeyval *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	void ***pp = f->userdata;
 	int kt = kv->key.type;
@@ -41,11 +41,11 @@ static struct mvc * create_mvc () {
 
 
 //...
-static int mvc_handler ( LiteKv * kv, int i, void *p ) {
+static int mvc_handler ( zKeyval * kv, int i, void *p ) {
 	FPRINTF( "Invoking routes_handler\n" );
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct routeh ***routes = f->userdata;
-	Table *st = NULL, *nt = NULL;
+	zTable *st = NULL, *nt = NULL;
 
 	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
 		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
@@ -87,7 +87,7 @@ static int mvc_handler ( LiteKv * kv, int i, void *p ) {
 }
 
 
-struct routeh ** build_mvc ( Table *t ) {
+struct routeh ** build_mvc ( zTable *t ) {
 	struct routeh **routes = NULL;
 	const struct rule rules[] = {
 		{ "routes", "t", .v.t = (void ***)&routes, mvc_handler }, 

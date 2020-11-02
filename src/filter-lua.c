@@ -49,7 +49,7 @@ static lua_State * lua_load_libs( lua_State **L ) {
 struct luaconf * build_luaconf ( const char *dir, char *err, int errlen ) {
 	struct luaconf *conf = NULL;
 	char path[2048] = {0};
-	Table *t = NULL;
+	zTable *t = NULL;
 	lua_State *L = NULL;
 
 	//
@@ -66,7 +66,7 @@ struct luaconf * build_luaconf ( const char *dir, char *err, int errlen ) {
 
 	//Allocate
 	FPRINTF( "config path is: %s\n", path );
-	if ( !( t = malloc( sizeof(Table) ) ) || !lt_init( t, NULL, 1024 ) ) {
+	if ( !( t = malloc( sizeof(zTable) ) ) || !lt_init( t, NULL, 1024 ) ) {
 		lua_close( L );
 		snprintf( err, errlen, "Failed to allocate heap for configuration." );
 		return NULL; //http_set_error( res, 500, "Failed to allocate config table." );
@@ -214,9 +214,9 @@ fprintf( stderr, "Adding field %s to Lua\n", (*(*ttt)->records)->field );
 
 
 //Combine everything that came from the call
-static Table * combine_models ( lua_State *L, char *err, int errlen ) {
+static zTable * combine_models ( lua_State *L, char *err, int errlen ) {
 	int top = lua_gettop( L );
-	Table *t = malloc( sizeof( Table ) );
+	zTable *t = malloc( sizeof( zTable ) );
 	if ( !t || !lt_init( t, NULL, 2048 ) ) {
 		snprintf( err, errlen, "Failed to initialize model table." );
 		return NULL;
@@ -234,7 +234,7 @@ static Table * combine_models ( lua_State *L, char *err, int errlen ) {
 
 		//...
 		if ( !lua_to_table( L, i, t ) ) {
-			snprintf( err, errlen, "Conversion to Table failed.\n" );
+			snprintf( err, errlen, "Conversion to zTable failed.\n" );
 			return NULL;
 		}
 
@@ -247,11 +247,11 @@ static Table * combine_models ( lua_State *L, char *err, int errlen ) {
 
 
 //Execute all models
-Table * execute_models ( struct luaconf *luaconf, lua_State *L, char *err, int errlen ) {
+zTable * execute_models ( struct luaconf *luaconf, lua_State *L, char *err, int errlen ) {
 	FPRINTF( "Beginning model execution...\n" );
 	struct mvc *mvc = luaconf->mvc;
 	char **model = mvc->models;
-	Table *t = malloc( sizeof( Table ) );
+	zTable *t = malloc( sizeof( zTable ) );
 		
 	if ( !t || !lt_init( t, NULL, 2048 ) ) {
 		snprintf( err, errlen, "Could not allocate space for tables." );
@@ -289,7 +289,7 @@ Table * execute_models ( struct luaconf *luaconf, lua_State *L, char *err, int e
 
 
 //
-uint8_t * execute_views ( struct luaconf *luaconf, Table *t, int *i, char *err, int errlen ) {
+uint8_t * execute_views ( struct luaconf *luaconf, zTable *t, int *i, char *err, int errlen ) {
 	struct mvc *mvc = luaconf->mvc;
 	char **view = mvc->views;
 	uint8_t *buf = NULL;
@@ -310,11 +310,13 @@ uint8_t * execute_views ( struct luaconf *luaconf, Table *t, int *i, char *err, 
 			return NULL; 
 		}
 
+#if 0
 		//Then do the render ( model.? )
 		if ( !( ren = table_to_uint8t( t, fbuf, flen, &renlen ) ) ) {
 			snprintf( err, errlen, "Failed to render model according to view file: %s\n", fpath );
 			return NULL; 
 		}
+#endif
 
 #if 1
 		//Append to the whole message
@@ -349,7 +351,7 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *conf
 	uint8_t *buf = NULL;
 	int buflen = 0;
 	char err[2048] = {0}, lconfpath[2048] = {0};
-	Table *model;
+	zTable *model;
 
 	//Check for config (though this is probably already done...)
 	if ( !config )

@@ -15,7 +15,7 @@ int main (int argc, char *argv[] ) {
 		const char *dbstr = db->db;
 		char err[ 2048 ] = {0};
 		void *handle = NULL;
-		Table *t = NULL;
+		zTable *t = NULL;
 
 		fprintf( stderr, "Using: %s\n", dbstr );
 		fprintf( stderr, "DB handle at %p\n", handle );
@@ -26,14 +26,14 @@ int main (int argc, char *argv[] ) {
 		}
 		fprintf( stderr, "DB handle at %p\n", handle );
 
-		fprintf( stderr, "Table at %p\n", t );
+		fprintf( stderr, "zTable at %p\n", t );
 		if ( !( t = db_exec( handle, db->query, NULL, err, sizeof(err) ) ) ) {
 			fprintf( stderr, "COULD NOT EXECUTE DATABASE QUERY: '%s'! %s\n", db->query, err );
 			db++;
 			continue;
 		}
 
-		fprintf( stderr, "Table now at %p\n", t );
+		fprintf( stderr, "zTable now at %p\n", t );
 		lt_dump( t );
 		lt_free( t );
 		free( t );

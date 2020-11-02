@@ -193,8 +193,8 @@ static struct HTTPRecord * init_record() {
 
 
 static struct HTTPRecord ** parse_url( struct HTTPBody *entity, char *err, int errlen ) {
-	Mem set;
-	memset( &set, 0, sizeof( Mem ) );
+	zWalker set;
+	memset( &set, 0, sizeof( zWalker ) );
 	int len = 0;
 
 	//Always process the URL (specifically GET vars)
@@ -209,13 +209,13 @@ static struct HTTPRecord ** parse_url( struct HTTPBody *entity, char *err, int e
 			int at = 0;
 			struct HTTPRecord *b = NULL; 
 			if ( !( b = init_record() ) ) {
-				snprintf( err, errlen, "[%s:%d] Memory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
+				snprintf( err, errlen, "[%s:%d] zWalkerory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
 				return NULL;
 			} 
 #else	
 			struct HTTPRecord *b = NULL;
 			if ( !(b = malloc( sizeof( struct HTTPRecord ) )) ) {
-				snprintf( err, errlen, "[%s:%d] Memory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
+				snprintf( err, errlen, "[%s:%d] zWalkerory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
 				( entity->path ) ? free( entity->path ) : 0;
 				( entity->method ) ? free( entity->method ) : 0;
 				( entity->protocol ) ? free( entity->protocol ) : 0;
@@ -240,8 +240,8 @@ static struct HTTPRecord ** parse_url( struct HTTPBody *entity, char *err, int e
 
 static struct HTTPRecord ** parse_headers( struct HTTPBody *entity, char *err, int errlen ) {
 	//Always process the headers
-	Mem set;
-	memset( &set, 0, sizeof( Mem ) );
+	zWalker set;
+	memset( &set, 0, sizeof( zWalker ) );
 	int len = 0;
 	int flLen = 0;
 
@@ -253,7 +253,7 @@ static struct HTTPRecord ** parse_headers( struct HTTPBody *entity, char *err, i
 			int at = memchrat( t, ':', set.size );
 			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
 			if ( !b ) {
-				snprintf( err, errlen, "[%s:%d] Memory allocation failure at header parsing: %s", __FILE__, __LINE__, entity->method );
+				snprintf( err, errlen, "[%s:%d] zWalkerory allocation failure at header parsing: %s", __FILE__, __LINE__, entity->method );
 #if 0
 				( entity->path ) ? free( entity->path ) : 0;
 				( entity->method ) ? free( entity->method ) : 0;
@@ -281,8 +281,8 @@ FPRINTF( "b->field '%s'\n", b->field );
 
 static struct HTTPRecord ** parse_body( struct HTTPBody *entity, char *err, int errlen ) {
 	//Always process the body 
-	Mem set;
-	memset( &set, 0, sizeof( Mem ) );
+	zWalker set;
+	memset( &set, 0, sizeof( zWalker ) );
 	int len = 0;
 	uint8_t *p = &entity->msg[ entity->hlen + strlen( "\r\n" ) ];
 	int plen = entity->mlen - entity->hlen;
@@ -485,8 +485,8 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 #else
 	//Define records for each type here...
 	int len = 0;
-	Mem set;
-	memset( &set, 0, sizeof( Mem ) );
+	zWalker set;
+	memset( &set, 0, sizeof( zWalker ) );
 
 	//Always process the URL (specifically GET vars)
 	if ( strlen( entity->path ) == 1 ) {
@@ -500,13 +500,13 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 			int at = 0;
 			struct HTTPRecord *b = NULL; 
 			if ( !( b = init_record() ) ) {
-				snprintf( err, errlen, "[%s:%d] Memory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
+				snprintf( err, errlen, "[%s:%d] zWalkerory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
 				return NULL;
 			} 
 #else	
 			struct HTTPRecord *b = NULL;
 			if ( !(b = malloc( sizeof( struct HTTPRecord ) )) ) {
-				snprintf( err, errlen, "[%s:%d] Memory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
+				snprintf( err, errlen, "[%s:%d] zWalkerory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
 				( entity->path ) ? free( entity->path ) : 0;
 				( entity->method ) ? free( entity->method ) : 0;
 				( entity->protocol ) ? free( entity->protocol ) : 0;
@@ -536,7 +536,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 	}
 #else
 	//Always process the headers
-	memset( &set, 0, sizeof( Mem ) );
+	memset( &set, 0, sizeof( zWalker ) );
 	len = 0;
 	uint8_t *h = &entity->msg[ flLen - 1 ];
 	while ( memwalk( &set, h, (uint8_t *)"\r", entity->hlen, 1 ) ) {
@@ -546,7 +546,7 @@ struct HTTPBody * http_parse_request ( struct HTTPBody *entity, char *err, int e
 			int at = memchrat( t, ':', set.size );
 			struct HTTPRecord *b = malloc( sizeof( struct HTTPRecord ) );
 			if ( !b ) {
-				snprintf( err, errlen, "[%s:%d] Memory allocation failure at header parsing: %s", __FILE__, __LINE__, entity->method );
+				snprintf( err, errlen, "[%s:%d] zWalkerory allocation failure at header parsing: %s", __FILE__, __LINE__, entity->method );
 				( entity->path ) ? free( entity->path ) : 0;
 				( entity->method ) ? free( entity->method ) : 0;
 				( entity->protocol ) ? free( entity->protocol ) : 0;
@@ -578,7 +578,7 @@ FPRINTF( "b->field '%s'\n", b->field );
 	}
 #else
 	//Always process the body 
-	memset( &set, 0, sizeof( Mem ) );
+	memset( &set, 0, sizeof( zWalker ) );
 	len = 0;
 	uint8_t *p = &entity->msg[ entity->hlen + strlen( "\r\n" ) ];
 	int plen = entity->mlen - entity->hlen;

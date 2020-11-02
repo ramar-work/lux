@@ -1,10 +1,10 @@
 #include "hosts.h"
 
 //A hosts handler
-static int hosts_iterator ( LiteKv * kv, int i, void *p ) {
+static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct host ***hosts = f->userdata;
-	Table *st = NULL, *nt = NULL;
+	zTable *st = NULL, *nt = NULL;
 
 	//If current index is a table
 	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
@@ -54,7 +54,7 @@ struct host * find_host ( struct host **hosts, char *hostname ) {
 
 #if 0 
 //Build hosts list
-struct host ** build_hosts ( Table *t ) {
+struct host ** build_hosts ( zTable *t ) {
 	struct host **hosts = NULL;
 	struct fp_iterator fp_data = { 0, 0, /*NULL,*/ &hosts, host_table_iterator };
 	int index;
@@ -77,7 +77,7 @@ struct host ** build_hosts ( Table *t ) {
 	return hosts; 	
 }
 #else
-struct host ** build_hosts ( Table *t ) {
+struct host ** build_hosts ( zTable *t ) {
 	struct host **hosts = NULL;
 	const struct rule rules[] = {
 		{ "hosts", "t", .v.t = (void ***)&hosts, hosts_iterator }, 
