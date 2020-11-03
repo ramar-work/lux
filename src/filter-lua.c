@@ -403,6 +403,8 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *conf
 	//Set all of this
 	http_set_ctype( res, mmtref( "text/html" ) );
 	http_set_content( res, buf, buflen );
+//write( 2, buf, buflen );
+fprintf( stderr, "buflen: %d\n", buflen );
 #else
  	uint8_t bug[] = "<h2>Everything is fine.</h2>";
 	http_set_content( res, bug, strlen((char *)bug) ); //, sizeof(bug) );

@@ -26,6 +26,9 @@ main: $(OBJ)
 	$(CC) $(LDFLAGS) $(CFLAGS) src/main.c -o $(NAME) $(OBJ) 
 	$(CC) $(LDFLAGS) $(CFLAGS) src/cli.c -o hcli $(OBJ)
 
+install:
+	cp ./hypno ./hcli $(PREFIX)/bin/
+
 # repl
 #	test -f sqlite3.o || $(CC) $(CFLAGS) -fPIC -c vendor/sqlite3.c -o shared/sqlite3.o
 repl:
