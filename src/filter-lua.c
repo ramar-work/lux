@@ -290,19 +290,20 @@ zTable * execute_models ( struct luaconf *luaconf, lua_State *L, char *err, int 
 
 //
 uint8_t * execute_views ( struct luaconf *luaconf, zTable *t, int *i, char *err, int errlen ) {
+	FPRINTF( "Beginning view execution...\n" );
 	struct mvc *mvc = luaconf->mvc;
 	char **view = mvc->views;
 	uint8_t *buf = NULL;
 	int buflen = 0;
+	FPRINTF( "dir: %s\n", luaconf->dir );
 
 	while ( view && *view ) {
 		uint8_t *fbuf = NULL;
-		uint8_t *ren = NULL;
 		int flen = 0;
 		int renlen = 0;
 		char fpath[ 2048 ] = { 0 };
 		snprintf( fpath, sizeof( fpath ), "%s/views/%s.%s", luaconf->dir, *view, "tpl" );
-		FPRINTF( "%s\n", fpath );
+		FPRINTF( "Loading view: %s\n", fpath );
 
 		//Read the entire file to render in and fail...
 		if ( !( fbuf = read_file( fpath, &flen, err, sizeof( err ) ) ) ) {
@@ -310,20 +311,36 @@ uint8_t * execute_views ( struct luaconf *luaconf, zTable *t, int *i, char *err,
 			return NULL; 
 		}
 
-#if 0
+	#if 0
+		//Right in the middle of something, as always...
+		uint8_t ren[] = { 'H', 'i', '!', ' ', 't', 'h', 'e', 'r', 'e' };
+		renlen = 9;
+	#else
+		//Set a blank source for the new rendered data to go
+		uint8_t *ren = NULL;
+		
+		//Set up the rendering library
+		zRender *rz = zrender_init();
+		zrender_set_default_dialect( rz );
+		zrender_set_fetchdata( rz, t );
+
 		//Then do the render ( model.? )
-		if ( !( ren = table_to_uint8t( t, fbuf, flen, &renlen ) ) ) {
+		if ( !( ren = zrender_render( rz, fbuf, flen, &renlen ) ) ) {
 			snprintf( err, errlen, "Failed to render model according to view file: %s\n", fpath );
 			return NULL; 
 		}
-#endif
 
-#if 1
+		FPRINTF( "Contents of rendered buffer.\n" );
+		write( 2, ren, renlen );
+	#endif
+
 		//Append to the whole message
 		append_to_uint8t( &buf, &buflen, ren, renlen );
-#endif
+		free( rz );
+		free( ren );
 		view++;	
 	}
+
 	*i = buflen;
 	return buf;
 }
@@ -391,34 +408,36 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *conf
 	if ( !set_framework_methods() )
 		return http_set_error( res, 500, "No errors occurred." );
 
+#if 1
 	//At this point, server data and libraries are available to Lua, so now run models...
 	if ( !( model = execute_models( luaconf, L, err, sizeof(err) ) ) )
 		return http_set_error( res, 500, err );
+
+	lt_dump( model );
 
 	//Generate some views
 	if ( !( buf = execute_views( luaconf, model, &buflen, err, sizeof(err) ) ) )
 		return http_set_error( res, 500, err );
 
-#if 1
 	//Set all of this
+	http_set_status( res, 200 );
 	http_set_ctype( res, mmtref( "text/html" ) );
 	http_set_content( res, buf, buflen );
-//write( 2, buf, buflen );
-fprintf( stderr, "buflen: %d\n", buflen );
+	FPRINTF( "buflen: %d\n", buflen );
 #else
  	uint8_t bug[] = "<h2>Everything is fine.</h2>";
 	http_set_content( res, bug, strlen((char *)bug) ); //, sizeof(bug) );
 #endif
 
-#if 0
+#if 1
 	if ( !http_finalize_response( res, err, sizeof(err) ) )
 		return http_set_error( res, 500, err );
 #endif
 
 	//Destroy everything
 	free( buf );
-	lt_free( model );
-	free( model );
+	//lt_free( model );
+	//free( model );
 	destroy_luaconf( luaconf );
 	lua_close( L );
 	return 1;

@@ -8,7 +8,7 @@
 #ifndef ROUTER_H
 #define ROUTER_H
 
-#define DUMPACTION( NUM ) \
+#define RDUMPACTION( NUM ) \
 	( NUM == ACT_ID    ) ? "ACT_ID" : \
 	( NUM == ACT_WILDCARD ) ? "ACT_WILDCARD" : \
 	( NUM == ACT_SINGLE   ) ? "ACT_SINGLE" : \

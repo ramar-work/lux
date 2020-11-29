@@ -16,23 +16,27 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	char err[ 2048 ] = {0};
 
 	//Read first
-	for ( ;; ) {	
-		int rd, bfsize = size * (++mult); 
+	for ( ;; ) {
+
 		unsigned char buf2[ size ]; 
 		memset( buf2, 0, size );
+		int bfsize = size * ( ++mult ); 
+		int rd = recv( fd, buf2, size, MSG_DONTWAIT );
 
 		//Read into a static buffer
-		if ( ( rd = recv( fd, buf2, size, MSG_DONTWAIT ) ) == -1 ) {
+		if ( rd == -1 && try )
+			break;
+		else if ( rd == 0 ) {
+			rq->msg = buf;
+			break;
+		}
+		else if ( rd == -1 && !try ) {
 			//A subsequent call will tell us a lot...
 			FPRINTF( "Couldn't read all of message...\n" );
 			//whatsockerr( errno );
 			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				if ( ++try == 2 ) {
 					FPRINTF( "Tried three times to read from socket. We're done.\n" );
-					FPRINTF( "rq->mlen: %d\n", rq->mlen );
-					FPRINTF( "%p\n", buf );
-					//rq->msg = buf;
-					//return 0;	
 					break;
 				}
 				FPRINTF("Tried %d times to read from socket. Got %d bytes.\n", try, rd );
@@ -41,11 +45,6 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 				//this would just be some uncaught condition...
 				return http_set_error( rs, 500, strerror( errno ) );
 			}
-		}
-		else if ( rd == 0 ) {
-			//will a zero ALWAYS be returned?
-			rq->msg = buf;
-			break;
 		}
 		else {
 			//realloc manually and read
@@ -58,9 +57,10 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 			memcpy( &buf[ bfsize - size ], buf2, rd ); 
 			rq->mlen += rd;
 			rq->msg = buf; //TODO: You keep resetting this, only needs to be done once...
+			try++;
 
 			//show read progress and data received, etc.
-			FPRINTF( "Recvd %d bytes on fd %d\n", rd, fd ); 
+			FPRINTF( "Received %d bytes on fd %d\n", rd, fd ); 
 		}
 	}
 
@@ -82,14 +82,17 @@ int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	for ( ;; ) {	
 		sent = send( fd, &rs->msg[ pos ], total, MSG_DONTWAIT );
 		FPRINTF( "Bytes sent: %d\n", sent );
+
 		if ( sent == 0 ) {
 			FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", rs->mlen );
 			return 1;
 		}
 		else if ( sent > -1 ) {
-			//continue resending...
-			pos += sent;
-			total -= sent;	
+			pos += sent, total -= sent;	
+			FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
+		}
+		else if ( sent == -1 && ( errno == EAGAIN || errno == EWOULDBLOCK ) ) {
+			FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
 		}
 		else {
 			//TODO: Can't close a most-likely closed socket.  What do you do?
@@ -109,20 +112,14 @@ int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 				return 0;
 			else if ( errno == ENOTSOCK )
 				return 0;
-			else if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
-				if ( ++try == 2 ) {
-					FPRINTF( "Tried three times to write to socket. We're done.\n" );
-					FPRINTF( "rs->mlen: %d\n", rs->mlen );
-					//rq->msg = buf;
-					return 0;	
-				}
-				FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
-			}
 			else {
 				//this would just be some uncaught condition...
 				FPRINTF( "Caught some unknown condition.\n" );
 			}
 		}
+
+		try++;
+		FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
 	}
 	FPRINTF( "Write complete.\n" );
 	return 1;

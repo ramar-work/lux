@@ -159,7 +159,7 @@ void dump_urimap( struct urimap *map ) {
 		}
 		fprintf( stderr, 
 			" action=%s, be=%s, len=%d )\n", 
-			DUMPACTION( (*a)->type ), DUMPMATCH( (*a)->mustbe ), (*a)->len );
+			RDUMPACTION( (*a)->type ), DUMPMATCH( (*a)->mustbe ), (*a)->len );
 		a++;
 	}
 }

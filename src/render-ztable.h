@@ -1,6 +1,6 @@
-#include "vendor/zwalker.h"
-#include "vendor/zhasher.h"
-#include "vendor/util.h"
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
+#include "util.h"
 
 
 #ifndef RENDER_H
@@ -85,9 +85,10 @@ void zrender_set_boundaries ( zRender *, const char *, const char *);
 void zrender_set_fetchdata( zRender *, void * );
 void zrender_set( zRender *, const char, Mapper, Extractor );
 void zrender_set_default_dialect( zRender *rz ) ;
+void zrender_free( struct map **map );
 
 #ifdef DEBUG_H
-void zrender_print_table ( struct map ** );
+int zrender_print_map( struct map ** );
 
 #define DUMPACTION( NUM ) \
 	( NUM == LOOP_START ) ? "LOOP_START" : \
@@ -99,7 +100,7 @@ void zrender_print_table ( struct map ** );
 	( NUM == BOOLEAN ) ? "BOOLEAN" : \
 	( NUM == RAW ) ? "RAW" : "UNKNOWN" 
 #else
-#define zrender_print_table(a)
+#define zrender_print_map(a) 1
 #endif
 
 #endif

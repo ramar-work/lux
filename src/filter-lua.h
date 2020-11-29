@@ -4,9 +4,10 @@
 #include "luabind.h"
 #include "config.h"
 #include "loader.h"
-#include "render.h"
+//#include "render.h"
 #include "router.h"
 #include "mvc.h"
+#include "../vendor/zrender.h"
 
 #ifndef FILTER_LUA_H
 #define FILTER_LUA_H

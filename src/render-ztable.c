@@ -1,5 +1,4 @@
-#include "zrender.h"
-
+#include "render-ztable.h"
 
 #ifdef DEBUG_H
 static int di = 0;
@@ -46,8 +45,10 @@ MAPPER(map_raw_extract) {
 
 
 MAPPER(map_simple_extract) {
-	zzzzzzTable *tt = (zzzzzzTable *)t;
+	RPRINTF( "\nSIMPLE EXTRACT", ptr, len ); 
+	zTable *tt = (zTable *)t;
 	int hlen=0, hash = lt_get_long_i( tt, ptr, len ); 
+	FPRINTF( "\nHASH: %d\n", hash ); 
 	if ( hash > -1 ) {
 		add_item( &row->hashList, zrender_copy_int( hash ), int *, &hlen );
 	}
@@ -62,7 +63,7 @@ MAPPER(map_loop_start) {
 	int blen = 0;
 	int element_count = 0;
 	uint8_t bbuf[ 2048 ] = { 0 };
-	zzzzzzTable *tt = (zzzzzzTable *)t;
+	zTable *tt = (zTable *)t;
 	RPRINTF( "LOOP_START", ptr, len );
 
 	//If a parent should exist, copy the parent's text 
@@ -260,7 +261,7 @@ EXTRACTOR(extract_loop_end) {
 
 EXTRACTOR(extract_simple_extract) {
 	FPRINTF( "%-20s\n", "xSIMPLE_EXTRACT" );
-	zzzzzzTable *tt = (zzzzzzTable *)t;
+	zTable *tt = (zTable *)t;
 	int hash = 0;
 	//rip me out
 	if ( (**row)->hashList ) {
@@ -467,6 +468,7 @@ struct map ** zrender_userdata_to_map ( zRender *rz, const uint8_t *src, int src
 			if ( ( z = rz->mapset[ *p ] ) ) {
 				//This should probably return some kind of error...
 				p = zrender_trim( p, ". #/$`!\t", nlen, &alen );
+
 				z->mapper( rp, &pr, &pplen, p, alen, rz->userdata ); 
 				add_item( &rr, rp, struct map *, &rrlen );
 			}
@@ -526,16 +528,23 @@ uint8_t *zrender_render( zRender *rz, const uint8_t *src, int srclen, int *newle
 		return NULL;
 	}
 
-	//TODO: Rename table_to_map to srcdata_to_map
 	//TODO: Be sure to catch errors when mapping (like things aren't there or something)
 	if ( !( map = zrender_userdata_to_map( rz, src, srclen ) ) ) {
 		return NULL;
 	}
 
+#ifdef DEBUG_H
+	zrender_print_map( map );
+#endif
+
 	//TODO: Same to catch errors here...
 	if ( !( block = zrender_map_to_uint8t( rz, map, &blocklen ) ) ) {
 		return NULL;
 	}
+
+#if 1
+	zrender_free( map );
+#endif
 
 	*newlen = blocklen;
 	return block; 
@@ -580,7 +589,10 @@ void zrender_free( struct map **map ) {
 
 #ifdef DEBUG_H
 //Purely for debugging, see what came out
-void zrender_print_table( struct map **map ) {
+int zrender_print_map( struct map **map ) {
+	if ( !map ) {
+		return 0;
+	}
 	while ( *map ) {
 		struct map *item = *map;
 
@@ -615,5 +627,6 @@ void zrender_print_table( struct map **map ) {
 		}
 		map++;
 	}
+	return 1;
 }
 #endif

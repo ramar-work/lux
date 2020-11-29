@@ -393,6 +393,7 @@ static struct HTTPBody * stake_body ( struct HTTPBody *entity, char *err, int er
 	char *header = (char *)entity->msg;
 	int pLen = memchrat( entity->msg, '\n', entity->mlen ) - 1;
 	const int flLen = pLen + strlen( "\r\n" );
+	FPRINTF( "ptr: %p, len: %d\n", entity->msg, entity->mlen );
 	int hdLen = memstrat( entity->msg, "\r\n\r\n", entity->mlen );
 
 	//Initialize the remainder of variables 
