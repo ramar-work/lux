@@ -149,6 +149,7 @@ unsigned char *httptrim (uint8_t *msg, const char *trim, int len, int *nlen) {
 	return m;
 }
 
+
 //list out all rows in an HTTPRecord array
 void print_httprecords ( struct HTTPRecord **r ) {
 	if ( *r == NULL ) return;
@@ -209,7 +210,7 @@ static struct HTTPRecord ** parse_url( struct HTTPBody *entity, char *err, int e
 			int at = 0;
 			struct HTTPRecord *b = NULL; 
 			if ( !( b = init_record() ) ) {
-				snprintf( err, errlen, "[%s:%d] zWalkerory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
+				snprintf( err, errlen, "[%s:%d] Memory allocation failure at URL parsing: %s", __FILE__, __LINE__, entity->method );
 				return NULL;
 			} 
 #else	
@@ -237,6 +238,7 @@ static struct HTTPRecord ** parse_url( struct HTTPBody *entity, char *err, int e
 	}
 	return NULL;
 }
+
 
 static struct HTTPRecord ** parse_headers( struct HTTPBody *entity, char *err, int errlen ) {
 	//Always process the headers
@@ -267,7 +269,7 @@ static struct HTTPRecord ** parse_headers( struct HTTPBody *entity, char *err, i
 			else {
 				at -= 2, t += 2;
 				b->field = copystr( t, at );
-FPRINTF( "b->field '%s'\n", b->field );
+				//FPRINTF( "b->field '%s'\n", b->field );
 				at += 2 /*Increment to get past ': '*/, t += at, set.size -= at;
 				b->value = t;
 				b->size = set.size - 1;
@@ -407,11 +409,11 @@ static struct HTTPBody * stake_body ( struct HTTPBody *entity, char *err, int er
 	entity->host = msg_get_value( "Host: ", "\r", entity->msg, hdLen );
 
 	//The protocol parsing can happen here...
-	if ( strcmp( entity->method, "HEAD" ) == 0 )
+	if ( !strcmp( entity->method, "HEAD" ) )
 		;
-	else if ( strcmp( entity->method, "GET" ) == 0 )
+	else if ( !strcmp( entity->method, "GET" ) )
 		;
-	else if ( strcmp( entity->method, "POST" ) == 0 || strcmp( entity->method, "PUT" ) ) {
+	else if ( !strcmp( entity->method, "POST" ) || !strcmp( entity->method, "PUT" ) ) {
 		char *clen = msg_get_value( "Content-Length: ", "\r", entity->msg, hdLen ); 
 		entity->clen = safeatoi( clen );
 		entity->ctype = msg_get_value( "Content-Type: ", ";\r", entity->msg, hdLen );

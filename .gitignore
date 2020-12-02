@@ -12,3 +12,8 @@
 .*.swp
 .*.swo
 .*.swf
+
+# Things we don't really need, but need to have handy.
+oldcode
+tests2
+tests-www
