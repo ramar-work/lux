@@ -1,2 +1,0 @@
--- multi.lua
-return "abcdefghi"
