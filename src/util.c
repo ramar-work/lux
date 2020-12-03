@@ -74,6 +74,34 @@ uint8_t *read_file ( const char *filename, int *len, char *err, int errlen ) {
 
 
 //Safely convert numeric buffers...
+int * satoi( const char *value, int *p ) {
+	//Make sure that content-length numeric
+	const char *v = value;
+	while ( *v ) {
+		if ( (int)*v < 48 || (int)*v > 57 ) return NULL;
+		v++;
+	}
+	*p = atoi( value );
+	return p; 
+}
+
+
+//Safely convert numeric buffers...
+int * datoi( const char *value ) {
+	//Make sure that content-length numeric
+	const char *v = value;
+	while ( *v ) {
+		if ( (int)*v < 48 || (int)*v > 57 ) return NULL;
+		v++;
+	}
+
+	int *p = malloc( sizeof(int) );
+	*p = atoi( value );
+	return p; 
+}
+
+
+//Safely convert numeric buffers...
 int safeatoi( const char *value ) {
 	//Copy to string
 	char lc[ 128 ];

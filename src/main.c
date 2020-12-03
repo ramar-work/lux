@@ -138,6 +138,11 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			continue;
 		}
 
+	#if 1
+		if ( !srv_response( fd, ctx ) ) {
+			FPRINTF( "Error in TCP socket handling.\n" );
+		}
+	#else
 		//Fork and serve a request 
 		if ( ( cpid = fork() ) == -1 ) {
 			//TODO: There is most likely a reason this didn't work.
@@ -157,6 +162,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 				FPRINTF( "Error in TCP socket handling.\n" );
 			}
 		}
+	#endif
 	}
 
 	//Destroy anything that should have been long running.

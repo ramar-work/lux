@@ -1,6 +1,6 @@
-#include "vendor/zwalker.h"
-#include "vendor/zhasher.h"
-#include "vendor/util.h"
+#include "zwalker.h"
+#include "zhasher.h"
+#include "../src/util.h"
 
 
 #ifndef RENDER_H

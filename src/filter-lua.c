@@ -1,6 +1,10 @@
 #include "filter-lua.h"
 #include "filter-static.h"
 
+#include <string.h>
+
+#define _POSIX_C_SOURCE 200809L
+
 #define FILTER_LUA_DEBUG
 
 #ifndef FILTER_LUA_DEBUG
@@ -124,7 +128,7 @@ struct luaconf * build_luaconf ( const char *dir, char *err, int errlen ) {
 	//Run the rules and build the route list
 	loader_run( t, rules );
 	conf->routes = build_mvc( t );
-	conf->dir = strdup( dir );
+	conf->dir = dupstr( dir );
 
 	//Debug dump
 	FPRINTF( "db: %s\n", conf->db );

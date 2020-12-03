@@ -131,7 +131,7 @@ void free_hosts ( struct host ** hlist ) {
 		hosts++;
 	}
 #endif
-	free( hosts );
+	free( hlist );
 }
 
 

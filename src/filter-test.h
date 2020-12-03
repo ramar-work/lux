@@ -1,5 +1,5 @@
 /*all data needed for filter testing*/
-#include "http.h"
+#include "../vendor/zhttp.h"
 #include "config.h"
 
 #define TPRINTF(...) \

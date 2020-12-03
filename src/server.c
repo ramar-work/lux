@@ -37,11 +37,11 @@ TODO
  * -------------------------------------------------------- */
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
+#include "../vendor/zhttp.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
 #include "luabind.h"
-#include "http.h"
 #include "socket.h"
 #include "util.h"
 #include "ctx-http.h"
@@ -206,9 +206,7 @@ int srv_end( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config *co
 
 
 
-
-
-
+//Generate a message in common log format
 void srv_commonlogformat( struct HTTPBody *rq, struct HTTPBody *rs ) {
 // ip - - [date] "method path protocol" status clen
 	const char fmt[] = 

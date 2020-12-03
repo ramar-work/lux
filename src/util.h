@@ -75,8 +75,13 @@
 #define append_to_char(DEST,DESTLEN,SRC) \
 	append_to_uint8t( (uint8_t **)DEST,DESTLEN,(uint8_t *)SRC,strlen(SRC) )
 
+#define dupstr(a) \
+	copystr( (uint8_t *)a, strlen(a) )	
+
 uint8_t *read_file ( const char *filename, int *len, char *err, int errlen );
 int safeatoi( const char *value );
+int * satoi( const char *value, int *p );
+int * datoi( const char *value );
 char *get_lstr( char **str, char chr, int *lt );
 char *msg_get_value ( const char *value, const char *chrs, uint8_t *msg, int len );
 char *copystr ( uint8_t *src, int len ) ;

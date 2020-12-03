@@ -1,6 +1,6 @@
-#include "http.h"
 #include "socket.h"
 #include "config.h"
+#include "../vendor/zhttp.h"
 
 #ifndef SERVER_H
 #define SERVER_H

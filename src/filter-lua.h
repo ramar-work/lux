@@ -1,4 +1,3 @@
-#include "http.h"
 #include "mime.h"
 #include "util.h"
 #include "luabind.h"
@@ -8,6 +7,7 @@
 #include "router.h"
 #include "mvc.h"
 #include "../vendor/zrender.h"
+#include "../vendor/zhttp.h"
 
 #ifndef FILTER_LUA_H
 #define FILTER_LUA_H

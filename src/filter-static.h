@@ -1,4 +1,4 @@
-#include "http.h"
+#include "../vendor/zhttp.h"
 #include "mime.h"
 #include "util.h"
 #include "config.h"
