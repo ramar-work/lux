@@ -120,7 +120,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	for ( ;; ) {
 #else
 	int die = 0;
-	for ( ; ++die < DIE_X_TIMES; ) {
+	for ( ; die++ < DIE_X_TIMES; ) {
 #endif
 		//Client address and length?
 		int fd = 0, status;	
