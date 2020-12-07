@@ -77,12 +77,10 @@ int meg_homes_handler ( zKeyval * kv, int i, void *p ) {
 	FPRINTF( "DEPTH AT %d, RIGHT LEFT KEYS FOR KEY 'HOMES'\n", f->depth );
 	if ( kv->key.type == LITE_TXT ) {
 		home = malloc( sizeof( struct home ) );
-		//home->home = strdup( kv->key.v.vchar );
 		home->home = kv->key.v.vchar;
 	}
 
 	if ( kv->value.type == LITE_TXT ) {
-		//home->type = strdup( kv->value.v.vchar );
 		home->type = kv->value.v.vchar;
 		add_item( homes, home, struct home *, &f->len );
 	}
@@ -98,9 +96,7 @@ int set_meg_v( zTable *t, void *p ) {
 	const struct rule rules[] = {
 		{ "wwwroot", "s", .v.s = &m->wwwroot  },
 		{ "cycle", "i", .v.i = &m->cycle },
-#if 1
 		{ "homes", "t", .v.t = ( void *** )&m->homes, meg_homes_handler },
-#endif
 		{ NULL }
 	};
 
@@ -140,44 +136,15 @@ void free_meg_v( zTable *t, void *p ) {
 	}
 	free( m->homes );
 	free( m->wwwroot );
-	lt_free( t );
-	free( t );
 }
 
 
-#if 0
-//Tests rules for pulling keys at a top-level.
-//I expect to see one unique key for one unique value (of any type)
-int set_server_rules( zTable *t ) {
-	struct meg m;
-	memset( &m, 0, sizeof( struct meg ) );
+//This is a simple structure.
+struct hostset { 
+	struct host **hosts; 
+};
 
-	const struct rule rules[] = {
-		{ "wwwroot", "s", .v.s = &m.wwwroot  },
-		{ "cycle", "i", .v.i = &m.cycle },
-		{ "homes", "t", .v.t = ( void *** )&m.homes, meg_homes_handler },
-		{ NULL }
-	};
 
-	//Try the loadset
-	if ( !loader_run( t, rules ) ) {
-		return 0;
-	} 
-
-	while ( m.homes && (*m.homes) ) {
-		static int i;
-		fprintf( stderr, "home %d: %s\n", i++, (*m.homes)->home );
-		free( (*m.homes)->home );
-		free( (*m.homes)->type );
-		free( (*m.homes) );
-		m.homes++;
-	}
-	free( m.wwwroot );
-	return 1;
-}
-#endif
-
-#if 0
 int test_hosts_handler ( zKeyval * kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 	struct host ***hosts = f->userdata;
@@ -204,13 +171,230 @@ int test_hosts_handler ( zKeyval * kv, int i, void *p ) {
 		};
 
 		//Why would this fail?
-		w->name = strdup( kv->key.v.vchar );
+		w->name = kv->key.v.vchar;
 		loader_run( nt, rules ); 
+
+		//This is extra stupid, b/c all you really need to do is loop through the table entries	
 		add_item( hosts, w, struct host *, &f->len );
+
+		//Let's just try destroying this table
+		lt_free( nt );
+		free( nt );
 	}
 	FPRINTF( "Done with hosts_handler\n" );
 	return 1;
 }
+
+
+
+
+//Tests rules for pulling multiple keys that are the same.
+int set_hostset_v( zTable *t, void *p ) {
+	struct hostset *hostset = (struct hostset *)p;
+	const struct rule rules[] = {
+		{ "hosts", "t", .v.t = (void ***)&hostset->hosts, test_hosts_handler }, 
+		{ NULL }
+	};
+
+	//Try the loadset
+	if ( !loader_run( t, rules ) ) {
+		return 0;
+	}
+	return 1;
+}
+
+
+void dump_hostset_v ( zTable *t, void *p ) {
+	struct hostset *hostset = (struct hostset *)p;
+	struct host **hosts = hostset->hosts;
+	while ( hosts && (*hosts) ) {
+		fprintf( stderr, "Host: %s\n", (*hosts)->name );
+		fprintf( stderr, "  w->alias: %s\n", (*hosts)->alias );
+		fprintf( stderr, "  w->dir: %s\n", (*hosts)->dir );
+		fprintf( stderr, "  w->filter: %s\n", (*hosts)->filter );
+		fprintf( stderr, "  w->root_default: %s\n", (*hosts)->root_default );
+		fprintf( stderr, "  w->ca_bundle: %s\n", (*hosts)->ca_bundle );
+		fprintf( stderr, "  w->certfile: %s\n", (*hosts)->certfile );
+		fprintf( stderr, "  w->keyfile: %s\n", (*hosts)->keyfile );
+		hosts++;
+	}
+}
+
+
+void free_hostset_v ( zTable *t, void *p ) {
+	struct hostset *hostset = (struct hostset *)p;
+	struct host **hosts = hostset->hosts;
+	while ( hosts && (*hosts) ) {
+		( (*hosts)->alias ) ? free( (*hosts)->alias ) : 0;
+		( (*hosts)->dir ) ? free( (*hosts)->dir ) : 0;
+		( (*hosts)->filter ) ? free( (*hosts)->filter ) : 0;
+		( (*hosts)->root_default ) ? free( (*hosts)->root_default ) : 0;
+		( (*hosts)->ca_bundle ) ? free( (*hosts)->ca_bundle ) : 0;
+		( (*hosts)->certfile ) ? free( (*hosts)->certfile ) : 0;
+		( (*hosts)->keyfile ) ? free( (*hosts)->keyfile ) : 0;
+		free( (*hosts) ); 
+		hosts++;
+	}
+	free( hostset->hosts );
+}
+
+
+
+struct routelist {
+	struct routeh { 
+		char *name; 
+		//struct mvc *mvc;
+		struct mvc {
+			char **models;
+			char **views;
+			char **queries;
+			char *returns;
+			char *auth;
+			char *content;
+			char *a;
+		} mvc;
+	} **routes;
+};
+
+
+
+int mvc_array_handler( zKeyval *kv, int i, void *p ) {
+	struct fp_iterator *f = (struct fp_iterator *)p;
+	void ***pp = f->userdata;
+	int kt = kv->key.type;
+
+	//If table count is one, then it better be a string.
+	if ( ( kt == LITE_INT || kt == LITE_TXT ) && kv->value.type == LITE_TXT ) {
+		char *p = strdup( kv->value.v.vchar );
+		add_item( pp, p, char *, &f->len ); 
+	}
+	return 1;
+}
+
+
+//...
+int test_routes_handler ( zKeyval * kv, int i, void *p ) {
+	FPRINTF( "Invoking routes_handler\n" );
+	struct fp_iterator *f = (struct fp_iterator *)p;
+	struct routeh ***routes = f->userdata;
+	zTable *st = NULL, *nt = NULL;
+	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
+		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
+#if 1
+		struct routeh *route = malloc( sizeof( struct routeh ) );
+		memset( route, 0, sizeof( struct routeh ) );
+		route->name = kv->key.v.vchar;
+#endif
+		//FPRINTF( "Route name: %s\n", kv->key.v.vchar );
+		nt = loader_shallow_copy( st, i+1, i+count );
+		//lt_dump( nt );
+
+#if 1
+		const struct rule rules[] = {
+			//Can be string, function or table
+			{ "model", "x", .v.t = (void ***)&route->mvc.models, mvc_array_handler },
+			{ "view", "x", .v.t = (void ***)&route->mvc.views, mvc_array_handler },
+			{ "query", "x", .v.t = (void ***)&route->mvc.queries, mvc_array_handler },
+			{ "returns", "s", .v.s = &route->mvc.returns },
+			{ "content", "s", .v.s = &route->mvc.content },
+	#if 0
+			{ "auth", "s", .v.s = &w->kk },
+			{ "content-type", "s", .v.s = &w->kk },
+			{ "hint", "s", .v.s = &w->kk },
+	#endif
+			{ NULL }
+		};
+		
+		if ( !loader_run( nt, rules ) ) {
+		}
+#endif
+		//route->mvc = rh;
+		add_item( routes, route, struct routeh *, &f->len );
+		lt_free( nt );
+		free( nt );
+	}
+	FPRINTF( "Done with routes_handler\n" );
+	return 1;
+}
+
+
+//A callback used to populate everything in routes
+int set_routelist_v( zTable *t, void *p ) {
+	struct routelist *r = ( struct routelist * )p;
+	struct routeh **routes = r->routes;
+	//mvc probably has to be allocated here
+	const struct rule rules[] = {
+		{ "routes", "t", .v.t = (void ***)&r->routes, test_routes_handler }, 
+		{ NULL }
+	};
+
+	//Try the loadset
+	if ( !loader_run( t, rules ) ) {
+		return 0;
+	}
+
+	return 1;
+}
+
+
+void dump_routelist_v (zTable *t, void *p) {
+	//Dump everything
+	struct routelist *r = ( struct routelist * )p;
+	struct routeh **routes = r->routes;
+
+	while ( routes && (*routes) ) {
+		static int i;
+		FPRINTF( "route %d: %s\n", i++, (*routes)->name );
+
+		//Notice more of the local referencing.  
+		//Using a pointer here will increment so that we lose track of the data.
+		struct mvc c = (*routes)->mvc;
+		FPRINTF( "\tmodel " );
+		while ( c.models && *c.models ) {
+			fprintf( stderr, "%s, ", *c.models ); 
+			c.models++;
+		}
+
+		fprintf( stderr, "views: " );
+		while ( c.views && *c.views ) { 
+			fprintf( stderr, "%s, ", *c.views ); c.views++;
+		}
+		fprintf( stderr, "\n" );
+		routes++;
+	}
+}
+
+
+void free_routelist_v (zTable *t, void *p) {
+	struct routelist *r = ( struct routelist * )p;
+	struct routeh **routes = r->routes;
+
+	while ( routes && (*routes) ) {
+		struct mvc *c = &(*routes)->mvc;
+		char **m = c->models, **v = c->views;
+		while ( m && *m ) { free( *m ); m++; }
+		while ( v && *v ) { free( *v ); v++; }
+		free( c->models );
+		free( c->views );
+		free( *routes );
+		routes++;	
+	}
+	free( r->routes );
+}
+
+
+
+
+#if 0
+struct mvc {
+	char **models;
+	char **views;
+	char **queries;
+	char *returns;
+	char *auth;
+	char *content;
+	char *a;
+};
 
 
 struct mvc {
@@ -392,7 +576,6 @@ int set_lua_rules ( zTable *t ) {
 
 
 struct Test {
-	
 	//Filename to use for the test
 	const char *filename;
 
@@ -414,15 +597,18 @@ struct Test {
 	//Random pointer data
 	void *data;
 } tests[] = {
-#if 1
-	TESTCASE( meg )
-//	{ TESTDIR "server.lua", set_meg_v, dump_meg_v, free_meg_v }
+#if 0
+	TESTCASE( meg ),
+ 	TESTCASE( hostset ),
 #else
+ 	TESTCASE( routelist ),
+#if 0
 	{ TESTDIR "server.lua", set_server_rules },
 	{ TESTDIR "server.lua", set_host_rules },
 	{ TESTDIR "host.lua", set_route_rules },
 #endif
-,	{ NULL }
+#endif
+ 	{ NULL }
 };
 
 
@@ -457,9 +643,9 @@ int main (int argc, char *argv[]) {
 		}
 	
 		//Allocate the structure we need for testdata
-		if ( !( p = malloc( t->sizep ) ) ) {
+		if ( t->sizep > 0 && !( p = malloc( t->sizep ) ) ) {
 			FPRINTF( "Error allocating userdata for testing.\n" );
-			goto next;
+			goto onext;
 		}
 
 		memset( p, 0, t->sizep );
@@ -467,7 +653,7 @@ int main (int argc, char *argv[]) {
 		//Run the table through the set of rules and let's see what we find 
 		if ( !t->set( tt, p ) ) {
 			FPRINTF( "Error setting userdata from Lua config file.\n" );
-			goto next;
+			goto onext;
 		}
 
 		//Dump...
@@ -476,8 +662,11 @@ int main (int argc, char *argv[]) {
 		//...and free
 		t->free( tt, p );
 
+onext:
+		lt_free( tt );
+
 next:
-		//lt_free( tt );
+		free( tt );
 		free( p );
 		lua_close( L );
 		t++;
