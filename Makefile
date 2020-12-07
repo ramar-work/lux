@@ -2,7 +2,8 @@
 NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
 LDFLAGS = -lgnutls -llua -ldl -lpthread -lsqlite3
-CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -Wno-format-security -fsanitize=address -fsanitize-undefined-trap-on-error -DSKIPMYSQL_H -DSKIPPGSQL_H -DDEBUG_H
+DEBUGFLAGS = -DSKIPMYSQL_H -DSKIPPGSQL_H -DDEBUG_H -DDIE_X_TIMES=1
+CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -Wno-format-security -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
 #GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -Wno-format-truncation -Wno-strict-overflow -std=c99 -Wno-deprecated-declarations -Wno-return-local-addr -O2 -DSKIPMYSQL_H -DSKIPPGSQL_H -DDEBUG_H
 CFLAGS = $(CLANGFLAGS)
 #CFLAGS = $(GCCFLAGS)
@@ -15,7 +16,7 @@ RANDOM_PORT = 1
 PORT_FILE = /tmp/hypno.port
 BROWSER = chromium
 RECORDS = 3
-TESTS = config database filter loader luabind router server util #render 
+TESTS = config loader database loader luabind router server util #render filter
 SRC =  vendor/zrender.c vendor/zhasher.c vendor/zwalker.c vendor/zhttp.c src/config.c src/hosts.c src/db-sqlite.c src/luabind.c src/mime.c src/socket.c src/util.c src/ctx-http.c src/ctx-https.c src/server.c src/loader.c src/mvc.c src/filter-static.c src/filter-lua.c src/router.c #src/filter-echo.c src/filter-dirent.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
 LIB = src/lua-db.c
 OBJ = ${SRC:.c=.o}

@@ -1,4 +1,4 @@
-#include "http.h"
+#include "../vendor/zhttp.h"
 #include "config.h"
 #include "filter-lua.h"
 #if 0
@@ -11,30 +11,42 @@
 #define TEST_LUA_DIR "tests/filter-lua/"
 #define TEST_STATIC_DIR "tests/filter-static/"
 
+#define HTTPRECORD( TEXT, VALUE ) \
+	&(struct HTTPRecord){ ZHTTP_URL_ENCODED, TEXT, strlen( VALUE ), (unsigned char *)VALUE }
+
+#define HTTPBRECORD( TEXT, CTYPE, VALUE, VSIZE ) \
+	&(struct HTTPRecord){ ZHTTP_MULTIPART, TEXT, VSIZE, (unsigned char *)VALUE, NULL, NULL, CTYPE }
+
+#define HTTPNULL() \
+	&(struct HTTPRecord){ 0, NULL }
+
 #define TESTCASE( NAME, METHOD, PATH, HEADERS, BODIES, TEXTHTML ) \
 	{ #NAME, { TEXTHTML, METHOD, PATH, HTTP_11, .headers=HEADERS, .body=BODIES } }
 
 #define FILTER( FUNCT, PATH, DFILE ) \
 	{ FUNCT, #FUNCT, PATH, DFILE }
 
+
+const char X_APP_WWW[] = "application/x-www-form-urlencoded";
+const char MULTIPART[] = "multipart/form-data";
+const char TEXTHTML[] = "text/html";
+const char HTTP_11[] = "HTTP/1.1";
+
+
 struct HTTPRecord *headers[] = {
-	&(struct HTTPRecord){ "X-Case-Contact", NULL, (uint8_t *)"Lydia", 5 },
-	&(struct HTTPRecord){ "ETag", NULL, (uint8_t *)"dd323d9asdf", 11 },
-	&(struct HTTPRecord){ "Accept", NULL, (uint8_t *)"*/*", 3 },
-	&(struct HTTPRecord){ NULL }
+	HTTPRECORD("X-Case-Contact", "Lydia" )
+,	HTTPRECORD("ETag", "dd323d9asdf" )
+,	HTTPRECORD("Accept", "*/*" )
+,	HTTPNULL()
 };
+
 
 struct HTTPRecord *bodies[] = {
-	&(struct HTTPRecord){ "field1", "text/html", (uint8_t *)"Lots of text", 12 },
-	&(struct HTTPRecord){ "another_field", "text/plain", (uint8_t *)"dd323d9asdf", 11 },
-	&(struct HTTPRecord){ "gunz", "text/plain", (uint8_t *)"Hello, world!", 13 },
-	&(struct HTTPRecord){ NULL }
+	HTTPBRECORD( "field1", "text/html", "Lots of text", 12 )
+,	HTTPBRECORD( "another_field", "text/plain", "dd323d9asdf", 11 )
+,	HTTPBRECORD( "gunz", "text/plain", "Hello, world!", 13 )
+,	HTTPNULL()
 };
-
-char X_APP_WWW[] = "application/x-www-form-urlencoded";
-char MULTIPART[] = "multipart/form-data";
-char TEXTHTML[] = "text/html";
-char HTTP_11[] = "HTTP/1.1";
 
 
 struct Test {
@@ -57,6 +69,7 @@ struct Test static_cases[] = {
 	{ NULL }
 };
 
+
 struct Test cases[] = {
 	TESTCASE(root, "GET", "/", NULL, NULL, TEXTHTML),
 	TESTCASE(appxwww_post, "POST", "/post", headers, bodies, X_APP_WWW),
@@ -70,6 +83,7 @@ struct Test cases[] = {
 #endif
 	{ NULL }
 };
+
 
 struct filter_test {
 	int (*filter)( 
