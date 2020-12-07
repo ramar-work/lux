@@ -263,6 +263,8 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 
 	//Per-request shut down goes here.
 	ctx->post && ctx->post( fd, config, &ctx->data );
+
+	//End the request and return a status
 	//srv_end( fd, &rq, &rs, config );
 	//Forking may force me to free this in two places
 	//ctx->free( &ctx->data );
@@ -276,8 +278,6 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 	http_free_body( &rs );
 	http_free_body( &rq );
 	return 1; 
-
-
 }
 
 

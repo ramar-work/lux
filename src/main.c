@@ -116,7 +116,12 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	}
 
 	//This can have one global variable
+#ifndef DEBUG_H 
 	for ( ;; ) {
+#else
+	int die = 0;
+	for ( ; ++die < DIE_X_TIMES; ) {
+#endif
 		//Client address and length?
 		int fd = 0, status;	
 		pid_t cpid; 
@@ -178,6 +183,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 }
 
 
+//Display help
 int help () {
 	const char *fmt = "  --%-10s       %-30s\n";
 	fprintf( stderr, "%s: No options received.\n", __FILE__ );

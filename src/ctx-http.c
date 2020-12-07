@@ -88,13 +88,9 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 			mult++;
 			//show read progress and data received, etc.
 			FPRINTF( "Received %d bytes on fd %d\n", rd, fd ); 
-getchar();
 		}
 	}
 
-	FPRINTF( "Read complete.\n" );
-close(fd);
-exit(0);
 	return 1;
 }
 
@@ -105,18 +101,23 @@ int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	FPRINTF( "Write started...\n" );
 	int sent = 0, pos = 0, try = 0;
 	int total = rs->mlen;
+	unsigned char *ptr = rs->msg;
 
 	for ( ;; ) {	
-		sent = send( fd, &rs->msg[ pos ], total, MSG_DONTWAIT );
+		sent = send( fd, ptr, total, MSG_DONTWAIT );
 		FPRINTF( "Bytes sent: %d\n", sent );
 
 		if ( sent == 0 ) {
 			FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", rs->mlen );
-			return 1;
+			break;	
 		}
 		else if ( sent > -1 ) {
-			pos += sent, total -= sent;	
+			pos += sent, total -= sent, ptr += sent;	
 			FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
+			if ( total == 0 ) {
+				FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", rs->mlen );
+				break;
+			}
 		}
 		else if ( sent == -1 && ( errno == EAGAIN || errno == EWOULDBLOCK ) ) {
 			FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
@@ -144,7 +145,6 @@ int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 				FPRINTF( "Caught some unknown condition.\n" );
 			}
 		}
-
 		try++;
 		FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
 	}
@@ -170,4 +170,3 @@ void free_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	FPRINTF( "Deallocation complete.\n" );
 }
 #endif
-
