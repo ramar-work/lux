@@ -8,9 +8,42 @@ A low maintenance web server and library for web development.
 hypno depends on the following:
 
 - Lua v5.3 or greater
+- GnuTLS 2.0 or greater
 
-Currently builds on Linux.
+Currently builds on most Linuxes without much help.  
 
+
+### OSX
+
+
+### Windows
+
+
+### Linux
+
+In lieu of a nice `./configure` script, basic instructions for getting Hypno running on a few common distributions are below.
+
+### Ubuntu / Debian / PopOS
+
+<pre>
+// Install the following dependencies
+$ apt install liblua5.3-devel gnutls-dev
+
+// Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
+
+// Make and install
+$ cd hypno && make && make install
+</pre>
+
+
+### Fedora
+
+
+### Arch
+
+
+### BSD
 
 <!-- ## Using the CLI -->
 <!--  -->

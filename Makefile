@@ -84,6 +84,7 @@ deps:
 clean:
 	-@find src/ -maxdepth 1 -type f -name "*.o" | xargs rm
 	-@find bin/ -maxdepth 1 -type f | xargs rm
+	-@find vendor/ -maxdepth 1 -type f -name "*.o" ! -name "sqlite3.o" | xargs rm
 	-@rm hcli hypno
 	-@find -maxdepth 1 -type f -name "vgcore*" | xargs rm
 
