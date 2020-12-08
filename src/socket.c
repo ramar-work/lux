@@ -145,8 +145,16 @@ struct sockAbstr * populate_socket ( struct sockAbstr *sa, int protocol, int soc
 	sa->iptype = PF_INET;
 	sa->reuse = SO_REUSEADDR;
 	sa->port = port;
-	sa->ctx = NULL;
+	memset( sa->iip, 0, 16 ); 
 	return sa;
+}
+
+
+int get_iip_of_socket( struct sockAbstr *a ) {
+	//struct sockaddr_in *cin = (struct sockaddr_in *)&a->addrinfo;
+	char *ip = inet_ntoa( a->sin->sin_addr );
+	memcpy( a->iip, ip, strlen( ip ) );
+	return 1;
 }
 
 
@@ -197,10 +205,12 @@ struct sockAbstr * open_listening_socket ( struct sockAbstr *sa, char *err, int 
 		return NULL;
 	}
 
+#if 1
 	if ( fcntl( sa->fd, F_SETFD, O_NONBLOCK ) == -1 ) {
 		snprintf( err, errlen, "fcntl error: %s\n", strerror(errno) ); 
 		return NULL;
 	}
+#endif
 
 	if (( status = bind( sa->fd, (struct sockaddr *)si, sizeof(struct sockaddr_in))) == -1 ) {
 		snprintf( err, errlen, "Couldn't bind socket to address! Error: %s\n", strerror( errno ) );

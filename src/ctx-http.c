@@ -1,26 +1,23 @@
 #include "ctx-http.h"
 
+//Define an interval for waiting
+static const struct timespec __interval__ = { 0, 100000000 };
+
 //No-op
 void create_notls ( void **p ) { ; }
 
-
 //Read a message that the server will use later.
-
-//TODO
-//Why not read directly into rq->msg?
-//Still not sure how to read all of the data from an incoming request, but we can't stop until it's done...
-//Can we reallocate instead of reading to buffer and copying?
-
 int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	FPRINTF( "Read started...\n" );
 	const int size = 1024; 
 	int mult = 1;
 	char err[ 2048 ] = {0};
+	struct cdata *conn = (struct cdata *)p;
 
 	//Read first
 	for ( ;; ) {
 
-		int rd, nsize = size * mult;
+		int flags, rd, nsize = size * mult;
 		unsigned char *ptr = NULL;
 
 		if ( ( ptr = rq->msg = realloc( rq->msg, nsize ) ) == NULL ) { 
@@ -31,38 +28,29 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 			return http_set_error( rs, 500, "Could not zero out new read buffer." ); 
 		}
 
-	#if 1
 		//Read a message
 		rd = recv( fd, ptr, size, MSG_DONTWAIT );
-		FPRINTF( "const bsize = %d, msgbuf size = %d, start pos = %d, recvd = %d, recvd so far = %d\n", size, nsize, nsize - size, rd, rq->mlen );
-		write( 2, "l: ", 3 );
-		write( 2, ptr, size );
-		write( 2, "\n", 1 );
+		//FPRINTF( "const bsize = %d, msgbuf size = %d, start pos = %d, recvd = %d, recvd so far = %d\n", size, nsize, nsize - size, rd, rq->mlen );
 	
-		#if 0
-		FPRINTF( "recv returned '%d'...\n", rd );
-		write( 2, ptr, rd );
-		FPRINTF( "supplied buffer (rq->msg) looks like: %p\n", rq->msg );	
-		getchar();
-		#endif
-
-		//Read into a static buffer
 		if ( rd == 0 ) {
-	#else
-		if ( ( rd = recv( fd, ptr, size, MSG_DONTWAIT ) ) == 0 ) {
-	#endif
-			break;
+			//you get a few times to try?  then just cut out and tell the server to try again?
+			conn->count = -2;
+			return 0;		
 		}
-		else if ( rd == -1 ) {
+		else if ( rd < 1 ) {
+			//Sleep before your next try	
+			nanosleep( &__interval__, NULL ); 
+
 			//A subsequent call will tell us a lot...
 			FPRINTF( "Couldn't read all of message...\n" );
 			//whatsockerr( errno );
 			if ( errno == EAGAIN || errno == EWOULDBLOCK )
 				FPRINTF("Trying again to read from socket. Got %d bytes.\n", rd );
 			else {
-				//All of this errors result in a 500
-				//( errno == EBADF || ECONNREFUSED || EFAULT || EINTR || EINVAL || ENOMEM || ENOTCONN || ENOTSOCK )
-				return http_set_error( rs, 500, strerror( errno ) );
+				//Any of these are probably fatal
+				//EBADF || ECONNREFUSED || EFAULT || EINTR || EINVAL || ENOMEM || ENOTCONN || ENOTSOCK )
+				conn->count = -2;
+				return 0;
 			}
 		}
 		else {
@@ -86,6 +74,7 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 			else {
 				//send a 500 with what went wrong
 				FPRINTF( "Got fatal HTTP parser error: %s\n", err );
+				conn->count = -1;
 				return http_set_error( rs, 500, err ); 
 			}
 			mult++;
@@ -105,6 +94,7 @@ int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	int sent = 0, pos = 0, try = 0;
 	int total = rs->mlen;
 	unsigned char *ptr = rs->msg;
+	struct cdata *conn = (struct cdata *)p;
 
 	for ( ;; ) {	
 		sent = send( fd, ptr, total, MSG_DONTWAIT );
@@ -127,25 +117,13 @@ int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 		}
 		else {
 			//TODO: Can't close a most-likely closed socket.  What do you do?
-			if ( errno == EBADF )
-				return 0;
-			else if ( errno == ECONNREFUSED )
-				return 0;
-			else if ( errno == EFAULT )
-				return 0;
-			else if ( errno == EINTR )
-				return 0;
-			else if ( errno == EINVAL )
-				return 0;
-			else if ( errno == ENOMEM )
-				return 0;
-			else if ( errno == ENOTCONN )
-				return 0;
-			else if ( errno == ENOTSOCK )
-				return 0;
+			if ( sent == -1 && ( errno == EAGAIN || errno == EWOULDBLOCK ) )
+				FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
 			else {
-				//this would just be some uncaught condition...
-				FPRINTF( "Caught some unknown condition.\n" );
+				//EBADF|ECONNREFUSED|EFAULT|EINTR|EINVAL|ENOMEM|ENOTCONN|ENOTSOCK
+				FPRINTF( "Got socket write error: %s\n", strerror( errno ) );
+				conn->count = -2;
+				return 0;	
 			}
 		}
 		try++;

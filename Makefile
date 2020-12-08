@@ -3,7 +3,7 @@ NAME = hypno
 OS = $(shell uname | sed 's/[_ ].*//')
 LDFLAGS = -lgnutls -llua -ldl -lpthread -lsqlite3
 DEBUGFLAGS = -DSKIPMYSQL_H -DSKIPPGSQL_H -DDEBUG_H -DDIE_X_TIMES=11
-CLANGFLAGS = -g -O0 -Wall -Werror -std=c99 -Wno-unused -Wno-format-security -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
+CLANGFLAGS = -g -O0 -Wall -Werror -Wno-unused -Wno-format-security -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
 #GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing -Wno-format-truncation -Wno-strict-overflow -std=c99 -Wno-deprecated-declarations -Wno-return-local-addr -O2 -DSKIPMYSQL_H -DSKIPPGSQL_H -DDEBUG_H
 CFLAGS = $(CLANGFLAGS)
 #CFLAGS = $(GCCFLAGS)

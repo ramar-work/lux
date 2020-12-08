@@ -119,8 +119,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 #ifndef DEBUG_H 
 	for ( ;; ) {
 #else
-	int die = 0;
-	for ( ; die++ < DIE_X_TIMES; ) {
+	for ( int die = 0 ; die++ < DIE_X_TIMES; ) {
 #endif
 		//Client address and length?
 		int fd = 0, status;	
@@ -132,22 +131,57 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			continue;
 		}
 
+	#if 0
 		//close the connection if something fails here
 		if ( !srv_setsocketoptions( fd ) ) {
 			FPRINTF( "socket %d could not be marked as non-blocking\n", fd );
 			return 0;
 		}
-
-		//If something bad happens when writing logs, what could it be?
-		if ( !srv_writelog( fd, &su ) ) {
-			continue;
-		}
+	#endif
 
 	#if 1
-		if ( !srv_response( fd, ctx ) ) {
-			FPRINTF( "Error in TCP socket handling.\n" );
+	#if 0
+		if ( fcntl( fd, F_SETFD, SIGIO ) == -1 ) {
+			FPRINTF( "Error in setting SIGIO on filedes %d.\n", fd );
+			return 0;
 		}
-	#else
+
+		if ( fcntl( fd, F_SETFL, SIGIO ) == -1 ) {
+			FPRINTF( "Error in setting SIGIO on filedes %d.\n", fd );
+			return 0;
+		}
+	#endif
+	#endif
+
+	#if 0
+		struct cdata connection = {0};	
+		connection.flags = O_NONBLOCK;
+	
+		//Get IP here and save it for logging purposes
+		if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
+			FPRINTF( "Error in getting IP address of connecting client.\n" );
+		}
+
+		for ( ;; ) {
+			//additionally, this one should block
+			if ( !srv_response( fd, ctx, &connection ) ) {
+				FPRINTF( "Error in TCP socket handling.\n" );
+			}
+
+			if ( connection.count < 0 || connection.count > 5 ) {
+				FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
+				int status = close( fd );
+				if ( status == -1 ) {
+					FPRINTF( "Error when closing child socket.\n" );
+				}
+				break;
+			}
+
+			FPRINTF( "Connection is done. count is %d\n", connection.count );
+		}
+	#endif
+
+	#if 1
 		//Fork and serve a request 
 		if ( ( cpid = fork() ) == -1 ) {
 			//TODO: There is most likely a reason this didn't work.
@@ -163,15 +197,34 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			}
 		}
 		else if ( cpid ) {
-			if ( !srv_response( fd, ctx ) ) {
-				FPRINTF( "Error in TCP socket handling.\n" );
+			struct cdata connection = {0};	
+			connection.flags = O_NONBLOCK;
+		
+			//Get IP here and save it for logging purposes
+			if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
+				FPRINTF( "Error in getting IP address of connecting client.\n" );
+			}
+
+			for ( ;; ) {
+				//additionally, this one should block
+				if ( !srv_response( fd, ctx, &connection ) ) {
+					FPRINTF( "Error in TCP socket handling.\n" );
+				}
+
+				if ( connection.count < 0 || connection.count > 5 ) {
+					FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
+					int status = close( fd );
+					if ( status == -1 ) {
+						FPRINTF( "Error when closing child socket.\n" );
+					}
+					break;
+				}
+
+				FPRINTF( "Connection is done. count is %d\n", connection.count );
 			}
 		}
 	#endif
 	}
-
-	//Destroy anything that should have been long running.
-	//ctx->free( &ctx->data );
 
 	//Close the socket
 	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {

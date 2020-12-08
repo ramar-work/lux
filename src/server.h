@@ -49,7 +49,21 @@ struct model {
 	void *data;
 };
 
-int srv_response ( int, struct senderrecvr * );
+
+//Added 12-08-20, track per connection data
+struct cdata {
+	int count;  //How many times until we hit the keep-alive mark?
+	int status;  //What is the status of the request? (perhaps only go up if complete?)
+	const void *global;  //Global READ-ONLY userdata
+	void *scope;    //Locally scoped userdata (only good for the life of the request)
+	char *ipv4;  //The IPv4 address of the incoming request (in string format)
+	char *ipv6;  //The IPv6 address of the incoming request (in string format)
+	int flags; //Flags for the connection in question
+};
+
+int srv_response ( int, struct senderrecvr *, struct cdata * );
+
 int srv_setsocketoptions ( int fd );
+
 int srv_writelog ( int fd, struct sockAbstr *su );
 #endif 

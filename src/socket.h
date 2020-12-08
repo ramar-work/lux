@@ -33,7 +33,7 @@ struct sockAbstr {
 	struct sockaddr_in *sin;	
 	struct sockaddr addrinfo; 
 	socklen_t addrlen;
-	void *ctx;
+	char iip[ 16 ];	
 };
 
 int read_from_socket ( int fd, uint8_t **b, void (*readMore)(int *, void *) );
@@ -47,6 +47,6 @@ struct sockAbstr * close_listening_socket ( struct sockAbstr *, char *, int );
 struct sockAbstr * accept_listening_socket ( struct sockAbstr *, int *fd, char *, int );
 struct sockAbstr * set_nonblock_on_socket ( struct sockAbstr *, char *, int );
 struct sockAbstr * set_timeout_on_socket ( struct sockAbstr *, int );
-
+int get_iip_of_socket( struct sockAbstr *a );
 
 #endif
