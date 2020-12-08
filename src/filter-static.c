@@ -141,6 +141,7 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct config *con
 		return http_set_error( rs, 500, err );
 	}
 
+	//http_set_content copies the data
 	//free( content );
 	return 1;
 }

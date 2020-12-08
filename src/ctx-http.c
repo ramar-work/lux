@@ -22,7 +22,6 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 
 		int rd, nsize = size * mult;
 		unsigned char *ptr = NULL;
-		FPRINTF( "const bsize = %d, msgbuf size = %d, start pos = %d\n", size, nsize, nsize - size );
 
 		if ( ( ptr = rq->msg = realloc( rq->msg, nsize ) ) == NULL ) { 
 			return http_set_error( rs, 500, "Could not allocate read buffer." ); 
@@ -35,6 +34,10 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	#if 1
 		//Read a message
 		rd = recv( fd, ptr, size, MSG_DONTWAIT );
+		FPRINTF( "const bsize = %d, msgbuf size = %d, start pos = %d, recvd = %d, recvd so far = %d\n", size, nsize, nsize - size, rd, rq->mlen );
+		write( 2, "l: ", 3 );
+		write( 2, ptr, size );
+		write( 2, "\n", 1 );
 	
 		#if 0
 		FPRINTF( "recv returned '%d'...\n", rd );

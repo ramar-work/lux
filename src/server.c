@@ -233,7 +233,7 @@ void srv_commonlogformat( struct HTTPBody *rq, struct HTTPBody *rs ) {
 
 	//Bugs?
 	char prot[127] = {0};
-	snprintf( prot, strlen(rq->protocol), "%s", rq->protocol );
+	snprintf( prot, strlen(rq->protocol) + 1, "%s", rq->protocol );
 
 	//Just print the log for now
 	snprintf( log, sizeof(log), fmt, 
