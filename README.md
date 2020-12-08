@@ -1,11 +1,15 @@
 # hypno
 
-A multi-lingual web server and library for web development.
+A low maintenance web server and library for web development.
 
 
-## Build
+## Building
 
-Currently builds on Linux and OSX.
+hypno depends on the following:
+
+- Lua v5.3 or greater
+
+Currently builds on Linux.
 
 
 <!-- ## Using the CLI -->

@@ -30,10 +30,12 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 
 		//Read a message
 		rd = recv( fd, ptr, size, MSG_DONTWAIT );
-		//FPRINTF( "const bsize = %d, msgbuf size = %d, start pos = %d, recvd = %d, recvd so far = %d\n", size, nsize, nsize - size, rd, rq->mlen );
+		#if 0
+		//FPRINTF( "bsize = %d, msgbuf size = %d, start pos = %d, recvd = %d, recvd so far = %d\n", size, nsize, nsize - size, rd, rq->mlen );
+		#endif
 	
 		if ( rd == 0 ) {
-			//you get a few times to try?  then just cut out and tell the server to try again?
+			//This says that we're receiving an overwhelming number of refreshes from a client.
 			conn->count = -2;
 			return 0;		
 		}
@@ -132,22 +134,3 @@ int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	FPRINTF( "Write complete.\n" );
 	return 1;
 }
-
-
-#if 0
-//Destroy anything
-void free_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
-	FPRINTF( "Deallocation started...\n" );
-
-	//Free the HTTP body 
-	http_free_body( rs );
-	http_free_body( rq );
-
-	//Close the file
-	if ( close( fd ) == -1 ) {
-		FPRINTF( "Couldn't close child socket. %s\n", strerror(errno) );
-	}
-
-	FPRINTF( "Deallocation complete.\n" );
-}
-#endif
