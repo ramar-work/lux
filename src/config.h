@@ -15,6 +15,7 @@ struct config {
 	const char *root_default;
 	struct routeh **routes;
 	struct host **hosts;
+	zTable *src;
 #if 0
 	//Questionable as to whether or not I'll need these...
 	void *ssl;

@@ -382,8 +382,9 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *conf
 		return http_set_error( res, 500, "No host directory specified." );
 
 	//Try parsing
-	if ( !( luaconf = build_luaconf( host->dir, err, sizeof(err) )) )
+	if ( !( luaconf = build_luaconf( host->dir, err, sizeof(err) )) ) { 
 		return http_set_error( res, 500, err );
+	}
 
 	//Check for and serve any static files 
 	//TODO: This should be able to serve a list of files matching a specific type

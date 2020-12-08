@@ -10,7 +10,7 @@ static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
 	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
 		struct host *w = malloc( sizeof( struct host ) );
 		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
-		FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count ); 
+		//FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count ); 
 		nt = loader_shallow_copy( st, i+1, i+count );
 		memset( w, 0, sizeof(struct host) );
 		const struct rule rules[] = {
@@ -24,9 +24,11 @@ static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
 			{ NULL }
 		};
 
-		w->name = strdup( kv->key.v.vchar );
+		w->name = kv->key.v.vchar;
 		if ( !loader_run( nt, rules ) ) {
 		}
+		lt_free( nt );
+		free( nt );
 		add_item( hosts, w, struct host *, &f->len );
 	}
 	return 1;
@@ -93,20 +95,6 @@ struct host ** build_hosts ( zTable *t ) {
 //Free hosts list
 void free_hosts ( struct host ** hlist ) {
 #if 0
-	struct host **hl = hosts;
-	while ( hl && *hl ) {
-		struct host *h = *hl;
-		( h->name ) ? free( h->name ) : 0;
-		( h->alias ) ? free( h->alias ) : 0 ;
-		( h->dir ) ? free( h->dir ) : 0;
-		( h->filter ) ? free( h->filter ) : 0 ;
-		( h->ca_bundle ) ? free( h->ca_bundle ) : 0 ;
-		( h->certfile ) ? free( h->certfile ) : 0 ;
-		( h->keyfile ) ? free( h->keyfile ) : 0 ;
-		( h->root_default ) ? free( h->root_default ) : 0;
-		free( *hl );
-		hl++;
-	}
 #else
 	struct host **hosts = hlist;
 	while ( hosts && (*hosts) ) {
@@ -119,7 +107,6 @@ void free_hosts ( struct host ** hlist ) {
 		FPRINTF( "w->ca_bundle: %s\n", (*hosts)->ca_bundle );
 		FPRINTF( "w->certfile: %s\n", (*hosts)->certfile );
 		FPRINTF( "w->keyfile: %s\n", (*hosts)->keyfile );
-		free( (*hosts)->name );
 		free( (*hosts)->alias );
 		free( (*hosts)->dir );
 		free( (*hosts)->filter );

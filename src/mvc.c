@@ -134,6 +134,7 @@ void dump_mvc ( struct mvc *mvc ) {
 	fprintf( stderr, "\n" );
 }
 
+
 void free_set( char **slist ) {
 	char **list = slist;	
 	#if 0
@@ -147,6 +148,7 @@ void free_set( char **slist ) {
 	#endif
 	free( slist );
 }
+
 
 void free_mvc ( struct mvc *mvc ) {
 	if ( mvc->returns )
@@ -167,15 +169,18 @@ void free_mvc ( struct mvc *mvc ) {
 void free_routeh ( struct routeh **list ) {
 	FPRINTF( "Freeing routeh list\n" );
 	struct routeh **routes = list;
+#if 0
+dump_routeh( list );
+fprintf(stderr,"routes: %p\n", routes );
 	while ( routes && *routes ) {
+#if 0
 		FPRINTF( "Freeing route at %s\n", (*routes)->name );
 		free_mvc( (*routes)->mvc );
 		free( (*routes)->name );
+#endif
 		routes++;
 	}
-	free( list );
+	//free( list );
 	FPRINTF( "Freeing routeh list\n" );
+#endif
 }
-
-
-

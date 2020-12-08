@@ -86,7 +86,8 @@ struct config * build_config ( char *file, char *err, int errlen ) {
 #endif
 
 	//Destroy lua_State and the tables...
-	free_t( t );
+	//free_t( t );
+	config->src = t;	
 	lua_close( L );
 	FPRINTF( "Configuration parsing complete.\n" );
 	return config;
@@ -95,9 +96,18 @@ struct config * build_config ( char *file, char *err, int errlen ) {
 
 //Destroy our config file.
 void free_config( struct config *config ) {
+#if 0
 	if ( config->hosts ) {
 		free_hosts( config->hosts );	
 	}
+	if ( config->routes ) {
+		free_routes( config->routes );
+	}
+#endif
+	//free( config->path );
+	//free( config->root_default );
+	lt_free( config->src );
+	free( config->src );
 	free( config );
 }
 

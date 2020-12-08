@@ -126,6 +126,10 @@ int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct config *config,
 		return http_set_error( res, 500, err ); 
 	}
 
+
+//fprintf( stderr, "%p %p\n", config->routes, *config->routes ); 
+//dump_routeh( config->routes );
+
 	if ( host->dir && !check_dir( host, err, sizeof(err) ) ) {
 		return http_set_error( res, 500, err ); 
 	}
@@ -183,9 +187,11 @@ int srv_start( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config *
 }
 
 
+#endif
+
 //End the request by deallocating all of the things
 int srv_end( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config *config ) {
-	FPRINTF( "Deallocation started...\n" );
+	//FPRINTF( "Deallocation started...\n" );
 
 	//Close the file first
 	if ( close( fd ) == -1 ) {
@@ -196,14 +202,18 @@ int srv_end( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config *co
 	http_free_body( rs );
 	http_free_body( rq );
 
-	//Destroy config...
-	//free_config( config );
+	//Free hosts
+	free_hosts( config->hosts );
+
+	//Free routes 
+	free_routeh( config->routes );
+
+	//Config should be freed here
+	free_config( config );
 
 	FPRINTF( "Deallocation complete.\n" );
 	return 0;
 }
-#endif
-
 
 
 //Generate a message in common log format
@@ -265,7 +275,9 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 	ctx->post && ctx->post( fd, config, &ctx->data );
 
 	//End the request and return a status
-	//srv_end( fd, &rq, &rs, config );
+#if 1
+	srv_end( fd, &rq, &rs, config );
+#else
 	//Forking may force me to free this in two places
 	//ctx->free( &ctx->data );
 
@@ -277,6 +289,7 @@ int srv_response ( int fd, struct senderrecvr *ctx ) {
 	//Free everything
 	http_free_body( &rs );
 	http_free_body( &rq );
+#endif
 	return 1; 
 }
 
