@@ -868,14 +868,12 @@ void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int 
 	struct HTTPRecord *r = NULL;
 
 	//Block bad types in lieu of an enum
-	if ( type < 0 || type > 2 ) {
+	if ( type < 0 || type > 2 )
 		return NULL;
-	}
 
 	//Block empty arguments
-	if ( !k || ( !v && vlen < 0 ) ) {
+	if ( !k || ( !v && vlen < 0 ) )
 		return NULL;
-	}
 
 	//We use entity->boundary as a hack to store the current index.
 	if ( !entity->boundary ) {
@@ -883,17 +881,17 @@ void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int 
 		memset( entity->boundary, 0, 4 );
 	}
 
-	if ( !( r = malloc( sizeof( struct HTTPRecord ) ) ) ) {
+	//Create a record
+	if ( !( r = malloc( sizeof( struct HTTPRecord ) ) ) )
 		return NULL;
-	}
 
 	//Set the members
 	len = entity->boundary[ type ];
-	r->field = zhttp_dupstr( k );
-	r->size = vlen;
-#if 1
-	r->value = v;
-#else
+ #if 1
+	r->field = zhttp_dupstr( k ), r->size = vlen, r->value = v;
+ #else
+	r->field = zhttp_dupstr( k ), r->size = vlen, r->value = v;
+	//Expensive copying.  Works just about nowhere...
 	if ( ( r->value = malloc( vlen ) ) == NULL ) {
 		free( r );
 		free( entity->boundary );
@@ -902,11 +900,10 @@ void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int 
 
 	memset( r->value, 0, vlen );
 	memcpy( r->value, v, vlen );
-#endif
+ #endif
 
 	zhttp_add_item( list, r, struct HTTPRecord *, &len );
-	//entity->size = vlen;
-	entity->boundary[ type ] = len;
+	entity->boundary[ type ] = len; //entity->size = vlen;
 	return r;
 }
 
@@ -915,7 +912,6 @@ void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int 
 void http_free_records( struct HTTPRecord **records ) {
 	struct HTTPRecord **r = records;
 	while ( r && *r ) {
-//fprintf( stderr, "field: %s\n", (*r)->field );
 		( *(*r)->field == '.' ) ? free( (*r)->value ) : 0;
 		(*r)->field ? free( (void *)(*r)->field ) : 0;
 		if ( (*r)->type == ZHTTP_MULTIPART ) { 
@@ -950,11 +946,13 @@ void http_free_body ( struct HTTPBody *entity ) {
 }
 
 
-
+//Set a HTTP status and message
 int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
 	char err[ 2048 ];
 	memset( err, 0, sizeof( err ) );
-	ZHTTP_PRINTF( "status: %d, mlen: %ld, msg: '%s'\n", status, strlen(message), message );
+	char *final = zhttp_dupstr( message );
+	const int len = strlen( message );
+	//ZHTTP_PRINTF( "status: %d, mlen: %ld, msg: '%s'\n", status, strlen(message), final );
 
 	if ( !http_set_status( entity, status ) ) {
 		ZHTTP_PRINTF( "SET STATUS FAILED!" );
@@ -966,7 +964,7 @@ int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
 		return 0;
 	}
 
-	if ( !http_set_content( entity, (unsigned char *)message, strlen( message ) ) ) {
+	if ( !http_set_content( entity, (unsigned char *)final, len ) ) {
 		ZHTTP_PRINTF( "SET CONTENT FAILED!" );
 		return 0;
 	}
@@ -976,10 +974,6 @@ int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
 		return 0;
 	}
 
-#if 0
-	fprintf(stderr, "msg: " );
-	ZHTTP_WRITE( entity->msg, entity->mlen );
-#endif
 	return 0;
 }
 

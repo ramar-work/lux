@@ -49,6 +49,9 @@ install:
 # examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
 examples: PORT=2222
 examples: 
+	@lua -e "a=loadfile( 'example/config.lua' )(); \
+		hosts = {}; for k,v in pairs(a.hosts) do table.insert( hosts, 'http://' .. k ) end; \
+		print( 'Hosts at example/config.lua are: ' .. table.concat( hosts, ', ' ) );"
 	bin/hypno --start --port $(PORT) --config example/config.lua 
 
 # repl - Build and test libraries for REPL usage
