@@ -29,7 +29,6 @@
  * -------------------------------------------------------- */
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
-#include "server.h"
 #include "ctx-http.h"
 #include "ctx-https.h"
 #include "server.h"
@@ -46,6 +45,12 @@
 
 #define eprintf(...) fprintf( stderr, "%s: ", "hypno" ) && fprintf( stderr, __VA_ARGS__ ) && fprintf( stderr, "\n" )
 
+const int defport = 2000;
+
+int arg_verbose = 0;
+
+int arg_debug = 0;
+
 struct values {
 	int port;
 	int ssl;
@@ -56,15 +61,12 @@ struct values {
 	char *config;
 };
 
-const int defport = 2000;
-int arg_verbose = 0;
-int arg_debug = 0;
 
-
+//Deifne a list of filters
 struct filter filters[] = {
 	{ "static", filter_static },
-  { "lua", filter_lua },
 #if 0
+  { "lua", filter_lua },
 , { "dirent", filter_dirent }
 , { "echo", filter_echo }
 , { "c", filter_c }
@@ -73,10 +75,10 @@ struct filter filters[] = {
 };
 
 
+//Define a list of "context types"
 struct senderrecvr sr[] = {
 	{ read_notls, write_notls, create_notls }
 , { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls }
-//, { NULL, read_static, write_static, free_notls  }
 ,	{ NULL }
 };
 
@@ -187,6 +189,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		else if ( cpid ) {
 			struct cdata connection = {0};	
 			connection.flags = O_NONBLOCK;
+			connection.ctx = ctx;
 		
 			//Get IP here and save it for logging purposes
 			if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
@@ -195,7 +198,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 			for ( ;; ) {
 				//additionally, this one should block
-				if ( !srv_response( fd, ctx, &connection ) ) {
+				if ( !srv_response( fd, &connection ) ) {
 					FPRINTF( "Error in TCP socket handling.\n" );
 				}
 

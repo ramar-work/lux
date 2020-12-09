@@ -57,9 +57,11 @@ void destroy_gnutls ( struct gnutls_abstr *g ) {
 }
 
 
-int post_gnutls ( int fd, struct config *config, void **p ) {
+const int post_gnutls ( int fd, struct cdata *conn, void **p ) {
+#if 0
 	struct gnutls_abstr *g = (struct gnutls_abstr *)*p;
 	destroy_gnutls( g );
+#endif
 	return 0;
 }
 
@@ -100,8 +102,9 @@ static int process_credentials ( struct gnutls_abstr *g, struct host **hosts ) {
 }
 
 
-int pre_gnutls ( int fd, struct config *config, void **p ) {
+const int pre_gnutls ( int fd, struct cdata *conn , void **p ) {
 
+#if 0
 	//Allocate a structure for the request process
 	struct gnutls_abstr *g;
 	int ret, size = sizeof( struct gnutls_abstr );
@@ -171,13 +174,14 @@ int pre_gnutls ( int fd, struct config *config, void **p ) {
 
 	FPRINTF( "GnuTLS handshake succeeded.\n" );
 	*p = g;
+#endif
 	return 1;
 }
 
 
-int read_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
+const int read_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *p ) {
 	FPRINTF( "Read started...\n" );
-	struct gnutls_abstr *g = (struct gnutls_abstr *)p;
+	struct gnutls_abstr *g = (struct gnutls_abstr *)p->ctx->data;
 	unsigned char *buf = malloc( 1 );
 	int mult = 0;
 	int try=0;
@@ -260,9 +264,9 @@ int read_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 }
 
 
-int write_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
+const int write_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *p ) {
 	FPRINTF( "Write started...\n" );
-	struct gnutls_abstr *g = (struct gnutls_abstr *)p;
+	struct gnutls_abstr *g = (struct gnutls_abstr *)p->ctx->data;
 	int total = rs->mlen;
 	int pos = 0;
 	int try = 0;

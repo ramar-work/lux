@@ -42,7 +42,7 @@
 #include "../vendor/zhttp.h"
 #include "mime.h"
 #include "util.h"
-#include "config.h"
+#include "lconfig.h"
 #include "render.h"
 #include "router.h"
 

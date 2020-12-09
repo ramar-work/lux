@@ -85,7 +85,7 @@ int check_for_disallowed_files ( const char *path ) {
 
 
 //
-int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct config *config, struct host *host ) {
+int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	struct stat sb;
 	int fd = 0;
 	int size = 0;
@@ -96,6 +96,7 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct config *con
 	const char *mimetype_default = mmtref( "application/octet-stream" );
 	const char *mimetype = NULL;
 	uint8_t *content = NULL;
+	struct host *host = conn->hconfig;
 
 	//Die if no host directory is specified.
 	if ( !host->dir ) {
@@ -179,7 +180,5 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct config *con
 		return http_set_error( rs, 500, err );
 	}
 
-	//http_set_content copies the data
-	//free( content );
 	return 1;
 }

@@ -41,18 +41,17 @@
 #include "mime.h"
 #include "util.h"
 #include "luabind.h"
-#include "config.h"
+#include "lconfig.h"
 #include "loader.h"
-//#include "render.h"
 #include "router.h"
 #include "mvc.h"
-#include "../vendor/zrender.h"
+#include "server.h"
 #include "../vendor/zhttp.h"
 
 #ifndef FILTER_LUA_H
 #define FILTER_LUA_H
 
-int filter_lua ( struct HTTPBody *, struct HTTPBody *, struct config *, struct host * );
+int filter_lua ( struct HTTPBody *, struct HTTPBody *, struct cdata * );
 
 struct luaconf {
 	char *db;	

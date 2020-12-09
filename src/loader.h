@@ -32,7 +32,6 @@
  * ---------
  * No entries yet.
  * ------------------------------------------- */
-#include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
 #include "util.h"
 
@@ -42,14 +41,12 @@
 struct rule {
 	const char *key; 
 	const char *type;
-#if 1
 	union {
 		char **s;
 		int *i;
 		void ***t;
 	} v;
 	int (*handler)( zKeyval *, int, void * );
-#endif
 };
 
 struct fp_iterator { 
@@ -61,6 +58,8 @@ struct fp_iterator {
 
 
 int loader_run ( zTable *, const struct rule * ) ;
+
 zTable *loader_shallow_copy( zTable *, int start, int end );
+
 void loader_free( const struct rule * );
 #endif

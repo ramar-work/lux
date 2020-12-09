@@ -40,12 +40,13 @@
 #include "../vendor/zhttp.h"
 #include "mime.h"
 #include "util.h"
-#include "config.h"
+#include "lconfig.h"
+#include "server.h"
 
 #ifndef FILTER_STATIC_H
 #define FILTER_STATIC_H
 
-int filter_static( struct HTTPBody *, struct HTTPBody *, struct config *, struct host * );
+int filter_static( struct HTTPBody *, struct HTTPBody *, struct cdata * );
 int check_static_prefix( const char *, const char * );
 
 #endif

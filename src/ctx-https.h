@@ -45,6 +45,26 @@
 #include "util.h"
 #include <assert.h>
 
+#ifndef CTXHTTPS_H
+#define CTXHTTPS_H
+
+#if 0
+#if 1
+	//#define CAFILE   "/etc/ssl/certs/ca-certificates.crt"
+	#define FPATH "tlshelp/"
+	#define KEYFILE  FPATH "x509-server-key.pem"
+	#define CERTFILE FPATH "x509-server.pem"
+	#define CAFILE   FPATH "x509-ca.pem"
+	#define CRLFILE  FPATH "crl.pem"
+#else
+	#define FPATH "tlshelp/collinshosting-final/"
+	#define KEYFILE  FPATH "x509-collinshosting-key.pem"
+	#define CERTFILE FPATH "x509-collinshosting-server.pem"
+	#define CAFILE   FPATH "collinshosting_com.ca-bundle"
+	#define CRLFILE  FPATH "crl.pem"
+#endif
+#endif
+
 struct gnutls_abstr {
 	gnutls_certificate_credentials_t x509_cred;
   gnutls_priority_t priority_cache;
@@ -57,9 +77,15 @@ struct gnutls_abstr {
 #endif
 };
 
-int pre_gnutls ( int, struct config *, void ** );
-int post_gnutls ( int, struct config *, void ** );
-int read_gnutls ( int, struct HTTPBody *, struct HTTPBody *, void *);
-int write_gnutls ( int, struct HTTPBody *, struct HTTPBody *, void *);
+const int pre_gnutls ( int, struct cdata *, void ** );
+
+const int post_gnutls ( int, struct cdata *, void ** );
+
+const int read_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
+
+const int write_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
+
 void create_gnutls( void ** );
+
 void free_gnults( void **p );
+#endif

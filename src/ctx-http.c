@@ -46,12 +46,12 @@ static const struct timespec __interval__ = { 0, 100000000 };
 void create_notls ( void **p ) { ; }
 
 //Read a message that the server will use later.
-int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
+const int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	FPRINTF( "Read started...\n" );
 	const int size = 1024; 
 	int mult = 1;
 	char err[ 2048 ] = {0};
-	struct cdata *conn = (struct cdata *)p;
+	//struct cdata *conn = (struct cdata *)p;
 
 	//Read first
 	for ( ;; ) {
@@ -130,12 +130,12 @@ int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 
 
 //Write
-int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
+const int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	FPRINTF( "Write started...\n" );
 	int sent = 0, pos = 0, try = 0;
 	int total = rs->mlen;
 	unsigned char *ptr = rs->msg;
-	struct cdata *conn = (struct cdata *)p;
+	//struct cdata *conn = (struct cdata *)p;
 
 	for ( ;; ) {	
 		sent = send( fd, ptr, total, MSG_DONTWAIT );

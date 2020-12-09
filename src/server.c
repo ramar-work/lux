@@ -45,32 +45,12 @@
  * ----------
  * 
  * -------------------------------------------------------- */
-#include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
-#include "../vendor/zhttp.h"
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
-#include "luabind.h"
-#include "socket.h"
-#include "util.h"
-#include "ctx-http.h"
-#include "ctx-https.h"
 #include "server.h"
-#include "config.h"
-#include "filter-static.h"
-#if 0
-#include "filter-dirent.h"
-#include "filter-echo.h"
-#include "filter-lua.h"
-#include "filter-c.h"
-#endif
-
 
 //Check the validity of a filter
-static struct filter * check_filter ( struct filter *filters, char *name ) {
+static struct filter * srv_check_filter ( const struct filter *filters, char *name ) {
 	while ( filters && filters->name ) {
-		struct filter *f = filters;
+		struct filter *f = ( struct filter * )filters;
 		if ( f->name && strcmp( f->name, name ) == 0 ) {
 			return f;
 		}
@@ -80,8 +60,9 @@ static struct filter * check_filter ( struct filter *filters, char *name ) {
 }
 
 
+
 //Check that the website's chosen directory is accessible and it's log directory is writeable.
-static int check_dir ( struct host *host, char *err, int errlen ) {
+static int srv_check_dir ( struct host *host, char *err, int errlen ) {
 	FPRINTF( "Checking directory at %s\n", host->dir );
 
 	//Check that log dir is accessible and writeable (or exists) - send 500 if not 
@@ -108,34 +89,31 @@ static int check_dir ( struct host *host, char *err, int errlen ) {
 
 
 //Start the request by allocating things we'll always need.
-static int srv_start( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct config **config ) {
+static int srv_start( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	FPRINTF( "Initial server allocation started...\n" );
-	//Build a config
-	char err[2048] = {0};
- #if 0
-	if (( *config = build_config( err, sizeof(err) )) == NULL ) {
+
+	//Build server config (because it can change)
+	char err[ 2048 ] = {0};
+	
+	conn->config = build_server_config( conn->ctx->config, err, sizeof(err) );
+	if ( !conn->config ) { 
 		//return http_set_error( res, 500, err );
 		//Kill the context
 		//Close the file
 		//Show me what happened and kill it...
 		return 0;
 	}
- #endif 
+
 	FPRINTF( "Initial server allocation complete.\n" );
 	return 1;
 }
 
 
 //Find the chosen host and generate a response via one of the selected filters
-#if 0
 static int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct cdata *conn) {
-#else
-static int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct config *config, struct senderrecvr *ctx ) {
-#endif
 	FPRINTF( "Proc started...\n" );
 	char err[2048] = {0};
 	zTable *t = NULL;
-	struct host *host = NULL;
 	struct filter *filter = NULL;
 
 	//With no default host, throw this 
@@ -144,66 +122,56 @@ static int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct config *
 		return http_set_error( res, 500, err ); 
 	}
 
-	if ( !( host = find_host( config->hosts, req->host ) ) ) {
+	if ( !( conn->hconfig = find_host( conn->config->hosts, req->host ) ) ) {
 		snprintf( err, sizeof(err), "Could not find host '%s'.", req->host );
 		return http_set_error( res, 404, err ); 
 	}
 
-	if ( !( filter = check_filter( ctx->filters, !host->filter ? "static" : host->filter ) ) ) {
-		snprintf( err, sizeof( err ), "Filter '%s' not supported", host->filter );
+	if ( !conn->hconfig->filter ) {
+		snprintf( err, sizeof( err ), "No Filter specified for '%s'", conn->hconfig->name );
 		return http_set_error( res, 500, err ); 
 	}
 
-	if ( host->dir && !check_dir( host, err, sizeof(err) ) ) {
+	if ( !( filter = srv_check_filter( conn->ctx->filters, conn->hconfig->filter ) ) ) {
+		snprintf( err, sizeof( err ), "Filter '%s' not supported", conn->hconfig->filter );
+		return http_set_error( res, 500, err ); 
+	}
+
+	if ( conn->hconfig->dir && !srv_check_dir( conn->hconfig, err, sizeof(err) ) ) {
 		return http_set_error( res, 500, err ); 
 	}
 
 	//Finally, now we can evalute the filter and the route.
-	if ( !filter->filter( req, res, config, host ) ) {
+	if ( !filter->filter( req, res, conn ) ) {
 		return 0;
 	}
 
 	//You can add a header to tell things to close
-
 	FPRINTF( "Proc complete.\n" );
 	return 1;
 }
 
 
 //End the request by deallocating all of the things
-static int srv_end( struct HTTPBody *rq, struct HTTPBody *rs, struct config *config ) {
+static int srv_end( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	FPRINTF( "Deallocation started...\n" );
 
-	//Free the HTTP body 
-	http_free_body( rs );
+	//Free HTTP request 
 	http_free_body( rq );
 
-	//Free hosts
-	free_hosts( config->hosts );
+	//Free HTTP response
+	http_free_body( rs );
 
-	//Free routes 
-	free_routeh( config->routes );
-
-	//Config should be freed here
-	free_config( config );
+	//Free the server config too
+	free_server_config( conn->config );
 
 	FPRINTF( "Deallocation complete.\n" );
 	return 0;
 }
 
 
-//Sets all socket options in one place
-int srv_setsocketoptions ( int fd ) {
-	if ( fcntl( fd, F_SETFD, O_NONBLOCK ) == -1 ) {
-		FPRINTF( "fcntl error at child socket: %s\n", strerror(errno) ); 
-		return 0;
-	}
-	return 1;
-}
 
-
-//Generate a message in common log format: 
-//ip - - [date] "method path protocol" status clen
+//Generate a message in common log format: ip - - [date] "method path protocol" status clen
 static void srv_log( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn) {
 	const char fmt[] = "%s %s %s [%s] \"%s %s %s\" %d %d";
 	const char datefmt[] = "%d/%b/%Y:%H:%M:%S %z";
@@ -227,42 +195,43 @@ static void srv_log( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *con
 
 
 //Generate a response
-int srv_response ( int fd, struct senderrecvr *ctx, struct cdata *conn ) {
+int srv_response ( int fd, struct cdata *conn ) {
 
 	struct HTTPBody rq = {0}, rs = {0};
-	struct config *config = NULL;
+	//struct config *config = NULL;
 	char err[2048] = {0};
 	int status = 0;
 
 	//Initialize the userdata
-	conn->global = ctx->data;
-	conn->scope = config;
+	//conn->ctx = ctx;
 	conn->status = 0;
 
 	//Parse our configuration here...
-#if 0
-	status = srv_start( &rq, &rs, &config );
-#else
-	conn->scope = config = build_config( ctx->config, err, sizeof(err) ); 
-	if ( !conn->scope ) {
-		FPRINTF( "Could not parse configuration file at: %s\n", ctx->config );
+	status = srv_start( &rq, &rs, conn );
+	if ( !status && conn->count == -2 ) {
+		srv_end( &rq, &rs, conn );
 		return 0;
+	}
+
+#if 0
+	//This is necessary for SSL
+	//Do any per-request initialization here.
+	if ( conn->ctx->pre ) {
+		if ( !( status = conn->ctx->pre( fd, config, &conn->ctx->data ) ) ) {
+
+		}
 	}
 #endif
 
-	//Do any per-request initialization here.
-	//ctx->pre && ( status = ctx->pre( fd, config, &ctx->data ) );
-
 	//Read the message
-	//status = ctx->read( fd, &rq, &rs, ctx->data );
-	status = ctx->read( fd, &rq, &rs, (void *)conn );
+	status = conn->ctx->read( fd, &rq, &rs, (void *)conn );
 	if ( !status && conn->count == -2 ) {
-		srv_end( &rq, &rs, config );
+		srv_end( &rq, &rs, conn );
 		return 0;
 	}
 
 	//Generate a message
-	status && ( status = srv_proc( &rq, &rs, config, ctx ) );
+	status && ( status = srv_proc( &rq, &rs, conn ) );
 	#if 0
 	if ( !status && conn->count == -2 ) {
 		return 0;
@@ -271,9 +240,9 @@ int srv_response ( int fd, struct senderrecvr *ctx, struct cdata *conn ) {
 
 	//Write the message	(should almost ALWAYS run)
 	//status = ctx->write( fd, &rq, &rs, ctx->data );
-	status = ctx->write( fd, &rq, &rs, (void *)conn );
+	//status = ctx->write( fd, &rq, &rs, (void *)conn );
 	if ( !status && conn->count == -2 ) {
-		srv_end( &rq, &rs, config );
+		srv_end( &rq, &rs, conn );
 		return 0;
 	}
 
@@ -281,11 +250,11 @@ int srv_response ( int fd, struct senderrecvr *ctx, struct cdata *conn ) {
 	srv_log( &rq, &rs, conn );
 
 	//Per-request shut down goes here.
-	ctx->post && ctx->post( fd, config, &ctx->data );
+	//ctx->post && ctx->post( fd, config, &ctx->data );
 
 #if 1
 	//End the request and return a status
-	srv_end( &rq, &rs, config );
+	srv_end( &rq, &rs, conn );
 
 	//Request should finish before we count this as an attempt. 
 	conn->count ++;

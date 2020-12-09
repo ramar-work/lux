@@ -30,10 +30,10 @@ PREFIX = /usr/local
 VERSION = 0.3
 TESTS = config loader database luabind router util #server render filter
 SRC = vendor/zrender.c vendor/zhasher.c vendor/zwalker.c vendor/zhttp.c \
-	src/config.c src/hosts.c src/db-sqlite.c src/luabind.c src/mime.c \
+	src/lconfig.c src/db-sqlite.c src/luabind.c src/mime.c \
 	src/socket.c src/util.c src/ctx-http.c src/ctx-https.c src/server.c \
-	src/loader.c src/mvc.c src/filter-static.c src/filter-lua.c \
-	src/router.c #src/filter-echo.c src/filter-dirent.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
+	src/loader.c src/mvc.c src/filter-static.c \
+	src/router.c #src/ctx-https.c src/filter-echo.c src/filter-lua.c src/filter-dirent.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
 
 # main - Compiles all code needed to get hypno running

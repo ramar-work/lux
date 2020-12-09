@@ -3,7 +3,7 @@
 #include "../vendor/zhasher.h"
 #include "util.h"
 #include "loader.h"
-#include "mvc.h"
+//#include "mvc.h"
 
 #ifndef ROUTER_H
 #define ROUTER_H

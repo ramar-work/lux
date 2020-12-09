@@ -1,5 +1,5 @@
 /* -------------------------------------------------------- *
- * server.c
+ * server.h
  * ========
  * 
  * Summary 
@@ -27,78 +27,59 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
  * THE SOFTWARE.
- *
  * 
- * Changelog 
+ * CHANGELOG 
  * ----------
  * 
  * -------------------------------------------------------- */
+#include "luabind.h"
 #include "socket.h"
-#include "config.h"
+#include "util.h"
+#include "lconfig.h"
+#include "../vendor/zhttp.h"
+#include "../vendor/zwalker.h"
+#include "../vendor/zhasher.h"
 #include "../vendor/zhttp.h"
 
 #ifndef SERVER_H
 #define SERVER_H
 
-#define RD_EAGAIN 88
-#define WR_EAGAIN 89
-#define AC_EAGAIN 21
-#define AC_EMFILE 31
-#define AC_EEINTR 41
-
-#if 1
-	//#define CAFILE   "/etc/ssl/certs/ca-certificates.crt"
-	#define FPATH "tlshelp/"
-	#define KEYFILE  FPATH "x509-server-key.pem"
-	#define CERTFILE FPATH "x509-server.pem"
-	#define CAFILE   FPATH "x509-ca.pem"
-	#define CRLFILE  FPATH "crl.pem"
-#else
-	#define FPATH "tlshelp/collinshosting-final/"
-	#define KEYFILE  FPATH "x509-collinshosting-key.pem"
-	#define CERTFILE FPATH "x509-collinshosting-server.pem"
-	#define CAFILE   FPATH "collinshosting_com.ca-bundle"
-	#define CRLFILE  FPATH "crl.pem"
-#endif
-
-struct filter {
-	const char *name;
-	int (*filter)( struct HTTPBody *, struct HTTPBody *, struct config *, struct host * );
-};
-
-struct senderrecvr { 
-	int (*read)( int, struct HTTPBody *, struct HTTPBody *, void * );
-	int (*write)( int, struct HTTPBody *, struct HTTPBody *, void * ); 
-	void (*init)( void ** );
-	void (*free)( void ** );
-	int (*pre)( int, struct config *, void ** );
-	int (*post)( int, struct config *, void ** ); 
-	struct filter *filters;
-	char *config;
-	void *data;
-}; 
-
-struct model {
-	int (*exec)( int, void * );
-	int (*stop)( int * );
-	void *data;
-};
-
+struct cdata;
+struct filter;
+struct senderrecvr;
 
 //Added 12-08-20, track per connection data
 struct cdata {
 	int count;  //How many times until we hit the keep-alive mark?
 	int status;  //What is the status of the request? (perhaps only go up if complete?)
-	const void *global;  //Global READ-ONLY userdata
-	void *scope;    //Locally scoped userdata (only good for the life of the request)
+	struct senderrecvr *ctx;  //Access the context through here now
+	struct srv_config *config;  //Server config
+	struct host *hconfig;  //Host config
 	char *ipv4;  //The IPv4 address of the incoming request (in string format)
 	char *ipv6;  //The IPv6 address of the incoming request (in string format)
 	int flags; //Flags for the connection in question
 };
 
-int srv_response ( int, struct senderrecvr *, struct cdata * );
 
-int srv_setsocketoptions ( int fd );
+//Filter for each request interpreter 
+struct filter {
+	const char *name;
+	int (*filter)( struct HTTPBody *, struct HTTPBody *, struct cdata * );
+};
 
-int srv_writelog ( int fd, struct sockAbstr *su );
+
+//Each new request works in its own environment.
+struct senderrecvr { 
+	const int (*read)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
+	const int (*write)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * ); 
+	void (*init)( void ** );
+	void (*free)( void ** );
+	const int (*pre)( int, struct cdata *, void ** );
+	const int (*post)( int, struct cdata *, void ** ); 
+	const struct filter *filters;
+	const char *config;
+	void *data;
+}; 
+
+int srv_response ( int, struct cdata * );
 #endif 
