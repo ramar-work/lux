@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * filter-static.c
- * ---------------
+ * ===========
+ * 
+ * Summary 
+ * -------
  * Functions comprising the static filter for interpreting HTTP messages.
  *
  * Usage

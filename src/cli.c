@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * cli.c
- * ---------
+ * =====
+ *
+ * Summary 
+ * -------
  * Command line tooling to help administer 
  * new sites.
  *
@@ -30,7 +33,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
  * THE SOFTWARE.
  *
- * CHANGELOG 
+ * Changelog
  * ---------
  * 
  * ------------------------------------------- */

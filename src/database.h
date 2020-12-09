@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * database.h
- * -----------
+ * ========
+ * 
+ * Summary 
+ * -------
  * Header file for functions for dealing with basic 
  * SQL database interactions.
  *

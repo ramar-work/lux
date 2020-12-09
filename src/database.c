@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * database.c
- * -----------
+ * ========
+ * 
+ * Summary 
+ * -------
  * Functions for dealing with basic SQL database
  * interactions.
  *

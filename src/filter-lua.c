@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * filter-lua.c
- * -------------
+ * ===========
+ * 
+ * Summary 
+ * -------
  * Functions comprising the Lua filter for interpreting HTTP messages. 
  *
  * Usage

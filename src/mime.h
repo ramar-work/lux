@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * mime.h
- * ------
+ * ======
+ * 
+ * Summary 
+ * -------
  * Header file for functions and data allowing Hypno to deal with different 
  * mimetypes.
  *

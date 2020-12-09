@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * filter-c.c
- * -----------
+ * ===========
+ * 
+ * Summary 
+ * -------
  * Filter for interpreting HTTP messages.
  *
  * Usage

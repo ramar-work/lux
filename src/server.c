@@ -1,39 +1,49 @@
 /* -------------------------------------------------------- *
-server.c
-========
-
-This is the basis of hypno's web server.
-
-USAGE
------
-These are the options:
-  --start            Start new servers             
-  --debug            Set debug rules               
-  --kill             Test killing a server         
-  --fork             Daemonize the server          
-  --config <arg>     Use this file for configuration
-  --port <arg>       Set a differnt port           
-  --ssl              Use ssl or not..              
-  --user <arg>       Choose a user to start as     
-
-
-BUILDING
---------
-Lua is a necessity because of the configuration parsing. 
-
-Running make is all we need for now on Linux and OSX.  Windows
-will need some additional help and Cygwin as well.
-
-
-TODO
-----
-- Implement threaded model
-- Write a couple of different types of loggers
-- Add global root default for config.lua
-- Is it useful to move the configuration initialization to a
-  different part of the code.
-- Add an option to show a parsed config
-
+ * server.c
+ * ========
+ * 
+ * Summary 
+ * -------
+ * Server functions for Hypno's server
+ * 
+ * Usage
+ * -----
+ * These are the options:
+ *   --start            Start new servers             
+ *   --debug            Set debug rules               
+ *   --kill             Test killing a server         
+ *   --fork             Daemonize the server          
+ *   --config <arg>     Use this file for configuration
+ *   --port <arg>       Set a differnt port           
+ *   --ssl              Use ssl or not..              
+ *   --user <arg>       Choose a user to start as     
+ * 
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to 
+ * deal in the Software without restriction, including without limitation the 
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ * sell copies of the Software, and to permit persons to whom the Software is 
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in 
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+ * THE SOFTWARE.
+ *
+ * 
+ * Changelog 
+ * ----------
+ * 
  * -------------------------------------------------------- */
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"

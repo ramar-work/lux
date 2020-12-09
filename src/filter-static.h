@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * filter-static.h
- * ---------------
+ * ===========
+ * 
+ * Summary 
+ * -------
  * Header file for Functions comprising the static filter for interpreting 
  * HTTP messages.
  *

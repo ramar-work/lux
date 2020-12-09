@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * config.h
- * ---------
+ * ========
+ * 
+ * Summary 
+ * -------
  * File to deal with parsing global configuration
  * for server.
  *

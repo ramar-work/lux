@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * filter-echo.h
- * -------------
+ * ===========
+ * 
+ * Summary 
+ * -------
  * Header file for functions comprising the echo filter for stress testing 
  * Hypno's capabilities. 
  *

@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * filter-dirent.h
- * ---------------
+ * ===========
+ * 
+ * Summary 
+ * -------
  * Header file for functions comprising the dirent filter for interpreting 
  * HTTP messages.
  *

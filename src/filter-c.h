@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * filter-c.h
- * -----------
+ * ===========
+ * 
+ * Summary 
+ * -------
  * Headers for C filter for interpreting HTTP messages.
  *
  * Usage

@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * filter-dirent.c
- * ---------------
+ * ===========
+ * 
+ * Summary 
+ * -------
  * Functions comprising the dirent filter for interpreting HTTP messages.
  *
  * Usage

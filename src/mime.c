@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * mime.c
- * ------
+ * ======
+ * 
+ * Summary 
+ * -------
  * Functions and data allowing Hypno to deal with different mimetypes.
  * messages. 
  *

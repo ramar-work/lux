@@ -2,6 +2,8 @@
  * main.c
  * ======
  * 
+ * Summary 
+ * -------
  * This is the basis of hypno's web server.
  * 
  * Usage

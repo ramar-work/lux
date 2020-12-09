@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * filter-echo.c
- * -------------
+ * ===========
+ * 
+ * Summary 
+ * -------
  * Functions comprising the echo filter for stress testing Hypno's capabilities. 
  *
  * Usage

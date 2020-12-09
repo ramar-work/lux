@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * ctx-https.c
- * -----------
+ * ========
+ * 
+ * Summary 
+ * -------
  * Functions for dealing with HTTPS contexts.
  *
  * Usage

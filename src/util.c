@@ -1,3 +1,4 @@
+//util.c
 #include "util.h"
 
 //Print binary data (in hex) using name of variable as key
@@ -12,8 +13,9 @@ uint8_t * srand_uint8t( uint8_t *src, int srclen, uint8_t *buf, int buflen ) {
 		return NULL;
 	}
 	
-	srclen --;
 	uint8_t *b = buf;
+	srclen -= 1;
+
 	while ( --buflen ) {
 		struct timespec ts;
 		clock_gettime(CLOCK_REALTIME, &ts);

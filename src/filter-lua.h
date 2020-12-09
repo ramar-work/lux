@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * filter-lua.h
- * -------------
+ * ===========
+ * 
+ * Summary 
+ * -------
  * Header file for functions comprising the Lua filter for interpreting HTTP 
  * messages. 
  *

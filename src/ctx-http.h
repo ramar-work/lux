@@ -1,6 +1,9 @@
 /* ------------------------------------------- * 
  * ctx-http.h
- * ----------
+ * ========
+ * 
+ * Summary 
+ * -------
  * Functions for dealing with HTTP contexts.
  *
  * Usage
