@@ -7,7 +7,7 @@
 #define CTX 0 
 #define TESTDIR "tests/server/"
 
-int filter_test( struct HTTPBody *rq, struct HTTPBody *rs, struct config *config, struct host *host );
+int filter_test( struct HTTPBody *rq, struct HTTPBody *rs, struct config *config, struct lconfig *host );
 
 
 int read_test( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
@@ -34,7 +34,7 @@ int write_test( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 void create_test( void **p ) {
 }
 
-int filter_test( struct HTTPBody *rq, struct HTTPBody *rs, struct config *config, struct host *host ) {
+int filter_test( struct HTTPBody *rq, struct HTTPBody *rs, struct config *config, struct lconfig *host ) {
 	char err[2048] = {0};
 	char message[] = ""
 		"HTTP/1.1 200 OK\r\n"

@@ -141,23 +141,23 @@ void free_meg_v( zTable *t, void *p ) {
 
 //This is a simple structure.
 struct hostset { 
-	struct host **hosts; 
+	struct lconfig **hosts; 
 };
 
 
 int test_hosts_handler ( zKeyval * kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
-	struct host ***hosts = f->userdata;
+	struct lconfig ***hosts = f->userdata;
 	zTable *st = NULL, *nt = NULL;
 	FPRINTF( "Invoking hosts_handler\n" );
 
 	//If current index is a table
 	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
-		struct host *w = NULL;
+		struct lconfig *w = NULL;
 		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
 		FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count ); 
 		nt = loader_shallow_copy( st, i+1, i+count );
-		w = malloc( sizeof( struct host ) );
+		w = malloc( sizeof( struct lconfig ) );
 		memset( w, 0, sizeof(struct host) );
 		const struct rule rules[] = {
 			{ "alias", "s", .v.s = &w->alias },
@@ -175,7 +175,7 @@ int test_hosts_handler ( zKeyval * kv, int i, void *p ) {
 		loader_run( nt, rules ); 
 
 		//This is extra stupid, b/c all you really need to do is loop through the table entries	
-		add_item( hosts, w, struct host *, &f->len );
+		add_item( hosts, w, struct lconfig *, &f->len );
 
 		//Let's just try destroying this table
 		lt_free( nt );
@@ -206,7 +206,7 @@ int set_hostset_v( zTable *t, void *p ) {
 
 void dump_hostset_v ( zTable *t, void *p ) {
 	struct hostset *hostset = (struct hostset *)p;
-	struct host **hosts = hostset->hosts;
+	struct lconfig **hosts = hostset->hosts;
 	while ( hosts && (*hosts) ) {
 		fprintf( stderr, "Host: %s\n", (*hosts)->name );
 		fprintf( stderr, "  w->alias: %s\n", (*hosts)->alias );
@@ -223,7 +223,7 @@ void dump_hostset_v ( zTable *t, void *p ) {
 
 void free_hostset_v ( zTable *t, void *p ) {
 	struct hostset *hostset = (struct hostset *)p;
-	struct host **hosts = hostset->hosts;
+	struct lconfig **hosts = hostset->hosts;
 	while ( hosts && (*hosts) ) {
 		( (*hosts)->alias ) ? free( (*hosts)->alias ) : 0;
 		( (*hosts)->dir ) ? free( (*hosts)->dir ) : 0;
@@ -480,7 +480,7 @@ int test_routes_handler ( zKeyval * kv, int i, void *p ) {
 
 //Tests rules for pulling multiple keys that are the same.
 int set_host_rules( zTable *t ) {
-	struct host **hosts = NULL;
+	struct lconfig **hosts = NULL;
 	const struct rule rules[] = {
 		{ "hosts", "t", .v.t = (void ***)&hosts, test_hosts_handler }, 
 		{ NULL }

@@ -6,7 +6,7 @@
 #define LCONFIG_H
 
 //Site configs go here
-struct host {
+struct lconfig {
 	char *name;	
 	char *alias;
 	char *dir;	
@@ -19,24 +19,23 @@ struct host {
 
 
 //Global config goes here
-struct srv_config {
+struct sconfig {
 	const char *path;
 	const char *root_default;
-	struct routeh **routes;
-	struct host **hosts;
+	struct lconfig **hosts;
 	zTable *src;
 };
 
 
-struct host * find_host ( struct host **, char * );
+struct lconfig * find_host ( struct lconfig **, char * );
 
 int host_table_iterator ( zKeyval *, int, void * );
 
-void free_hosts ( struct host ** );
+void free_hosts ( struct lconfig ** );
 
-void dump_hosts ( struct host ** );
+void dump_hosts ( struct lconfig ** );
 
-struct srv_config * build_server_config ( const char *, char *, int );
+struct sconfig * build_server_config ( const char *, char *, int );
 
-void free_server_config( struct srv_config * );
+void free_server_config( struct sconfig * );
 #endif

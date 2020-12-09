@@ -62,7 +62,7 @@ static struct filter * srv_check_filter ( const struct filter *filters, char *na
 
 
 //Check that the website's chosen directory is accessible and it's log directory is writeable.
-static int srv_check_dir ( struct host *host, char *err, int errlen ) {
+static int srv_check_dir ( struct lconfig *host, char *err, int errlen ) {
 	FPRINTF( "Checking directory at %s\n", host->dir );
 
 	//Check that log dir is accessible and writeable (or exists) - send 500 if not 

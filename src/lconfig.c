@@ -13,16 +13,16 @@ static void free_t( zTable *t ) {
 //A hosts handler
 static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
-	struct host ***hosts = f->userdata;
+	struct lconfig ***hosts = f->userdata;
 	zTable *st = NULL, *nt = NULL;
 
 	//If current index is a table
 	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
-		struct host *w = malloc( sizeof( struct host ) );
+		struct lconfig *w = malloc( sizeof( struct lconfig ) );
 		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
 		//FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count ); 
 		nt = loader_shallow_copy( st, i+1, i+count );
-		memset( w, 0, sizeof(struct host) );
+		memset( w, 0, sizeof( struct lconfig ) );
 		const struct rule rules[] = {
 			{ "alias", "s", .v.s = &w->alias },
 			{ "dir", "s", .v.s = &w->dir },
@@ -39,19 +39,19 @@ static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
 		}
 		lt_free( nt );
 		free( nt );
-		add_item( hosts, w, struct host *, &f->len );
+		add_item( hosts, w, struct lconfig *, &f->len );
 	}
 	return 1;
 }
 
 
 //Find a host
-struct host * find_host ( struct host **hosts, char *hostname ) {
+struct lconfig * find_host ( struct lconfig **hosts, char *hostname ) {
 	char host[ 2048 ] = { 0 };
 	int pos = memchrat( hostname, ':', strlen( hostname ) );
 	memcpy( host, hostname, ( pos > -1 ) ? pos : strlen(hostname) );
 	while ( hosts && *hosts ) {
-		struct host *req = *hosts;
+		struct lconfig *req = *hosts;
 		if ( req->name && strcmp( req->name, host ) == 0 )  {
 			return req;	
 		}
@@ -65,8 +65,8 @@ struct host * find_host ( struct host **hosts, char *hostname ) {
 
 
 //Build a list of valid hosts
-static struct host ** build_hosts ( zTable *t ) {
-	struct host **hosts = NULL;
+static struct lconfig ** build_hosts ( zTable *t ) {
+	struct lconfig **hosts = NULL;
 	const struct rule rules[] = {
 		{ "hosts", "t", .v.t = (void ***)&hosts, hosts_iterator }, 
 		{ NULL }
@@ -78,8 +78,8 @@ static struct host ** build_hosts ( zTable *t ) {
 
 
 //Free hosts list
-void free_hosts ( struct host ** hlist ) {
-	struct host **hosts = hlist;
+void free_hosts ( struct lconfig ** hlist ) {
+	struct lconfig **hosts = hlist;
 	while ( hosts && (*hosts) ) {
 		static int i;
 		free( (*hosts)->alias );
@@ -97,8 +97,8 @@ void free_hosts ( struct host ** hlist ) {
 
 
 //Dump the host list
-void dump_hosts ( struct host **hosts ) {
-	struct host **r = hosts;
+void dump_hosts ( struct lconfig **hosts ) {
+	struct lconfig **r = hosts;
 	fprintf( stderr, "Hosts:\n" );
 	while ( r && *r ) {
 		fprintf( stderr, "\t%p => ", *r );
@@ -111,10 +111,10 @@ void dump_hosts ( struct host **hosts ) {
 }
 
 //build_server_config or get_server_config
-struct srv_config * build_server_config ( const char *file, char *err, int errlen ) {
+struct sconfig * build_server_config ( const char *file, char *err, int errlen ) {
 	FPRINTF( "Configuration parsing started...\n" );
 
-	struct srv_config *config = NULL; 
+	struct sconfig *config = NULL; 
 	zTable *t = NULL;
 	lua_State *L = NULL;
 
@@ -125,7 +125,7 @@ struct srv_config * build_server_config ( const char *file, char *err, int errle
 	}
 
 	//Allocate config
-	if ( ( config = malloc( sizeof(struct srv_config) ) ) == NULL ) {
+	if ( ( config = malloc( sizeof( struct sconfig ) ) ) == NULL ) {
 		snprintf( err, errlen, "Could not initialize memory when parsing config at: %s\n", file );
 		return NULL;
 	}
@@ -192,7 +192,7 @@ struct srv_config * build_server_config ( const char *file, char *err, int errle
 //build_site_config or get_site_config
 
 //Destroy the server oonfig file.
-void free_server_config( struct srv_config *config ) {
+void free_server_config( struct sconfig *config ) {
 #if 0
 	if ( config->hosts ) {
 		free_hosts( config->hosts );	

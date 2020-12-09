@@ -90,7 +90,7 @@ struct filter_test {
 		struct HTTPBody *, 
 		struct HTTPBody *, 
 		struct config *, 
-		struct host * 
+		struct lconfig * 
 	); 
 	const char *name; 
 	const char *path;
@@ -166,7 +166,7 @@ int main ( int argc, char *argv[] ) {
 			char err[2048] = { 0 };
 			struct HTTPBody response = { 0 };
 			struct config config = { .root_default = f->root };
-			struct host host = { .dir = (char *)f->path, .root_default = (char *)f->root };
+			struct lconfig host = { .dir = (char *)f->path, .root_default = (char *)f->root };
 
 			fprintf( file, "\n[ Test name: %-13s ]: ", test->name );
 

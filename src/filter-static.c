@@ -96,7 +96,7 @@ int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn
 	const char *mimetype_default = mmtref( "application/octet-stream" );
 	const char *mimetype = NULL;
 	uint8_t *content = NULL;
-	struct host *host = conn->hconfig;
+	struct lconfig *host = conn->hconfig;
 
 	//Die if no host directory is specified.
 	if ( !host->dir ) {

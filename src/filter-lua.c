@@ -404,7 +404,7 @@ static int set_framework_methods() {
 
 //filter-lua.c - Run HTTP messages through a Lua handler
 //Any processing can be done in the middle.  Since we're in another "thread" anyway
-int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *config, struct host *host ) {
+int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *config, struct lconfig *host ) {
 
 	struct luaconf *luaconf = NULL;
 	lua_State *L = NULL;

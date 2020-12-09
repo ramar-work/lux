@@ -66,7 +66,7 @@ const int post_gnutls ( int fd, struct cdata *conn, void **p ) {
 }
 
 
-static int process_credentials ( struct gnutls_abstr *g, struct host **hosts ) {
+static int process_credentials ( struct gnutls_abstr *g, struct lconfig **hosts ) {
 	while ( *hosts ) {
 		char *dir = (*hosts)->dir;
 		//each of the files need to be loaded somehow...
@@ -121,7 +121,7 @@ const int pre_gnutls ( int fd, struct cdata *conn , void **p ) {
 	}
 
 	//Get config hosts, and get all the key details
-	//struct host **hosts = config->hosts;
+	//struct lconfig **hosts = config->hosts;
 	if ( !process_credentials( g, config->hosts ) ) {
 		gnutls_certificate_free_credentials( g->x509_cred );
 		free( g );

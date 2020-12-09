@@ -53,8 +53,8 @@ struct cdata {
 	int count;  //How many times until we hit the keep-alive mark?
 	int status;  //What is the status of the request? (perhaps only go up if complete?)
 	struct senderrecvr *ctx;  //Access the context through here now
-	struct srv_config *config;  //Server config
-	struct host *hconfig;  //Host config
+	struct sconfig *config;  //Server config
+	struct lconfig *hconfig;  //Host config
 	char *ipv4;  //The IPv4 address of the incoming request (in string format)
 	char *ipv6;  //The IPv6 address of the incoming request (in string format)
 	int flags; //Flags for the connection in question

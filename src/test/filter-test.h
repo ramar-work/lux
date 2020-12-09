@@ -34,7 +34,7 @@ struct Test {
 }; 
 
 
-typedef int (*Filter)(struct HTTPBody *, struct HTTPBody *, struct config *, struct host *);
+typedef int (*Filter)(struct HTTPBody *, struct HTTPBody *, struct config *, struct lconfig *);
 
 
 int filter_test ( const char *fname, Filter filter, struct config *c, struct Test *tt ) {
