@@ -1,3 +1,4 @@
+//hosts.c - Consider putting all of this into lconfig
 #include "hosts.h"
 
 //A hosts handler

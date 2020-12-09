@@ -1,8 +1,8 @@
 /* ------------------------------------------- * 
  * loader.c 
  * --------------
- * Load config files written with Lua into a
- * structure that C can easily talk to.
+ * Load config files written with Lua into a structure that C can easily talk 
+ * to.
  *
  * LICENSE
  * -------

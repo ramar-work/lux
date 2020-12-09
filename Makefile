@@ -1,15 +1,19 @@
-# --------------------------------------------------------- #
-# Makefile for Hypno
-# 
-# Contains all the targets necessary to assemble
-# Hypno on most machines. 
-#
-# Eventually, this will be dropped in favor of
-# autotools.
-#
-# Copyright 2020 Tubular Modular Inc. dba Collins Design
-# --------------------------------------------------------- #
+## --------------------------------------------------------- ##
+## Makefile
+## 
+## @summary
+## Contains all the targets necessary to assemble
+## Hypno on most machines. 
+##
+## Eventually, this will be dropped in favor of
+## autotools.
+##
+## @author
+## Copyright 2020 Tubular Modular Inc. dba Collins Design
+## --------------------------------------------------------- ##
 NAME = hypno
+USER = http
+GROUP = http
 OS = $(shell uname | sed 's/[_ ].*//')
 LDFLAGS = -lgnutls -llua -ldl -lpthread -lsqlite3
 DEBUGFLAGS = -DSKIPMYSQL_H -DSKIPPGSQL_H -DDEBUG_H
@@ -41,6 +45,11 @@ main: $(OBJ)
 # install - Installs targets to $PREFIX/bin
 install:
 	cp bin/hypno bin/hcli $(PREFIX)/bin/
+
+# examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
+examples: PORT=2222
+examples: 
+	bin/hypno --start --port $(PORT) --config example/config.lua 
 
 # repl - Build and test libraries for REPL usage
 #	test -f sqlite3.o || $(CC) $(CFLAGS) -fPIC -c vendor/sqlite3.c -o shared/sqlite3.o
@@ -79,9 +88,25 @@ clean:
 	-@rm hcli hypno
 	-@find -maxdepth 1 -type f -name "vgcore*" | xargs rm
 
-# pkg - Make a package for distribution
+# list - List all the targets and what they do
+list:
+	@printf 'Available options are:\n'
+	@sed -n '/^# / { s/# //; 1d; p; }' Makefile | awk -F '-' '{ printf "  %-20s - %s\n", $$1, $$2 }'
+
+#if 0
+# pkg - Make a package of the latest tagged version for distribution
 pkg:
-	git archive --format tar HEAD | gzip > $(NAME)-$(VERSION).tar.gz
+	git archive --format tar HEAD `git tag | tail -n 1` | \
+		gzip > $(NAME)-`git tag | tail -n 1`.tar.gz
+
+# pkgtest - Make a package of the latest version of dev
+pkgtest:
+	git archive --format tar HEAD | \
+		gzip > $(NAME)-`git tag | tail -n 1`.tar.gz
+
+# makefile - Generate a Makefile appropriate for a regular user
+makefile:
+	@sed '/^# /d' Makefile | cpp - | sed '/^# /d'
 
 # changelog - Generate a full changelog from the commit history
 changelog:
@@ -99,3 +124,4 @@ changelog:
 	@printf "## HISTORY\n\n"
 	@git log --full-history --author=Antonio | sed '{ s/^   /- /; }'
 	@printf "\n<link rel=stylesheet href=changelog.css>\n"
+#endif

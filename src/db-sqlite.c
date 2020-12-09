@@ -1,37 +1,40 @@
-//gcc -ldl -llua -o database vendor/single.o database.c && ./config
-#include "db-sqlite.h"
-
-/*
+/* ------------------------------------------- * 
+ * db-sqlite.c
+ * -----------
+ * Functions for dealing with data interchange between zTable and sqlite3.
  *
- * SQLiteest
- * ======
- * sqlite3_open
- * sqlite3_close
- * sqlite3_close_v2
- * sqlite3_bind_[ text, blob, int, int64, null ] - Bind different values
- * sqlite3_result_[ text, blob, int, int64, null ] - Retrieve different values
- * sqlite3_column_[ text, blob, int, int64, null ] - idk what this is...
- * sqlite3_errmsg
- *
- * MySQL
- * =====
- *
- * Postgres
- * ========
- *
- * (sadly, SQL server and Oracle are probably the most needed...)
- *
- * General
- * =======
- * Most things need to:
- * open(...) - Open a database
- * close(...) - Close database
- * exec( ... ) - Execute a query (SELECT, INSERT, DELETE, UPDATE, etc)
- *	INSERT is hard...
- * results() - Return set of results (this kind of runs independently of stuff)
+ * Usage
+ * -----
+ * gcc -ldl -llua -o database vendor/single.o database.c && ./config
  * 
- */
-
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to 
+ * deal in the Software without restriction, including without limitation the 
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ * sell copies of the Software, and to permit persons to whom the Software is 
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in 
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+ * THE SOFTWARE.
+ *
+ * CHANGELOG 
+ * ---------
+ * 
+ * ------------------------------------------- */
+#include "db-sqlite.h"
 
 int db_check_query ( const char *query, char *err, int errlen ) {
 	if ( !query ) {

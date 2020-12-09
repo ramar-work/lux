@@ -1,4 +1,4 @@
-#include "../filter-test.h"
+#include "filter-test.h"
 #include "../filter-static.h"
 #define TESTDIR "tests/filter-static/"
 

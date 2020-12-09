@@ -1,3 +1,4 @@
+//hosts.c - Consider putting all of this into lconfig
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
 #include "loader.h"
