@@ -47,11 +47,11 @@
  * ---------
  * No entries yet.
  * ------------------------------------------- */
-#include "loader.h"
-#include "util.h"
-#include "hosts.h"
-#include "routes.h"
-#include "luautil.h"
+#include "../loader.h"
+#include "../util.h"
+#include "../hosts.h"
+#include "../routes.h"
+#include "../luautil.h"
 
 #define TESTDIR "tests/loader/"
 

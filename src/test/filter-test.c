@@ -1,10 +1,10 @@
-#include "../vendor/zhttp.h"
-#include "config.h"
-#include "filter-lua.h"
+#include "../../vendor/zhttp.h"
+#include "../config.h"
+#include "../filter-lua.h"
 #if 0
-#include "filter-static.h"
-#include "filter-echo.h"
-#include "filter-c.h"
+#include "../filter-static.h"
+#include "../filter-echo.h"
+#include "../filter-c.h"
 #endif
 
 #define TEST_C_DIR "tests/filter-c/"

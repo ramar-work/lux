@@ -1,4 +1,4 @@
-#include "util.h"
+#include "../util.h"
 
 const char *words[] = {
 	"arbutus",

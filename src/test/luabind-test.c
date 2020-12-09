@@ -1,5 +1,5 @@
-#include "luabind.h"
-#include "util.h"
+#include "../luabind.h"
+#include "../util.h"
 
 #define TESTDIR "tests/luabind/"
 

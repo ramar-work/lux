@@ -1,6 +1,6 @@
-#include "luabind.h"
-#include "config.h"
-#include "hosts.h"
+#include "../luabind.h"
+#include "../config.h"
+#include "../hosts.h"
 
 #define TESTDIR "tests/config/"
 

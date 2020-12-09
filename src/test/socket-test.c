@@ -1,5 +1,5 @@
-#include "socket.h"
-#include "http.h"
+#include "../socket.h"
+#include "../http.h"
 
 //Sends a message over HTTP
 int write_static ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {

@@ -1,4 +1,4 @@
-#include "render.h"
+#include "../render.h"
 
 #define TESTDIR "tests/render/"
 

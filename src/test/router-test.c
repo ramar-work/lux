@@ -1,9 +1,9 @@
 //Compile me with: 
 //gcc -ldl -lpthread -o router vendor/single.o vendor/sqlite3.o router.c && ./router
-#include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
-#include "util.h"
-#include "router.h"
+#include "../../vendor/zwalker.h"
+#include "../../vendor/zhasher.h"
+#include "../util.h"
+#include "../router.h"
 
 //These are static routes
 //const char *routes[] = {
@@ -14,8 +14,6 @@ struct routeh *routes[] = {
 	ROUTE( "//" ),
 	ROUTE( "/route" ),
 	ROUTE( "/route/" ),
-	ROUTE( "/{route,julius}" ),
-	ROUTE( "/{route,julius}/:id" ),
 	ROUTE( "/route" ),
 	ROUTE( "/route/:id" ),
 	ROUTE( "/route/:id=string" ),
@@ -23,6 +21,8 @@ struct routeh *routes[] = {
 	ROUTE( "/:id" ),
 	ROUTE( "/route/*" ),
 	ROUTE( "/route/*/jackpot" ),
+	ROUTE( "/{route,julius}" ),
+	ROUTE( "/{route,julius}/:id" ),
 #if 0
 //Do I want to handle '?'
 , "/route/?"
@@ -45,11 +45,11 @@ const char *requests[] = {
 , "/route/bashful"
 , "/route/bashful/jackpot"
 , "/route/333/jackpot"
-#if 0
 , "/julius/3"
-, "/3"
+, "/unresolvable"
 , "/joseph/route/337"
 , "/route/337a"
+#if 0
 , "/route/3"
 #endif
 , NULL
@@ -61,15 +61,18 @@ int main (int argc, char *argv[]) {
 	struct routeh *resv = NULL;
 	const char **urilist = requests;
 	while ( *urilist ) {
-		fprintf( stderr,  "Checking routes against this URI: %s\n", *urilist );
+		int routecount = sizeof( routes ) / sizeof( struct routeh * );
+		fprintf( stderr,  "Checking %d routes against this URI: %s\n", routecount, *urilist );
+#if 1
 		//the best way to do this is to run one at a time...
 		if ( !( resv = resolve_routeh( rlist, *urilist ) ) ) {
-			fprintf( stderr, "Path %s did not resolve.\n", *urilist );		
+			fprintf( stderr, "FAIL: Path %s did not resolve.\n", *urilist );		
 			urilist++;
 			continue;
 		}
 
-		fprintf( stderr, "Path %s resolved to name: %s\n", *urilist, resv->name );
+		fprintf( stderr, "SUCC: Path %s resolved to name: %s\n", *urilist, resv->name );
+#endif
 		urilist++;
 	}
 

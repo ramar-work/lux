@@ -1,6 +1,7 @@
 # Track nothing and add by force
 *
 !src
+!src/test
 !Makefile
 !*.md
 !*.c

@@ -1,39 +1,29 @@
 /* -------------------------------------------------------- *
-main.c
-======
-
-This is the basis of hypno's web server.
-
-USAGE
------
-These are the options:
-  --start            Start new servers             
-  --debug            Set debug rules               
-  --kill             Test killing a server         
-  --fork             Daemonize the server          
-  --config <arg>     Use this file for configuration
-  --port <arg>       Set a differnt port           
-  --ssl              Use ssl or not..              
-  --user <arg>       Choose a user to start as     
-
-
-BUILDING
---------
-Lua is a necessity because of the configuration parsing. 
-
-Running make is all we need for now on Linux and OSX.  Windows
-will need some additional help and Cygwin as well.
-
-
-TODO
-----
-- Implement threaded model
-- Write a couple of different types of loggers
-- Add global root default for config.lua
-- Is it useful to move the configuration initialization to a
-  different part of the code.
-- Add an option to show a parsed config
-
+ * main.c
+ * ======
+ * 
+ * This is the basis of hypno's web server.
+ * 
+ * Usage
+ * -----
+ * These are the options:
+ *   --start            Start new servers             
+ *   --debug            Set debug rules               
+ *   --kill             Test killing a server         
+ *   --fork             Daemonize the server          
+ *   --config <arg>     Use this file for configuration
+ *   --port <arg>       Set a differnt port           
+ *   --ssl              Use ssl or not..              
+ *   --user <arg>       Choose a user to start as     
+ * 
+ * 
+ * Building
+ * --------
+ * Lua is a necessity because of the configuration parsing. 
+ * 
+ * Running make is all we need for now on Linux and OSX.  Windows
+ * will need some additional help and Cygwin as well.
+ * 
  * -------------------------------------------------------- */
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
@@ -116,11 +106,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	}
 
 	//This can have one global variable
-#ifndef DEBUG_H 
 	for ( ;; ) {
-#else
-	for ( int die = 0 ; die++ < DIE_X_TIMES; ) {
-#endif
 		//Client address and length?
 		int fd = 0, status;	
 		pid_t cpid; 

@@ -1,8 +1,8 @@
 /*server-test.c*/
-#include "server.h"
-#include "socket.h"
-#include "ctx-http.h"
-#include "ctx-https.h"
+#include "../server.h"
+#include "../socket.h"
+#include "../ctx-http.h"
+#include "../ctx-https.h"
 #define PORT 2020
 #define CTX 0 
 #define TESTDIR "tests/server/"
@@ -113,7 +113,7 @@ int server_loop ( int type ) {
 	}
 
 	//Handle the request
-	if ( !srv_response( fd, ctx ) ) {
+	if ( !srv_response( fd, ctx, NULL ) ) {
 		fprintf( stderr, "Error in response generation.\n" );
 		return 0;
 	}
