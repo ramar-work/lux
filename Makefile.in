@@ -42,11 +42,15 @@ CFLAGS = $(CLANGFLAGS)
 #CFLAGS = $(GCCFLAGS)
 CC = clang
 #CC = gcc
-SRC = vendor/zrender.c vendor/zhasher.c vendor/zwalker.c vendor/zhttp.c \
-	src/configs.c src/db-sqlite.c src/luabind.c src/mime.c \
-	src/socket.c src/util.c src/ctx-http.c src/ctx-https.c src/server.c \
-	src/loader.c src/mvc.c src/filter-static.c \
-	src/router.c #src/ctx-https.c src/filter-echo.c src/filter-lua.c src/filter-dirent.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
+SRC = \
+	@srcdir@/vendor/zrender.c @srcdir@/vendor/zhasher.c @srcdir@/vendor/zwalker.c \
+	@srcdir@/vendor/zhttp.c @srcdir@/src/configs.c @srcdir@/src/db-sqlite.c \
+	@srcdir@/src/luabind.c @srcdir@/src/mime.c @srcdir@/src/socket.c \
+	@srcdir@/src/util.c @srcdir@/src/ctx-http.c @srcdir@/src/ctx-https.c \
+	@srcdir@/src/server.c @srcdir@/src/loader.c @srcdir@/src/mvc.c \
+	@srcdir@/src/filter-static.c \
+	@srcdir@/src/router.c 
+#@srcdir@/src/ctx-https.c @srcdir@/src/filter-echo.c @srcdir@/src/filter-lua.c @srcdir@/src/filter-dirent.c @srcdir@/src/filter-c.c @srcdir@/src/xml.c @srcdir@/src/json.c @srcdir@/src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
 TESTS = loader database luabind router util #server render filter config 
 
@@ -91,15 +95,13 @@ test:
 
 # deps - Build some of the larger dependencies first (they take a minute)
 deps:
-	$(CC) $(CFLAGS) -o vendor/sqlite3.o -c vendor/sqlite3.c 
+	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
 
 # clean - Get rid of object files and tests 
 clean:
-	-@find src/ -maxdepth 1 -type f -name "*.o" | xargs rm
-	-@find bin/ -maxdepth 1 -type f | xargs rm
-	-@find vendor/ -maxdepth 1 -type f -name "*.o" ! -name "sqlite3.o" | xargs rm
-	-@rm hcli hypno
-	-@find -maxdepth 1 -type f -name "vgcore*" | xargs rm
+	-@find $(srcdir)/src/ -maxdepth 1 -type f -name "*.o" | xargs rm
+	-@find $(srcdir)/bin/ -maxdepth 1 -type f | xargs rm
+	-@find $(srcdir)/vendor/ -maxdepth 1 -type f -name "*.o" ! -name "sqlite3.o" | xargs rm
 
 # list - List all the targets and what they do
 list:
