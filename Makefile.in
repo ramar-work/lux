@@ -1,3 +1,4 @@
+# @configure_input@
 ## --------------------------------------------------------- ##
 ## Makefile
 ## 
@@ -11,10 +12,21 @@
 ## @author
 ## Copyright 2020 Tubular Modular Inc. dba Collins Design
 ## --------------------------------------------------------- ##
-NAME = hypno
+
+# Package-specific
+NAME = @PACKAGE_NAME@
+VERSION = @PACKAGE_VERSION@ 
+
+# Prefix-specific
+PREFIX = @prefix@
+EXEC_PREFIX = @exec_prefix@
+BINDIR = @bindir@
+
+# Security-specific
 USER = http
 GROUP = http
-OS = $(shell uname | sed 's/[_ ].*//')
+
+# Everything else
 LDFLAGS = -lgnutls -llua -ldl -lpthread -lsqlite3
 DEBUGFLAGS = -DSKIPMYSQL_H -DSKIPPGSQL_H -DFORK_H -DDEBUG_H
 CLANGFLAGS = -g -O0 -Wall -Werror -Wno-unused -Wno-format-security \
@@ -26,15 +38,13 @@ CFLAGS = $(CLANGFLAGS)
 #CFLAGS = $(GCCFLAGS)
 CC = clang
 #CC = gcc
-PREFIX = /usr/local
-VERSION = 0.3
-TESTS = loader database luabind router util #server render filter config 
 SRC = vendor/zrender.c vendor/zhasher.c vendor/zwalker.c vendor/zhttp.c \
 	src/configs.c src/db-sqlite.c src/luabind.c src/mime.c \
 	src/socket.c src/util.c src/ctx-http.c src/ctx-https.c src/server.c \
 	src/loader.c src/mvc.c src/filter-static.c \
 	src/router.c #src/ctx-https.c src/filter-echo.c src/filter-lua.c src/filter-dirent.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
+TESTS = loader database luabind router util #server render filter config 
 
 # main - Compiles all code needed to get hypno running
 main: $(OBJ)
@@ -66,11 +76,7 @@ repl:
 	lua -l libhypno - < tests/lua-db/dbtest.lua
  
 %.o: %.c 
-ifeq ($(OS),CYGWIN)
 	$(CC) -c -o $@ $< $(CFLAGS)
-else
-	$(CC) -c -o $@ $< $(CFLAGS)
-endif
 
 # test -  Build all test files
 test: $(OBJ) 
@@ -107,8 +113,8 @@ pkgtest:
 	git archive --format tar HEAD | \
 		gzip > $(NAME)-`git tag | tail -n 1`.tar.gz
 
-# makefile - Generate a Makefile appropriate for a regular user
-makefile:
+# umakefile - Generate a Makefile appropriate for a regular user
+nmakefile:
 	@sed '/^# /d' Makefile | cpp - | sed '/^# /d'
 
 # changelog - Generate a full changelog from the commit history
@@ -128,3 +134,9 @@ changelog:
 	@git log --full-history --author=Antonio | sed '{ s/^   /- /; }'
 	@printf "\n<link rel=stylesheet href=changelog.css>\n"
 #endif
+
+Makefile: Makefile.in config.status
+	./config.status $@
+
+config.status: configure
+	./config.status --recheck

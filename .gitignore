@@ -2,7 +2,10 @@
 *
 !src
 !src/test
-!Makefile
+#!Makefile
+!configure.ac
+!configure
+!Makefile.in
 !*.md
 !*.c
 !*.h
