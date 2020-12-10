@@ -1,3 +1,5 @@
+#include <limits.h>
+#include <stdlib.h>
 #include "luabind.h"
 #include "loader.h"
 #include "../vendor/zhasher.h"
@@ -20,8 +22,7 @@ struct lconfig {
 
 //Global config goes here
 struct sconfig {
-	const char *path;
-	const char *root_default;
+	char *path, *wwwroot;
 	struct lconfig **hosts;
 	zTable *src;
 };

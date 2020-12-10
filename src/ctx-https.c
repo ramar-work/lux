@@ -57,7 +57,7 @@ void destroy_gnutls ( struct gnutls_abstr *g ) {
 }
 
 
-const int post_gnutls ( int fd, struct cdata *conn, void **p ) {
+const int post_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *conn) {
 #if 0
 	struct gnutls_abstr *g = (struct gnutls_abstr *)*p;
 	destroy_gnutls( g );
@@ -102,7 +102,7 @@ static int process_credentials ( struct gnutls_abstr *g, struct lconfig **hosts 
 }
 
 
-const int pre_gnutls ( int fd, struct cdata *conn , void **p ) {
+const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *conn) {
 
 #if 0
 	//Allocate a structure for the request process

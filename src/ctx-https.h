@@ -77,9 +77,9 @@ struct gnutls_abstr {
 #endif
 };
 
-const int pre_gnutls ( int, struct cdata *, void ** );
+const int pre_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
 
-const int post_gnutls ( int, struct cdata *, void ** );
+const int post_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
 
 const int read_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
 

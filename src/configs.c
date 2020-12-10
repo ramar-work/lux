@@ -1,5 +1,5 @@
 //lconfig.c - Put all the config stuff into the same place
-#include "lconfig.h"
+#include "configs.h"
 
 //Free config tables
 static void free_t( zTable *t ) {
@@ -110,6 +110,42 @@ void dump_hosts ( struct lconfig **hosts ) {
 	}
 }
 
+
+static int check_server_root( char **item, char *err, int errlen ) {
+	struct stat sb;
+	char *rp = NULL;
+
+	//If null item
+	if ( !*item ) {
+		//It can be blank
+		return 1;
+	}
+
+	//If it starts with a '/', assume its absolute
+	if ( **item == '/' ) { 
+		if ( stat( *item, &sb ) > -1 )
+			return 1;
+		else {
+			snprintf( err, errlen, "wwwroot '%s' does not exist or is not accessible.", *item ); 
+			return 0;
+		}
+	}
+
+	//If it doesn't, then get the realpath
+	if ( ( rp = realpath( *item, NULL ) ) )
+		*item = rp;
+	else {
+		//Make a filename
+		snprintf( err, errlen, "wwwroot realpath() failure: %s.", strerror( errno ) );
+		return 0;
+	}
+
+		
+
+	return 1;
+}
+
+
 //build_server_config or get_server_config
 struct sconfig * build_server_config ( const char *file, char *err, int errlen ) {
 	FPRINTF( "Configuration parsing started...\n" );
@@ -174,12 +210,19 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 		return NULL;
 	}
 
-#if 0
+	//This is the web root 
+	config->wwwroot = loader_get_char_value( t, "wwwroot" ); 
+
 	//This is the global root default
-	if ( ( config->root_default = get_char_value( t, "root_default" ) ) ) {
-		config->root_default = strdup( config->root_default );
+	//config->root_default = loader_get_char_value( t, "root_default" ); 
+
+	//Die if the webroot is inaccessible
+	if ( config->wwwroot && !check_server_root( &config->wwwroot, err, errlen ) ) {
+		free_t( t );
+		free( config );
+		lua_close( L );
+		return NULL;
 	} 
-#endif
 
 	//Destroy lua_State and the tables...
 	//free_t( t );
@@ -193,6 +236,9 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 
 //Destroy the server oonfig file.
 void free_server_config( struct sconfig *config ) {
+	if ( !config ) {
+		return;
+	}
 #if 0
 	if ( config->hosts ) {
 		free_hosts( config->hosts );	
@@ -203,6 +249,7 @@ void free_server_config( struct sconfig *config ) {
 #endif
 	//free( config->path );
 	//free( config->root_default );
+	//FPRINTF( "%p\n", config ); getchar();
 	lt_free( config->src );
 	free( config->src );
 	free( config );

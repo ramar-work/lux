@@ -75,9 +75,21 @@ struct filter filters[] = {
 };
 
 
+//In lieu of an actual ctx object, we do this to mock pre & post which don't exist
+const 
+int fkctpre( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *c ) {
+	return 1;
+}
+
+const 
+int fkctpost( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *c) {
+	return 1;
+}
+
+
 //Define a list of "context types"
 struct senderrecvr sr[] = {
-	{ read_notls, write_notls, create_notls }
+	{ read_notls, write_notls, create_notls, NULL, fkctpre, fkctpost  }
 , { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls }
 ,	{ NULL }
 };
@@ -143,9 +155,10 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	#endif
 	#endif
 
-	#if 0
+	#ifdef NOFORK_H
 		struct cdata connection = {0};	
 		connection.flags = O_NONBLOCK;
+		connection.ctx = ctx;
 	
 		//Get IP here and save it for logging purposes
 		if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
@@ -154,7 +167,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 		for ( ;; ) {
 			//additionally, this one should block
-			if ( !srv_response( fd, ctx, &connection ) ) {
+			if ( !srv_response( fd, &connection ) ) {
 				FPRINTF( "Error in TCP socket handling.\n" );
 			}
 
@@ -171,7 +184,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		}
 	#endif
 
-	#if 1
+	#ifdef FORK_H
 		//Fork and serve a request 
 		if ( ( cpid = fork() ) == -1 ) {
 			//TODO: There is most likely a reason this didn't work.
@@ -204,8 +217,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 				if ( connection.count < 0 || connection.count > 5 ) {
 					FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
-					int status = close( fd );
-					if ( status == -1 ) {
+					if ( close( fd ) == -1 ) {
 						FPRINTF( "Error when closing child socket.\n" );
 					}
 					break;

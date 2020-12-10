@@ -85,7 +85,8 @@ int check_for_disallowed_files ( const char *path ) {
 
 
 //
-int filter_static ( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
+const int filter_static ( int dd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
+	(void)dd;
 	struct stat sb;
 	int fd = 0;
 	int size = 0;

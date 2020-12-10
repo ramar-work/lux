@@ -41,7 +41,7 @@
 #include "mime.h"
 #include "util.h"
 #include "luabind.h"
-#include "lconfig.h"
+#include "configs.h"
 #include "loader.h"
 #include "router.h"
 #include "mvc.h"

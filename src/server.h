@@ -35,7 +35,7 @@
 #include "luabind.h"
 #include "socket.h"
 #include "util.h"
-#include "lconfig.h"
+#include "configs.h"
 #include "../vendor/zhttp.h"
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
@@ -64,7 +64,7 @@ struct cdata {
 //Filter for each request interpreter 
 struct filter {
 	const char *name;
-	int (*filter)( struct HTTPBody *, struct HTTPBody *, struct cdata * );
+	const int (*filter)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
 };
 
 
@@ -74,8 +74,8 @@ struct senderrecvr {
 	const int (*write)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * ); 
 	void (*init)( void ** );
 	void (*free)( void ** );
-	const int (*pre)( int, struct cdata *, void ** );
-	const int (*post)( int, struct cdata *, void ** ); 
+	const int (*pre)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
+	const int (*post)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
 	const struct filter *filters;
 	const char *config;
 	void *data;

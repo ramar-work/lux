@@ -62,46 +62,50 @@ static struct filter * srv_check_filter ( const struct filter *filters, char *na
 
 
 //Check that the website's chosen directory is accessible and it's log directory is writeable.
-static int srv_check_dir ( struct lconfig *host, char *err, int errlen ) {
-	FPRINTF( "Checking directory at %s\n", host->dir );
+static int srv_check_dir ( struct cdata *conn, char *err, int errlen ) {
+	FPRINTF( "Checking directory at %s\n", conn->hconfig->dir );
 
 	//Check that log dir is accessible and writeable (or exists) - send 500 if not 
 	struct stat sb;
-	if ( !host->dir ) {
-		snprintf( err, errlen, "Directory for host '%s' does not exist.", host->name );
+	char *adir, dir[ 2048 ] = { 0 };
+
+	if ( !( adir = conn->hconfig->dir ) ) {
+		snprintf( err, errlen, "Directory for host '%s' does not exist.", conn->hconfig->name );
 		return 0;
 	}
 
-	//This check belongs within the filter...	
-	if ( stat( host->dir, &sb ) == -1 ) {
-		const char *fmt = "Log directory for host '%s' not accessible: %s.";
-		snprintf( err, errlen, fmt, host->dir, strerror(errno) );
+	if ( stat( adir, &sb ) == -1 ) {
+		//Try to build a full one
+		snprintf( dir, sizeof(dir), "%s/%s", conn->config->wwwroot, conn->hconfig->dir );
+		if ( stat( dir, &sb ) == -1 ) {
+			const char *fmt = "Directory for host '%s' not accessible: %s.";
+			snprintf( err, errlen, fmt, conn->hconfig->name, strerror(errno) );
+			return 0;
+		}
+		adir = dir;
+	}
+
+	if ( access( adir, W_OK ) == -1 ) {
+		const char *fmt = "Directory for host '%s' not writeable: %s.";
+		snprintf( err, errlen, fmt, conn->hconfig->name, strerror(errno) );
 		return 0;
 	}
 
-	if ( access( host->dir, W_OK ) == -1 ) {
-		const char *fmt = "Log directory for host '%s' not writeable: %s.";
-		snprintf( err, errlen, fmt, host->name, strerror(errno) );
-		return 0;
-	}
+	//TODO: Fix me
+	conn->hconfig->dir = strdup( adir );
 	return 1;
 }
 
 
-//Start the request by allocating things we'll always need.
-static int srv_start( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
+//Build server configuration
+static const int srv_start( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	FPRINTF( "Initial server allocation started...\n" );
-
-	//Build server config (because it can change)
 	char err[ 2048 ] = {0};
 	
 	conn->config = build_server_config( conn->ctx->config, err, sizeof(err) );
 	if ( !conn->config ) { 
-		//return http_set_error( res, 500, err );
-		//Kill the context
-		//Close the file
-		//Show me what happened and kill it...
-		return 0;
+		conn->count = -3;
+		return http_set_error( rs, 500, err );
 	}
 
 	FPRINTF( "Initial server allocation complete.\n" );
@@ -110,11 +114,13 @@ static int srv_start( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *co
 
 
 //Find the chosen host and generate a response via one of the selected filters
-static int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct cdata *conn) {
+static const int srv_proc( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata *conn) {
 	FPRINTF( "Proc started...\n" );
 	char err[2048] = {0};
 	zTable *t = NULL;
 	struct filter *filter = NULL;
+	int count = conn->count;	
+	conn->count = -3;
 
 	//With no default host, throw this 
 	if ( !req->host ) {
@@ -137,17 +143,41 @@ static int srv_proc( struct HTTPBody *req, struct HTTPBody *res, struct cdata *c
 		return http_set_error( res, 500, err ); 
 	}
 
-	if ( conn->hconfig->dir && !srv_check_dir( conn->hconfig, err, sizeof(err) ) ) {
+	if ( conn->hconfig->dir && !srv_check_dir( conn, err, sizeof(err) ) ) {
 		return http_set_error( res, 500, err ); 
 	}
 
 	//Finally, now we can evalute the filter and the route.
-	if ( !filter->filter( req, res, conn ) ) {
+	if ( !filter->filter( fd, req, res, conn ) ) {
 		return 0;
 	}
 
 	//You can add a header to tell things to close
+	conn->count = count;
 	FPRINTF( "Proc complete.\n" );
+	return 1;
+}
+
+
+//Generate a message in common log format: ip - - [date] "method path protocol" status clen
+static const int srv_log( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn) {
+	const char fmt[] = "%s %s %s [%s] \"%s %s %s\" %d %d";
+	const char datefmt[] = "%d/%b/%Y:%H:%M:%S %z";
+	char log[2048] = {0};
+	char date[2048] = {0};
+
+	//Generate the time	
+	time_t t = time(NULL);
+	struct tm *tmp = localtime(&t);
+	strftime( date, sizeof(date), datefmt, tmp );
+
+	//Bugs?
+	char *prot = ( rq->protocol ) ? rq->protocol : "HTTP/1.1";	
+
+	//Just print the log for now
+	snprintf( log, sizeof(log), fmt, 
+		conn->ipv4, "-", "-", date, rq->method, rq->path, prot, rs->status, rs->clen );
+	FPRINTF( "%s\n", log );
 	return 1;
 }
 
@@ -170,96 +200,41 @@ static int srv_end( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn
 }
 
 
-
-//Generate a message in common log format: ip - - [date] "method path protocol" status clen
-static void srv_log( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn) {
-	const char fmt[] = "%s %s %s [%s] \"%s %s %s\" %d %d";
-	const char datefmt[] = "%d/%b/%Y:%H:%M:%S %z";
-	char log[2048] = {0};
-	char date[2048] = {0};
-
-	//Generate the time	
-	time_t t = time(NULL);
-	struct tm *tmp = localtime(&t);
-	strftime( date, sizeof(date), datefmt, tmp );
-
-	//Bugs?
-	char *prot = ( rq->protocol ) ? rq->protocol : "HTTP/1.1";	
-	snprintf( prot, strlen(rq->protocol) + 1, "%s", rq->protocol );
-
-	//Just print the log for now
-	snprintf( log, sizeof(log), fmt, 
-		"127.0.0.1", "-", "-", date, rq->method, rq->path, prot, rs->status, rs->clen );
-	FPRINTF( "%s\n", log );
-}
-
-
 //Generate a response
 int srv_response ( int fd, struct cdata *conn ) {
 
 	struct HTTPBody rq = {0}, rs = {0};
-	//struct config *config = NULL;
 	char err[2048] = {0};
 	int status = 0;
 
-	//Initialize the userdata
-	//conn->ctx = ctx;
-	conn->status = 0;
+	const int (*rc[])( int, struct HTTPBody *, struct HTTPBody *, struct cdata *) = {
+		srv_start
+	, conn->ctx->pre
+	, conn->ctx->read
+	, srv_proc
+	, conn->ctx->write
+	, conn->ctx->post
+	, srv_log
+	};
 
-	//Parse our configuration here...
-	status = srv_start( &rq, &rs, conn );
-	if ( !status && conn->count == -2 ) {
-		srv_end( &rq, &rs, conn );
-		return 0;
-	}
-
-#if 0
-	//This is necessary for SSL
-	//Do any per-request initialization here.
-	if ( conn->ctx->pre ) {
-		if ( !( status = conn->ctx->pre( fd, config, &conn->ctx->data ) ) ) {
-
+	//A conn->count of -3 means stop and write the message immediately
+	for ( int i = 0; i < 7; i++ ) {
+		status = rc[i]( fd, &rq, &rs, conn );
+		if ( !status && conn->count == -3 && ( i = 3 ) )
+			continue;
+		else if ( !status && conn->count == -2 ) {
+			srv_end( &rq, &rs, conn );
+			return 0;
 		}
 	}
-#endif
 
-	//Read the message
-	status = conn->ctx->read( fd, &rq, &rs, (void *)conn );
-	if ( !status && conn->count == -2 ) {
-		srv_end( &rq, &rs, conn );
-		return 0;
-	}
-
-	//Generate a message
-	status && ( status = srv_proc( &rq, &rs, conn ) );
-	#if 0
-	if ( !status && conn->count == -2 ) {
-		return 0;
-	}
-	#endif
-
-	//Write the message	(should almost ALWAYS run)
-	//status = ctx->write( fd, &rq, &rs, ctx->data );
-	//status = ctx->write( fd, &rq, &rs, (void *)conn );
-	if ( !status && conn->count == -2 ) {
-		srv_end( &rq, &rs, conn );
-		return 0;
-	}
-
-	//Log the server problems (unless they were just bugs)
-	srv_log( &rq, &rs, conn );
-
-	//Per-request shut down goes here.
-	//ctx->post && ctx->post( fd, config, &ctx->data );
-
-#if 1
 	//End the request and return a status
 	srv_end( &rq, &rs, conn );
 
 	//Request should finish before we count this as an attempt. 
-	conn->count ++;
-#else
-#endif
+	if ( conn->count >= 0 ) {
+		conn->count ++;
+	}
 	return 1; 
 }
 

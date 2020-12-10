@@ -16,7 +16,7 @@ USER = http
 GROUP = http
 OS = $(shell uname | sed 's/[_ ].*//')
 LDFLAGS = -lgnutls -llua -ldl -lpthread -lsqlite3
-DEBUGFLAGS = -DSKIPMYSQL_H -DSKIPPGSQL_H -DDEBUG_H
+DEBUGFLAGS = -DSKIPMYSQL_H -DSKIPPGSQL_H -DNOFORK_H -DDEBUG_H
 CLANGFLAGS = -g -O0 -Wall -Werror -Wno-unused -Wno-format-security \
 	-fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
 GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing \
@@ -28,9 +28,9 @@ CC = clang
 #CC = gcc
 PREFIX = /usr/local
 VERSION = 0.3
-TESTS = config loader database luabind router util #server render filter
+TESTS = loader database luabind router util #server render filter config 
 SRC = vendor/zrender.c vendor/zhasher.c vendor/zwalker.c vendor/zhttp.c \
-	src/lconfig.c src/db-sqlite.c src/luabind.c src/mime.c \
+	src/configs.c src/db-sqlite.c src/luabind.c src/mime.c \
 	src/socket.c src/util.c src/ctx-http.c src/ctx-https.c src/server.c \
 	src/loader.c src/mvc.c src/filter-static.c \
 	src/router.c #src/ctx-https.c src/filter-echo.c src/filter-lua.c src/filter-dirent.c src/filter-c.c src/xml.c src/json.c src/dirent-filter.c

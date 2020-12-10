@@ -56,6 +56,9 @@ struct fp_iterator {
 	zTable *source;
 };
 
+int loader_get_int_value ( zTable *t, const char *key, int notFound );
+
+char * loader_get_char_value ( zTable *t, const char *key );
 
 int loader_run ( zTable *, const struct rule * ) ;
 
