@@ -22,6 +22,10 @@ PREFIX = @prefix@
 EXEC_PREFIX = @exec_prefix@
 BINDIR = @bindir@
 
+# VPATH-specific
+srcdir = @srcdir@
+VPATH = @srcdir@
+
 # Security-specific
 USER = http
 GROUP = http
@@ -48,13 +52,13 @@ TESTS = loader database luabind router util #server render filter config
 
 # main - Compiles all code needed to get hypno running
 main: $(OBJ)
-	-@test -d bin/ || mkdir bin/
-	$(CC) $(LDFLAGS) $(CFLAGS) src/main.c -o bin/$(NAME) $(OBJ) 
-	$(CC) $(LDFLAGS) $(CFLAGS) src/cli.c -o bin/hcli $(OBJ)
+	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)bin/
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/main.c -o $(srcdir)/bin/$(NAME) $(OBJ) 
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli.c -o $(srcdir)/bin/hcli $(OBJ)
 
 # install - Installs targets to $PREFIX/bin
 install:
-	cp bin/hypno bin/hcli $(PREFIX)/bin/
+	cp $(srcdir)/bin/hypno $(srcdir)/bin/hcli $(PREFIX)/bin/
 
 # examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
 examples: PORT=2222
@@ -62,7 +66,7 @@ examples:
 	@lua -e "a=loadfile( 'example/config.lua' )(); \
 		hosts = {}; for k,v in pairs(a.hosts) do table.insert( hosts, 'http://' .. k ) end; \
 		print( 'Hosts at example/config.lua are: ' .. table.concat( hosts, ', ' ) );"
-	bin/hypno --start --port $(PORT) --config example/config.lua 
+	$(srcdir)/bin/hypno --start --port $(PORT) --config $(srcdir)/example/config.lua 
 
 # repl - Build and test libraries for REPL usage
 #	test -f sqlite3.o || $(CC) $(CFLAGS) -fPIC -c vendor/sqlite3.c -o shared/sqlite3.o
@@ -82,7 +86,7 @@ repl:
 test: $(OBJ) 
 test: CFLAGS+=-DTEST_H
 test:
-	-@test -d bin/ || mkdir bin/
+	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	for t in $(TESTS); do $(CC) $(LDFLAGS) $(CFLAGS) -o bin/$$t src/test/$${t}-test.c $(OBJ); done
 
 # deps - Build some of the larger dependencies first (they take a minute)
