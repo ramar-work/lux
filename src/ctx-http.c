@@ -8,8 +8,7 @@
  *
  * Usage
  * -----
- * Compile me with: 
- * gcc -ldl -llua -o config vendor/single.o config.c luabind.c && ./config
+ * -
  *
  * LICENSE
  * -------

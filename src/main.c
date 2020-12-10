@@ -41,8 +41,6 @@
 #include "filter-c.h"
 #endif
 
-#define CTXTYPE 1
-
 #define eprintf(...) fprintf( stderr, "%s: ", "hypno" ) && fprintf( stderr, __VA_ARGS__ ) && fprintf( stderr, "\n" )
 
 const int defport = 2000;
