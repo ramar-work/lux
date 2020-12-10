@@ -42,10 +42,10 @@
 //Define an interval for polling 
 static const struct timespec __interval__ = { 0, 100000000 };
 
+
 //No-op
 void create_notls ( void **p ) { ; }
 
-#define MAXIMUS 1
 
 //Read a message that the server will use later.
 const int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
@@ -57,40 +57,19 @@ const int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct 
 	struct timespec timer = {0};
 	clock_gettime( CLOCK_REALTIME, &timer );	
 
-#if MAXIMUS
 	//Allocate space for the first call
 	if ( ( rq->msg = malloc( size ) ) == NULL ) {
 		return http_set_error( rs, 500, "Could not allocate initial read buffer." ); 
 	} 
-#endif
 
 	//Read first
 	for ( ;; ) {
 
 		int flags, rd, nsize = size * mult;
-	#if MAXIMUS
 		unsigned char *ptr = rq->msg;
 		ptr += ( nsize - size );
-	#else
-		unsigned char *ptr = NULL;
-		if ( ( ptr = rq->msg = realloc( rq->msg, nsize ) ) == NULL ) { 
-			return http_set_error( rs, 500, "Could not allocate read buffer." ); 
-		}
 
-		if ( !memset( ptr += (nsize - size), 0, size ) ) {
-			return http_set_error( rs, 500, "Could not zero out new read buffer." ); 
-		}
-	#endif
-
-	#if MAXIMUS
 		if ( ( rd = recv( fd, ptr, size, MSG_DONTWAIT ) ) == 0 ) {
-	#else
-		//Read a message
-		rd = recv( fd, ptr, size, MSG_DONTWAIT );
-	
-		//This says that we're receiving an overwhelming number of refreshes from a client.
-		if ( rd == 0 ) {
-	#endif
 			conn->count = -2; //most likely resources are unavailable
 			return 0;		
 		}
@@ -112,16 +91,14 @@ const int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct 
 			nanosleep( &__interval__, NULL );
 		}
 		else {
-			//Try to parse
 			rq->mlen += rd;
 			struct HTTPBody *tmp = http_parse_request( rq, err, sizeof(err) ); 
 	
-			//Is this handling everything?
+			//TODO: Is this handling everything?
 			if ( tmp->error == ZHTTP_NONE ) { 
 				FPRINTF( "All data received\n" );
 				break;
 			}
-		#if MAXIMUS
 			else if ( tmp->error != ZHTTP_INCOMPLETE_HEADER ) { // && tmp->error !=	ZHTTP_INCOMPLETE_REQUEST
 				FPRINTF( "Got fatal HTTP parser error: %s\n", err );
 				conn->count = -3;
@@ -135,23 +112,6 @@ const int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct 
 			FPRINTF( "Received %d bytes on fd %d\n", rd, fd ); 
 			clock_gettime( CLOCK_REALTIME, &timer );	
 			mult++;
-		#else
-			else if ( tmp->error == ZHTTP_INCOMPLETE_HEADER ) {
-				FPRINTF( "Got non-fatal HTTP parser error: %s.  Try reading again...\n", err );
-			}
-			else {
-				FPRINTF( "Got fatal HTTP parser error: %s\n", err );
-				conn->count = -3;
-				return http_set_error( rs, 500, err ); 
-			}
-
-			//Show read progress and data received, etc.
-			FPRINTF( "Received %d bytes on fd %d\n", rd, fd ); 
-
-			//Reset timer and allocate more space for read buffer
-			clock_gettime( CLOCK_REALTIME, &timer );	
-			mult++;
-		#endif
 		}
 	}
 	return 1;
@@ -164,7 +124,6 @@ const int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct
 	int sent = 0, pos = 0, try = 0;
 	int total = rs->mlen;
 	unsigned char *ptr = rs->msg;
-	//struct cdata *conn = (struct cdata *)p;
 
 	for ( ;; ) {	
 		sent = send( fd, ptr, total, MSG_DONTWAIT );
