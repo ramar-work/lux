@@ -39,17 +39,19 @@
  * ---------
  * 
  * ------------------------------------------- */
+#include <dlfcn.h>
 #include "../vendor/zhttp.h"
 #include "mime.h"
 #include "util.h"
 #include "configs.h"
 #include "render.h"
 #include "router.h"
+#include "server.h"
 
 #ifndef FILTER_C_H
 #define FILTER_C_H
 
-int filter_c ( struct HTTPBody *, struct HTTPBody *, void * );
+const int filter_c ( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
 
 typedef zTable * ( *Model )( struct HTTPBody *req, struct HTTPBody *res, int len );
 

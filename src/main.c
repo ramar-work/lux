@@ -35,10 +35,10 @@
 #include "socket.h"
 #include "filter-static.h"
 #include "filter-lua.h"
+#include "filter-c.h"
 #if 0
 #include "filter-dirent.h"
 #include "filter-echo.h"
-#include "filter-c.h"
 #endif
 
 #define eprintf(...) fprintf( stderr, "%s: ", "hypno" ) && fprintf( stderr, __VA_ARGS__ ) && fprintf( stderr, "\n" )
@@ -62,14 +62,15 @@ struct values {
 
 //Deifne a list of filters
 struct filter filters[] = {
-	{ "static", filter_static },
+	{ "static", filter_static }
+, { "c", filter_c }
 #if 0
   { "lua", filter_lua },
 , { "dirent", filter_dirent }
 , { "echo", filter_echo }
 , { "c", filter_c }
 #endif
-  { NULL }
+, { NULL }
 };
 
 

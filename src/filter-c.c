@@ -52,8 +52,8 @@
 	fprintf( stderr, __VA_ARGS__ )
 #endif
 
-#define HOMEDIR "/home/ramar/prj/hypno/"
 
+#if 0
 int resolved ( const char *path, const char **routes ) {
 	while ( routes && *routes ) {
 		if ( resolve( path, *routes ) ) return 1;
@@ -89,43 +89,46 @@ const char **copy_routes ( Route *routes ) {
 	}
 	return routelist;
 }
+#endif
 
 
-void print_routes ( Route *routes ) {
-	while ( routes->route ) {
-		fprintf(stderr,"\n");
-		FILTER_C_PRINT( "Route '%s'\n", routes->route );
-		routes++;		
-	}
-}
-
-
-int filter_c ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
-	zTable *model = NULL;
+//...
+const int filter_c ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata *conn ) {
+#if 0
 	Route *routelist, *route = NULL;
+#endif
+
+	zTable *model = NULL;
 	const char *apppath = "/app/app.so"; //or "/app.so"
 	void *app = NULL;
-	struct config *config = NULL;
+	struct sconfig *config = NULL;
 	char err[ 2048 ] = { 0 };
 	char filename[ 2048 ] = { 0 };
 	uint8_t *msg = NULL;
 	int msglen = 0;
 
-	//Get config	
-	if ( !(config = (struct config *)ctx) ) 
+#if 1
+	//Get config (this should never happen)
+	if ( !(config = (struct sconfig *)conn->ctx) ) {
+		conn->count = -3;	
 		return http_set_error( res, 500, "failed to load clobal config." );
+	}
+#endif
 
 	//Execute static resources first...
-	if ( check_static_prefix( req->path, "static" ) )
-		return filter_static( req, res, config );
+	if ( check_static_prefix( req->path, "static" ) ) {
+		return filter_static( fd, req, res, conn );
+	}
 
 	FILTER_C_PRINT( "Config ptr at: %p\n", config );
 
-	if ( snprintf( filename, sizeof( filename ), "%s%s", config->path, apppath ) == -1 )
+	if ( snprintf( filename, sizeof( filename ), "%s%s", config->path, apppath ) == -1 ) {
 		return http_set_error( res, 500, "Path failed." );
+	}
 
 	FILTER_C_PRINT( "Loading app at: %s\n", filename );
 
+	//Try opening the app
 	if ( !( app = dlopen( filename, RTLD_LAZY ) ) ) {
 		snprintf( err, sizeof( err ), "Could not open application: %s.", dlerror() );
 		return http_set_error( res, 500, err ); 
@@ -133,6 +136,7 @@ int filter_c ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 
 	FILTER_C_PRINT( "App initialized at: %p\n", app );
 
+#if 0
 	//Find the routes (should always be called routes)
 	if ( !( routelist = ( Route * ) dlsym( app, "routes" )) ) {
 		dlclose( app ); 
@@ -189,6 +193,7 @@ int filter_c ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 		}
 		route->views++;
 	}
+#endif
 
 	if ( dlclose( app ) == -1 ) {
 		snprintf( err, sizeof( err ), "Failed to close application: %s\n", strerror( errno ) );
@@ -196,13 +201,26 @@ int filter_c ( struct HTTPBody *req, struct HTTPBody *res, void *ctx ) {
 	}
 
 	FILTER_C_PRINT( "App now closed, address is: %p\n", app );
-	//return http_set_error( res, 200, "This is a C app, and it sucks..." );
+#if 1
+	return http_set_error( res, 200, "This is a C app, and it sucks..." );
+#else
 	http_set_status( res, 200 );
 	http_set_ctype( res, "text/html" );
 	http_set_content( res, msg, msglen );
 	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
 		return http_set_error( res, 500, err );
 	}
-
 	return 1;
+#endif
 }
+
+
+void print_routes ( Route *routes ) {
+	while ( routes->route ) {
+		fprintf(stderr,"\n");
+		FILTER_C_PRINT( "Route '%s'\n", routes->route );
+		routes++;		
+	}
+}
+
+

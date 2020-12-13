@@ -84,7 +84,13 @@ int check_for_disallowed_files ( const char *path ) {
 }
 
 
-//
+//Return a block of data
+unsigned char * getdoc ( const char *path ) {
+	return NULL;
+}
+
+
+//...
 const int filter_static ( int dd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	(void)dd;
 	struct stat sb;
