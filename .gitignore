@@ -1,5 +1,6 @@
 # Track nothing and add by force
 *
+!example/*
 !src
 !src/test
 #!Makefile
