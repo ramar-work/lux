@@ -32,7 +32,7 @@ GROUP = http
 
 # Everything else
 LDFLAGS = -lgnutls -llua -ldl -lpthread -lsqlite3
-DEBUGFLAGS = -DSKIPMYSQL_H -DSKIPPGSQL_H -DFORK_H -DDEBUG_H
+DEBUGFLAGS = -DSKIPMYSQL_H -DSKIPPGSQL_H -DNOFORK_H -DDEBUG_H
 CLANGFLAGS = -g -O0 -Wall -Werror -Wno-unused -Wno-format-security \
 	-fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
 GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing \
@@ -48,11 +48,15 @@ SRC = \
 	@srcdir@/src/luabind.c @srcdir@/src/mime.c @srcdir@/src/socket.c \
 	@srcdir@/src/util.c @srcdir@/src/ctx-http.c @srcdir@/src/ctx-https.c \
 	@srcdir@/src/server.c @srcdir@/src/loader.c @srcdir@/src/mvc.c \
-	@srcdir@/src/filter-static.c @srcdir@/src/filter-c.c \
-	@srcdir@/src/router.c 
+	@srcdir@/src/router.c @srcdir@/src/filter-static.c \
+	@srcdir@/src/filter-c.c \
+	@srcdir@/src/filter-echo.c
+
 #@srcdir@/src/ctx-https.c @srcdir@/src/filter-echo.c @srcdir@/src/filter-lua.c @srcdir@/src/filter-dirent.c @srcdir@/src/filter-c.c @srcdir@/src/xml.c @srcdir@/src/json.c @srcdir@/src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
+
 TESTS = loader database luabind router util #server render filter config 
+
 
 # main - Compiles all code needed to get hypno running
 main: $(OBJ)

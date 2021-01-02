@@ -42,10 +42,11 @@
 #include "../vendor/zhttp.h"
 #include "mime.h"
 #include "util.h"
+#include "server.h"
 
 #ifndef FILTER_ECHO_H
 #define FILTER_ECHO_H
 
-int filter_echo ( struct HTTPBody *, struct HTTPBody *, void * );
+const int filter_echo ( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
 
 #endif

@@ -23,7 +23,7 @@
  * --------
  * Lua is a necessity because of the configuration parsing. 
  * 
- * Running make is all we need for now on Linux and OSX.  Windows
+ * Running `make` is all we need for now on Linux and OSX.  Windows
  * will need some additional help and Cygwin as well.
  * 
  * -------------------------------------------------------- */
@@ -36,12 +36,15 @@
 #include "filter-static.h"
 #include "filter-lua.h"
 #include "filter-c.h"
+#include "filter-echo.h"
 #if 0
 #include "filter-dirent.h"
-#include "filter-echo.h"
 #endif
 
-#define eprintf(...) fprintf( stderr, "%s: ", "hypno" ) && fprintf( stderr, __VA_ARGS__ ) && fprintf( stderr, "\n" )
+#define eprintf(...) \
+	fprintf( stderr, "%s: ", "hypno" ) && \
+	fprintf( stderr, __VA_ARGS__ ) && \
+	fprintf( stderr, "\n" )
 
 const int defport = 2000;
 
@@ -60,15 +63,14 @@ struct values {
 };
 
 
-//Deifne a list of filters
+//Define a list of filters
 struct filter filters[] = {
 	{ "static", filter_static }
 , { "c", filter_c }
+, { "echo", filter_echo }
 #if 0
   { "lua", filter_lua },
 , { "dirent", filter_dirent }
-, { "echo", filter_echo }
-, { "c", filter_c }
 #endif
 , { NULL }
 };
