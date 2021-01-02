@@ -49,8 +49,9 @@
  * ------------------------------------------- */
 #include "../loader.h"
 #include "../util.h"
-#include "../hosts.h"
-#include "../routes.h"
+#include "../configs.h"
+//#include "../hosts.h"
+//#include "../routes.h"
 #include "../luautil.h"
 
 #define TESTDIR "tests/loader/"
@@ -158,7 +159,7 @@ int test_hosts_handler ( zKeyval * kv, int i, void *p ) {
 		FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count ); 
 		nt = loader_shallow_copy( st, i+1, i+count );
 		w = malloc( sizeof( struct lconfig ) );
-		memset( w, 0, sizeof(struct host) );
+		memset( w, 0, sizeof( struct lconfig ) );
 		const struct rule rules[] = {
 			{ "alias", "s", .v.s = &w->alias },
 			{ "dir", "s", .v.s = &w->dir },

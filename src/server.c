@@ -219,8 +219,8 @@ int srv_response ( int fd, struct cdata *conn ) {
 
 	//A conn->count of -3 means stop and write the message immediately
 	for ( int i = 0; i < 7; i++ ) {
-		status = rc[i]( fd, &rq, &rs, conn );
-		if ( !status && conn->count == -3 && ( i = 3 ) )
+		//if ( !status && conn->count == -3 && ( i = 3 ) )
+		if ( !( status = rc[i]( fd, &rq, &rs, conn ) ) && conn->count == -3 && ( i = 3 ) )
 			continue;
 		else if ( !status && conn->count == -2 ) {
 			srv_end( &rq, &rs, conn );

@@ -237,8 +237,9 @@ int loader_run ( zTable *t, const struct rule *rule ) {
 			FPRINTF( "Type not set for rule key '%s'\n", rule->key );
 		}
 		else if ( *rule->type == 's' ) {
+			char *s = loader_get_char_value( t, rule->key );
+			*rule->v.s = strdup( s );
 			FPRINTF( "Got value '%s' for rule key '%s'\n", *rule->v.s, rule->key ); 
-			*rule->v.s = strdup( loader_get_char_value( t, rule->key ) ); 
 		}
 		else if ( *rule->type == 'i' ) { 
 			FPRINTF( "Got value '%d' for rule key '%s'\n", *rule->v.i, rule->key ); 
@@ -324,6 +325,7 @@ void loader_free ( const struct rule *rule ) {
 		else {
 			FPRINTF( "Unknown type set for rule key '%s'\n", rule->key );
 		}
+		rule++;
 	}
 }
 

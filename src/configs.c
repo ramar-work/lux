@@ -35,8 +35,7 @@ static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
 		};
 
 		w->name = kv->key.v.vchar;
-		if ( !loader_run( nt, rules ) ) {
-		}
+		loader_run( nt, rules );
 		lt_free( nt );
 		free( nt );
 		add_item( hosts, w, struct lconfig *, &f->len );
@@ -72,7 +71,9 @@ static struct lconfig ** build_hosts ( zTable *t ) {
 		{ NULL }
 	};
 
-	loader_run( t, rules );
+	if ( !loader_run( t, rules ) ) {
+		//...
+	}
 	return hosts;
 }
 
@@ -81,7 +82,7 @@ static struct lconfig ** build_hosts ( zTable *t ) {
 void free_hosts ( struct lconfig ** hlist ) {
 	struct lconfig **hosts = hlist;
 	while ( hosts && (*hosts) ) {
-		static int i;
+		FPRINTF( "Freeing host %s\n", (*hosts)->name );
 		free( (*hosts)->alias );
 		free( (*hosts)->dir );
 		free( (*hosts)->filter );
@@ -111,6 +112,7 @@ void dump_hosts ( struct lconfig **hosts ) {
 }
 
 
+//...
 static int check_server_root( char **item, char *err, int errlen ) {
 	struct stat sb;
 	char *rp = NULL;
@@ -132,15 +134,15 @@ static int check_server_root( char **item, char *err, int errlen ) {
 	}
 
 	//If it doesn't, then get the realpath
-	if ( ( rp = realpath( *item, NULL ) ) )
+	if ( ( rp = realpath( *item, NULL ) ) ) {
+		free( *item );
 		*item = rp;
+	}
 	else {
 		//Make a filename
 		snprintf( err, errlen, "wwwroot realpath() failure: %s.", strerror( errno ) );
 		return 0;
 	}
-
-		
 
 	return 1;
 }
@@ -211,10 +213,10 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 	}
 
 	//This is the web root 
-	config->wwwroot = loader_get_char_value( t, "wwwroot" ); 
+	config->wwwroot = strdup( loader_get_char_value( t, "wwwroot" ) ); 
 
 	//This is the global root default
-	//config->root_default = loader_get_char_value( t, "root_default" ); 
+	//config->root_default = strdup( loader_get_char_value( t, "root_default" ) ); 
 
 	//Die if the webroot is inaccessible
 	if ( config->wwwroot && !check_server_root( &config->wwwroot, err, errlen ) ) {
@@ -225,7 +227,6 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 	} 
 
 	//Destroy lua_State and the tables...
-	//free_t( t );
 	config->src = t;	
 	lua_close( L );
 	FPRINTF( "Configuration parsing complete.\n" );
@@ -239,15 +240,17 @@ void free_server_config( struct sconfig *config ) {
 	if ( !config ) {
 		return;
 	}
-#if 0
+
 	if ( config->hosts ) {
 		free_hosts( config->hosts );	
 	}
+
+#if 0
 	if ( config->routes ) {
 		free_routes( config->routes );
 	}
 #endif
-	//free( config->path );
+	free( config->wwwroot );
 	//free( config->root_default );
 	//FPRINTF( "%p\n", config ); getchar();
 	lt_free( config->src );

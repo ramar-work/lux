@@ -22,7 +22,8 @@ struct lconfig {
 
 //Global config goes here
 struct sconfig {
-	char *path, *wwwroot;
+	char *path; 
+	char *wwwroot;
 	struct lconfig **hosts;
 	zTable *src;
 };

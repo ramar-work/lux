@@ -23,8 +23,8 @@
  * --------
  * Lua is a necessity because of the configuration parsing. 
  * 
- * Running `make` is all we need for now on Linux and OSX.  Windows
- * will need some additional help and Cygwin as well.
+ * Running `make` is all we need for now on Linux and OSX.  
+ * Windows will need some additional help and Cygwin as well.
  * 
  * -------------------------------------------------------- */
 #include "../vendor/zwalker.h"
@@ -45,6 +45,14 @@
 	fprintf( stderr, "%s: ", "hypno" ) && \
 	fprintf( stderr, __VA_ARGS__ ) && \
 	fprintf( stderr, "\n" )
+
+#ifdef LEAKTEST_H
+ #define CONN_CONTINUE int i=0; i<1; i++
+ #define CONN_CLOSE 1
+#else
+ #define CONN_CONTINUE ;;
+ #define CONN_CLOSE 0 
+#endif
 
 const int defport = 2000;
 
@@ -123,7 +131,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	}
 
 	//This can have one global variable
-	for ( ;; ) {
+	for ( CONN_CONTINUE ) {
 		//Client address and length?
 		int fd = 0, status;	
 		pid_t cpid; 
@@ -171,8 +179,8 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			if ( !srv_response( fd, &connection ) ) {
 				FPRINTF( "Error in TCP socket handling.\n" );
 			}
-
-			if ( connection.count < 0 || connection.count > 5 ) {
+			
+			if ( CONN_CLOSE || connection.count < 0 || connection.count > 5 ) {
 				FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
 				int status = close( fd );
 				if ( status == -1 ) {
@@ -216,7 +224,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 					FPRINTF( "Error in TCP socket handling.\n" );
 				}
 
-				if ( connection.count < 0 || connection.count > 5 ) {
+				if ( CONN_CLOSE || connection.count < 0 || connection.count > 5 ) {
 					FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
 					if ( close( fd ) == -1 ) {
 						FPRINTF( "Error when closing child socket.\n" );
