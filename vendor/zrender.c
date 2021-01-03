@@ -16,10 +16,10 @@ static char * replace_chars ( char *src, int srclen ) {
 
 
 //Didn't I write something to add to a buffer?
-void extract_table_value ( zKeyval *lt, uint8_t **ptr, int *len, uint8_t *t, int tl ) {
+void extract_table_value ( zKeyval *lt, unsigned char **ptr, int *len, unsigned char *t, int tl ) {
 	if ( lt->value.type == LITE_TXT ) {
 		*len = strlen( lt->value.v.vchar ); 
-		*ptr = (uint8_t *)lt->value.v.vchar;
+		*ptr = (unsigned char *)lt->value.v.vchar;
 	}
 
 	else if ( lt->value.type == LITE_BLB ) {
@@ -28,12 +28,12 @@ void extract_table_value ( zKeyval *lt, uint8_t **ptr, int *len, uint8_t *t, int
 	}
 	else if ( lt->value.type == LITE_INT ) {
 		*len = snprintf( (char *)t, tl - 1, "%d", lt->value.v.vint );
-		*ptr = (uint8_t *)t;
+		*ptr = (unsigned char *)t;
 	}
 	else {
 		//If for some reason we can't convert, just use a blank value.
 		*len = 0;
-		*ptr = (uint8_t *)"";
+		*ptr = (unsigned char *)"";
 	}
 }
 
@@ -62,7 +62,7 @@ MAPPER(map_loop_start) {
 	int hlen = 0;
 	int blen = 0;
 	int element_count = 0;
-	uint8_t bbuf[ 2048 ] = { 0 };
+	unsigned char bbuf[ 2048 ] = { 0 };
 	zTable *tt = (zTable *)t;
 	RPRINTF( "LOOP_START", ptr, len );
 
@@ -176,7 +176,7 @@ MAPPER(map_complex_extract) {
 			//Generate the hash strings
 			if ( 1 ) {
 			struct map **xx = *parent;
-			uint8_t tr[ 2048 ] = { 0 };
+			unsigned char tr[ 2048 ] = { 0 };
 			int trlen = 0;
 			
 			for ( int ii=0; ii < *plen; ii++ ) {
@@ -268,7 +268,7 @@ EXTRACTOR(extract_simple_extract) {
 		int hash = **( (**row)->hashList ); 
 		if ( hash > -1 ) { 
 			zKeyval *lt = lt_retkv( t, hash );
-			uint8_t *iptr = NULL, nbuf[ 64 ] = { 0 };
+			unsigned char *iptr = NULL, nbuf[ 64 ] = { 0 };
 			int itemlen = 0;
 			extract_table_value( lt, &iptr, &itemlen, nbuf, sizeof(nbuf) ); 
 			append_to_uint8t( dst, dlen, iptr, itemlen );
@@ -288,7 +288,7 @@ EXTRACTOR(extract_complex_extract) {
 		if ( ( hash = **list ) > -1 ) {
 			zKeyval *lt = lt_retkv( t, hash );
 			//NOTE: At this step, nobody should care about types that much...
-			uint8_t *iptr = NULL, nbuf[ 64 ] = { 0 };
+			unsigned char *iptr = NULL, nbuf[ 64 ] = { 0 };
 			int itemlen = 0;
 			extract_table_value( lt, &iptr, &itemlen, nbuf, sizeof(nbuf) ); 
 			append_to_uint8t( dst, dlen, iptr, itemlen );
@@ -337,7 +337,7 @@ void zrender_set_default_dialect( zRender *rz ) {
 
 
 //...
-struct map * init_map () {
+struct map * init_map ( int action ) {
 	struct map *rp = malloc( sizeof( struct map ) );
 	if ( !rp ) {
 		//Free and destroy things
@@ -345,7 +345,7 @@ struct map * init_map () {
 	}
 
 	memset( rp, 0, sizeof( struct map ) );
-	rp->action = 0; 
+	rp->action = action; 
 	rp->ptr = NULL; 
 	rp->len = 0; 
 	rp->hashList = NULL; 
@@ -380,11 +380,11 @@ void zrender_set( zRender *rz, const char map, Mapper mp, Extractor xp ) {
 
 
 //Trim an unsigned character block 
-uint8_t *zrender_trim ( uint8_t *msg, const char *trim, int len, int *nlen ) {
+unsigned char *zrender_trim ( const unsigned char *msg, const char *trim, int len, int *nlen ) {
 	//Define stuff
-	//uint8_t *m = msg;
-	uint8_t *forwards = msg;
-	uint8_t *backwards = &msg[ len - 1 ];
+	//unsigned char *m = msg;
+	unsigned char *forwards = (unsigned char *)msg;
+	unsigned char *backwards = (unsigned char *)&msg[ len - 1 ];
 	int nl = len;
 	int tl = strlen( trim );
 	while ( nl ) {
@@ -403,72 +403,71 @@ uint8_t *zrender_trim ( uint8_t *msg, const char *trim, int len, int *nlen ) {
 
 
 //Check that the data is balanced.
-int zrender_check_balance ( zRender *rz, const uint8_t *src, int srclen ) {
-
-	//This is the syntax to check for...
+int zrender_check_balance ( zRender *rz, const unsigned char *src, int srclen ) {
 	zWalker r;
 	memset( &r, 0, sizeof( zWalker ) );
-	//Check these counts at the end...	
-	int startList = 0, endList = 0;
+	unsigned char check[] = { rz->zStart[0], rz->zEnd[0], '\n' };
+	struct pos { int a, b, l, lp; } set[128] = {0}; 
+	int sl = 0, el = 0, nl = 0, mark = 0;
 
 	//just check that the list is balanced
-	while ( memwalk( &r, src, (uint8_t *)"{}", srclen, 2 ) ) {
-		if ( r.size == 0 ) {
-			if ( r.chr == '{' ) {
-				startList ++;
-			}	
-			else if ( r.chr == '}' ) {
-				endList ++;
-			}	
+	while ( memwalk( &r, src, check, srclen, 3 ) ) {
+		if ( r.chr == '\n' ) 
+			nl++, set[ sl ].lp = r.pos;
+		else if ( r.chr == check[0] && *r.ptr == check[0] )
+			mark = 1, set[ sl ].a = r.pos, set[ sl ].l = nl, sl++;
+		else if ( mark == 1 && r.chr == check[1] && *r.ptr == check[1] ) {
+			//start list must be marked first, or don't go
+			mark = 0, set[ sl ].b = r.pos, set[ sl ].l = nl, el++;
 		}	
 	}
 
-	FPRINTF( "%s: %d ?= %d\n", __func__, startList, endList );
-	return ( startList == endList );
+	if ( sl != el ) {
+		//print an error message...
+		//rz->error = ZRENDER_SYNTAX;
+		for ( int i = 0; i <= sl; i++ ) {
+			if ( set[i].b == 0 ) {
+				const char fmt[] = "No matching terminator found for sequence at line %d, pos %d\n";
+				snprintf( rz->errmsg, 1024, fmt, set[i].l, set[i].a - set[i].lp ); 
+				return 0;
+			}	
+		}
+	}
+
+	return 1; 
 }
 
 
 //Convert userdata to an array map
-struct map ** zrender_userdata_to_map ( zRender *rz, const uint8_t *src, int srclen ) {
-	struct map **rr = NULL ; 
-	struct parent **pp = NULL;
-	struct map **pr = NULL;
-	int rrlen = 0;
-	int pplen = 0;
-	zWalker r;
-	memset( &r, 0, sizeof( zWalker ) );
+struct map ** zrender_userdata_to_map ( zRender *rz, const unsigned char *src, int srclen ) {
+	struct map **rr = NULL, **pr = NULL;
+	int rrlen = 0, pplen = 0;
+	zWalker r = { 0 };
 
 	//The check map is now dynamically generated
-	uint8_t check[] = { rz->zStart[0], rz->zEnd[0] };
+	unsigned char check[] = { rz->zStart[0], rz->zEnd[0] };
 	int checklen = 2;//sizeof(check);
 
 	//Allocating a list of characters to elements is easiest.
-	while ( memwalk( &r, (uint8_t *)src, check, srclen, checklen ) ) {
-		//More than likely, I'll always use a multi-byte delimiter
-		//FPRINTF( "MOTION == %s\n", DUMPACTION( rp->action ) );
+	while ( memwalk( &r, (unsigned char *)src, check, srclen, checklen ) ) {
 		struct zrSet *z = NULL; 
-		if ( r.size == 0 && r.chr == '{' ) {
-		}
-		else if ( r.chr != '}' ) {
-			//We can simply copy if ACTION & BLOCK are 0 
-			struct map *rp = init_map();
-			rp->action = 0;  
+		if ( r.chr == '{' && *r.ptr == '{' ) {
+			struct map *rp = init_map( 0 );
 			if ( ( z = rz->mapset[ 0 ] ) ) {
-				z->mapper( rp, NULL, NULL, (uint8_t *)&src[ r.pos ], r.size, rz->userdata );
+				z->mapper( rp, NULL, NULL, (unsigned char *)&src[ r.pos ], r.size - 1, rz->userdata );
 				add_item( &rr, rp, struct map *, &rrlen );
 			}
 		}
-		else if ( src[ r.pos + r.size + 1 ] == '}' ) {
+		else if ( r.chr == '}' && *r.ptr == '}' )	 {
 			//Start extraction...
 			int alen=0, nlen = 0;	
-			struct map *rp = init_map();
-			uint8_t *p = zrender_trim( (uint8_t *)&src[ r.pos ], " ", r.size, &nlen );
-			rp->action = *p;  
+			unsigned char *p = zrender_trim( (unsigned char *)&src[ r.pos ], " ", r.size - 1, &nlen );
+			struct map *rp = init_map( *p );
 
 			//If no character handler exists, we fallback to 1
 			if ( ( z = rz->mapset[ *p ] ) || ( z = rz->mapset[1] ) ) {
 				//This should probably return some kind of error...
-				FPRINTF("RUNNING MAPPER on %c\n", rp->action ? ( ( rp->action == 1 ) ? 'S' : rp->action ) : 'R' );
+				//FPRINTF("RUNNING MAPPER on %c\n", rp->action ? ( ( rp->action == 1 ) ? 'S' : rp->action ) : 'R' );
 				p = zrender_trim( p, ". #/$`!\t", nlen, &alen );
 				z->mapper( rp, &pr, &pplen, p, alen, rz->userdata ); 
 				add_item( &rr, rp, struct map *, &rrlen );
@@ -476,7 +475,14 @@ struct map ** zrender_userdata_to_map ( zRender *rz, const uint8_t *src, int src
 		}
 	}
 
-	//zrender_print_table( rr );getchar();
+	//copy at the end all sloppy like...
+	struct zrSet *z = NULL; 
+	struct map *rp = init_map( 0 );
+	if ( ( z = rz->mapset[ 0 ] ) ) {
+		z->mapper( rp, NULL, NULL, (unsigned char *)&src[ r.pos ], srclen - r.pos, rz->userdata );
+		add_item( &rr, rp, struct map *, &rrlen );
+	}
+
 #if 0
 	//Move through each of the rows 
 	//Destroy the parent list
@@ -488,16 +494,12 @@ struct map ** zrender_userdata_to_map ( zRender *rz, const uint8_t *src, int src
 
 
 //Merge the values referenced in the map array into an unsigned character block
-uint8_t *zrender_map_to_uint8t ( zRender *rz, struct map **xmap, int *newlen ) {
+unsigned char *zrender_map_to_uint8t ( zRender *rz, struct map **xmap, int *newlen ) {
 	//...
-	uint8_t *block = NULL;
+	unsigned char *block = NULL;
 	int blocklen = 0;
-	//struct dep depths[10] = { { 0, 0, 0 } };
-	//struct dep *d = depths;
-	struct ptr *ptr, mptr[10] = { { 0, 0, 0 } };
-	ptr = mptr;
-
-	//...
+	struct ptr mptr[10] = { { 0, 0, 0 } };
+	struct ptr *ptr = mptr;
 	struct map **map = xmap;
 
 	while ( *map ) {
@@ -518,12 +520,12 @@ uint8_t *zrender_map_to_uint8t ( zRender *rz, struct map **xmap, int *newlen ) {
 
 
 //Do all the steps to make templating quick and easy.
-uint8_t *zrender_render( zRender *rz, const uint8_t *src, int srclen, int *newlen ) {
+unsigned char *zrender_render( zRender *rz, const unsigned char *src, int srclen, int *newlen ) {
 
 	//Define things
 	struct map **map = NULL;
-	uint8_t *block = NULL;
-	int blocklen = 0;
+	unsigned char *buf = NULL;
+	int buflen = 0;
 
 	//TODO: Mark the place where the thing is undone
 	if ( !zrender_check_balance( rz, src, srclen ) ) {
@@ -538,17 +540,17 @@ uint8_t *zrender_render( zRender *rz, const uint8_t *src, int srclen, int *newle
 	}
 
 	//TODO: Same to catch errors here...
-	if ( !( block = zrender_map_to_uint8t( rz, map, &blocklen ) ) ) {
+	if ( !( buf = zrender_map_to_uint8t( rz, map, &buflen ) ) ) {
 		return NULL;
 	}
 
-	*newlen = blocklen;
-	return block; 
+	*newlen = buflen;
+	return buf; 
 }
 
 
 //Destroy the zRender structure
-void zrender_free( struct map **map ) {
+void zrender_free_table( struct map **map ) {
 	struct map **top = map;
 
 	while ( *map ) {
@@ -583,6 +585,11 @@ void zrender_free( struct map **map ) {
 }
 
 
+void zrender_free( zRender *z ) {
+
+}
+
+
 #ifdef DEBUG_H
 //Purely for debugging, see what came out
 void zrender_print_table( struct map **map ) {
@@ -593,7 +600,7 @@ void zrender_print_table( struct map **map ) {
 		FPRINTF( "[%3d] => action: %-16s", di++, DUMPACTION( item->action ) );
 
 		if ( item->action == RAW || item->action == EXECUTE ) {
-			uint8_t *p = (uint8_t *)item->ptr;
+			unsigned char *p = (unsigned char *)item->ptr;
 			fprintf( stderr, " len: %3d, ", item->len ); 
 			write( 2, p, item->len );
 			fprintf( stderr, "\n" );

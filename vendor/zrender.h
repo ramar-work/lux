@@ -1,6 +1,6 @@
-#include "zwalker.h"
-#include "zhasher.h"
-#include "../src/util.h"
+#include "vendor/zwalker.h"
+#include "vendor/zhasher.h"
+#include "vendor/util.h"
 
 
 #ifndef RENDER_H
@@ -19,7 +19,7 @@
 	void name ( struct map ***row, uint8_t **dst, int *dlen, uint8_t *src, int len, struct ptr **ptr, void *t )
 
 #define MAPPER(name) \
-	void name ( struct map *row, struct map ***parent, int *plen, uint8_t *ptr, int len, void *t )
+	void name ( struct map *row, struct map ***parent, int *plen, unsigned char *ptr, int len, void *t )
 
 
 enum {
@@ -69,6 +69,8 @@ typedef struct zRender {
 	const char *zStart, *zEnd;
 	void *userdata;
 	int zrlen;
+	int error;
+	char errmsg[1024];
 	struct zrSet *mapset[128]; //takes up more space
 } zRender;
 
@@ -82,13 +84,16 @@ uint8_t *zrender_render ( zRender *, const uint8_t *, int, int * );
 int zrender_check_balance ( zRender *, const uint8_t *, int );
 void zrender_free_table( struct map **map );
 int * zrender_copy_int ( int i ) ;
-uint8_t *zrender_trim ( uint8_t *msg, const char *trim, int len, int *nlen ) ;
+uint8_t *zrender_trim ( const uint8_t *msg, const char *trim, int len, int *nlen ) ;
 
 zRender * zrender_init();
 void zrender_set_boundaries ( zRender *, const char *, const char *);
 void zrender_set_fetchdata( zRender *, void * );
 void zrender_set( zRender *, const char, Mapper, Extractor );
 void zrender_set_default_dialect( zRender *rz ) ;
+unsigned char *zrender_map_to_uint8t ( zRender *, struct map **, int * );
+struct map ** zrender_userdata_to_map ( zRender *, const unsigned char *, int );
+void zrender_free( zRender * );
 
 #ifdef DEBUG_H
 void zrender_print_table ( struct map ** );

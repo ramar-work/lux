@@ -34,12 +34,10 @@
 #include "server.h"
 #include "socket.h"
 #include "filter-static.h"
-#include "filter-lua.h"
 #include "filter-c.h"
 #include "filter-echo.h"
-#if 0
 #include "filter-dirent.h"
-#endif
+#include "filter-lua.h"
 
 #define eprintf(...) \
 	fprintf( stderr, "%s: ", "hypno" ) && \
@@ -76,9 +74,9 @@ struct filter filters[] = {
 	{ "static", filter_static }
 , { "c", filter_c }
 , { "echo", filter_echo }
+, { "dirent", filter_dirent }
 #if 0
   { "lua", filter_lua },
-, { "dirent", filter_dirent }
 #endif
 , { NULL }
 };

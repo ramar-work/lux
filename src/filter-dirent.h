@@ -39,12 +39,16 @@
  * 
  * ------------------------------------------- */
 #include "../vendor/zhttp.h"
+#include "../vendor/zrender.h"
 #include "mime.h"
 #include "util.h"
+#include "server.h"
+#include <sys/types.h> 
+#include <dirent.h> 
 
 #ifndef FILTER_DIR_H
 #define FILTER_DIR_H
 
-int filter_dirent ( struct HTTPBody *, struct HTTPBody *, void * );
+const int filter_dirent ( int fd, struct HTTPBody *, struct HTTPBody *, struct cdata * );
 
 #endif

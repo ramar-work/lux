@@ -39,10 +39,35 @@
  * ------------------------------------------- */
 #include "filter-dirent.h"
 
-/*dirent.c - a directory handler*/
-int filter_dirent ( struct HTTPBody *req, struct HTTPBody *res, void *p ) {
-#if 0
-	char path[PATHLEN] = {0};
+static const unsigned char templ[] = " \
+<table> \
+	<thead> \
+		<th>Filename</th> \
+		<th>Size</th> \
+		<th>Type</th> \
+		<th>Date Changed</th> \
+		<th>Date Accessed</th> \
+		<th>Date Modified</th> \
+	</thead> \
+	<tbody> \
+		{{ directories }} \
+		<tr> \
+			<td>{{ .name }}</td> \
+			<td>{{ .size }}</td> \
+			<td>{{ .filetype }}</td> \
+			<td>{{ .date_changed }}</td> \
+			<td>{{ .date_accessed }}</td> \
+			<td>{{ .date_modified }}</td> \
+		</tr> \
+		{{ /directories }} \
+	</tbody> \
+</table> \
+";
+
+const int 
+filter_dirent ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata *conn ) {
+	const int pathlen = 2048;
+	char err[ 2048 ] = {0}, path[ pathlen ] = {0};
 	struct dirent *dir = NULL;
 	struct stat st;
 	char *dirname = NULL;
@@ -50,44 +75,62 @@ int filter_dirent ( struct HTTPBody *req, struct HTTPBody *res, void *p ) {
 	zTable t;
 	lt_init( &t, NULL, 1027 );
 
-	if ( !( ds = opendir( dirname ) ) )
-		return http_err( h, 404, "Page not found..." );
+	//Make sure a directory was specified
+	if ( !( dirname = conn->hconfig->dir ) ) {
+		return http_set_error( res, 500, "No directory specified" );
+	}
+
+	//If we fail to open, then the filter is no good
+	if ( !( ds = opendir( dirname ) ) ) {
+		return http_set_error( res, 404, "Page not found..." );
+	}
+
+	//Somehow, we need to get a number of entries before starting
+	int index = 0;
+	lt_addtextkey( &t, "directories" );
+	lt_descend( &t );
 
 	//Get directory listing
-	while ( (dir = readdir( ds )) ) 
-	{
+	while ( ( dir = readdir( ds ) ) ) {
 		//Check config to hide . & ..
-		if ( dir->d_name && *dir->d_name == '.' )
-			continue;	
+		if ( *dir->d_name == '.' ) continue;	
 
 		//Save pathname	
-		snprintf(path, PATHLEN, "%s/%s", dirname, dir->d_name);
+		snprintf( path, pathlen, "%s/%s", dirname, dir->d_name );
 
 		//Configure what happens if the server can't access a file 
-		if ( stat( path, &st ) == -1 )
-			continue;
+		if ( stat( path, &st ) == -1 ) continue;
+
+		//Make a new table
+		lt_addintkey( &t, index++ );
+		lt_descend( &t );
+
+		//Add the file name...
+		lt_addtextkey( &t, "name" ); 
+		lt_addtextvalue( &t, dir->d_name );
+		lt_finalize( &t );
 
 		//check file type
-		lt_addblobkey( &t, "filetype", 8 ); 
+		lt_addtextkey( &t, "filetype" ); 
 		if ( S_ISREG( st.st_mode ) )
-			lt_addblobvalue( &t, "file", 4 );
+			lt_addtextvalue( &t, "file" );
 		else if ( S_ISDIR( st.st_mode ) )
-			lt_addblobvalue( &t, "directory", 9);
+			lt_addtextvalue( &t, "directory" );
 		else if ( S_ISLNK( st.st_mode ) )
-			lt_addblobvalue( &t, "link", 4);
+			lt_addtextvalue( &t, "link" );
 		else if ( S_ISCHR( st.st_mode ) )
-			lt_addblobvalue( &t, "character device", 16);
+			lt_addtextvalue( &t, "character device" );
 		else if ( S_ISBLK( st.st_mode ) )
-			lt_addblobvalue( &t, "block device", 12);
+			lt_addtextvalue( &t, "block device" );
 		else if ( S_ISFIFO( st.st_mode ) )
-			lt_addblobvalue( &t, "fifo", 4);
-		else if ( S_ISSOCK( st.st_mode ) )
-			lt_addblobvalue( &t, "socket", 6);
-
+			lt_addtextvalue( &t, "fifo" );
+		else if ( S_ISSOCK( st.st_mode ) ) {
+			lt_addtextvalue( &t, "socket" );
+		}
 		lt_finalize( &t );
 
 		//get / save size
-		lt_addblobkey( &t, "size", 4 );
+		lt_addtextkey( &t, "size" );
 		lt_addintvalue( &t, st.st_size ); 
 		lt_finalize( &t );
 
@@ -103,8 +146,8 @@ int filter_dirent ( struct HTTPBody *req, struct HTTPBody *res, void *p ) {
 		permissions[ 7 ] = 'r';
 		permissions[ 8 ] = 'w';
 		permissions[ 9 ] = 'x';
-		lt_addblobkey( &t, (uint8_t *)"permissions", 11 );
-		lt_addblobvalue( &t, (uint8_t *)permissions, 10 );
+		lt_addtextkey( &t, "permissions" );
+		lt_addtextvalue( &t, permissions );
 		lt_finalize( &t );
 
 		//get owner
@@ -116,27 +159,57 @@ int filter_dirent ( struct HTTPBody *req, struct HTTPBody *res, void *p ) {
 		//Get status changes, and access times
 		char *aa = NULL;
 		aa = ctime( &st.st_ctime );
-		lt_addblobkey( &t, (uint8_t *)"date_changed", 11 );
-		lt_addblobvalue (&t, aa, strlen( aa ));
+		lt_addtextkey( &t, "date_changed" );
+		lt_addtextvalue( &t, aa );
 		lt_finalize( &t );
 
 		aa = ctime( &st.st_atime );
-		lt_addblobkey( &t, (uint8_t *)"date_accessed", 11 );
-		lt_addblobvalue (&t, aa, strlen( aa ));
+		lt_addtextkey( &t, "date_accessed" );
+		lt_addtextvalue( &t, aa );
 		lt_finalize( &t );
 
 		aa = ctime( &st.st_mtime );
-		lt_addblobkey( &t, (uint8_t *)"date_modified", 11 );
-		lt_addblobvalue (&t, aa, strlen( aa ));
+		lt_addtextkey( &t, "date_modified" );
+		lt_addtextvalue( &t, aa );
 		lt_finalize( &t );
-		//Put it in a table
+
+		//Come out
+		lt_ascend( &t );
 	}	
 
-	//Render it
-	//render_render( );
+	//Do I need to do this?
+	lt_ascend( &t );
+	lt_lock( &t );
+	zTable *tt = &t;
+	lt_dump( tt );
 
+	//This may have helped more
+	unsigned char *buf = NULL;
+	int blen = 0;
+	zRender *rz = zrender_init();
+	zrender_set_default_dialect( rz );
+	zrender_set_fetchdata( rz, &t );
+	
+	if ( !( buf = zrender_render( rz, templ, sizeof(templ), &blen ) ) ) {
+		lt_free( &t );
+		//zrender_free( rz );
+		return http_set_error( res, 500, "Render error" );
+	}
+
+	//Generate a message
+	http_set_status( res, 200 );
+	http_set_ctype( res, "text/html" );
+	http_set_content( res, buf, blen );
+
+	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
+		free( buf );
+		lt_free( &t );
+		//zrender_free( rz );
+		return http_set_error( res, 500, err );
+	}
+	
 	//Free everything
-	//render_free( &r );
-#endif
+	lt_free( &t );
+	//zrender_free( rz );
 	return 1;
 }
