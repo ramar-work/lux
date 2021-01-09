@@ -44,7 +44,6 @@
 #include "mime.h"
 #include "util.h"
 #include "configs.h"
-#include "render.h"
 #include "router.h"
 #include "server.h"
 

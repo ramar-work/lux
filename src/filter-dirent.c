@@ -50,9 +50,9 @@ static const unsigned char templ[] = " \
 		<th>Date Modified</th> \
 	</thead> \
 	<tbody> \
-		{{ directories }} \
+		{{ #directories }} \
 		<tr> \
-			<td>{{ .name }}</td> \
+			<td><a href=\"/\">{{ .name }}</a></td> \
 			<td>{{ .size }}</td> \
 			<td>{{ .filetype }}</td> \
 			<td>{{ .date_changed }}</td> \
@@ -175,7 +175,14 @@ filter_dirent ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata
 
 		//Come out
 		lt_ascend( &t );
-	}	
+	}
+
+	//Close the directory before moving forward
+	if ( closedir( ds ) == -1 ) {
+		lt_free( &t );
+		snprintf( err, sizeof( err ), "Couldn't close directory %s", path );
+		return http_set_error( res, 500, err ); 
+	}
 
 	//Do I need to do this?
 	lt_ascend( &t );
@@ -192,7 +199,7 @@ filter_dirent ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata
 	
 	if ( !( buf = zrender_render( rz, templ, sizeof(templ), &blen ) ) ) {
 		lt_free( &t );
-		//zrender_free( rz );
+		zrender_free( rz );
 		return http_set_error( res, 500, "Render error" );
 	}
 
@@ -210,6 +217,6 @@ filter_dirent ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata
 	
 	//Free everything
 	lt_free( &t );
-	//zrender_free( rz );
+	zrender_free( rz );
 	return 1;
 }
