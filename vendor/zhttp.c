@@ -139,14 +139,25 @@ static char *zhttp_copystr ( unsigned char *src, int len ) {
 }
 
 
+#if 0 
 //Duplicate a string
-static char * zhttp_dupstr ( const char *v ) {
+char * zhttp_dupstr ( const char *v ) {
 	int len = strlen( v );
 	char * vv = malloc( len + 1 );
 	memset( vv, 0, len + 1 );
 	memcpy( vv, v, len );
 	return vv;
 } 
+#endif
+
+
+//Duplicate a block 
+unsigned char * zhttp_dupblk( const unsigned char *v, int vlen ) {
+	unsigned char * vv = malloc( vlen );
+	memset( vv, 0, vlen );
+	memcpy( vv, v, vlen );
+	return vv;
+}
 
 
 //Generate random characters
@@ -606,17 +617,9 @@ struct HTTPBody * http_parse_response ( struct HTTPBody *entity, char *err, int 
 
 	//Initialize the remainder of variables 
 	entity->headers = entity->body = entity->url = NULL;
-#if 0
-	entity->protocol = zhttp_get_lstr( &header, ' ', &pLen ); 
-	char *status = zhttp_get_lstr( &header, ' ', &pLen );
-	entity->status = safeatoi( status );
-	free( status );
-	//char *status_text = zhttp_get_lstr( &header, ' ', &pLen );
-#endif
 	entity->hlen = hdLen; 
 	entity->host = zhttp_msg_get_value( "Host: ", "\r", entity->msg, hdLen );
 
-print_httpbody( entity );
 	return NULL;
 } 
 
@@ -627,21 +630,19 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 	int msglen = 0;
 	int http_header_len = 0;
 	int multipart = 0;
-	struct HTTPRecord **headers = NULL;
-	struct HTTPRecord **body = NULL;
+	struct HTTPRecord **headers = entity->headers;
+	struct HTTPRecord **body = entity->body;
 	char http_header_buf[ 2048 ] = { 0 };
 	char http_header_fmt[] = "%s %s %s\r\n";
 	const char http_host_header_str[] = "Host: %s";
 	const char http_content_length_header_str[] = "Content-Length: %d";
 	const char http_content_type_header_str[] = "Content-Type: %s";
 
-	if ( entity->boundary ) {
+	if ( entity->boundary )
 		free( entity->boundary );
-	}
 
-	if ( !entity->protocol ) {
+	if ( !entity->protocol )
 		entity->protocol = "HTTP/1.1";
-	}
 
 	if ( !entity->path ) {
 		snprintf( err, errlen, "%s", "No path specified with request." );
@@ -667,13 +668,13 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 
 
 	//TODO: Catch each of these or use a static buffer and append ONE time per struct...
-	while ( entity->headers && (*entity->headers)->field ) {
-		struct HTTPRecord *r = *entity->headers;
+	while ( headers && *headers ) {
+		struct HTTPRecord *r = *headers;
 		zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)r->field, strlen( r->field ) ); 
 		zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)": ", 2 ); 
 		zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)r->value, r->size ); 
 		zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)"\r\n", 2 ); 
-		entity->headers++;
+		headers++;
 	}
 
 	if ( msglen ) {
@@ -687,18 +688,18 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 		//multipart is not (but seperated differently)
 		if ( !multipart ) {
 			int n = 0;
-			while ( entity->body && (*entity->body)->field ) {
-				struct HTTPRecord *r = *entity->body;
+			while ( body && (*body)->field ) {
+				struct HTTPRecord *r = *body;
 				( n ) ? zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)"&", 1 ) : 0;
 				zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)r->field, strlen( r->field ) ); 
 				zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)"=", 1 ); 
 				zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)r->value, r->size - 1 ); 
-				entity->body++, n++;
+				body++, n++;
 			}
 		}
 		else {
-			while ( entity->body && (*entity->body)->field ) {
-				struct HTTPRecord *r = *entity->body;
+			while ( body && (*body)->field ) {
+				struct HTTPRecord *r = *body;
 				const char cdisph[] = "Content-Disposition: " ;
 				const char cdispt[] = "form-data;" ;
 				const char nameh[] = "name=";
@@ -714,7 +715,7 @@ struct HTTPBody * http_finalize_request ( struct HTTPBody *entity, char *err, in
 				zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)"\r\n\r\n", 4 ); 
 				zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)r->value, r->size ); 
 				zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)"\r\n", 2 ); 
-				entity->body++;
+				body++;
 			}
 			zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)entity->boundary, strlen( entity->boundary ) ); 
 			zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)"--", 2 ); 
@@ -775,8 +776,8 @@ struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, i
 	unsigned char *msg = NULL;
 	int msglen = 0;
 	int http_header_len = 0;
-	struct HTTPRecord **headers = NULL;
-	struct HTTPRecord **body = NULL;
+	struct HTTPRecord **headers = entity->headers;
+	struct HTTPRecord **body = entity->body;
 	char http_header_buf[ 2048 ] = { 0 };
 	char http_header_fmt[] = "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n";
 
@@ -795,8 +796,8 @@ struct HTTPBody * http_finalize_response ( struct HTTPBody *entity, char *err, i
 		return NULL;
 	}
 
-ZHTTP_PRINTF( "HTTP BODY ptr: %p, size: %d\n", (*entity->body)->value, (*entity->body)->size ); 
-	if ( (*entity->body) && ( !(*entity->body)->value || !(*entity->body)->size ) ) {
+	//ZHTTP_PRINTF( "HTTP BODY ptr: %p, size: %d\n", (*entity->body)->value, (*entity->body)->size ); 
+	if ( body && *body && ( !(*body)->value || !(*body)->size ) ) {
 		snprintf( err, errlen, "%s", "No body length specified with response." );
 		return NULL;
 	}
@@ -812,13 +813,13 @@ ZHTTP_PRINTF( "HTTP BODY ptr: %p, size: %d\n", (*entity->body)->value, (*entity-
 	}
 
 	//TODO: Catch each of these or use a static buffer and append ONE time per struct...
-	while ( entity->headers && (*entity->headers)->field ) {
-		struct HTTPRecord *r = *entity->headers;
+	while ( headers && *headers ) {
+		struct HTTPRecord *r = *headers;
 		zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)r->field, strlen( r->field ) ); 
 		zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)": ", 2 ); 
 		zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)r->value, r->size ); 
 		zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)"\r\n", 2 ); 
-		entity->headers++;
+		headers++;
 	}
 
 	if ( !msg ) {
@@ -831,15 +832,7 @@ ZHTTP_PRINTF( "HTTP BODY ptr: %p, size: %d\n", (*entity->body)->value, (*entity-
 		return NULL;
 	}
 
-	int esize = (*entity->body)->size;
-#if 0
-ZHTTP_PRINTF( "ENTITY WRITE: %p %d\n", (*entity->body)->value, esize );
-	for ( int i=0; i < esize; i++ ) {
-ZHTTP_PRINTF( "ENTITY: %2c\n", (*entity->body)->value[ i ] );
-	}
-#endif
-
-	if ( !zhttp_append_to_uint8t( &msg, &msglen, (*entity->body)->value, esize ) ) {
+	if ( !zhttp_append_to_uint8t( &msg, &msglen, (*entity->body)->value, (*entity->body)->size ) ) {
 		snprintf( err, errlen, "%s", "Could not add content to message." );
 		return NULL;
 	}
@@ -863,7 +856,8 @@ char * http_set_char( char **k, const char *v ) {
 
 
 //...
-void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int type, const char *k, unsigned char *v, int vlen ) {
+void * http_set_record
+ ( struct HTTPBody *entity, struct HTTPRecord ***list, int type, const char *k, unsigned char *v, int vlen, int free ) {
 	int len = 0;
 	struct HTTPRecord *r = NULL;
 
@@ -882,25 +876,13 @@ void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int 
 	}
 
 	//Create a record
-	if ( !( r = malloc( sizeof( struct HTTPRecord ) ) ) )
-		return NULL;
-
-	//Set the members
-	len = entity->boundary[ type ];
- #if 1
-	r->field = zhttp_dupstr( k ), r->size = vlen, r->value = v;
- #else
-	r->field = zhttp_dupstr( k ), r->size = vlen, r->value = v;
-	//Expensive copying.  Works just about nowhere...
-	if ( ( r->value = malloc( vlen ) ) == NULL ) {
-		free( r );
-		free( entity->boundary );
+	if ( !( r = malloc( sizeof( struct HTTPRecord ) ) ) ) {
 		return NULL;
 	}
 
-	memset( r->value, 0, vlen );
-	memcpy( r->value, v, vlen );
- #endif
+	//Set the members
+	len = entity->boundary[ type ];
+	r->field = zhttp_dupstr( k ), r->size = vlen, r->value = v;
 
 	zhttp_add_item( list, r, struct HTTPRecord *, &len );
 	entity->boundary[ type ] = len; //entity->size = vlen;
@@ -909,16 +891,23 @@ void * http_set_record( struct HTTPBody *entity, struct HTTPRecord ***list, int 
 
 
 //...
-void http_free_records( struct HTTPRecord **records ) {
+static void http_free_records( struct HTTPRecord **records ) {
 	struct HTTPRecord **r = records;
 	while ( r && *r ) {
-		( *(*r)->field == '.' ) ? free( (*r)->value ) : 0;
-		(*r)->field ? free( (void *)(*r)->field ) : 0;
+		if ( *(*r)->field == '.' || (*r)->free ) {
+			free( (*r)->value );
+		}
+
+		if ( (*r)->field ) {
+			free( (void *)(*r)->field ); 
+		}
+
 		if ( (*r)->type == ZHTTP_MULTIPART ) { 
 			(*r)->disposition ? free( (void *)(*r)->disposition ) : 0;
 			(*r)->filename ? free( (void *)(*r)->filename ) : 0;
 			(*r)->ctype ? free( (void *)(*r)->ctype ) : 0;
 		}
+
 		free( *r );
 		r++;
 	}
@@ -926,6 +915,7 @@ void http_free_records( struct HTTPRecord **records ) {
 }
 
 
+//...
 void http_free_body ( struct HTTPBody *entity ) {
 	//Free all of the header info
 	entity->path ? free( entity->path ) : 0;
@@ -946,13 +936,11 @@ void http_free_body ( struct HTTPBody *entity ) {
 }
 
 
-//Set a HTTP status and message
+//...
 int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
 	char err[ 2048 ];
 	memset( err, 0, sizeof( err ) );
-	char *final = zhttp_dupstr( message );
-	const int len = strlen( message );
-	//ZHTTP_PRINTF( "status: %d, mlen: %ld, msg: '%s'\n", status, strlen(message), final );
+	ZHTTP_PRINTF( "status: %d, mlen: %ld, msg: '%s'\n", status, strlen(message), message );
 
 	if ( !http_set_status( entity, status ) ) {
 		ZHTTP_PRINTF( "SET STATUS FAILED!" );
@@ -964,7 +952,7 @@ int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
 		return 0;
 	}
 
-	if ( !http_set_content( entity, (unsigned char *)final, len ) ) {
+	if ( !http_set_content( entity, (unsigned char *)message, strlen( message ) ) ) {
 		ZHTTP_PRINTF( "SET CONTENT FAILED!" );
 		return 0;
 	}
@@ -974,10 +962,15 @@ int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
 		return 0;
 	}
 
+#if 0
+	fprintf(stderr, "msg: " );
+	ZHTTP_WRITE( entity->msg, entity->mlen );
+#endif
 	return 0;
 }
 
 
+#ifdef DEBUG_H
 //list out all rows in an HTTPRecord array
 void print_httprecords ( struct HTTPRecord **r ) {
 	if ( *r == NULL ) return;
@@ -1029,3 +1022,4 @@ void print_httpbody ( struct HTTPBody *r ) {
 		}
 	}	
 }
+#endif

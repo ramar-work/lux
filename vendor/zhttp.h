@@ -37,7 +37,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
-#include "zwalker.h"
+#include <zwalker.h>
 
 #ifdef DEBUG_H
  #include <stdio.h>
@@ -50,9 +50,9 @@
  #define ZHTTP_WRITE(...)
 #endif
 
-#ifndef HTTP_H
+#ifndef ZHTTP_H
 
-#define HTTP_H
+#define ZHTTP_H
 
 #define zhttp_add_item(LIST,ELEMENT,SIZE,LEN) \
 	zhttp_add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
@@ -81,20 +81,26 @@
 #define http_set_host(ENTITY,VAL) \
 	http_set_char( &(ENTITY)->host, VAL )
 	
-#define http_set_body(ENTITY,KEY,VAL,VLEN) \
-	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, VAL, VLEN )
-	
 #define http_set_content(ENTITY,VAL,VLEN) \
-	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", VAL, VLEN )
+	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", VAL, VLEN, 1 )
 
-#define http_set_content_text(ENTITY,VAL) \
-	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", (unsigned char *)VAL, strlen(VAL) )
+#define http_copy_content(ENTITY,VAL,VLEN) \
+	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", zhttp_dupblk((unsigned char *)VAL, VLEN), VLEN, 1 )
 
-#define http_set_textbody(ENTITY,KEY,VAL) \
-	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, (unsigned char *)VAL, strlen((char *)VAL) )
-	
+#define http_copy_tcontent(ENTITY,VAL) \
+	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", zhttp_dupstr(VAL), strlen(VAL), 1 )
+
 #define http_set_header(ENTITY,KEY,VAL) \
-	http_set_record( ENTITY, &(ENTITY)->headers, 0, KEY, (unsigned char *)VAL, strlen(VAL) )
+	http_set_record( ENTITY, &(ENTITY)->headers, 0, KEY, (unsigned char *)VAL, strlen(VAL), 0 )
+
+#define http_copy_header(ENTITY,KEY,VAL) \
+	http_set_record( ENTITY, &(ENTITY)->headers, 0, KEY, (unsigned char *)zhttp_dupstr(VAL), strlen(VAL), 1 )
+
+#define http_copy_theader(ENTITY,KEY,VAL) \
+	http_set_record( ENTITY, &(ENTITY)->headers, 0, KEY, zhttp_dupstr(VAL), strlen(VAL), 1 )
+
+#define zhttp_dupstr(V) \
+	(char *)zhttp_dupblk( (unsigned char *)V, strlen(V) + 1 )
 
 extern const char http_200_fixed[];
 
@@ -174,7 +180,7 @@ struct HTTPRecord {
 	const char *disposition;
 	const char *filename;
 	const char *ctype;
-	unsigned char *extra;
+	char free;
 #else
 	union {
 		unsigned char *uchars; 
@@ -212,10 +218,6 @@ unsigned char *httpvtrim (unsigned char *, int , int *) ;
 
 unsigned char *httptrim (unsigned char *, const char *, int , int *) ;
 
-void print_httprecords ( struct HTTPRecord ** ) ;
-
-void print_httpbody ( struct HTTPBody * ) ;
-
 void http_free_body( struct HTTPBody * );
 
 struct HTTPBody * http_finalize_response (struct HTTPBody *, char *, int );
@@ -230,8 +232,17 @@ int http_set_int( int *, int );
 
 char *http_set_char( char **, const char * );
 
-void *http_set_record( struct HTTPBody *, struct HTTPRecord ***, int, const char *, unsigned char *, int );
+void *http_set_record( struct HTTPBody *, struct HTTPRecord ***, int, const char *, unsigned char *, int, int );
 
 int http_set_error ( struct HTTPBody *entity, int status, char *message );
 
+unsigned char * zhttp_dupblk( const unsigned char *v, int vlen ) ;
+
+#ifdef DEBUG_H
+ void print_httprecords ( struct HTTPRecord ** );
+ void print_httpbody ( struct HTTPBody * );
+#else
+ #define print_httprecords(...)
+ #define print_httpbody(...)
+#endif
 #endif

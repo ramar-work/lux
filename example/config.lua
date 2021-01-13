@@ -26,6 +26,12 @@ return {
 			filter = "c"
 		},
 
+		-- Redirect does nothing of real importance
+		["redirect.hypno"] = { 
+			-- Where to redirect?
+			filter = "redirect"
+		},
+
 		-- See the dirent filter in action 
 		["dir.hypno"] = { 
 			dir = "dir",

@@ -37,6 +37,7 @@
 #include "filter-c.h"
 #include "filter-echo.h"
 #include "filter-dirent.h"
+#include "filter-redirect.h"
 #include "filter-lua.h"
 
 #define eprintf(...) \
@@ -75,6 +76,7 @@ struct filter filters[] = {
 , { "c", filter_c }
 , { "echo", filter_echo }
 , { "dirent", filter_dirent }
+, { "redirect", filter_redirect }
 #if 0
   { "lua", filter_lua },
 #endif
