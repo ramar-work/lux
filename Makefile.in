@@ -38,10 +38,10 @@ CLANGFLAGS = -g -O0 -Wall -Werror -Wno-unused -Wno-format-security -Ivendor \
 GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing \
 	-Wno-format-truncation -Wno-strict-overflow -Wno-deprecated-declarations \
 	-Wno-return-local-addr -O2 $(DEBUGFLAGS) -Ivendor
-#CFLAGS = $(CLANGFLAGS)
-CFLAGS = $(GCCFLAGS)
-#CC = clang
-CC = gcc
+CFLAGS = $(CLANGFLAGS)
+#CFLAGS = $(GCCFLAGS)
+CC = clang
+#CC = gcc
 SRC = \
 	@srcdir@/vendor/zrender.c @srcdir@/vendor/zhasher.c @srcdir@/vendor/zwalker.c \
 	@srcdir@/vendor/zhttp.c @srcdir@/src/configs.c @srcdir@/src/db-sqlite.c \
