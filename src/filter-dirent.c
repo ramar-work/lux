@@ -67,13 +67,17 @@ static const unsigned char templ[] = " \
 const int 
 filter_dirent ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata *conn ) {
 	const int pathlen = 2048;
-	char err[ 2048 ] = {0}, path[ pathlen ] = {0};
+	char err[ 2048 ], path[ pathlen ]; //= { 0 }, path[ (const int)pathlen ] = {0};
 	struct dirent *dir = NULL;
 	struct stat st;
 	char *dirname = NULL;
 	DIR *ds = NULL;
 	zTable t;
 	lt_init( &t, NULL, 1027 );
+
+	//I hate GCC
+	memset( err, 0, sizeof( err ) );
+	memset( path, 0, pathlen );
 
 	//Make sure a directory was specified
 	if ( !( dirname = conn->hconfig->dir ) ) {

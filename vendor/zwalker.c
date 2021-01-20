@@ -112,8 +112,13 @@ int memwalk ( zWalker *w
 	w->ptr = (unsigned char *)( !w->ptr ? data : w->ptr );
 	#if 0
 	w->src = &data[ w->pos ];
+	//w->src = ( !w->src ) ? (unsigned char *)data : ( w->src += w->size ) ; 
 	#else
-	w->src = ( !w->src ? (unsigned char *)data : ( w->src += w->size ) ); 
+	if ( !w->src )
+		w->src = (unsigned char *)data;
+	else {
+		w->src += w->size;
+	}
 	#endif
 
 	if ( ( w->pos = w->next ) == datalen ) {

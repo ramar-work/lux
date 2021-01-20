@@ -311,7 +311,7 @@ static struct HTTPRecord * init_record() {
 //Parse out the URL (or path requested) of an HTTP request 
 static int parse_url( struct HTTPBody *entity, char *err, int errlen ) {
 	int l = 0, len = 0;
-	struct HTTPRecord *b; 
+	struct HTTPRecord *b = NULL; 
 	zWalker set = {0};
 	char *p;
 
@@ -332,8 +332,7 @@ static int parse_url( struct HTTPBody *entity, char *err, int errlen ) {
 			b->field = zhttp_copystr( t, set.size - 1 ); 
 		}
 		else { 
-			b->value = t; 
-			b->size = ( set.chr == '&' ) ? set.size - 1 : set.size; 
+			b->value = t, b->size = ( set.chr == '&' ) ? set.size - 1 : set.size;
 			zhttp_add_item( &entity->url, b, struct HTTPRecord *, &len );
 			b = NULL;
 		}
