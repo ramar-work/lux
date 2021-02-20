@@ -308,7 +308,7 @@ zTable * execute_models ( struct luaconf *luaconf, lua_State *L, char *err, int 
 		snprintf( filename, sizeof(filename), modelfmt, luaconf->dir, *model );
 		FPRINTF( "Executing model: %s\n", filename );
 		if ( !lua_exec_file( L, filename, err, errlen ) ) {
-			FPRINTF( err );
+			FPRINTF( "%s", err );
 			return NULL;
 		}
 
@@ -404,8 +404,9 @@ static int set_framework_methods() {
 
 //filter-lua.c - Run HTTP messages through a Lua handler
 //Any processing can be done in the middle.  Since we're in another "thread" anyway
-int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *config, struct lconfig *host ) {
-
+const int filter_lua( int dd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
+//int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *config, struct lconfig *hconfig ) {
+	(void)dd;
 	struct luaconf *luaconf = NULL;
 	lua_State *L = NULL;
 	uint8_t *buf = NULL;
@@ -414,59 +415,64 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *conf
 	zTable *model;
 
 	//Check for config (though this is probably already done...)
-	if ( !config )
-		return http_set_error( res, 500, "No global config is present." );
+	if ( !conn->config )
+		return http_set_error( rs, 500, "No global config is present." );
 
-	if ( !host->dir )
-		return http_set_error( res, 500, "No host directory specified." );
+	if ( !conn->hconfig->dir )
+		return http_set_error( rs, 500, "No hconfig directory specified." );
 
 	//Try parsing
-	if ( !( luaconf = build_luaconf( host->dir, err, sizeof(err) )) ) { 
-		return http_set_error( res, 500, err );
+	if ( !( luaconf = build_luaconf( conn->hconfig->dir, err, sizeof(err) )) ) { 
+		return http_set_error( rs, 500, err );
 	}
 
 	//Check for and serve any static files 
 	//TODO: This should be able to serve a list of files matching a specific type
-	if ( check_static_prefix( req->path, luaconf->spath ) ) {
+	if ( check_static_prefix( rq->path, luaconf->spath ) ) {
 		destroy_luaconf( luaconf );
-		return filter_static( req, res, config, host );
+		return filter_static( 0, rq, rs, conn );
 	}
+	return http_set_error( rs, 200, "HTTP test successful." );
 
 	//...
-	if ( !( luaconf->mvc = find_active_route( luaconf, req->path ) ) ) {
+	if ( !( luaconf->mvc = find_active_route( luaconf, rq->path ) ) ) {
 		destroy_luaconf( luaconf );
-		snprintf( err, sizeof(err), "Path %s does not resolve.", req->path );
-		return http_set_error( res, 404, err );
+		snprintf( err, sizeof(err), "Path %s does not resolve.", rq->path );
+		return http_set_error( rs, 404, err );
 	} 	
+
+
+
+
 
 	//Load Lua libraries...
 	if ( !lua_load_libs( &L ) )
-		return http_set_error( res, 500, "Could not allocate Lua environment." );
+		return http_set_error( rs, 500, "Could not allocate Lua environment." );
 
 	//Build an environment
-	if ( !build_luaenv( L, req, err, sizeof(err) ) ) {
+	if ( !build_luaenv( L, rq, err, sizeof(err) ) ) {
 		snprintf( err, sizeof(err), "Set error with build_luaenv." );
-		return http_set_error( res, 500, err );
+		return http_set_error( rs, 500, err );
 	}
 
 	if ( !set_framework_methods() )
-		return http_set_error( res, 500, "No errors occurred." );
+		return http_set_error( rs, 500, "No errors occurred." );
 
 #if 1
 	//At this point, server data and libraries are available to Lua, so now run models...
 	if ( !( model = execute_models( luaconf, L, err, sizeof(err) ) ) )
-		return http_set_error( res, 500, err );
+		return http_set_error( rs, 500, err );
 
 	lt_dump( model );
 
 	//Generate some views
 	if ( !( buf = execute_views( luaconf, model, &buflen, err, sizeof(err) ) ) )
-		return http_set_error( res, 500, err );
+		return http_set_error( rs, 500, err );
 
 	//Set all of this
-	http_set_status( res, 200 );
-	http_set_ctype( res, mmtref( "text/html" ) );
-	http_set_content( res, buf, buflen );
+	http_set_status( rs, 200 );
+	http_set_ctype( rs, mmtref( "text/html" ) );
+	http_set_content( rs, buf, buflen );
 	FPRINTF( "buflen: %d\n", buflen );
 #else
  	uint8_t bug[] = "<h2>Everything is fine.</h2>";
@@ -474,8 +480,8 @@ int filter_lua ( struct HTTPBody *req, struct HTTPBody *res, struct config *conf
 #endif
 
 #if 1
-	if ( !http_finalize_response( res, err, sizeof(err) ) )
-		return http_set_error( res, 500, err );
+	if ( !http_finalize_response( rs, err, sizeof(err) ) )
+		return http_set_error( rs, 500, err );
 #endif
 
 	//Destroy everything

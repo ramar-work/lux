@@ -217,7 +217,7 @@ int main (int argc, char *argv[]) {
 	}
 
 	if ( !dir_cmd( defaults, err, sizeof(err) ) ) {
-		ERRPRINTF( err );
+		ERRPRINTF( "%s.", err );
 		return 0;
 	}
 	return 0;

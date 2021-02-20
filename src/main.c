@@ -55,10 +55,6 @@
 
 const int defport = 2000;
 
-int arg_verbose = 0;
-
-int arg_debug = 0;
-
 struct values {
 	int port;
 	int ssl;
@@ -77,8 +73,8 @@ struct filter filters[] = {
 , { "echo", filter_echo }
 , { "dirent", filter_dirent }
 , { "redirect", filter_redirect }
+, { "lua", filter_lua }
 #if 0
-  { "lua", filter_lua },
 #endif
 , { NULL }
 };
@@ -250,17 +246,20 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 //Display help
 int help () {
-	const char *fmt = "  --%-10s       %-30s\n";
+	const char *fmt = "%s --%-10s       %-30s\n";
 	fprintf( stderr, "%s: No options received.\n", __FILE__ );
-	fprintf( stderr, fmt, "start", "start new servers" );
-	fprintf( stderr, fmt, "debug", "set debug rules" );
-	fprintf( stderr, fmt, "kill", "test killing a server" );
-	fprintf( stderr, fmt, "fork", "daemonize the server" );
-	fprintf( stderr, fmt, "config <arg>", "use this file for configuration" );
-	fprintf( stderr, fmt, "port <arg>", "set a differnt port" );
-	fprintf( stderr, fmt, "ssl", "use ssl or not.." );
-	fprintf( stderr, fmt, "user <arg>", "choose a user to start as" );
+	fprintf( stderr, fmt, "-s," "start", "Start the server" );
+	fprintf( stderr, fmt, "-c," "config <arg>", "Use this Lua file for configuration" );
+	fprintf( stderr, fmt, "-p," "port <arg>", "Start using a different port" );
+	fprintf( stderr, fmt, "-u," "user <arg>", "Choose an alternate user to start as" );
+	fprintf( stderr, fmt, "   " "use-ssl", "Use SSL" );
+	fprintf( stderr, fmt, "   " "debug", "set debug rules" );
+	fprintf( stderr, fmt, "-h," "help", "Show the help menu." );
 #if 0
+	//This is just not done yet...
+	fprintf( stderr, fmt, "-k," "kill", "Kill a running server" );
+	fprintf( stderr, fmt, "   " "dump", "Dump configuration at startup" );
+	fprintf( stderr, fmt, "-f," "fork", "Daemonize the server when starting" );
 	fprintf( stderr, fmt, "dir <arg>", "Use this directory to serve from" );
 #endif
 	return 0;	
@@ -329,17 +328,17 @@ int main (int argc, char *argv[]) {
 	}
 	
 	while ( *argv ) {
-		if ( strcmp( *argv, "--start" ) == 0 ) 
+		if ( !strcmp( *argv, "-s" ) || !strcmp( *argv, "--start" ) ) 
 			values.start = 1;
-		else if ( strcmp( *argv, "--kill" ) == 0 ) 
+		else if ( !strcmp( *argv, "-k" ) || !strcmp( *argv, "--kill" ) ) 
 			values.kill = 1;
-		else if ( strcmp( *argv, "--ssl" ) == 0 ) 
-			values.ssl = 1;
-		else if ( strcmp( *argv, "--daemonize" ) == 0 ) 
+#if 0
+		else if ( !strcmp( *argv, "-d" ) || !strcmp( *argv, "--daemonize" ) ) 
 			values.fork = 1;
-		else if ( strcmp( *argv, "--debug" ) == 0 ) 
-			arg_debug = 1;
-		else if ( strcmp( *argv, "--config" ) == 0 ) {
+#endif
+		else if ( !strcmp( *argv, "--use-ssl" ) ) 
+			values.ssl = 1;
+		else if ( !strcmp( *argv, "-c" ) || !strcmp( *argv, "--config" ) ) {
 			argv++;
 			if ( !*argv ) {
 				eprintf( "Expected argument for --config!" );
@@ -347,7 +346,7 @@ int main (int argc, char *argv[]) {
 			}
 			values.config = *argv;
 		}
-		else if ( strcmp( *argv, "--port" ) == 0 ) {
+		else if ( !strcmp( *argv, "-p" ) || !strcmp( *argv, "--port" ) ) {
 			argv++;
 			if ( !*argv ) {
 				eprintf( "Expected argument for --port!" );
@@ -356,7 +355,7 @@ int main (int argc, char *argv[]) {
 			//TODO: This should be safeatoi 
 			values.port = atoi( *argv );
 		}
-		else if ( strcmp( *argv, "--user" ) == 0 ) {
+		else if ( !strcmp( *argv, "-u" ) || !strcmp( *argv, "--user" ) ) {
 			argv++;
 			if ( !*argv ) {
 				eprintf( "Expected argument for --user!" );
@@ -365,10 +364,6 @@ int main (int argc, char *argv[]) {
 			values.user = strdup( *argv );
 		}
 		argv++;
-	}
-
-	if ( arg_debug ) {
-		print_options( &values );
 	}
 
 	//Set all of the socket stuff

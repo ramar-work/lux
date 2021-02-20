@@ -52,14 +52,12 @@ return {
 			filter = "static"
 		},
 	
-		--[[	
 		-- See LuaMVC in action
 		["luamvc.hypno"] = { 
 			dir = "luamvc",
 			root_default = "/index.html",
 			filter = "lua"
 		},
-		--]]
 
 		-- SSL hosts look like this
 		--[[

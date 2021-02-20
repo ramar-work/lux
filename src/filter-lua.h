@@ -47,11 +47,12 @@
 #include "mvc.h"
 #include "server.h"
 #include "../vendor/zhttp.h"
+#include "../vendor/zrender.h"
 
 #ifndef FILTER_LUA_H
 #define FILTER_LUA_H
 
-int filter_lua ( struct HTTPBody *, struct HTTPBody *, struct cdata * );
+const int filter_lua( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
 
 struct luaconf {
 	char *db;	

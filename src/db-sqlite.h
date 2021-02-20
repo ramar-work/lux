@@ -38,18 +38,7 @@
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
 #include "luabind.h"
-
-#ifndef SKIPSQLITE3_H
- #include <sqlite3.h>
-#endif
-
-#ifndef SKIPMYSQL_H
- #include <mysql.h>
-#endif
-
-#ifndef SKIPPGSQL_H
- #include <postgresql.h>
-#endif
+#include <sqlite3.h>
 
 #ifndef HDATABASE_H
 #define HDATABASE_H
