@@ -99,15 +99,15 @@ const int filter_c ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct 
 #endif
 
 	zTable *model = NULL;
-	const char *apppath = "/app/app.so"; //or "/app.so"
+	const char *apppath = "/bin/app.so";
 	void *app = NULL;
-	struct sconfig *config = NULL;
 	char err[ 2048 ] = { 0 };
 	char filename[ 2048 ] = { 0 };
 	uint8_t *msg = NULL;
 	int msglen = 0;
+	struct lconfig *config = conn->hconfig;
 
-#if 1
+#if 0
 	//Get config (this should never happen)
 	if ( !(config = (struct sconfig *)conn->ctx) ) {
 		conn->count = -3;	
@@ -122,20 +122,38 @@ const int filter_c ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct 
 
 	FILTER_C_PRINT( "Config ptr at: %p\n", config );
 
-	if ( snprintf( filename, sizeof( filename ), "%s%s", config->path, apppath ) == -1 ) {
+	if ( snprintf( filename, sizeof( filename ), "%s%s", config->dir, apppath ) == -1 ) {
 		return http_set_error( res, 500, "Path failed." );
 	}
 
 	FILTER_C_PRINT( "Loading app at: %s\n", filename );
 
 	//Try opening the app
-	if ( !( app = dlopen( filename, RTLD_LAZY ) ) ) {
+	if ( !( app = dlopen( filename, RTLD_NOW ) ) ) {
 		snprintf( err, sizeof( err ), "Could not open application: %s.", dlerror() );
 		return http_set_error( res, 500, err ); 
 	}
 
 	FILTER_C_PRINT( "App initialized at: %p\n", app );
 
+#if 1
+	//Just run "main" from the shared object, and let that handle everything 
+	int (*a)( struct HTTPBody *req, struct HTTPBody *res );
+
+	if ( !( a = dlsym( app, "app" ) ) ) {
+		snprintf( err, sizeof( err ), "Could not find main() method in shared app: %s.", dlerror() );
+		return http_set_error( res, 500, err ); 
+	}
+
+	FILTER_C_PRINT( "App entry point found.\n" );
+
+	if ( !a( req, res ) ) {
+		return http_set_error( res, 500, "Execution error at shared app." );
+	}
+
+	FILTER_C_PRINT( "App successfully executed.\n" );
+		
+#else
 #if 0
 	//Find the routes (should always be called routes)
 	if ( !( routelist = ( Route * ) dlsym( app, "routes" )) ) {
@@ -194,6 +212,7 @@ const int filter_c ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct 
 		route->views++;
 	}
 #endif
+#endif
 
 	if ( dlclose( app ) == -1 ) {
 		snprintf( err, sizeof( err ), "Failed to close application: %s\n", strerror( errno ) );
@@ -201,17 +220,11 @@ const int filter_c ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct 
 	}
 
 	FILTER_C_PRINT( "App now closed, address is: %p\n", app );
-#if 1
-	return http_set_error( res, 200, "This is a C app, and it sucks..." );
-#else
-	http_set_status( res, 200 );
-	http_set_ctype( res, "text/html" );
-	http_set_content( res, msg, msglen );
+
 	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
 		return http_set_error( res, 500, err );
 	}
 	return 1;
-#endif
 }
 
 

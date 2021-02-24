@@ -15,7 +15,8 @@
 #define NOSQLITE_H
 
 //Forks or threads
-#define HFORK_H
+#define FORK_H
+//#define HFORK_H
 //#define HTHREAD_H
 
 //Enable or disable certain filters

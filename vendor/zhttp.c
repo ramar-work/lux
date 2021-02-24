@@ -180,12 +180,6 @@ static void * zhttp_add_item_to_list( void ***list, void *element, int size, int
 		return NULL;
 	}
 
-	#if 0
-	ZHTTP_PRINTF( 
-		"Successfully reallocated block to size %d\n", size * ((*len) + 2) ); 
-	ZHTTP_PRINTF( "list => %p, %d, %d, %d\n", *list, (*len), (*len) + 1, size * ((*len) + 2 ) );
-	#endif
-
 	(*list)[ *len ] = element; 
 	(*list)[ (*len) + 1 ] = NULL; 
 	(*len) += 1; 
@@ -311,7 +305,7 @@ static struct HTTPRecord * init_record() {
 //Parse out the URL (or path requested) of an HTTP request 
 static int parse_url( struct HTTPBody *entity, char *err, int errlen ) {
 	int l = 0, len = 0;
-	struct HTTPRecord *b = NULL; 
+	struct HTTPRecord *b; 
 	zWalker set = {0};
 	char *p;
 
@@ -332,7 +326,8 @@ static int parse_url( struct HTTPBody *entity, char *err, int errlen ) {
 			b->field = zhttp_copystr( t, set.size - 1 ); 
 		}
 		else { 
-			b->value = t, b->size = ( set.chr == '&' ) ? set.size - 1 : set.size;
+			b->value = t; 
+			b->size = ( set.chr == '&' ) ? set.size - 1 : set.size; 
 			zhttp_add_item( &entity->url, b, struct HTTPRecord *, &len );
 			b = NULL;
 		}
@@ -951,7 +946,7 @@ int http_set_error ( struct HTTPBody *entity, int status, char *message ) {
 		return 0;
 	}
 
-	if ( !http_set_content( entity, (unsigned char *)message, strlen( message ) ) ) {
+	if ( !http_copy_content( entity, (unsigned char *)message, strlen( message ) ) ) {
 		ZHTTP_PRINTF( "SET CONTENT FAILED!" );
 		return 0;
 	}

@@ -37,6 +37,8 @@ void free_hosts ( struct lconfig ** );
 
 void dump_hosts ( struct lconfig ** );
 
+void dump_sconfig ( struct sconfig * );
+
 struct sconfig * build_server_config ( const char *, char *, int );
 
 void free_server_config( struct sconfig * );

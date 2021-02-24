@@ -61,8 +61,12 @@ struct values {
 	int start;
 	int kill;
 	int fork;
+	int dump;
 	char *user;
 	char *config;
+ #ifdef DEBUG_H
+	int pfork;
+ #endif
 };
 
 
@@ -139,57 +143,37 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		}
 
 	#if 0
-		//close the connection if something fails here
-		if ( !srv_setsocketoptions( fd ) ) {
-			FPRINTF( "socket %d could not be marked as non-blocking\n", fd );
-			return 0;
-		}
-	#endif
-
-	#if 1
-	#if 0
-		if ( fcntl( fd, F_SETFD, SIGIO ) == -1 ) {
-			FPRINTF( "Error in setting SIGIO on filedes %d.\n", fd );
-			return 0;
-		}
-
-		if ( fcntl( fd, F_SETFL, SIGIO ) == -1 ) {
-			FPRINTF( "Error in setting SIGIO on filedes %d.\n", fd );
-			return 0;
-		}
-	#endif
-	#endif
-
-	#ifdef NOFORK_H
-		struct cdata connection = {0};	
-		connection.flags = O_NONBLOCK;
-		connection.ctx = ctx;
-	
-		//Get IP here and save it for logging purposes
-		if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
-			FPRINTF( "Error in getting IP address of connecting client.\n" );
-		}
-
-		for ( ;; ) {
-			//additionally, this one should block
-			if ( !srv_response( fd, &connection ) ) {
-				FPRINTF( "Error in TCP socket handling.\n" );
+		//For test purposes, we need this
+		if ( !v->fork ) {
+			struct cdata connection = {0};	
+			connection.flags = O_NONBLOCK;
+			connection.ctx = ctx;
+		
+			//Get IP here and save it for logging purposes
+			if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
+				FPRINTF( "Error in getting IP address of connecting client.\n" );
 			}
-			
-			if ( CONN_CLOSE || connection.count < 0 || connection.count > 5 ) {
-				FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
-				int status = close( fd );
-				if ( status == -1 ) {
-					FPRINTF( "Error when closing child socket.\n" );
+
+			for ( ;; ) {
+				//additionally, this one should block
+				if ( !srv_response( fd, &connection ) ) {
+					FPRINTF( "Error in TCP socket handling.\n" );
 				}
-				break;
+				
+				if ( CONN_CLOSE || connection.count < 0 || connection.count > 5 ) {
+					FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
+					int status = close( fd );
+					if ( status == -1 ) {
+						FPRINTF( "Error when closing child socket.\n" );
+					}
+					break;
+				}
+
+				FPRINTF( "Connection is done. count is %d\n", connection.count );
 			}
-
-			FPRINTF( "Connection is done. count is %d\n", connection.count );
 		}
-	#endif
-
-	#ifdef FORK_H
+	#else
+		//Do fork
 		//Fork and serve a request 
 		if ( ( cpid = fork() ) == -1 ) {
 			//TODO: There is most likely a reason this didn't work.
@@ -246,15 +230,17 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 //Display help
 int help () {
-	const char *fmt = "%s --%-10s       %-30s\n";
 	fprintf( stderr, "%s: No options received.\n", __FILE__ );
-	fprintf( stderr, fmt, "-s," "start", "Start the server" );
-	fprintf( stderr, fmt, "-c," "config <arg>", "Use this Lua file for configuration" );
-	fprintf( stderr, fmt, "-p," "port <arg>", "Start using a different port" );
-	fprintf( stderr, fmt, "-u," "user <arg>", "Choose an alternate user to start as" );
-	fprintf( stderr, fmt, "   " "use-ssl", "Use SSL" );
-	fprintf( stderr, fmt, "   " "debug", "set debug rules" );
-	fprintf( stderr, fmt, "-h," "help", "Show the help menu." );
+	const char *fmt = "%s --%-16s       %-30s\n";
+	fprintf( stderr, fmt, "-s,", "start", "Start the server" );
+	fprintf( stderr, fmt, "-c,", "config <arg>", "Use this Lua file for configuration" );
+	fprintf( stderr, fmt, "-p,", "port <arg>", "Start using a different port" );
+	fprintf( stderr, fmt, "-u,", "user <arg>", "Choose an alternate user to start as" );
+	fprintf( stderr, fmt, "-d,", "dump", "Dump configuration" );
+	fprintf( stderr, fmt, "   ", "no-fork", "Do not fork" );
+	fprintf( stderr, fmt, "   ", "use-ssl", "Use SSL" );
+	fprintf( stderr, fmt, "   ", "debug", "set debug rules" );
+	fprintf( stderr, fmt, "-h,", "help", "Show the help menu." );
 #if 0
 	//This is just not done yet...
 	fprintf( stderr, fmt, "-k," "kill", "Kill a running server" );
@@ -332,6 +318,8 @@ int main (int argc, char *argv[]) {
 			values.start = 1;
 		else if ( !strcmp( *argv, "-k" ) || !strcmp( *argv, "--kill" ) ) 
 			values.kill = 1;
+		else if ( !strcmp( *argv, "-d" ) || !strcmp( *argv, "--dump" ) ) 
+			values.dump = 1;
 #if 0
 		else if ( !strcmp( *argv, "-d" ) || !strcmp( *argv, "--daemonize" ) ) 
 			values.fork = 1;
@@ -379,6 +367,15 @@ int main (int argc, char *argv[]) {
 		return 1;
 	}
 
+	//Dump the configuration if necessary
+	if ( values.dump ) {
+		fprintf( stderr, "Hypno is running with the following settings.\n" );
+		fprintf( stderr, "Port:           %d\n", values.port );
+		fprintf( stderr, "Using SSL?:     %s\n", values.ssl ? "T" : "F" );
+		fprintf( stderr, "Daemonized:     %s\n", values.fork ? "T" : "F" );
+		fprintf( stderr, "Request Model:  %s\n", "Fork" );
+	}
+
 	//Start a server
 	if ( values.start ) {
 	#if 0
@@ -393,7 +390,8 @@ int main (int argc, char *argv[]) {
 	}
 
 	if ( values.kill ) {
-
+		eprintf ( "%s\n", "--kill not yet implemented." );
+		return 1;
 	}
 
 	return 0;
