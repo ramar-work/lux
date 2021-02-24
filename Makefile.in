@@ -32,10 +32,10 @@ GROUP = http
 
 # Everything else
 LDFLAGS = -lgnutls -llua -ldl -lpthread
-DEBUGFLAGS = -DSKIPMYSQL_H -DSKIPPGSQL_H -DNOFORK_H -DLEAKTEST_H -DDEBUG_H
-CFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -Ivendor
-GCCFLAGS = -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing \
-	-Wno-format-truncation -O2 -Ivendor
+DEBUGFLAGS = -DDEBUG_H
+CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -Ivendor
+GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
+	-Wno-format-truncation -Wno-return-local-addr -O2 -Ivendor
 CFLAGS = $(GCCFLAGS)
 CC = gcc
 SRC = \
@@ -65,7 +65,13 @@ main: $(OBJ)
 debug: debug-clang
 	@printf '' > /dev/null
 
+clang: CC = clang
+clang: CFLAGS = $(CLANGFLAGS)
+clang: main
+	@printf '' > /dev/null
+
 debug-clang: CC = clang
+debug-clang: CFLAGS = $(CLANGFLAGS)
 debug-clang: CFLAGS += -g -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
 debug-clang: main
 	@printf '' > /dev/null

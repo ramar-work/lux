@@ -21,6 +21,13 @@ return {
 	wwwroot = "example",
 	hosts = {
 		-- See the C filter in action
+		["localhost"] = { 
+			root_default = "/index.html",
+			dir = "localhost",
+			filter = "static"
+		},
+
+		-- See the C filter in action
 		["app.hypno"] = { 
 			root_default = "/index.html", -- Technically, no root is needed
 			filter = "c"
