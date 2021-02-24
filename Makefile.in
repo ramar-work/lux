@@ -31,25 +31,23 @@ USER = http
 GROUP = http
 
 # Everything else
-LDFLAGS = -lgnutls -llua -ldl -lpthread -lsqlite3
+LDFLAGS = -lgnutls -llua -ldl -lpthread
 DEBUGFLAGS = -DSKIPMYSQL_H -DSKIPPGSQL_H -DNOFORK_H -DLEAKTEST_H -DDEBUG_H
-CLANGFLAGS = -g -O0 -Wall -Werror -Wno-unused -Wno-format-security -Ivendor \
-	-fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
-GCCFLAGS = -g -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing \
-	-Wno-format-truncation -Wno-strict-overflow -Wno-deprecated-declarations \
-	-Wno-return-local-addr -O2 $(DEBUGFLAGS) -Ivendor
-CFLAGS = $(CLANGFLAGS)
-#CFLAGS = $(GCCFLAGS)
-CC = clang
-#CC = gcc
+CFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -Ivendor
+GCCFLAGS = -Wall -Werror -Wno-unused -Wstrict-overflow -Wno-strict-aliasing \
+	-Wno-format-truncation -O2 -Ivendor
+CFLAGS = $(GCCFLAGS)
+CC = gcc
 SRC = \
+	@srcdir@/vendor/sqlite3.c \
 	@srcdir@/vendor/zrender.c @srcdir@/vendor/zhasher.c @srcdir@/vendor/zwalker.c \
 	@srcdir@/vendor/zhttp.c @srcdir@/src/configs.c @srcdir@/src/db-sqlite.c \
 	@srcdir@/src/luabind.c @srcdir@/src/mime.c @srcdir@/src/socket.c \
 	@srcdir@/src/util.c @srcdir@/src/ctx-http.c @srcdir@/src/ctx-https.c \
 	@srcdir@/src/server.c @srcdir@/src/loader.c @srcdir@/src/mvc.c \
 	@srcdir@/src/router.c @srcdir@/src/filter-static.c @srcdir@/src/filter-c.c \
-	@srcdir@/src/filter-echo.c @srcdir@/src/filter-dirent.c @srcdir@/src/filter-redirect.c
+	@srcdir@/src/filter-echo.c @srcdir@/src/filter-dirent.c @srcdir@/src/filter-redirect.c \
+	@srcdir@/src/filter-lua.c
 
 #@srcdir@/src/ctx-https.c @srcdir@/src/filter-echo.c @srcdir@/src/filter-lua.c @srcdir@/src/filter-dirent.c @srcdir@/src/filter-c.c @srcdir@/src/xml.c @srcdir@/src/json.c @srcdir@/src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
@@ -59,9 +57,24 @@ TESTS = loader database luabind router util #server render filter config
 
 # main - Compiles all code needed to get hypno running
 main: $(OBJ)
-	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)bin/
+	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/main.c -o $(srcdir)/bin/$(NAME) $(OBJ) 
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli.c -o $(srcdir)/bin/hcli $(OBJ)
+
+# debug - Builds code with debugging flags on
+debug: debug-clang
+	@printf '' > /dev/null
+
+debug-clang: CC = clang
+debug-clang: CFLAGS += -g -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
+debug-clang: main
+	@printf '' > /dev/null
+
+debug-gcc: CC = gcc
+debug-gcc: CFLAGS += -g -O0 $(DEBUGFLAGS)
+debug-gcc: main
+	@printf '' > /dev/null
+
 
 # install - Installs targets to $PREFIX/bin
 install:
@@ -87,8 +100,8 @@ repl:
 		shared/lua-db.o shared/zhasher.o shared/luabind.o
 	lua -l libhypno - < tests/lua-db/dbtest.lua
  
-%.o: %.c 
-	$(CC) -c -o $@ $< $(CFLAGS)
+#%.o: %.c 
+#	$(CC) -c -o $@ $< $(CFLAGS)
 
 # test -  Build all test files
 test: $(OBJ) 

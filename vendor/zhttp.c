@@ -305,7 +305,7 @@ static struct HTTPRecord * init_record() {
 //Parse out the URL (or path requested) of an HTTP request 
 static int parse_url( struct HTTPBody *entity, char *err, int errlen ) {
 	int l = 0, len = 0;
-	struct HTTPRecord *b; 
+	struct HTTPRecord *b = NULL;  
 	zWalker set = {0};
 	char *p;
 
