@@ -45,10 +45,50 @@ static const struct timespec __interval__ = { 0, 100000000 };
 //No-op
 void create_notls ( void **p ) { ; }
 
+static void dumpconn( struct cdata *conn, const char *fname ) {
+	if ( conn ) {	
+
+		fprintf( stderr, "SERVER INFO\n" );
+		fprintf( stderr, "[%s] count: %d\n", fname, conn->count );
+		fprintf( stderr, "[%s] status: %d\n", fname, conn->status );
+		fprintf( stderr, "[%s] ipv4: %s\n", fname, conn->ipv4 );
+		fprintf( stderr, "[%s] ipv6: %s\n", fname, conn->ipv6 );
+
+		fprintf( stderr, "SERVER CONFIG\n" );
+		fprintf( stderr, "[%s] ptr: %p\n", fname, conn->config );
+		if ( conn->config ) {
+			fprintf( stderr, "[%s] wwwroot: %s\n", fname, conn->config->wwwroot );
+			fprintf( stderr, "[%s] hosts: %p\n", fname, conn->config->hosts );
+		}
+
+#if 0
+		fprintf( stderr, "LOCAL CONFIG\n" );
+		fprintf( stderr, "[%s] ptr : %p\n", fname, conn->hconfig );
+		if ( conn->hconfig ) {
+			fprintf( stderr, "[%s] name	: %s\n", fname, conn->hconfig->name	 );
+			fprintf( stderr, "[%s] alias: %s\n", fname, conn->hconfig->alias );
+			fprintf( stderr, "[%s] dir	: %s\n", fname, conn->hconfig->dir	 );
+			fprintf( stderr, "[%s] filter	: %s\n", fname, conn->hconfig->filter	 );
+			fprintf( stderr, "[%s] root_default	: %s\n", fname, conn->hconfig->root_default	 );
+			fprintf( stderr, "[%s] ca_bundle: %s\n", fname, conn->hconfig->ca_bundle );
+			fprintf( stderr, "[%s] certfile: %s\n", fname, conn->hconfig->certfile );
+			fprintf( stderr, "[%s] keyfile: %s\n", fname, conn->hconfig->keyfile );
+		}
+#endif
+	}
+}
+
+
+const int pre_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
+dumpconn( conn, __func__ );
+	return 1;
+}
+
 
 //Read a message that the server will use later.
 const int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	FPRINTF( "Read started...\n" );
+dumpconn( conn, __func__ );
 	int mult = 1, size = 1024; 
 	char err[ 2048 ] = {0};
 
@@ -113,6 +153,7 @@ const int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct 
 			mult++;
 		}
 	}
+dumpconn( conn, __func__ );
 	return 1;
 }
 
@@ -120,6 +161,7 @@ const int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct 
 //Write
 const int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	FPRINTF( "Write started...\n" );
+dumpconn( conn, __func__ );
 	int sent = 0, pos = 0, try = 0;
 	int total = rs->mlen;
 	unsigned char *ptr = rs->msg;

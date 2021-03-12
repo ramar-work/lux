@@ -42,9 +42,7 @@
 #include "filter-c.h"
 #include "filter-static.h"
 
-#define FILTER_C_DEBUG
-
-#ifndef FILTER_C_DEBUG
+#ifndef DEBUG_H 
  #define FILTER_C_PRINT(...)
 #else
  #define FILTER_C_PRINT(...) \

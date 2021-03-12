@@ -432,7 +432,7 @@ const int filter_lua( int dd, struct HTTPBody *rq, struct HTTPBody *rs, struct c
 		destroy_luaconf( luaconf );
 		return filter_static( 0, rq, rs, conn );
 	}
-	return http_set_error( rs, 200, "HTTP test successful." );
+	//return http_set_error( rs, 200, "HTTP test successful." );
 
 	//...
 	if ( !( luaconf->mvc = find_active_route( luaconf, rq->path ) ) ) {
@@ -440,10 +440,6 @@ const int filter_lua( int dd, struct HTTPBody *rq, struct HTTPBody *rs, struct c
 		snprintf( err, sizeof(err), "Path %s does not resolve.", rq->path );
 		return http_set_error( rs, 404, err );
 	} 	
-
-
-
-
 
 	//Load Lua libraries...
 	if ( !lua_load_libs( &L ) )

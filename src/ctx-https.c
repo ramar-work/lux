@@ -37,10 +37,10 @@
  * ------------------------------------------- */
 #include "ctx-https.h"
 
-#define CHECK(x) assert((x)>=0)
-
 void create_gnutls( void **p ) {
-	CHECK( gnutls_global_init() );
+	if ( !gnutls_global_init() ) {
+		
+	}
 	//gnutls_global_set_log_function( tls_log_func );
 }
 
@@ -66,6 +66,9 @@ const int post_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct c
 }
 
 
+
+//This should be done one time before anything starts running
+//Also meaning that global initialization and de-initialization are needed 
 static int process_credentials ( struct gnutls_abstr *g, struct lconfig **hosts ) {
 	while ( *hosts ) {
 		char *dir = (*hosts)->dir;
@@ -103,12 +106,16 @@ static int process_credentials ( struct gnutls_abstr *g, struct lconfig **hosts 
 
 
 const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *conn) {
+	//TODO: This isn't supposed to be done every time.
+	if ( !gnutls_global_init() ) {
+		return 0;	
+	}
 
-#if 0
+#if 1
 	//Allocate a structure for the request process
 	struct gnutls_abstr *g;
 	int ret, size = sizeof( struct gnutls_abstr );
-	if ( !( g = malloc( size ))  || !memset( g, 0, size ) ) { 
+	if ( !( g = malloc( size )) || !memset( g, 0, size ) ) { 
 		FPRINTF( "Failed to allocate space for gnutls_abstr\n" );
 		return 0;
 	}
@@ -122,7 +129,7 @@ const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cd
 
 	//Get config hosts, and get all the key details
 	//struct lconfig **hosts = config->hosts;
-	if ( !process_credentials( g, config->hosts ) ) {
+	if ( !process_credentials( g, conn->config->hosts ) ) {
 		gnutls_certificate_free_credentials( g->x509_cred );
 		free( g );
 		return 0;
@@ -173,7 +180,7 @@ const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cd
 	}
 
 	FPRINTF( "GnuTLS handshake succeeded.\n" );
-	*p = g;
+	//*p = g;
 #endif
 	return 1;
 }

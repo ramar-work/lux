@@ -10,7 +10,7 @@ static void free_t( zTable *t ) {
 }
 
 void dump_sconfig ( struct sconfig *c ) {
-	fprintf( stderr, "path: %s\n", c->path );
+	//fprintf( stderr, "path: %s\n", c->path );
 	fprintf( stderr, "wwwroot: %s\n", c->wwwroot );
 	fprintf( stderr, "hosts: %p\n", c->hosts );
 	fprintf( stderr, "src: %p\n", c->src );
