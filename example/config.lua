@@ -66,17 +66,14 @@ return {
 			filter = "lua"
 		},
 
-		-- SSL hosts look like this
-		--[[
-		-- A static host (I'm GUESSING, that we're crashing because no host points anywhere)
+		-- SSL capable hosts look like this
 		["ssl.hypno"] = { 
-			dir = "/home/ramar/prj/site/hypno-www/collinshosting.com",
+			dir = "ssl",
 			root_default = "/index.html",
-			ca_bundle = "collinshosting_com.ca-bundle",
-			cert_file = "collinshosting_com.crt",
-			keyfile = "x509-collinshosting-key.pem",
+			ca_bundle = "supergreatwok.xyz/supergreatwok_xyz.ca-bundle",
+			cert_file = "supergreatwok.xyz/supergreatwok_xyz.crt",
+			keyfile = "supergreatwok.xyz/x509-collinshosting-key.pem",
 			filter = "static"
 		},
-		--]]
 	}
 }

@@ -70,15 +70,13 @@ const int post_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct c
 //This should be done one time before anything starts running
 //Also meaning that global initialization and de-initialization are needed 
 static int process_credentials ( struct gnutls_abstr *g, struct lconfig **hosts ) {
-	while ( *hosts ) {
-		char *dir = (*hosts)->dir;
-		//each of the files need to be loaded somehow...
-		if ( dir && (*hosts)->certfile  ) {
+	for ( struct lconfig **h = hosts; *h ; h++ ) {
+		if ( (*h)->dir && (*h)->certfile  ) {
 			//Make a filename
 			char cert[2048] = {0}, key[2048] = {0}, ca[2048] = {0};
-			snprintf( cert, sizeof(cert), "%s/%s", dir, (*hosts)->certfile );
-			snprintf( key, sizeof(key), "%s/%s", dir, (*hosts)->keyfile );
-			snprintf( ca, sizeof(ca), "%s/%s", dir, (*hosts)->ca_bundle );
+			snprintf( cert, sizeof(cert), "%s/%s", (*h)->dir, (*h)->certfile );
+			snprintf( key, sizeof(key), "%s/%s", (*h)->dir, (*h)->keyfile );
+			snprintf( ca, sizeof(ca), "%s/%s", (*h)->dir, (*h)->ca_bundle );
 			#if 0
 			FPRINTF( "Attempting to process these certs\n" );
 			FPRINTF( "ca bundle: %s\n", ca );
@@ -89,17 +87,16 @@ static int process_credentials ( struct gnutls_abstr *g, struct lconfig **hosts 
 			//Will this ever be negative?	
 			int cp = gnutls_certificate_set_x509_trust_file( g->x509_cred, ca, GNUTLS_X509_FMT_PEM );
 			if ( cp < 0 ) {
-				FPRINTF( "Could not set trust for '%s': %s\n", (*hosts)->name, gnutls_strerror( cp ) );
+				FPRINTF( "Could not set trust for '%s': %s\n", (*h)->name, gnutls_strerror( cp ) );
 				return 0;
 			}
 			FPRINTF( "Certificates processed: %d\n", cp );
 			int status = gnutls_certificate_set_x509_key_file( g->x509_cred, cert, key, GNUTLS_X509_FMT_PEM );
 			if ( status < 0 ) {
-				FPRINTF( "Could not set certificate for '%s': %s\n", (*hosts)->name, gnutls_strerror( status ) );
+				FPRINTF( "Could not set certificate for '%s': %s\n", (*h)->name, gnutls_strerror( status ) );
 				return 0;
 			}
 		}
-		hosts++;
 	}	
 	return 1;
 }
@@ -111,10 +108,11 @@ const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cd
 		return 0;	
 	}
 
-#if 1
-	//Allocate a structure for the request process
+	//Define
 	struct gnutls_abstr *g;
 	int ret, size = sizeof( struct gnutls_abstr );
+#if 1
+	//Allocate a structure for the request process
 	if ( !( g = malloc( size )) || !memset( g, 0, size ) ) { 
 		FPRINTF( "Failed to allocate space for gnutls_abstr\n" );
 		return 0;
@@ -167,10 +165,14 @@ const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cd
   gnutls_transport_set_int( g->session, fd );
 
 	//Do the actual handshake with an open file descriptor
+#if 0
+	while ( ( ret = gnutls_handshake( g->session ) ) == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED );
+#else
 	do {
 		ret = gnutls_handshake( g->session );
 	}
 	while ( ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED );	
+#endif
 
 	if ( ret < 0 ) {
 		destroy_gnutls( g );
