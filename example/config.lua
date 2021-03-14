@@ -70,9 +70,9 @@ return {
 		["supergreatwok.xyz"] = { 
 			dir = "ssl",
 			root_default = "/index.html",
-			ca_bundle = "ssl/misc/supergreatwok.xyz/supergreatwok_xyz.ca-bundle",
-			cert_file = "ssl/misc/supergreatwok.xyz/supergreatwok_xyz.crt",
-			key_file = "ssl/misc/supergreatwok.xyz/supergreatwok_xyz.pem",
+			ca_bundle = "misc/ssl/supergreatwok.xyz/supergreatwok_xyz.ca-bundle",
+			cert_file = "misc/ssl/supergreatwok.xyz/supergreatwok_xyz.crt",
+			key_file = "misc/ssl/supergreatwok.xyz/supergreatwok_xyz.pem",
 			filter = "static"
 		},
 	}

@@ -51,7 +51,7 @@ struct senderrecvr;
 //Added 12-08-20, track per connection data
 struct cdata {
 	int count;  //How many times until we hit the keep-alive mark?
-	int status;  //What is the status of the request? (perhaps only go up if complete?)
+	int status;  //What is the status of the request?
 	struct senderrecvr *ctx;  //Access the context through here now
 	struct sconfig *config;  //Server config
 	struct lconfig *hconfig;  //Host config

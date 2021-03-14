@@ -36,14 +36,14 @@
  * ---------
  * 
  * ------------------------------------------- */
+#include <gnutls/gnutls.h>
+#include <sys/stat.h>
+#include <stddef.h>
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
-#include <gnutls/gnutls.h>
-#include <stddef.h>
 #include "socket.h"
 #include "server.h"
 #include "util.h"
-#include <assert.h>
 
 #ifndef CTXHTTPS_H
 #define CTXHTTPS_H

@@ -86,9 +86,11 @@ dumpconn( conn, __func__ );
 
 
 //Read a message that the server will use later.
-const int read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
+const int 
+read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	FPRINTF( "Read started...\n" );
-dumpconn( conn, __func__ );
+
+	//Define
 	int mult = 1, size = 1024; 
 	char err[ 2048 ] = {0};
 
@@ -97,9 +99,8 @@ dumpconn( conn, __func__ );
 	clock_gettime( CLOCK_REALTIME, &timer );	
 
 	//Allocate space for the first call
-	if ( ( rq->msg = malloc( size ) ) == NULL ) {
+	if ( !( rq->msg = malloc( size ) ) )
 		return http_set_error( rs, 500, "Could not allocate initial read buffer." ); 
-	} 
 
 	//Read first
 	for ( ;; ) {
@@ -153,7 +154,7 @@ dumpconn( conn, __func__ );
 			mult++;
 		}
 	}
-dumpconn( conn, __func__ );
+	FPRINTF( "Read complete.\n" );
 	return 1;
 }
 
@@ -161,12 +162,10 @@ dumpconn( conn, __func__ );
 //Write
 const int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	FPRINTF( "Write started...\n" );
-dumpconn( conn, __func__ );
-	int sent = 0, pos = 0, try = 0;
-	int total = rs->mlen;
+	int sent = 0, pos = 0, try = 0, total = rs->mlen;
 	unsigned char *ptr = rs->msg;
 
-	for ( ;; ) {	
+	for ( ;; ) {
 		sent = send( fd, ptr, total, MSG_DONTWAIT );
 		FPRINTF( "Bytes sent: %d\n", sent );
 
