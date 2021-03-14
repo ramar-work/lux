@@ -51,7 +51,7 @@ SRC = \
 
 #@srcdir@/src/ctx-https.c @srcdir@/src/filter-echo.c @srcdir@/src/filter-lua.c @srcdir@/src/filter-dirent.c @srcdir@/src/filter-c.c @srcdir@/src/xml.c @srcdir@/src/json.c @srcdir@/src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
-
+TARGET = main
 TESTS = loader database luabind router util #server render filter config 
 
 
@@ -88,7 +88,7 @@ install:
 
 # examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
 examples: PORT=2222
-examples: main
+examples: $(TARGET) 
 examples: 
 	@lua -e "a=loadfile( 'example/config.lua' )(); \
 		hosts = {}; for k,v in pairs(a.hosts) do table.insert( hosts, 'http://' .. k ) end; \

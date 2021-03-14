@@ -90,6 +90,7 @@ static int process_credentials ( struct gnutls_abstr *g, struct lconfig **hosts 
 				FPRINTF( "Could not set trust for '%s': %s\n", (*h)->name, gnutls_strerror( cp ) );
 				return 0;
 			}
+
 			FPRINTF( "Certificates processed: %d\n", cp );
 			int status = gnutls_certificate_set_x509_key_file( g->x509_cred, cert, key, GNUTLS_X509_FMT_PEM );
 			if ( status < 0 ) {
@@ -103,15 +104,10 @@ static int process_credentials ( struct gnutls_abstr *g, struct lconfig **hosts 
 
 
 const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *conn) {
-	//TODO: This isn't supposed to be done every time.
-	if ( !gnutls_global_init() ) {
-		return 0;	
-	}
-
 	//Define
 	struct gnutls_abstr *g;
 	int ret, size = sizeof( struct gnutls_abstr );
-#if 1
+
 	//Allocate a structure for the request process
 	if ( !( g = malloc( size )) || !memset( g, 0, size ) ) { 
 		FPRINTF( "Failed to allocate space for gnutls_abstr\n" );
@@ -173,7 +169,6 @@ const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cd
 	}
 	while ( ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED );	
 #endif
-
 	if ( ret < 0 ) {
 		destroy_gnutls( g );
 		FPRINTF( "GnuTLS handshake failed: %s\n", gnutls_strerror( ret ) );
@@ -182,10 +177,9 @@ const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cd
 	}
 
 	FPRINTF( "GnuTLS handshake succeeded.\n" );
-	//*p = g;
-#endif
 	return 1;
 }
+
 
 
 const int read_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *p ) {

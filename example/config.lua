@@ -67,12 +67,12 @@ return {
 		},
 
 		-- SSL capable hosts look like this
-		["ssl.hypno"] = { 
+		["supergreatwok.xyz"] = { 
 			dir = "ssl",
 			root_default = "/index.html",
-			ca_bundle = "supergreatwok.xyz/supergreatwok_xyz.ca-bundle",
-			cert_file = "supergreatwok.xyz/supergreatwok_xyz.crt",
-			keyfile = "supergreatwok.xyz/x509-collinshosting-key.pem",
+			ca_bundle = "ssl/misc/supergreatwok.xyz/supergreatwok_xyz.ca-bundle",
+			cert_file = "ssl/misc/supergreatwok.xyz/supergreatwok_xyz.crt",
+			keyfile = "ssl/misc/supergreatwok.xyz/supergreatwok_xyz.pem",
 			filter = "static"
 		},
 	}
