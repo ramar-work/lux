@@ -71,8 +71,8 @@ static void dumpconn( struct cdata *conn, const char *fname ) {
 			fprintf( stderr, "[%s] filter	: %s\n", fname, conn->hconfig->filter	 );
 			fprintf( stderr, "[%s] root_default	: %s\n", fname, conn->hconfig->root_default	 );
 			fprintf( stderr, "[%s] ca_bundle: %s\n", fname, conn->hconfig->ca_bundle );
-			fprintf( stderr, "[%s] certfile: %s\n", fname, conn->hconfig->certfile );
-			fprintf( stderr, "[%s] keyfile: %s\n", fname, conn->hconfig->keyfile );
+			fprintf( stderr, "[%s] cert_file: %s\n", fname, conn->hconfig->cert_file );
+			fprintf( stderr, "[%s] key_file: %s\n", fname, conn->hconfig->key_file );
 		}
 #endif
 	}

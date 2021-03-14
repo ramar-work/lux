@@ -15,8 +15,8 @@ struct lconfig {
 	char *filter;	
 	char *root_default;	
 	char *ca_bundle;
-	char *certfile;
-	char *keyfile;
+	char *cert_file;
+	char *key_file;
 };
 
 

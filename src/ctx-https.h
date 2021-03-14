@@ -72,8 +72,8 @@ struct gnutls_abstr {
 #if 0
 	const char *cafile;
 	const char *crlfile; 
-	const char *certfile;
-	const char *keyfile;
+	const char *cert_file;
+	const char *key_file;
 #endif
 };
 

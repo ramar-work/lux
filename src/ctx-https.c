@@ -66,22 +66,47 @@ const int post_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct c
 }
 
 
+#include <sys/stat.h>
 
 //This should be done one time before anything starts running
 //Also meaning that global initialization and de-initialization are needed 
 static int process_credentials ( struct gnutls_abstr *g, struct lconfig **hosts ) {
+	FPRINTF( "Runnnig proc credentials with hosts: %p\n", hosts );
 	for ( struct lconfig **h = hosts; *h ; h++ ) {
-		if ( (*h)->dir && (*h)->certfile  ) {
+		FPRINTF( "Host %s contains:\n", (*h)->name );
+		FPRINTF( "name: %s\n", (*h)->name );	
+		FPRINTF( "alias: %s\n", (*h)->alias );
+		FPRINTF( "dir: %s\n", (*h)->dir );	
+		FPRINTF( "filter: %s\n", (*h)->filter );	
+		FPRINTF( "root_default: %s\n", (*h)->root_default );	
+		FPRINTF( "ca_bundle: %s\n", (*h)->ca_bundle );
+		FPRINTF( "cert_file: %s\n", (*h)->cert_file );
+		FPRINTF( "key_file: %s\n", (*h)->key_file );
+	}
+
+	for ( struct lconfig **h = hosts; *h ; h++ ) {
+		FPRINTF( "Host %s will init SSL: %s\n", (*h)->name, ( (*h)->dir && (*h)->cert_file ) ? "Y" : "N" );
+		if ( (*h)->dir && (*h)->cert_file  ) {
 			//Make a filename
 			char cert[2048] = {0}, key[2048] = {0}, ca[2048] = {0};
-			snprintf( cert, sizeof(cert), "%s/%s", (*h)->dir, (*h)->certfile );
-			snprintf( key, sizeof(key), "%s/%s", (*h)->dir, (*h)->keyfile );
+			snprintf( cert, sizeof(cert), "%s/%s", (*h)->dir, (*h)->cert_file );
+			snprintf( key, sizeof(key), "%s/%s", (*h)->dir, (*h)->key_file );
 			snprintf( ca, sizeof(ca), "%s/%s", (*h)->dir, (*h)->ca_bundle );
-			#if 0
+			#if 1
 			FPRINTF( "Attempting to process these certs\n" );
 			FPRINTF( "ca bundle: %s\n", ca );
 			FPRINTF( "cert: %s\n", cert );
 			FPRINTF( "key: %s\n", key );
+
+char *w[] = { cert, key, ca, NULL };
+for ( char **ww = w; *ww; ww++ ) {
+	struct stat sb = {0};
+	int s = stat( *ww, &sb );
+	if ( s == -1 ) {
+			FPRINTF( "STAT ERR: %s\n", strerror( errno ) );
+			exit( 1 );
+	}
+}
 			#endif
 
 			//Will this ever be negative?	
@@ -105,8 +130,9 @@ static int process_credentials ( struct gnutls_abstr *g, struct lconfig **hosts 
 
 const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *conn) {
 	//Define
-	struct gnutls_abstr *g;
+	struct gnutls_abstr *g = NULL;
 	int ret, size = sizeof( struct gnutls_abstr );
+	FPRINTF( "Starting PRE GnuTLS\n" );
 
 	//Allocate a structure for the request process
 	if ( !( g = malloc( size )) || !memset( g, 0, size ) ) { 
@@ -126,6 +152,7 @@ const int pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cd
 	if ( !process_credentials( g, conn->config->hosts ) ) {
 		gnutls_certificate_free_credentials( g->x509_cred );
 		free( g );
+		FPRINTF( "Proc cred failure.\n" );
 		return 0;
 	}
 

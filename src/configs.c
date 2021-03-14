@@ -35,8 +35,8 @@ static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
 			{ "filter", "s", .v.s = &w->filter },
 			{ "root_default", "s", .v.s = &w->root_default },
 			{ "ca_bundle", "s", .v.s = &w->ca_bundle },
-			{ "certfile", "s", .v.s = &w->certfile },
-			{ "keyfile", "s", .v.s = &w->keyfile },
+			{ "cert_file", "s", .v.s = &w->cert_file },
+			{ "key_file", "s", .v.s = &w->key_file },
 			{ NULL }
 		};
 
@@ -94,8 +94,8 @@ void free_hosts ( struct lconfig ** hlist ) {
 		free( (*hosts)->filter );
 		free( (*hosts)->root_default );
 		free( (*hosts)->ca_bundle );
-		free( (*hosts)->certfile );
-		free( (*hosts)->keyfile );
+		free( (*hosts)->cert_file );
+		free( (*hosts)->key_file );
 		free( (*hosts) );
 		hosts++;
 	}

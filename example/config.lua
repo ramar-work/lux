@@ -72,7 +72,7 @@ return {
 			root_default = "/index.html",
 			ca_bundle = "ssl/misc/supergreatwok.xyz/supergreatwok_xyz.ca-bundle",
 			cert_file = "ssl/misc/supergreatwok.xyz/supergreatwok_xyz.crt",
-			keyfile = "ssl/misc/supergreatwok.xyz/supergreatwok_xyz.pem",
+			key_file = "ssl/misc/supergreatwok.xyz/supergreatwok_xyz.pem",
 			filter = "static"
 		},
 	}

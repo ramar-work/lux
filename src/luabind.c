@@ -42,13 +42,10 @@ void *lua_set_methods ( lua_State *L, const char *namespace, struct lua_function
 
 static void lua_dumptable ( lua_State *L, int *pos, int *sd ) {
 	lua_pushnil( L );
-	FPRINTF( "*pos = %d\n", *pos );
 
 	while ( lua_next( L, *pos ) != 0 ) {
 		//Fancy printing
-		//fprintf( stderr, "%s", &"\t\t\t\t\t\t\t\t\t\t"[ 10 - *sd ] );
 		PRETTY_TABS( *sd );
-		fprintf( stderr, "[%3d:%2d] => ", *pos, *sd );
 
 		//Print both left and right side
 		for ( int i = -2; i < 0; i++ ) {
@@ -91,7 +88,6 @@ static void lua_dumptable ( lua_State *L, int *pos, int *sd ) {
 			//PRETTY_TABS( *sd );
 		}
 		getchar();
-		FPRINTF( "Popping key\n" );
 		lua_pop( L, 1 );
 	}
 	return;
@@ -102,10 +98,8 @@ static void lua_dumptable ( lua_State *L, int *pos, int *sd ) {
 //Loop through a table in memory
 void lua_loop ( lua_State *L ) {
 	int a = lua_gettop( L );
-	FPRINTF( "Looping through %d values.\n", a );
 
 	for ( int i=1; i <= a; i++ ) {
-		FPRINTF( "%-2d: %s\n", i, lua_typename( L, lua_type( L, i )) );
 		//lua_getindex(L, i );
 	}
 }
@@ -158,15 +152,12 @@ void lua_stackdump ( lua_State *L ) {
 int lua_to_table (lua_State *L, int index, zTable *t ) {
 	static int sd;
 	lua_pushnil( L );
-	FPRINTF( "Current stack depth: %d\n", sd++ );
 
 	while ( lua_next( L, index ) != 0 ) {
 		int kt, vt;
-		FPRINTF( "key, value: " );
 
 		//This should pop both keys...
-		FPRINTF( "%s, %s\n", lua_typename( L, lua_type(L, -2 )), lua_typename( L, lua_type(L, -1 )));
-
+	#if 0
 		//Keys
 		if (( kt = lua_type( L, -2 )) == LUA_TNUMBER )
 			FPRINTF( "key: %lld\n", (long long)lua_tointeger( L, -2 ));
@@ -178,6 +169,7 @@ int lua_to_table (lua_State *L, int index, zTable *t ) {
 			FPRINTF( "val: %lld\n", (long long)lua_tointeger( L, -1 ));
 		else if ( vt  == LUA_TSTRING )
 			FPRINTF( "val: %s\n", lua_tostring( L, -1 ));
+	#endif
 
 		//Get key (remember Lua indices always start at 1.  Hence the minus.
 		if (( kt = lua_type( L, -2 )) == LUA_TNUMBER )
@@ -192,14 +184,12 @@ int lua_to_table (lua_State *L, int index, zTable *t ) {
 			lt_addtextvalue( t, (char *)lua_tostring( L, -1 ));
 		else if ( vt == LUA_TTABLE ) {
 			lt_descend( t );
-			FPRINTF( "Descending because value at %d is table...\n", -1 );
 			lua_loop( L );
 			lua_to_table( L, index + 2, t ); 
 			lt_ascend( t );
 			sd--;
 		}
 
-		FPRINTF( "popping last two values...\n" );
 		if ( vt == LUA_TNUMBER || vt == LUA_TSTRING ) {
 			lt_finalize( t );
 		}
@@ -227,7 +217,6 @@ int table_to_lua (lua_State *L, int index, zTable *tt) {
 		for ( int i=0; i<2; i++ ) {
 			zhRecord *r = items[i].r; 
 			t = items[i].t;
-			FPRINTF( "%s\n", ( i ) ? lt_typename( t ) : lt_typename( t ));
 
 			if ( i ) {
 				if (t == LITE_NUL)
@@ -261,7 +250,6 @@ int table_to_lua (lua_State *L, int index, zTable *tt) {
 		lua_loop( L );
 	}
 
-	FPRINTF( "Done!\n" );
 	return 1;
 }
 
@@ -435,7 +423,6 @@ int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 	
 		errlen -= len;	
 		snprintf( &err[ len ], errlen, "%s\n", (char *)lua_tostring( L, -1 ) );
-		//fprintf(stderr, "LUA LOAD ERROR: %s, %s", err, (char *)lua_tostring( L, -1 ) );
 		lua_pop( L, lua_gettop( L ) );
 		return 0;	
 	}
@@ -456,7 +443,6 @@ int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 
 		errlen -= len;	
 		snprintf( &err[ len ], errlen, "%s\n", (char *)lua_tostring( L, -1 ) );
-		//fprintf(stderr, "LUA EXEC ERROR: %s, %s", err, (char *)lua_tostring( L, -1 ) );	
 		lua_pop( L, lua_gettop( L ) );
 		return 0;	
 	}
