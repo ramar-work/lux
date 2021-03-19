@@ -190,7 +190,45 @@ $ make examples
 
 ## Usage
 
-This section is not finished yet.
+### Server
+
+Hypno currently ships with a server (hypno-server) capable of:
+
+- Serving static web pages.
+- Serving web applications via a shared object.
+- Serving a list of files in a directory.
+- Handling redirects.
+- Serving TLS encrypted traffic.
+
+The commands are listed below: 
+<pre>
+-s, --start                  Start the server              
+-c, --config <arg>           Use this Lua file for configuration
+-p, --port <arg>             Start using a different port  
+-u, --user <arg>             Choose an alternate user to start as
+-d, --dump                   Dump configuration            
+    --no-fork                Do not fork                   
+    --use-ssl                Use SSL                       
+    --debug                  set debug rules               
+-h, --help                   Show the help menu.  
+</pre>
+
+
+### Admin
+
+Hypno also ships with a command line interface (hypno-cli) which will eventually
+be capable of:
+
+- Stress testing applications via the command line
+- Modifying instances / applications
+- Modifying domains within local DNS
+
+
+### Configuration
+
+Hypno leans on Lua's speed and simplicity for configuration tasks. 
+See the example/ directory for what a typical server configuration
+file looks like.
 
 
 <!-- ## Rationale -->
