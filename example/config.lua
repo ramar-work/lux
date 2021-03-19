@@ -35,6 +35,15 @@ return {
 		},
 		--]]
 
+		--[[
+		-- See LuaMVC in action
+		["luamvc.hypno"] = { 
+			dir = "luamvc",
+			root_default = "/index.html",
+			filter = "lua"
+		},
+		--]]
+
 		-- Redirect does nothing of real importance
 		["redirect.hypno"] = { 
 			-- Where to redirect?
@@ -61,13 +70,6 @@ return {
 			filter = "static"
 		},
 	
-		-- See LuaMVC in action
-		["luamvc.hypno"] = { 
-			dir = "luamvc",
-			root_default = "/index.html",
-			filter = "lua"
-		},
-
 		-- SSL capable hosts look like this
 		["supergreatwok.xyz"] = { 
 			dir = "ssl",
