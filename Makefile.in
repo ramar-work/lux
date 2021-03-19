@@ -32,7 +32,9 @@ GROUP = http
 
 # Everything else
 IFLAGS = -Ivendor -I/usr/include/lua5.3
-LDFLAGS = -lgnutls -llua -ldl -lpthread
+#LFLAGS = -L/usr/lib/x86_64-linux-gnu 
+#LDFLAGS = $(LFLAGS) -lgnutls -llua -ldl -lpthread
+LDFLAGS = -ldl -lpthread
 DEBUGFLAGS = -DDEBUG_H
 CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security $(IFLAGS)
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
@@ -66,6 +68,22 @@ SRC = \
 OBJ = ${SRC:.c=.o}
 TARGET = main
 TESTS = loader database luabind router util #server render filter config 
+UNAME = $(shell uname)
+
+# Handle slight differences between Debian and others...
+ifeq ($(UNAME),Linux)
+	DEBUNAME = $(shell uname -a | awk '{ print $$2 }')
+	ifeq ($(DEBUNAME),debian)
+		LDFLAGS += $(shell pkg-config --libs --cflags lua5.3 gnutls) 
+	else
+		LDFLAGS += $(shell pkg-config --libs --cflags lua gnutls) 
+	endif
+endif
+
+ifeq ($(UNAME),Darwin)
+	CC = clang
+	CFLAGS = $(CLANGFLAGS) 
+endif
 
 
 # main - Compiles all code needed to get hypno running
