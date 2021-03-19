@@ -20,18 +20,20 @@
 return {
 	wwwroot = "example",
 	hosts = {
-		-- See the C filter in action
+		-- Default host in case no domain is specified
 		["localhost"] = { 
 			root_default = "/index.html",
 			dir = "localhost",
 			filter = "static"
 		},
-
+		
+		--[[
 		-- See the C filter in action
 		["app.hypno"] = { 
 			root_default = "/index.html", -- Technically, no root is needed
 			filter = "c"
 		},
+		--]]
 
 		-- Redirect does nothing of real importance
 		["redirect.hypno"] = { 
