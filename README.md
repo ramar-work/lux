@@ -10,7 +10,8 @@ hypno depends on the following:
 - Lua v5.3 or greater
 - GnuTLS 2.0 or greater
 
-Currently builds on most Linuxes without much help.  
+Arch Linux is the distribution used for development, and as such it
+is pretty easy to get it running there.  
 
 
 ### OSX
@@ -21,7 +22,8 @@ Currently builds on most Linuxes without much help.
 
 ### Linux
 
-In lieu of a nice `./configure` script, basic instructions for getting Hypno running on a few common distributions are below.
+In lieu of a nice `./configure` script, basic instructions for getting Hypno 
+running on a few common distributions are below.
 
 ### Ubuntu / Debian / PopOS
 

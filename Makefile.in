@@ -40,16 +40,28 @@ CFLAGS = $(GCCFLAGS)
 CC = gcc
 SRC = \
 	@srcdir@/vendor/sqlite3.c \
-	@srcdir@/vendor/zrender.c @srcdir@/vendor/zhasher.c @srcdir@/vendor/zwalker.c \
-	@srcdir@/vendor/zhttp.c @srcdir@/src/configs.c @srcdir@/src/db-sqlite.c \
-	@srcdir@/src/luabind.c @srcdir@/src/mime.c @srcdir@/src/socket.c \
-	@srcdir@/src/util.c @srcdir@/src/ctx-http.c @srcdir@/src/ctx-https.c \
-	@srcdir@/src/server.c @srcdir@/src/loader.c @srcdir@/src/mvc.c \
-	@srcdir@/src/router.c @srcdir@/src/filter-static.c @srcdir@/src/filter-c.c \
-	@srcdir@/src/filter-echo.c @srcdir@/src/filter-dirent.c @srcdir@/src/filter-redirect.c \
+	@srcdir@/vendor/zrender.c \
+	@srcdir@/vendor/zhasher.c \
+	@srcdir@/vendor/zwalker.c \
+	@srcdir@/vendor/zhttp.c \
+	@srcdir@/src/configs.c \
+	@srcdir@/src/db-sqlite.c \
+	@srcdir@/src/luabind.c \
+	@srcdir@/src/mime.c \
+	@srcdir@/src/socket.c \
+	@srcdir@/src/util.c \
+	@srcdir@/src/ctx-http.c \
+	@srcdir@/src/ctx-https.c \
+	@srcdir@/src/server.c \
+	@srcdir@/src/loader.c \
+	@srcdir@/src/mvc.c \
+	@srcdir@/src/router.c \
+	@srcdir@/src/filter-static.c \
+	@srcdir@/src/filter-c.c \
+	@srcdir@/src/filter-echo.c \
+	@srcdir@/src/filter-dirent.c \
+	@srcdir@/src/filter-redirect.c \
 	@srcdir@/src/filter-lua.c
-
-#@srcdir@/src/ctx-https.c @srcdir@/src/filter-echo.c @srcdir@/src/filter-lua.c @srcdir@/src/filter-dirent.c @srcdir@/src/filter-c.c @srcdir@/src/xml.c @srcdir@/src/json.c @srcdir@/src/dirent-filter.c
 OBJ = ${SRC:.c=.o}
 TARGET = main
 TESTS = loader database luabind router util #server render filter config 
@@ -58,8 +70,8 @@ TESTS = loader database luabind router util #server render filter config
 # main - Compiles all code needed to get hypno running
 main: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/main.c -o $(srcdir)/bin/$(NAME) $(OBJ) 
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli.c -o $(srcdir)/bin/hcli $(OBJ)
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/main.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) 
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/harness.c -o $(srcdir)/bin/hypno-cli $(OBJ)
 
 # debug - Builds code with debugging flags on
 debug: debug-clang
@@ -84,7 +96,7 @@ debug-gcc: main
 
 # install - Installs targets to $PREFIX/bin
 install:
-	cp $(srcdir)/bin/hypno $(srcdir)/bin/hcli $(PREFIX)/bin/
+	cp $(srcdir)/bin/* $(PREFIX)/bin/
 
 # examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
 examples: PORT=2222
@@ -106,9 +118,6 @@ repl:
 		shared/lua-db.o shared/zhasher.o shared/luabind.o
 	lua -l libhypno - < tests/lua-db/dbtest.lua
  
-#%.o: %.c 
-#	$(CC) -c -o $@ $< $(CFLAGS)
-
 # test -  Build all test files
 test: $(OBJ) 
 test: CFLAGS+=-DTEST_H
@@ -130,6 +139,11 @@ clean:
 list:
 	@printf 'Available options are:\n'
 	@sed -n '/^# / { s/# //; 1d; p; }' Makefile | awk -F '-' '{ printf "  %-20s - %s\n", $$1, $$2 }'
+
+# plat - Build on a different platform by specifying the target
+plat:
+	make pkg	
+
 
 #if 0
 # pkg - Make a package of the latest tagged version for distribution

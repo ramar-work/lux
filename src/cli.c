@@ -183,13 +183,6 @@ int main (int argc, char *argv[]) {
 			help();	
 		else if ( strcmp( *argv, "--verbose" ) == 0 ) 
 			arg_verbose = 1;
-		else if ( strcmp( *argv, "--port" ) == 0 ) {
-			argv++;
-			if ( !*argv ) {
-				ERRPRINTF( "Expected argument for --port!" );
-				return 0;
-			} 
-		}
 		else if ( strcmp( *argv, "--dir" ) == 0 ) {
 			argv++;
 			if ( !*argv ) {
