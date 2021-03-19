@@ -102,10 +102,12 @@ install:
 examples: PORT=2222
 examples: $(TARGET) 
 examples: 
+	@clear
 	@lua -e "a=loadfile( 'example/config.lua' )(); \
 		hosts = {}; for k,v in pairs(a.hosts) do table.insert( hosts, 'http://' .. k ) end; \
-		print( 'Hosts at example/config.lua are: ' .. table.concat( hosts, ', ' ) );"
-	$(srcdir)/bin/hypno --start --port $(PORT) --config $(srcdir)/example/config.lua 
+		print( 'Hosts at example/config.lua are:\n' .. table.concat( hosts, '\n' ) );"
+	@$(srcdir)/bin/$(NAME)-server --start --port $(PORT) --config $(srcdir)/example/config.lua 
+	@echo "hypno-server is listening for requests at port 2222"
 
 # repl - Build and test libraries for REPL usage
 #	test -f sqlite3.o || $(CC) $(CFLAGS) -fPIC -c vendor/sqlite3.c -o shared/sqlite3.o
