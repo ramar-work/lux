@@ -31,11 +31,12 @@ USER = http
 GROUP = http
 
 # Everything else
+IFLAGS = -Ivendor -I/usr/include/lua5.3
 LDFLAGS = -lgnutls -llua -ldl -lpthread
 DEBUGFLAGS = -DDEBUG_H
-CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -Ivendor
+CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security $(IFLAGS)
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
-	-Wno-format-truncation -Wno-return-local-addr -O2 -Ivendor
+	-Wno-format-truncation -Wno-return-local-addr -O2 $(IFLAGS)
 CFLAGS = $(GCCFLAGS)
 CC = gcc
 SRC = \

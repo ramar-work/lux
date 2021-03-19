@@ -38,7 +38,7 @@ different platforms.
 
 <pre>
 // Install the following dependencies
-$ apt install liblua5.3-devel gnutls-dev
+$ pacman -Sy liblua5.3-devel gnutls-dev make
 
 // Get hypno via Git
 $ git clone https://github.com/zaiah-dj/hypno.git
@@ -49,11 +49,11 @@ $ cd hypno && make && make install
 
 
 
-### Ubuntu / Debian / PopOS
+### Debian / PopOS
 
 <pre>
 // Install the following dependencies
-$ apt install liblua5.3-devel gnutls-dev
+$ apt install liblua5.3-dev gnutls-dev make
 
 // Get hypno via Git
 $ git clone https://github.com/zaiah-dj/hypno.git
@@ -67,7 +67,7 @@ $ cd hypno && make && make install
 
 <pre>
 # Install dependencies
-$ yum install lua-devel gnutls-devel
+$ yum install lua-devel gnutls-devel make
 
 # Get hypno via Git
 $ git clone https://github.com/zaiah-dj/hypno.git
