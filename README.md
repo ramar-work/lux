@@ -17,18 +17,6 @@ Hypno is slowly moving over to GNU autoconf for a consistent build process.
 Even in its current state, it still needs no exotic flags to build on
 different platforms.
 
-#### Arch
-
-<pre>
-// Install the following dependencies
-$ pacman -Sy liblua5.3-devel gnutls-dev make
-
-// Get hypno via Git
-$ git clone https://github.com/zaiah-dj/hypno.git
-
-// Make and install
-$ cd hypno && make && make install
-</pre>
 
 #### Debian 
 
@@ -43,9 +31,15 @@ $ git clone https://github.com/zaiah-dj/hypno.git
 
 # Make and install
 $ cd hypno && make && make install
+
+# Run the examples at port 2222
+$ make examples
 </pre>
 
-### Fedora
+
+#### Fedora
+
+Instructions for Debian ought to translate to other yum-based distributions.
 
 <pre>
 # Install dependencies
@@ -60,6 +54,29 @@ $ cd hypno && make && make install
 # Run the examples to see the code in action.
 $ make examples
 </pre>
+
+
+#### Arch & others
+
+Arch happens to be the distribution that hypno is developed on and
+it is a fairly straightforward process to build there.  
+<pre>
+# Install dependencies
+$ pacman -Sy lua gnutls
+
+# Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
+
+# Make and install
+$ cd hypno && make && make install
+
+# Run the examples to see the code in action.
+$ make examples
+</pre>
+
+SuSE, Slackware, Gentoo and others have not been tested yet, but the 
+steps boil down roughly to the same thing.
+
 
 
 ### Windows (via Cygwin)
@@ -92,6 +109,9 @@ $ git clone https://github.com/zaiah-dj/hypno.git
 
 # Make and install
 $ cd hypno && make && make install
+
+# Run the examples at port 2222
+$ make examples
 </pre>
 
 NOTE: In my opinion, running Hypno on Cygwin is really just
@@ -102,9 +122,52 @@ Linux feel just aren't fast enough for production-level performance.
 ### OSX
 
 The OSX build needs a bit of work.   Building Lua manually and linking against
-that seems to be the best solution for now.
+that seems to be the best solution for now. 
 
+The OSX build also requires brew, which requires XCode and XCode's command line 
+tools.
 
+#### Getting Dependencies via Brew
+
+The GnuTLS dependency can be grabbed via Brew.  Hypno will also require `pkg-config`
+to find all of the libraries after installation.
+
+<pre>
+$ brew install gnutls pkg-config
+</pre>
+
+Unfortunately, the Lua package downloaded with Homebrew does not ship with 
+it's headers or a library.  So we'll need to create one ourselves.
+
+#### Getting and Building Lua
+
+There are three steps to building Lua manually.
+
+1. Visit http://www.lua.org/download.html
+2. Download Lua 5.3.6 from http://www.lua.org/ftp/lua-5.3.6.tar.gz
+3. Build the library and install it.
+
+We can do all of this via the command line.
+<pre>
+$ curl -R -O http://www.lua.org/ftp/lua-5.3.6.tar.gz
+$ tar xzf lua-5.3.6.tar.gz && cd lua-5.3.6
+$ make macosx && make install
+</pre>
+
+#### Building Hypno
+
+Building Hypno now will be simliar to other Linux based builds.
+
+<pre>
+# Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
+
+# Make and install
+$ cd hypno && make && make install
+
+# Run the examples at port 2222
+$ make examples
+</pre>
 
 
 <!-- ## Using the CLI -->
