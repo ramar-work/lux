@@ -16,14 +16,38 @@ is pretty easy to get it running there.
 
 ### OSX
 
+The OSX build currently relies on <a href="https://brew.sh">Brew</a> 
+(which requires XCode command line tools and, in turn, XCode).  In the
+future, this dependency will probably be removed.
 
-### Windows
+<pre>
+
+</pre>
+
+
+### Windows (via Cygwin)
 
 
 ### Linux
 
-In lieu of a nice `./configure` script, basic instructions for getting Hypno 
-running on a few common distributions are below.
+Hypno is slowly moving over to GNU autoconf for a consistent build process.
+Even in its current state, it still needs no exotic flags to build on
+different platforms.
+
+### Arch
+
+<pre>
+// Install the following dependencies
+$ apt install liblua5.3-devel gnutls-dev
+
+// Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
+
+// Make and install
+$ cd hypno && make && make install
+</pre>
+
+
 
 ### Ubuntu / Debian / PopOS
 
@@ -41,6 +65,19 @@ $ cd hypno && make && make install
 
 ### Fedora
 
+<pre>
+# Install dependencies
+$ yum install lua-devel gnutls-devel
+
+# Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
+
+# Make and install
+$ cd hypno && make && make install
+
+# Run the examples to see the code in action.
+$ make examples
+</pre>
 
 ### Arch
 

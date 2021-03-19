@@ -141,8 +141,14 @@ list:
 	@sed -n '/^# / { s/# //; 1d; p; }' Makefile | awk -F '-' '{ printf "  %-20s - %s\n", $$1, $$2 }'
 
 # plat - Build on a different platform by specifying the target
+# figure out host and ping it to see if its running
+# either package this or scp -r * to host
+# go to host and try to build with commands
+# exit
 plat:
-	make pkg	
+	make -f build/Makefile.arch boom
+	echo $(OS)	
+	
 
 
 #if 0

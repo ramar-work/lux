@@ -48,31 +48,31 @@ void create_notls ( void **p ) { ; }
 static void dumpconn( struct cdata *conn, const char *fname ) {
 	if ( conn ) {	
 
-		fprintf( stderr, "SERVER INFO\n" );
-		fprintf( stderr, "[%s] count: %d\n", fname, conn->count );
-		fprintf( stderr, "[%s] status: %d\n", fname, conn->status );
-		fprintf( stderr, "[%s] ipv4: %s\n", fname, conn->ipv4 );
-		fprintf( stderr, "[%s] ipv6: %s\n", fname, conn->ipv6 );
+		FPRINTF( "SERVER INFO\n" );
+		FPRINTF( "[%s] count: %d\n", fname, conn->count );
+		FPRINTF( "[%s] status: %d\n", fname, conn->status );
+		FPRINTF( "[%s] ipv4: %s\n", fname, conn->ipv4 );
+		FPRINTF( "[%s] ipv6: %s\n", fname, conn->ipv6 );
 
-		fprintf( stderr, "SERVER CONFIG\n" );
-		fprintf( stderr, "[%s] ptr: %p\n", fname, conn->config );
+		FPRINTF( "SERVER CONFIG\n" );
+		FPRINTF( "[%s] ptr: %p\n", fname, conn->config );
 		if ( conn->config ) {
-			fprintf( stderr, "[%s] wwwroot: %s\n", fname, conn->config->wwwroot );
-			fprintf( stderr, "[%s] hosts: %p\n", fname, conn->config->hosts );
+			FPRINTF( "[%s] wwwroot: %s\n", fname, conn->config->wwwroot );
+			FPRINTF( "[%s] hosts: %p\n", fname, conn->config->hosts );
 		}
 
 #if 0
-		fprintf( stderr, "LOCAL CONFIG\n" );
-		fprintf( stderr, "[%s] ptr : %p\n", fname, conn->hconfig );
+		FPRINTF( "LOCAL CONFIG\n" );
+		FPRINTF( "[%s] ptr : %p\n", fname, conn->hconfig );
 		if ( conn->hconfig ) {
-			fprintf( stderr, "[%s] name	: %s\n", fname, conn->hconfig->name	 );
-			fprintf( stderr, "[%s] alias: %s\n", fname, conn->hconfig->alias );
-			fprintf( stderr, "[%s] dir	: %s\n", fname, conn->hconfig->dir	 );
-			fprintf( stderr, "[%s] filter	: %s\n", fname, conn->hconfig->filter	 );
-			fprintf( stderr, "[%s] root_default	: %s\n", fname, conn->hconfig->root_default	 );
-			fprintf( stderr, "[%s] ca_bundle: %s\n", fname, conn->hconfig->ca_bundle );
-			fprintf( stderr, "[%s] cert_file: %s\n", fname, conn->hconfig->cert_file );
-			fprintf( stderr, "[%s] key_file: %s\n", fname, conn->hconfig->key_file );
+			FPRINTF( "[%s] name	: %s\n", fname, conn->hconfig->name	 );
+			FPRINTF( "[%s] alias: %s\n", fname, conn->hconfig->alias );
+			FPRINTF( "[%s] dir	: %s\n", fname, conn->hconfig->dir	 );
+			FPRINTF( "[%s] filter	: %s\n", fname, conn->hconfig->filter	 );
+			FPRINTF( "[%s] root_default	: %s\n", fname, conn->hconfig->root_default	 );
+			FPRINTF( "[%s] ca_bundle: %s\n", fname, conn->hconfig->ca_bundle );
+			FPRINTF( "[%s] cert_file: %s\n", fname, conn->hconfig->cert_file );
+			FPRINTF( "[%s] key_file: %s\n", fname, conn->hconfig->key_file );
 		}
 #endif
 	}

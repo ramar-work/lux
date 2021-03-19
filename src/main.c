@@ -112,7 +112,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 	//Initialize
 	populate_tcp_socket( &su, &v->port );
-	ctx = &sr[ 0 ]; //&sr[ v->ssl ];	
+	ctx = &sr[ v->ssl ];	
 	ctx->init( &ctx->data );
 	ctx->filters = filters;
 	ctx->config = v->config;
