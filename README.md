@@ -10,23 +10,6 @@ hypno depends on the following:
 - Lua v5.3 or greater
 - GnuTLS 2.0 or greater
 
-Arch Linux is the distribution used for development, and as such it
-is pretty easy to get it running there.  
-
-
-### OSX
-
-The OSX build currently relies on <a href="https://brew.sh">Brew</a> 
-(which requires XCode command line tools and, in turn, XCode).  In the
-future, this dependency will probably be removed.
-
-<pre>
-
-</pre>
-
-
-### Windows (via Cygwin)
-
 
 ### Linux
 
@@ -34,7 +17,7 @@ Hypno is slowly moving over to GNU autoconf for a consistent build process.
 Even in its current state, it still needs no exotic flags to build on
 different platforms.
 
-### Arch
+#### Arch
 
 <pre>
 // Install the following dependencies
@@ -47,21 +30,20 @@ $ git clone https://github.com/zaiah-dj/hypno.git
 $ cd hypno && make && make install
 </pre>
 
+#### Debian 
 
-
-### Debian / PopOS
+Instructions for Debian ought to translate to other apt-based distributions.
 
 <pre>
-// Install the following dependencies
+# Install the following dependencies
 $ apt install liblua5.3-dev gnutls-dev make
 
-// Get hypno via Git
+# Get hypno via Git
 $ git clone https://github.com/zaiah-dj/hypno.git
 
-// Make and install
+# Make and install
 $ cd hypno && make && make install
 </pre>
-
 
 ### Fedora
 
@@ -79,10 +61,51 @@ $ cd hypno && make && make install
 $ make examples
 </pre>
 
-### Arch
+
+### Windows (via Cygwin)
+
+The Cygwin build is pretty close to what it would be on a typical
+Linux system.  Dependencies can be grabbed either through the command-line
+or through setup.exe.  That said, if you are not already using 
+<a href="https://github.com/transcode-open/apt-cyg">apt-cyg</a>, 
+you're missing out.
+
+To install the dependencies via `apt-cyg`, try the following:
+<pre>
+$ apt-cyg install gnutls-devel lua-devel lua
+</pre>
+
+To install the via the setup.exe program, just search for the following
+names: `gnutls-devel`, `lua-devel`, `lua`.
+
+The program should find the newest versions and install them.
+
+You will also need `gcc` and `make` if you do not typically build software
+in your Cygwin environment. 
+
+The rest of the build steps are follow what would be done a regular Linux
+system.
+
+<pre>
+# Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
+
+# Make and install
+$ cd hypno && make && make install
+</pre>
+
+NOTE: In my opinion, running Hypno on Cygwin is really just
+useful for quick tests.  The emulation and utilities used to get that
+Linux feel just aren't fast enough for production-level performance.
 
 
-### BSD
+### OSX
+
+The OSX build needs a bit of work.   Building Lua manually and linking against
+that seems to be the best solution for now.
+
+
+
 
 <!-- ## Using the CLI -->
 <!--  -->

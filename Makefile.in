@@ -83,6 +83,7 @@ endif
 ifeq ($(UNAME),Darwin)
 	CC = clang
 	CFLAGS = $(CLANGFLAGS) 
+	LDFLAGS += $(shell pkg-config --libs --cflags lua gnutls) 
 endif
 
 
