@@ -31,14 +31,13 @@
 #include "../vendor/zhasher.h"
 #include "ctx-http.h"
 #include "ctx-https.h"
-#include "server.h"
 #include "socket.h"
+#include "server.h"
 #include "filter-static.h"
-#include "filter-c.h"
 #include "filter-echo.h"
 #include "filter-dirent.h"
 #include "filter-redirect.h"
-#include "filter-lua.h"
+#include <dlfcn.h>
 
 #define eprintf(...) \
 	fprintf( stderr, "%s: ", "hypno" ) && \
@@ -55,6 +54,10 @@
 
 const int defport = 2000;
 
+const char libn[] = "libname";
+
+const char appn[] = "app";
+
 struct values {
 	int port;
 	int ssl;
@@ -63,7 +66,9 @@ struct values {
 	int fork;
 	int dump;
 	char *user;
+	char *group;
 	char *config;
+	char *libdir;
 #ifdef DEBUG_H
 	int pfork;
 #endif
@@ -71,28 +76,41 @@ struct values {
 
 
 //Define a list of filters
-struct filter filters[] = {
+struct filter filters[16] = { 
 	{ "static", filter_static }
-, { "c", filter_c }
-, { "echo", filter_echo }
-, { "dirent", filter_dirent }
-, { "redirect", filter_redirect }
-, { "lua", filter_lua }
-#if 0
-#endif
+,	{ "echo", filter_echo }
+,	{ "dirent", filter_dirent }
+,	{ "redirect", filter_redirect }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
 , { NULL }
 };
 
 
 //In lieu of an actual ctx object, we do this to mock pre & post which don't exist
-const 
-int fkctpre( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *c ) {
+const int fkctpre( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c ) {
 	return 1;
 }
 
-const 
-int fkctpost( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *c) {
+const int fkctpost( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c) {
 	return 1;
+}
+
+
+//Return fi
+static int findex() {
+	int fi = 0;
+	for ( struct filter *f = filters; f->name; f++, fi++ ); 
+	return fi;	
 }
 
 
@@ -142,39 +160,8 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			continue;
 		}
 
-	#if 0
-		//For test purposes, we need this
-		if ( !v->fork ) {
-			struct cdata connection = {0};	
-			connection.flags = O_NONBLOCK;
-			connection.ctx = ctx;
-		
-			//Get IP here and save it for logging purposes
-			if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
-				FPRINTF( "Error in getting IP address of connecting client.\n" );
-			}
-
-			for ( ;; ) {
-				//additionally, this one should block
-				if ( !srv_response( fd, &connection ) ) {
-					FPRINTF( "Error in TCP socket handling.\n" );
-				}
-				
-				if ( CONN_CLOSE || connection.count < 0 || connection.count > 5 ) {
-					FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
-					int status = close( fd );
-					if ( status == -1 ) {
-						FPRINTF( "Error when closing child socket.\n" );
-					}
-					break;
-				}
-
-				FPRINTF( "Connection is done. count is %d\n", connection.count );
-			}
-		}
-	#else
-		//Do fork
 		//Fork and serve a request 
+		//fork() should not be the only choice
 		if ( ( cpid = fork() ) == -1 ) {
 			//TODO: There is most likely a reason this didn't work.
 			FPRINTF( "Failed to setup new child connection. %s\n", strerror(errno) );
@@ -215,7 +202,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 				FPRINTF( "Connection is done. count is %d\n", connection.count );
 			}
 		}
-	#endif
 	}
 
 	//Close the socket
@@ -228,6 +214,85 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 }
 
 
+int cmd_dump( struct values *v, char *err, int errlen ) {
+	fprintf( stderr, "Hypno is running with the following settings.\n" );
+	fprintf( stderr, "===============\n" );
+	fprintf( stderr, "Port:                %d\n", v->port );
+	fprintf( stderr, "Using SSL?:          %s\n", v->ssl ? "T" : "F" );
+	fprintf( stderr, "Daemonized:          %s\n", v->fork ? "T" : "F" );
+	fprintf( stderr, "Request Model:       %s\n", "Fork" );
+	fprintf( stderr, "User:                %s\n", v->user );
+	fprintf( stderr, "Group:               %s\n", v->group );
+	fprintf( stderr, "Config:              %s\n", v->config );
+	fprintf( stderr, "Library Directory:   %s\n", v->libdir );
+
+	fprintf( stderr, "Filters enabled:\n" );
+	for ( struct filter *f = filters; f->name; f++ ) {
+		fprintf( stderr, "[ %-16s ] %p\n", f->name, f->filter ); 
+	}
+	return 1;
+}
+
+
+
+//...
+int cmd_libs( struct values *v, char *err, int errlen ) {
+	//Define
+	DIR *dir;
+	struct dirent *d;
+	int findex = 0;
+
+	//Find the last index
+	for ( struct filter *f = filters; f->name; f++, findex++ );
+
+	//Open directory
+	if ( !( dir = opendir( v->libdir ) ) ) {
+		snprintf( err, errlen, "%s", strerror( errno ) );
+		return 0;
+	}
+
+	//List whatever directory
+	for ( ; ( d = readdir( dir ) );  ) { 
+		void *lib = NULL;
+		struct filter *f = &filters[ findex ];
+		char fpath[2048] = {0};
+
+		//Skip '.' & '..', and stop if you can't open it...
+		if ( *d->d_name == '.' ) {
+			continue;
+		}
+
+		//Try to open the library
+		snprintf( fpath, sizeof( fpath ) - 1, "%s/%s", v->libdir, d->d_name );
+		if ( ( lib = dlopen( fpath, RTLD_NOW ) ) == NULL ) { 
+			fprintf( stderr, "dlopen error: %s\n", strerror( errno ) );
+			continue; 
+		}
+
+		//Look for the symbol 'libname'
+		if ( !( f->name = (const char *)dlsym( lib, libn ) ) ) {
+			fprintf( stderr, "dlsym libname error: %s\n", dlerror() );
+			//Don't open, don't load, and close what's there...
+			dlclose( lib );
+			continue;
+		}
+
+		//Look for the symbol 'app'
+		if ( !( f->filter = dlsym( lib, appn ) ) ) {
+			fprintf( stderr, "dlsym app error: %s\n", strerror( errno ) );
+			dlclose( lib );
+			continue;
+		}
+
+		//Move to the next
+		findex++;
+	}
+
+	return 1;
+}
+
+
+
 //Display help
 int help () {
 	fprintf( stderr, "%s: No options received.\n", __FILE__ );
@@ -236,15 +301,14 @@ int help () {
 	fprintf( stderr, fmt, "-c,", "config <arg>", "Use this Lua file for configuration" );
 	fprintf( stderr, fmt, "-p,", "port <arg>", "Start using a different port" );
 	fprintf( stderr, fmt, "-u,", "user <arg>", "Choose an alternate user to start as" );
-	fprintf( stderr, fmt, "-d,", "dump", "Dump configuration" );
+	fprintf( stderr, fmt, "-x,", "dump", "Dump configuration at startup" );
+	fprintf( stderr, fmt, "-k,", "kill", "Kill a running server" );
+	fprintf( stderr, fmt, "-l,", "libs <arg>", "Point to libraries at <arg>" );
 	fprintf( stderr, fmt, "   ", "no-fork", "Do not fork" );
 	fprintf( stderr, fmt, "   ", "use-ssl", "Use SSL" );
 	fprintf( stderr, fmt, "   ", "debug", "set debug rules" );
 	fprintf( stderr, fmt, "-h,", "help", "Show the help menu." );
 #if 0
-	//This is just not done yet...
-	fprintf( stderr, fmt, "-k," "kill", "Kill a running server" );
-	fprintf( stderr, fmt, "   " "dump", "Dump configuration at startup" );
 	fprintf( stderr, fmt, "-f," "fork", "Daemonize the server when starting" );
 	fprintf( stderr, fmt, "dir <arg>", "Use this directory to serve from" );
 #endif
@@ -319,14 +383,22 @@ int main (int argc, char *argv[]) {
 			values.start = 1;
 		else if ( !strcmp( *argv, "-k" ) || !strcmp( *argv, "--kill" ) ) 
 			values.kill = 1;
-		else if ( !strcmp( *argv, "-d" ) || !strcmp( *argv, "--dump" ) ) 
+		else if ( !strcmp( *argv, "-x" ) || !strcmp( *argv, "--dump" ) ) 
 			values.dump = 1;
-#if 0
+	#if 0
 		else if ( !strcmp( *argv, "-d" ) || !strcmp( *argv, "--daemonize" ) ) 
 			values.fork = 1;
-#endif
+	#endif
 		else if ( !strcmp( *argv, "--use-ssl" ) ) 
 			values.ssl = 1;
+		else if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--libs" ) ) {
+			argv++;
+			if ( !*argv ) {
+				eprintf( "Expected argument for --libs!" );
+				return 0;
+			}
+			values.libdir = *argv;
+		}
 		else if ( !strcmp( *argv, "-c" ) || !strcmp( *argv, "--config" ) ) {
 			argv++;
 			if ( !*argv ) {
@@ -344,6 +416,14 @@ int main (int argc, char *argv[]) {
 			//TODO: This should be safeatoi 
 			values.port = atoi( *argv );
 		}
+		else if ( !strcmp( *argv, "-g" ) || !strcmp( *argv, "--group" ) ) {
+			argv++;
+			if ( !*argv ) {
+				eprintf( "Expected argument for --group!" );
+				return 0;
+			} 
+			values.group = strdup( *argv );
+		}
 		else if ( !strcmp( *argv, "-u" ) || !strcmp( *argv, "--user" ) ) {
 			argv++;
 			if ( !*argv ) {
@@ -355,11 +435,10 @@ int main (int argc, char *argv[]) {
 		argv++;
 	}
 
+
 	//Set all of the socket stuff
-	if ( !values.port )
-		port = (int *)&defport;
-	else {
-		port = &values.port;
+	if ( !values.port ) {
+		values.port = defport;
 	}
 
 	//Pull in a configuration
@@ -368,13 +447,18 @@ int main (int argc, char *argv[]) {
 		return 1;
 	}
 
+	//Open the libraries (in addition to stuff)
+	if ( values.libdir ) {
+		//Load shared libraries
+		if ( !cmd_libs( &values, err, sizeof( err ) ) ) {
+			eprintf( "%s", err );
+			return 1;
+		}
+	}
+
 	//Dump the configuration if necessary
 	if ( values.dump ) {
-		fprintf( stderr, "Hypno is running with the following settings.\n" );
-		fprintf( stderr, "Port:           %d\n", values.port );
-		fprintf( stderr, "Using SSL?:     %s\n", values.ssl ? "T" : "F" );
-		fprintf( stderr, "Daemonized:     %s\n", values.fork ? "T" : "F" );
-		fprintf( stderr, "Request Model:  %s\n", "Fork" );
+		cmd_dump( &values, err, sizeof( err ) );		
 	}
 
 	//Start a server
@@ -389,6 +473,7 @@ int main (int argc, char *argv[]) {
 			return 1;
 		}
 	}
+
 
 	if ( values.kill ) {
 		eprintf ( "%s\n", "--kill not yet implemented." );

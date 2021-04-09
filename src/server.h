@@ -39,7 +39,6 @@
 #include "../vendor/zhttp.h"
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
-#include "../vendor/zhttp.h"
 
 #ifndef SERVER_H
 #define SERVER_H
