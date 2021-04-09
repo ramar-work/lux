@@ -6,99 +6,26 @@
 #include <errno.h>
 #include <zwalker.h>
 #include <zhttp.h>
-#include "util.h"
-
-#if 0
-char * strupper ( const char *str ) {
-	return NULL;
-}
-
-char * strlower ( const char *str ) {
-	return NULL;
-}
-
-char * mstrlower ( const char *str ) {
-	return NULL;
-}
-
-char * mstrupper ( const char *str ) {
-	return NULL;
-}
-
-char * strjoin ( const char *str, ... ) {
-	return NULL;
-}
-
-char ** strbreak ( const char *str ) {
-	return NULL;
-}
-
-char * strbefore ( const char *str, const char *delim ) {
-	return NULL;
-}
-
-char * strafter ( const char *str, const char *delim ) {
-	return NULL;
-}
-#endif
-
 
 #define PP "harness"
 
-#define BASIC_HTML \
-	"<html>\n" \
-	"	<head>\n" \
-	"		<title>Hypno Site Test</title>\n" \
-	"	</head>\n" \
-	"	<body>\n" \
-	"		<h2>Hypno Example Site</h2>\n" \
-	"		<p>This is an example page to help users test out Hypno.</p>\n" \
-	"	</body>\n" \
-	"</html>\n"
-
-#define DEFAULT_LUA \
-	"return {\n" \
-	"	db = \"roast.db\",\n" \
-	"	title = \"da food snob\",\n" \
-	"	fqdn = \"dafoodsnob.com\",\n" \
-	"	template_engine = \"roast.db\",\n" \
-	"	static = \"static\",\n" \
-	"	routes = {\n" \
-	"		default = { model=\"roast\",view=\"roast\" },\n" \
-	"		turkey = { model=\"turkey\",view=\"roast\" },\n" \
-	"		chicken = { model=\"chicken\",view=\"roast\" },\n" \
-	"		beef = { model=\"beef\",view=\"roast\" },\n" \
-	"		recipe = {\n" \
-	"			[\":id=number\"] = { model=\"recipe\",view=\"recipe\" },\n" \
-	"		},\n" \
-	"	}	\n" \
-	"}\n"
-
-#define ERRPRINTF(...) \
-	fprintf( stderr, "%s: ", PP ); \
-	fprintf( stderr, __VA_ARGS__ ); \
-	fprintf( stderr, "%s", "\n" );
-
 #define HELP \
-"-l, --library <arg>      Specify a library for testing (required).\n" \
-"-u, --uri <arg>          Specify a URI for testing (required).\n" \
-"-c, --content-type <arg> Specify a content-type for testing.\n" \
-"-n, --host <arg>         Specify a hostname for use w/ the request.\n" \
-"-s, --symbol <arg>       Specify a hostname for use w/ the request.\n" \
-"-m, --method <arg>       Specify an HTTP method to be used when making\n" \
-"                         a request. (GET is default)\n" \
-"-p, --protocol <arg>     Specify alternate protocols (HTTP/1.0, 2.0, etc)\n" \
-"-B, --body <arg>         Specify a body to use when making requests.\n" \
-"                         (Use multiple invocations for additional arguments)\n" \
-"-H, --header <arg>       Specify a header to use when making requests.\n" \
-"                         (Use multiple invocations for additional arguments)\n" \
-"-M, --multipart          Use a multipart request when using POST or PUT\n" \
-"-v, --verbose            Be wordy.\n" \
-"-h, --help               Show help and quit.\n"
+	"-l, --library <arg>      Specify a library for testing (required).\n" \
+	"-u, --uri <arg>          Specify a URI for testing (required).\n" \
+	"-c, --content-type <arg> Specify a content-type for testing.\n" \
+	"-n, --host <arg>         Specify a hostname for use w/ the request.\n" \
+	"-s, --symbol <arg>       Specify a hostname for use w/ the request.\n" \
+	"-m, --method <arg>       Specify an HTTP method to be used when making\n" \
+	"                         a request. (GET is default)\n" \
+	"-p, --protocol <arg>     Specify alternate protocols (HTTP/1.0, 2.0, etc)\n" \
+	"-B, --body <arg>         Specify a body to use when making requests.\n" \
+	"                         (Use multiple invocations for additional arguments)\n" \
+	"-H, --header <arg>       Specify a header to use when making requests.\n" \
+	"                         (Use multiple invocations for additional arguments)\n" \
+	"-M, --multipart          Use a multipart request when using POST or PUT\n" \
+	"-v, --verbose            Be wordy.\n" \
+	"-h, --help               Show help and quit.\n"
 
-
-const int H_DIR = 31;
-const int H_FILE = 32;
 
 struct arg {
 	char *lib;
@@ -109,7 +36,6 @@ struct arg {
 	char *symbol;
 	char *protocol;
 	char *uri;
-	char *srcdir;
 	int verbose;
 	int randomize;
 	int multipart;
@@ -119,28 +45,8 @@ struct arg {
 	char **body;
 };
 
-struct app {
-	const char *name;
-	const char  type;  //DIR, FILE
-	const char *content;
-};
 
-struct app defaults[] = {
-	{ "/app/", H_DIR, NULL },
-	{ "/views/", H_DIR, NULL },
-	{ "/log/", H_DIR, NULL },
-	{ "/middleware/", H_DIR, NULL },
-	{ "/misc/", H_DIR, NULL },
-	{ "/static/", H_DIR, NULL },
-	{ "/static/index.html", H_FILE, BASIC_HTML },
-	{ "/app/hello.lua", H_FILE, NULL },
-	{ "/views/hello.tpl", H_FILE, NULL },
-	{ "/config.lua", H_FILE, DEFAULT_LUA },
-	{ NULL }
-};
-
-
-static int method_expects_body ( char *mstr ) {
+int method_expects_body ( char *mstr ) {
 	const char *mth[] = { 
 		"POST", "PUT", "DELETE"
 	};
@@ -154,7 +60,7 @@ static int method_expects_body ( char *mstr ) {
 
 
 
-static int method_is_valid ( char *mstr ) {
+int method_is_valid ( char *mstr ) {
 	const char *mth[] = { 
 		"HEAD", "GET", "POST", "PUT", "DELETE", "OPTIONS", "TRACE" 
 	};
@@ -168,71 +74,52 @@ static int method_is_valid ( char *mstr ) {
 
 
 
-//Dir cmd should create a new thing
-#if 0
-int dir_cmd ( struct arg *arg ) {
-	//Define
-	struct stat sb;
-
-	if ( !arg->srcdir ) {
-		ERRPRINTF( "No source directory specified." );
-		return 0;
-	}
-
-	if ( stat( arg->srcdir, &sb ) == -1 ) {
-		fprintf( stderr, "Source directory '%s' does not exist.\n", arg->srcdir );
-		if ( mkdir( arg->srcdir, 0755 ) == -1 ) {
-			ERRPRINTF( "Failed to create source directory '%s': %s.", arg->srcdir, strerror(errno) );
-			return 0;
-		}
-	}
-
-	for ( struct app *layout = defaults; layout->name; layout++ ) {
-		char rname[ 2048 ] = { 0 };
-		snprintf( rname, sizeof( rname ) - 1, "%s%s", arg_srcdir, layout->name );
-		//fprintf( stdout, "resource name: %s\n", rname );
-#if 1
-		if ( layout->type == H_DIR ) {	
-			if ( mkdir( rname, 0755 ) == -1 ) {
-				snprintf( err, errlen, "Directory creation failure at %s: %s", rname, strerror( errno ));
-				return 0;
-			}
-		}
-		else if ( layout->type == H_FILE ) {
-			int fd = 0;
-			const char *content = layout->content;
-			if ( ( fd = open( rname, O_CREAT | O_RDWR, 0755 ) ) == -1 ) {
-				snprintf( err, errlen, "Failed to open file at %s: %s", rname, strerror( errno ));
-				return 0;
-			} 
-
-			if ( content ) {
-				if ( write( fd, content, strlen( content ) ) == -1 ) {
-					snprintf( err, errlen, "Failed to write to file at %s: %s", rname, strerror( errno ));
-					return 0;
-				}
-			} 
-
-			if ( close( fd ) == -1 ) {
-				snprintf( err, errlen, "Could not close file at %s: %s", rname, strerror( errno ));
-				return 0;
-			} 
-		}
-#endif
-		layout++;
-	}	
-
-
-}
-#endif
-
-
-//harness cmd should test endpoints and whatnot
-#if 0
-int harness_cmd ( struct arg *arg ) {
-	struct HTTPBody req = {0}, res = {0};
+int main ( int argc, char * argv[] ) {
+	//Make this
+	struct arg arg = {0};
+	int blen = 0;
 	void *app = NULL;
 	int (*httpfunc)( struct HTTPBody *, struct HTTPBody * );
+	struct HTTPBody req = {0}, res = {0};
+	char err[ 2048 ] = { 0 };
+
+	//check for options
+	if ( argc < 2 ) {
+		fprintf( stderr, PP ":\n%s\n", HELP );
+		return 1;
+	}
+
+	while ( *argv ) {
+		if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--library" ) )
+			arg.lib = *( ++argv );
+		else if ( !strcmp( *argv, "-u" ) || !strcmp( *argv, "--uri" ) )
+			arg.uri = *( ++argv );
+		else if ( !strcmp( *argv, "-c" ) || !strcmp( *argv, "--content-type" ) )
+			arg.ctype = *( ++argv );
+		else if ( !strcmp( *argv, "-m" ) || !strcmp( *argv, "--method" ) )
+			arg.method = *( ++argv );
+		else if ( !strcmp( *argv, "-s" ) || !strcmp( *argv, "--symbol" ) )
+			arg.symbol = *( ++argv );
+		else if ( !strcmp( *argv, "-p" ) || !strcmp( *argv, "--protocol" ) )
+			arg.protocol = *( ++argv );
+		else if ( !strcmp( *argv, "-M" ) || !strcmp( *argv, "--multipart" ) )
+			arg.multipart = 1;
+		else if ( !strcmp( *argv, "-F" ) || !strcmp( *argv, "--form" ) )
+			add_item( &arg.body, *( ++argv ), unsigned char *, &arg.blen );
+		else if ( !strcmp( *argv, "-B" ) || !strcmp( *argv, "--binary" ) )
+			add_item( &arg.body, *( ++argv ), unsigned char *, &arg.blen ), arg.multipart = 1;
+		else if ( !strcmp( *argv, "-H" ) || !strcmp( *argv, "--headers" ) )
+			add_item( &arg.headers, *( ++argv ), unsigned char *, &arg.hlen );
+		else if ( !strcmp( *argv, "-r" ) || !strcmp( *argv, "--random" ) )
+			arg.randomize = 1;
+		else if ( !strcmp( *argv, "-v" ) || !strcmp( *argv, "--verbose" ) )
+			arg.verbose = 1;
+		else if ( !strcmp( *argv, "-h" ) || !strcmp( *argv, "--help" ) ) {
+			fprintf( stderr, "%s\n", HELP );
+			return 0;
+		}	
+		argv++;
+	}
 
 	//Catch any problems
 	if ( !arg.method )
@@ -325,6 +212,12 @@ int harness_cmd ( struct arg *arg ) {
 		free( arg.body ); 
 	}
 
+	//Die on unspecified symbols...
+	if ( !arg.symbol ) {
+		fprintf( stderr, "%s\n", "Symbol not specified." );
+		return 1; 
+	}
+
 	//Assemble a message from here...
 	if ( !http_finalize_request( &req, err, sizeof( err ) ) ) {
 		fprintf( stderr, "%s\n", err );
@@ -365,70 +258,6 @@ int harness_cmd ( struct arg *arg ) {
 	//Destroy res, req and anything else allocated
 	http_free_request( &req );
 	http_free_response( &res );
-
-
-}
-#endif
-
-
-
-int main ( int argc, char * argv[] ) {
-	//Make this
-	struct arg arg = {0};
-	int blen = 0;
-	char err[ 2048 ] = { 0 };
-
-	//check for options
-	if ( argc < 2 ) {
-		fprintf( stderr, PP ":\n%s\n", HELP );
-		return 1;
-	}
-
-	while ( *argv ) {
-		if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--library" ) )
-			arg.lib = *( ++argv );
-		else if ( !strcmp( *argv, "-u" ) || !strcmp( *argv, "--uri" ) )
-			arg.uri = *( ++argv );
-		else if ( !strcmp( *argv, "-c" ) || !strcmp( *argv, "--content-type" ) )
-			arg.ctype = *( ++argv );
-		else if ( !strcmp( *argv, "-m" ) || !strcmp( *argv, "--method" ) )
-			arg.method = *( ++argv );
-		else if ( !strcmp( *argv, "-s" ) || !strcmp( *argv, "--symbol" ) )
-			arg.symbol = *( ++argv );
-		else if ( !strcmp( *argv, "-p" ) || !strcmp( *argv, "--protocol" ) )
-			arg.protocol = *( ++argv );
-		else if ( !strcmp( *argv, "-M" ) || !strcmp( *argv, "--multipart" ) )
-			arg.multipart = 1;
-		else if ( !strcmp( *argv, "-F" ) || !strcmp( *argv, "--form" ) )
-			add_item( &arg.body, *( ++argv ), unsigned char *, &arg.blen );
-		else if ( !strcmp( *argv, "-B" ) || !strcmp( *argv, "--binary" ) )
-			add_item( &arg.body, *( ++argv ), unsigned char *, &arg.blen ), arg.multipart = 1;
-		else if ( !strcmp( *argv, "-H" ) || !strcmp( *argv, "--headers" ) )
-			add_item( &arg.headers, *( ++argv ), unsigned char *, &arg.hlen );
-		else if ( !strcmp( *argv, "-r" ) || !strcmp( *argv, "--random" ) )
-			arg.randomize = 1;
-		else if ( !strcmp( *argv, "-v" ) || !strcmp( *argv, "--verbose" ) )
-			arg.verbose = 1;
-		else if ( !strcmp( *argv, "-h" ) || !strcmp( *argv, "--help" ) ) {
-			fprintf( stderr, "%s\n", HELP );
-			return 0;
-		}	
-		else if ( strcmp( *argv, "--dir" ) == 0 ) {
-			argv++;
-			if ( !*argv ) {
-				ERRPRINTF( "Expected argument for --dir!" );
-				return 0;
-			} 
-			arg.srcdir = *argv;
-		}
-		argv++;
-	}
-
-#if 0
-	harness_cmd( &arg );
-
-	dir_cmd( &arg );
-#endif
 
 	//After we're done, look at the response
 	return 0;

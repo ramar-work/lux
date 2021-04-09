@@ -268,5 +268,3 @@ file looks like.
 <!-- - Only one library exists that makes Javascript easy to bind to C (duktape - which is great!) -->
 
 
-
-## Notes

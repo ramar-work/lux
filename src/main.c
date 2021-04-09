@@ -64,9 +64,9 @@ struct values {
 	int dump;
 	char *user;
 	char *config;
- #ifdef DEBUG_H
+#ifdef DEBUG_H
 	int pfork;
- #endif
+#endif
 };
 
 
@@ -303,6 +303,7 @@ int daemonizer() {
 	#endif
 }
 #endif
+
 
 int main (int argc, char *argv[]) {
 	struct values values = { 0 };
