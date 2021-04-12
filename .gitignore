@@ -1,25 +1,11 @@
 # Track nothing and add by force
 *
 !example/*
-!src
-!src/test
-#!Makefile
+!src/*
 !configure.ac
 !configure
 !Makefile.in
 !*.md
 !*.c
 !*.h
-*.o
-*.exe
-*.db
-*.test
-.*.swp
-.*.swo
-.*.swf
 
-# Things we don't really need, but need to have handy.
-oldcode/
-tests2/
-tests-www/
-logs/

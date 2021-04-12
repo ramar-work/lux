@@ -28,16 +28,8 @@ return {
 		},
 		
 		--[[
-		-- See the C filter in action
-		["app.hypno"] = { 
-			root_default = "/index.html", -- Technically, no root is needed
-			filter = "c"
-		},
-		--]]
-
-		--[[
 		-- See LuaMVC in action
-		["luamvc.hypno"] = { 
+		["i_dont_exist.hypno"] = { 
 			dir = "luamvc",
 			root_default = "/index.html",
 			filter = "lua"

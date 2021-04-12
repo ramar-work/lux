@@ -39,10 +39,10 @@
  * ---------
  * 
  * ------------------------------------------- */
-#include "../vendor/zhttp.h"
-#include "mime.h"
-#include "util.h"
-#include "server.h"
+#include <zhttp.h>
+#include "../mime.h"
+#include "../util.h"
+#include "../server.h"
 
 #ifndef FILTER_ECHO_H
 #define FILTER_ECHO_H

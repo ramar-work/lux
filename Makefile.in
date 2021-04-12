@@ -6,41 +6,48 @@
 ## Contains all the targets necessary to assemble
 ## Hypno on most machines. 
 ##
-## Eventually, this will be dropped in favor of
-## autotools.
-##
 ## @author
 ## Copyright 2020 Tubular Modular Inc. dba Collins Design
 ## --------------------------------------------------------- ##
 
 # Package-specific
 NAME = @PACKAGE_NAME@
+
 VERSION = @PACKAGE_VERSION@ 
 
 # Prefix-specific
 PREFIX = @prefix@
+
 EXEC_PREFIX = @exec_prefix@
+
 BINDIR = @bindir@
 
 # VPATH-specific
 srcdir = @srcdir@
+
 VPATH = @srcdir@
 
 # Security-specific
 USER = http
+
 GROUP = http
 
 # Everything else
 IFLAGS = -Ivendor -I/usr/include/lua5.3
-#LFLAGS = -L/usr/lib/x86_64-linux-gnu 
-#LDFLAGS = $(LFLAGS) -lgnutls -llua -ldl -lpthread
+
 LDFLAGS = -ldl -lpthread
+
 DEBUGFLAGS = -DDEBUG_H
+
 CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security $(IFLAGS)
+
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
 	-Wno-format-truncation -Wno-return-local-addr -O2 $(IFLAGS)
+
 CFLAGS = $(GCCFLAGS)
+
 CC = gcc
+
 SRC = \
 	@srcdir@/vendor/sqlite3.c \
 	@srcdir@/vendor/zrender.c \
@@ -48,7 +55,6 @@ SRC = \
 	@srcdir@/vendor/zwalker.c \
 	@srcdir@/vendor/zhttp.c \
 	@srcdir@/src/configs.c \
-	@srcdir@/src/db-sqlite.c \
 	@srcdir@/src/luabind.c \
 	@srcdir@/src/mime.c \
 	@srcdir@/src/socket.c \
@@ -57,17 +63,18 @@ SRC = \
 	@srcdir@/src/ctx-https.c \
 	@srcdir@/src/server.c \
 	@srcdir@/src/loader.c \
-	@srcdir@/src/mvc.c \
 	@srcdir@/src/router.c \
-	@srcdir@/src/filter-static.c \
-	@srcdir@/src/filter-c.c \
-	@srcdir@/src/filter-echo.c \
-	@srcdir@/src/filter-dirent.c \
-	@srcdir@/src/filter-redirect.c \
-	@srcdir@/src/filter-lua.c
+	@srcdir@/src/filters/filter-static.c \
+	@srcdir@/src/filters/filter-echo.c \
+	@srcdir@/src/filters/filter-dirent.c \
+	@srcdir@/src/filters/filter-redirect.c
+
 OBJ = ${SRC:.c=.o}
+
 TARGET = main
+
 TESTS = loader database luabind router util #server render filter config 
+
 UNAME = $(shell uname)
 
 # Handle slight differences between Debian and others...
@@ -90,8 +97,9 @@ endif
 # main - Compiles all code needed to get hypno running
 main: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/main.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) 
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/harness.c -o $(srcdir)/bin/hypno-cli $(OBJ)
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/main.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) 
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ)
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ)
 
 # debug - Builds code with debugging flags on
 debug: debug-clang

@@ -29,14 +29,14 @@
  * -------------------------------------------------------- */
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
-#include "ctx-http.h"
-#include "ctx-https.h"
-#include "socket.h"
-#include "server.h"
-#include "filter-static.h"
-#include "filter-echo.h"
-#include "filter-dirent.h"
-#include "filter-redirect.h"
+#include "../ctx-http.h"
+#include "../ctx-https.h"
+#include "../socket.h"
+#include "../server.h"
+#include "../filters/filter-static.h"
+#include "../filters/filter-echo.h"
+#include "../filters/filter-dirent.h"
+#include "../filters/filter-redirect.h"
 #include <dlfcn.h>
 
 #define eprintf(...) \
@@ -56,7 +56,7 @@ const int defport = 2000;
 
 const char libn[] = "libname";
 
-const char appn[] = "app";
+const char appn[] = "filter";
 
 struct values {
 	int port;
@@ -106,6 +106,7 @@ const int fkctpost( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c) {
 }
 
 
+
 //Return fi
 static int findex() {
 	int fi = 0;
@@ -114,12 +115,14 @@ static int findex() {
 }
 
 
+
 //Define a list of "context types"
 struct senderrecvr sr[] = {
 	{ read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost  }
 , { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls }
 ,	{ NULL }
 };
+
 
 
 //Loop should be extracted out
@@ -214,26 +217,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 }
 
 
-int cmd_dump( struct values *v, char *err, int errlen ) {
-	fprintf( stderr, "Hypno is running with the following settings.\n" );
-	fprintf( stderr, "===============\n" );
-	fprintf( stderr, "Port:                %d\n", v->port );
-	fprintf( stderr, "Using SSL?:          %s\n", v->ssl ? "T" : "F" );
-	fprintf( stderr, "Daemonized:          %s\n", v->fork ? "T" : "F" );
-	fprintf( stderr, "Request Model:       %s\n", "Fork" );
-	fprintf( stderr, "User:                %s\n", v->user );
-	fprintf( stderr, "Group:               %s\n", v->group );
-	fprintf( stderr, "Config:              %s\n", v->config );
-	fprintf( stderr, "Library Directory:   %s\n", v->libdir );
-
-	fprintf( stderr, "Filters enabled:\n" );
-	for ( struct filter *f = filters; f->name; f++ ) {
-		fprintf( stderr, "[ %-16s ] %p\n", f->name, f->filter ); 
-	}
-	return 1;
-}
-
-
 
 //...
 int cmd_libs( struct values *v, char *err, int errlen ) {
@@ -293,6 +276,28 @@ int cmd_libs( struct values *v, char *err, int errlen ) {
 
 
 
+//dump
+int cmd_dump( struct values *v, char *err, int errlen ) {
+	fprintf( stderr, "Hypno is running with the following settings.\n" );
+	fprintf( stderr, "===============\n" );
+	fprintf( stderr, "Port:                %d\n", v->port );
+	fprintf( stderr, "Using SSL?:          %s\n", v->ssl ? "T" : "F" );
+	fprintf( stderr, "Daemonized:          %s\n", v->fork ? "T" : "F" );
+	fprintf( stderr, "Request Model:       %s\n", "Fork" );
+	fprintf( stderr, "User:                %s\n", v->user );
+	fprintf( stderr, "Group:               %s\n", v->group );
+	fprintf( stderr, "Config:              %s\n", v->config );
+	fprintf( stderr, "Library Directory:   %s\n", v->libdir );
+
+	fprintf( stderr, "Filters enabled:\n" );
+	for ( struct filter *f = filters; f->name; f++ ) {
+		fprintf( stderr, "[ %-16s ] %p\n", f->name, f->filter ); 
+	}
+	return 1;
+}
+
+
+
 //Display help
 int help () {
 	fprintf( stderr, "%s: No options received.\n", __FILE__ );
@@ -316,6 +321,8 @@ int help () {
 }
 
 
+
+//
 void print_options ( struct values *v ) {
 	const char *fmt = "%-10s: %s\n";
 	fprintf( stderr, "%s invoked with options:\n", __FILE__ );

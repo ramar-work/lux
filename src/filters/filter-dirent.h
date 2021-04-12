@@ -1,13 +1,16 @@
 /* ------------------------------------------- * 
- * db-sqlite.h
- * -----------
- * Header file for functions for dealing with data interchange between zTable 
- * and sqlite3.
+ * filter-dirent.h
+ * ===========
+ * 
+ * Summary 
+ * -------
+ * Header file for functions comprising the dirent filter for interpreting 
+ * HTTP messages.
  *
  * Usage
  * -----
- * gcc -ldl -llua -o database vendor/single.o database.c && ./config
- * 
+ * filter-dirent.c allows hypno to act as a directory server, in which the
+ * server simply presents the user with a list of files for view or download. 
  *
  * LICENSE
  * -------
@@ -35,17 +38,17 @@
  * ---------
  * 
  * ------------------------------------------- */
-#include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
-#include "luabind.h"
-#include <sqlite3.h>
+#include <sys/types.h> 
+#include <dirent.h> 
+#include <zhttp.h>
+#include <zrender.h>
+#include "../mime.h"
+#include "../util.h"
+#include "../server.h"
 
-#ifndef HDATABASE_H
-#define HDATABASE_H
+#ifndef FILTER_DIR_H
+#define FILTER_DIR_H
 
-void *db_open( const char *, char *, int ) ;
-void *db_close( void **, char *, int );
-zTable *db_exec( void *, const char *, void **, char *, int ) ;
-zTable *db_to_table ( const char *filename, const char *query );
+const int filter_dirent ( int fd, struct HTTPBody *, struct HTTPBody *, struct cdata * );
 
 #endif

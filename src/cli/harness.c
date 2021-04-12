@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <zwalker.h>
 #include <zhttp.h>
+#include "../util.h"
 
 #define PP "harness"
 
