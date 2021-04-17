@@ -25,11 +25,13 @@
 	"-m, --method <arg>       Specify an HTTP method to be used when making\n" \
 	"                         a request. (GET is default)\n" \
 	"-p, --protocol <arg>     Specify alternate protocols (HTTP/1.0, 2.0, etc)\n" \
-	"-B, --body <arg>         Specify a body to use when making requests.\n" \
+	"-F, --form <arg>         Specify a body to use when making requests.\n" \
+	"-B, --binary <arg>       Specify a body to use when making requests. (assumes multipart)\n" \
 	"                         (Use multiple invocations for additional arguments)\n" \
 	"-H, --header <arg>       Specify a header to use when making requests.\n" \
 	"                         (Use multiple invocations for additional arguments)\n" \
 	"-M, --multipart          Use a multipart request when using POST or PUT\n" \
+	"-S, --msg-only           Show only the message, no header info\n" \
 	"-v, --verbose            Be wordy.\n" \
 	"-h, --help               Show help and quit.\n"
 
@@ -48,10 +50,12 @@ struct arg {
 	int multipart;
 	int blen;
 	int hlen;
+	int msgonly;
 	int dump;
 	char **headers;
 	char **body;
 };
+
 
 void dump_args( struct arg *arg ) {
 	fprintf( stderr, "lib:       %s\n", arg->lib );
@@ -68,17 +72,9 @@ void dump_args( struct arg *arg ) {
 	fprintf( stderr, "verbose:   %s\n", arg->verbose ? "Y" : "N" );
 	fprintf( stderr, "randomize: %s\n", arg->randomize ? "Y" : "N" ); 
 	fprintf( stderr, "multipart: %s\n", arg->multipart ? "Y" : "N" );
+	fprintf( stderr, "msg-only:  %s\n", arg->msgonly ? "Y" : "N" );
 	fprintf( stderr, "blen:      %d\n", arg->blen );
 	fprintf( stderr, "hlen:      %d\n", arg->hlen );
-}
-
-
-void dump_records( struct HTTPRecord **r ) {
-	for ( struct HTTPRecord **a = r; a && *a; a++ ) {
-		fprintf( stderr, "%p: %s -> ", *a, (*a)->field ); 
-		write( 2, (*a)->value, (*a)->size );
-		write( 2, "\n", 1 );
-	}
 }
 
 
@@ -141,6 +137,8 @@ int main ( int argc, char * argv[] ) {
 			arg.protocol = *( ++argv );
 		else if ( !strcmp( *argv, "-M" ) || !strcmp( *argv, "--multipart" ) )
 			arg.multipart = 1;
+		else if ( !strcmp( *argv, "-S" ) || !strcmp( *argv, "--msg-only" ) )
+			arg.msgonly = 1;
 		else if ( !strcmp( *argv, "-r" ) || !strcmp( *argv, "--random" ) )
 			arg.randomize = 1;
 		else if ( !strcmp( *argv, "-v" ) || !strcmp( *argv, "--verbose" ) )
@@ -173,8 +171,9 @@ int main ( int argc, char * argv[] ) {
 	}
 
 	//Catch any problems
-	if ( !arg.method )
+	if ( !arg.method ) {
 		arg.method = "GET";
+	}
 	else if ( !method_is_valid( arg.method ) ) {
 		fprintf( stderr, PP ": Wrong method requested: %s\n", arg.method );
 		return 1;
@@ -221,12 +220,9 @@ int main ( int argc, char * argv[] ) {
 	req.path = zhttp_dupstr( arg.uri );
 	req.ctype = zhttp_dupstr( "text/html" );
 	req.host = !arg.host ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.host );
-#if 1
-	req.method = zhttp_dupstr( "GET" );
-	req.protocol = zhttp_dupstr( "HTTP/1.1" );
-#else
-	req.method = zhttp_dupstr( ( !arg.method ) ? "GET" : arg.method );
-	req.protocol = zhttp_dupstr( !arg.protocol ? "HTTP/1.1" : arg.protocol );
+	req.method = zhttp_dupstr( arg.method );
+	req.protocol = !arg.protocol ? zhttp_dupstr( "HTTP/1.1" ) : zhttp_dupstr( arg.protocol );
+#if 0
 	req.alias = !arg.alias ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.alias );
 #endif
 
@@ -319,7 +315,12 @@ int main ( int argc, char * argv[] ) {
 	}
 
 	//Show whatever message should have come out
-	write( 1, res.msg, res.mlen );
+	if ( !arg.msgonly ) 
+		write( 1, res.msg, res.mlen );
+	else {
+		int sp = res.mlen - res.clen;	
+		write( 1, &res.msg[ sp ], res.mlen - sp );
+	}
 	fflush( stdout );
 
 	if ( dlclose( app ) == -1 ) {
