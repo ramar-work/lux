@@ -7,15 +7,21 @@
 #include <zwalker.h>
 #include <zhttp.h>
 #include "../util.h"
+#include "../server.h"
 
 #define PP "harness"
 
+#define FSYMBOL "filter"
+
+#define NSYMBOL "libname"
+
 #define HELP \
-	"-l, --library <arg>      Specify a library for testing (required).\n" \
-	"-u, --uri <arg>          Specify a URI for testing (required).\n" \
+	"-l, --library <arg>      Specify path to library (required).\n" \
+	"-d, --directory <arg>    Specify path to web app directory (required).\n" \
+	"-u, --uri <arg>          Specify a URI (required).\n" \
 	"-c, --content-type <arg> Specify a content-type for testing.\n" \
 	"-n, --host <arg>         Specify a hostname for use w/ the request.\n" \
-	"-s, --symbol <arg>       Specify a hostname for use w/ the request.\n" \
+	"-a, --alias <arg>        Specify an alternate hostname for use w/ the request.\n" \
 	"-m, --method <arg>       Specify an HTTP method to be used when making\n" \
 	"                         a request. (GET is default)\n" \
 	"-p, --protocol <arg>     Specify alternate protocols (HTTP/1.0, 2.0, etc)\n" \
@@ -33,8 +39,8 @@ struct arg {
 	char *path;
 	char *ctype;
 	char *host;
+	char *alias;
 	char *method;
-	char *symbol;
 	char *protocol;
 	char *uri;
 	int verbose;
@@ -42,9 +48,38 @@ struct arg {
 	int multipart;
 	int blen;
 	int hlen;
+	int dump;
 	char **headers;
 	char **body;
 };
+
+void dump_args( struct arg *arg ) {
+	fprintf( stderr, "lib:       %s\n", arg->lib );
+	fprintf( stderr, "path:      %s\n", arg->path );
+	fprintf( stderr, "ctype:     %s\n", arg->ctype );
+	fprintf( stderr, "host:      %s\n", arg->host );
+	fprintf( stderr, "alias:     %s\n", arg->alias );
+	fprintf( stderr, "method:    %s\n", arg->method );
+	fprintf( stderr, "protocol:  %s\n", arg->protocol );
+	fprintf( stderr, "uri:       %s\n", arg->uri );
+	fprintf( stderr, "headers:   %p\n", arg->headers );
+	fprintf( stderr, "body:      %p\n", arg->body );
+
+	fprintf( stderr, "verbose:   %s\n", arg->verbose ? "Y" : "N" );
+	fprintf( stderr, "randomize: %s\n", arg->randomize ? "Y" : "N" ); 
+	fprintf( stderr, "multipart: %s\n", arg->multipart ? "Y" : "N" );
+	fprintf( stderr, "blen:      %d\n", arg->blen );
+	fprintf( stderr, "hlen:      %d\n", arg->hlen );
+}
+
+
+void dump_records( struct HTTPRecord **r ) {
+	for ( struct HTTPRecord **a = r; a && *a; a++ ) {
+		fprintf( stderr, "%p: %s -> ", *a, (*a)->field ); 
+		write( 2, (*a)->value, (*a)->size );
+		write( 2, "\n", 1 );
+	}
+}
 
 
 int method_expects_body ( char *mstr ) {
@@ -80,11 +115,12 @@ int main ( int argc, char * argv[] ) {
 	struct arg arg = {0};
 	int blen = 0;
 	void *app = NULL;
-	int (*httpfunc)( struct HTTPBody *, struct HTTPBody * );
+	int (*filter)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
 	struct HTTPBody req = {0}, res = {0};
-	char err[ 2048 ] = { 0 };
+	char *fname, err[ 2048 ] = { 0 };
+	struct cdata conn;
+	struct lconfig sconf;
 
-	//check for options
 	if ( argc < 2 ) {
 		fprintf( stderr, PP ":\n%s\n", HELP );
 		return 1;
@@ -93,33 +129,47 @@ int main ( int argc, char * argv[] ) {
 	while ( *argv ) {
 		if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--library" ) )
 			arg.lib = *( ++argv );
+		else if ( !strcmp( *argv, "-d" ) || !strcmp( *argv, "--directory" ) )
+			arg.path = *( ++argv );
 		else if ( !strcmp( *argv, "-u" ) || !strcmp( *argv, "--uri" ) )
 			arg.uri = *( ++argv );
 		else if ( !strcmp( *argv, "-c" ) || !strcmp( *argv, "--content-type" ) )
 			arg.ctype = *( ++argv );
 		else if ( !strcmp( *argv, "-m" ) || !strcmp( *argv, "--method" ) )
 			arg.method = *( ++argv );
-		else if ( !strcmp( *argv, "-s" ) || !strcmp( *argv, "--symbol" ) )
-			arg.symbol = *( ++argv );
 		else if ( !strcmp( *argv, "-p" ) || !strcmp( *argv, "--protocol" ) )
 			arg.protocol = *( ++argv );
 		else if ( !strcmp( *argv, "-M" ) || !strcmp( *argv, "--multipart" ) )
 			arg.multipart = 1;
-		else if ( !strcmp( *argv, "-F" ) || !strcmp( *argv, "--form" ) )
-			add_item( &arg.body, *( ++argv ), unsigned char *, &arg.blen );
-		else if ( !strcmp( *argv, "-B" ) || !strcmp( *argv, "--binary" ) )
-			add_item( &arg.body, *( ++argv ), unsigned char *, &arg.blen ), arg.multipart = 1;
-		else if ( !strcmp( *argv, "-H" ) || !strcmp( *argv, "--headers" ) )
-			add_item( &arg.headers, *( ++argv ), unsigned char *, &arg.hlen );
 		else if ( !strcmp( *argv, "-r" ) || !strcmp( *argv, "--random" ) )
 			arg.randomize = 1;
 		else if ( !strcmp( *argv, "-v" ) || !strcmp( *argv, "--verbose" ) )
 			arg.verbose = 1;
+		else if ( !strcmp( *argv, "-D" ) || !strcmp( *argv, "--dump" ) )
+			arg.dump = 1;
+		else if ( !strcmp( *argv, "-H" ) || !strcmp( *argv, "--headers" ) ) {
+			char * a = *( ++argv );
+			add_item( &arg.headers, a, unsigned char *, &arg.hlen );
+		}
+		else if ( !strcmp( *argv, "-F" ) || !strcmp( *argv, "--form" ) ) {
+			char * a = *( ++argv );
+			add_item( &arg.body, a, unsigned char *, &arg.blen );
+		}
+		else if ( !strcmp( *argv, "-B" ) || !strcmp( *argv, "--binary" ) ) {
+			char * a = *( ++argv );
+			add_item( &arg.body, a, unsigned char *, &arg.blen ); 
+			arg.multipart = 1;
+		}
 		else if ( !strcmp( *argv, "-h" ) || !strcmp( *argv, "--help" ) ) {
 			fprintf( stderr, "%s\n", HELP );
 			return 0;
 		}	
 		argv++;
+	}
+
+	//Dump the arguments if you need to
+	if ( arg.dump ) {
+		dump_args( &arg );
 	}
 
 	//Catch any problems
@@ -135,6 +185,11 @@ int main ( int argc, char * argv[] ) {
 		return 1;
 	} 
 
+	if ( !arg.path ) {
+		fprintf( stderr, PP ": Directory to application not specified.\n" );
+		return 1;
+	}
+
 	if ( !arg.uri )
 		arg.uri = "/";
 	else if ( *arg.uri != '/' ) {
@@ -142,17 +197,37 @@ int main ( int argc, char * argv[] ) {
 		return 1;
 	}
 
+	//Load the app, find the symbol and run the code...
+	if ( !( app = dlopen( arg.lib, RTLD_LAZY ) ) ) {
+		fprintf( stderr, PP ": Could not open application at %s: %s.\n", arg.lib, dlerror() );
+		return 1;
+	}
+
+	//Find the name, since that will cause problems if not specified
+	if ( !( fname = dlsym( app, NSYMBOL ) ) ) {
+		dlclose( app );
+		fprintf( stderr, PP ": symbol '%s' not found in filter: %s\n", NSYMBOL, strerror(errno) );
+		return 1;
+	} 
+
+	//Find the main function symbol
+	if ( !( filter = dlsym( app, FSYMBOL )) ) {
+		dlclose( app );
+		fprintf( stderr, PP ": symbol '%s' not found in filter: %s\n", FSYMBOL, strerror(errno) );
+		return 1;
+	}
 
 	//Populate the request structure.  Normally, one will never populate this from scratch
 	req.path = zhttp_dupstr( arg.uri );
 	req.ctype = zhttp_dupstr( "text/html" );
-	req.host = zhttp_dupstr( "example.com" );
+	req.host = !arg.host ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.host );
 #if 1
 	req.method = zhttp_dupstr( "GET" );
 	req.protocol = zhttp_dupstr( "HTTP/1.1" );
 #else
 	req.method = zhttp_dupstr( ( !arg.method ) ? "GET" : arg.method );
 	req.protocol = zhttp_dupstr( !arg.protocol ? "HTTP/1.1" : arg.protocol );
+	req.alias = !arg.alias ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.alias );
 #endif
 
 	//TODO: This is damned ugly...
@@ -213,32 +288,30 @@ int main ( int argc, char * argv[] ) {
 		free( arg.body ); 
 	}
 
-	//Die on unspecified symbols...
-	if ( !arg.symbol ) {
-		fprintf( stderr, "%s\n", "Symbol not specified." );
-		return 1; 
-	}
-
 	//Assemble a message from here...
 	if ( !http_finalize_request( &req, err, sizeof( err ) ) ) {
 		fprintf( stderr, "%s\n", err );
 		return 1; 
 	}
 
-	//Load the app, find the symbol and run the code...
-	if ( !( app = dlopen( arg.lib, RTLD_LAZY ) ) ) {
-		fprintf( stderr, PP ": Could not open application at %s: %s.\n", arg.lib, dlerror() );
-		return 1;
-	}
+	//Mock the site config data (or populate from file)
+	sconf.name = req.host;
+	sconf.alias = "";
+	sconf.dir = arg.path;
+	sconf.filter = fname;
+	sconf.root_default = "";
 
-	if ( !( httpfunc = dlsym( app, arg.symbol )) ) {
-		dlclose( app );
-		fprintf( stderr, PP ": '%s' not found in C app: %s\n", arg.symbol, strerror(errno) );
-		return 1;
-	}
+	//Mock the connection data
+	conn.count = 0;
+	conn.status = 0;
+	conn.ctx = NULL;
+	conn.config = NULL;
+	conn.hconfig = &sconf;
+	conn.ipv4 = "192.168.0.1";
+	//conn.ipv6 = '192.168.0.1';
 
-	if ( !httpfunc( &req, &res ) ) {
-		fprintf( stderr, PP ": HTTP funct '%s' failed to execute\n", arg.symbol );
+	if ( !filter( 0, &req, &res, &conn ) ) {
+		fprintf( stderr, PP ": HTTP funct '%s' failed to execute\n", FSYMBOL );
 		write( 2, res.msg, res.mlen );
 		http_free_request( &req );
 		http_free_response( &res );

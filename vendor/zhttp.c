@@ -914,7 +914,13 @@ void http_free_body ( zhttp_t *entity ) {
 	entity->host ? free( entity->host ) : 0;
 	entity->method ? free( entity->method ) : 0;
 	entity->protocol ? free( entity->protocol ) : 0;
-	entity->boundary ? free( entity->boundary ) : 0;
+	#if 0
+	//TODO: This is causing some problems, and I'm unsure why...
+	if ( entity->boundary ) {
+		fprintf( stderr, "eb is: %p\n", entity->boundary );
+		free( entity->boundary );
+	}
+	#endif
 
 	http_free_records( entity->headers );
 	http_free_records( entity->url );
