@@ -110,6 +110,17 @@
 #define http_copy_theader(ENTITY,KEY,VAL) \
 	http_set_record( ENTITY, &(ENTITY)->headers, 0, KEY, zhttp_dupstr(VAL), strlen(VAL), 1 )
 
+
+#define http_set_uripart(ENTITY,KEY,VAL) \
+	http_set_record( ENTITY, &(ENTITY)->url, 2, KEY, (unsigned char *)VAL, strlen(VAL), 0 )
+
+#define http_copy_uripart(ENTITY,KEY,VAL) \
+	http_set_record( ENTITY, &(ENTITY)->url, 2, KEY, (unsigned char *)zhttp_dupstr(VAL), strlen(VAL), 1 )
+
+#define http_copy_turipart(ENTITY,KEY,VAL) \
+	http_set_record( ENTITY, &(ENTITY)->url, 2, KEY, zhttp_dupstr(VAL), strlen(VAL), 1 )
+
+
 #define zhttp_dupstr(V) \
 	(char *)zhttp_dupblk( (unsigned char *)V, strlen(V) + 1 )
 

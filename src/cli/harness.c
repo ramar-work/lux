@@ -246,6 +246,28 @@ int main ( int argc, char * argv[] ) {
 		free( arg.headers ); 
 	}
 
+	//Also need to add GET vars from URI
+	//TODO: Single char values do not work... strangely enough
+	for ( char *ww = index( arg.uri, '?' ); ww ; ) {
+		char aa[ 1024 ] = {0}, bb[ 1024 ] = {0};
+		zWalker w = {0};
+		ww++;
+
+		for ( int len; strwalk( &w, ww, "&=" ); ) {
+			len = ( w.chr == '=' || w.chr == '&' ) ? w.size	- 1 : w.size;
+			if ( w.chr == '=' ) 
+				memcpy( aa, &ww[ w.pos ], len );
+			else {
+				memcpy( bb, &ww[ w.pos ], len );
+				http_copy_uripart( &req, aa, bb );
+				memset( aa, 0, sizeof( aa ) );
+				memset( bb, 0, sizeof( bb ) );
+			}
+		}
+
+		break;
+	}  
+
 	//POST, PUT & DELETE typically expect a body...
 	if ( method_expects_body( req.method ) && arg.body ) {
 		//Make it multipart if requested
