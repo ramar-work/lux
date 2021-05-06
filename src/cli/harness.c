@@ -330,7 +330,8 @@ int main ( int argc, char * argv[] ) {
 
 	if ( !filter( 0, &req, &res, &conn ) ) {
 		fprintf( stderr, PP ": HTTP funct '%s' failed to execute\n", FSYMBOL );
-		write( 2, res.msg, res.mlen );
+		write( 1, res.msg, res.mlen );
+		fflush( stdout );
 		http_free_request( &req );
 		http_free_response( &res );
 		return 1;

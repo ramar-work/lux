@@ -73,7 +73,7 @@ OBJ = ${SRC:.c=.o}
 
 TARGET = main
 
-TESTS = loader database luabind router util #server render filter config 
+TESTS = luabind router util #server render filter config 
 
 UNAME = $(shell uname)
 
@@ -150,7 +150,7 @@ repl:
  
 # test -  Build all test files
 test: $(OBJ) 
-test: CFLAGS+=-DTEST_H
+test: CFLAGS += -g -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS) -DTEST_H
 test:
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	for t in $(TESTS); do $(CC) $(LDFLAGS) $(CFLAGS) -o bin/$$t src/test/$${t}-test.c $(OBJ); done
