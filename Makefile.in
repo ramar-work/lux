@@ -122,9 +122,18 @@ debug-gcc: main
 	@printf '' > /dev/null
 
 
-# install - Installs targets to $PREFIX/bin
+# install - Installs targets to $PREFIX/{bin,share} and /var/lib
 install:
 	cp $(srcdir)/bin/* $(PREFIX)/bin/
+	cp -r $(srcdir)/share $(PREFIX)/share/$(NAME)
+	mkdir /var/lib/$(NAME)/
+	cp $(srcdir)/lib/* /var/lib/$(NAME)/
+	chown -R $(USER):$(GROUP) /var/lib/$(NAME)/
+
+# uninstall - Uninstalls hypno
+uninstall:
+	-rm -rf /var/lib/$(NAME)/ $(PREFIX)/share/$(NAME)/	
+	-rm $(PREFIX)/bin/$(NAME)-{cli,harness,server}
 
 # examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
 examples: PORT=2222

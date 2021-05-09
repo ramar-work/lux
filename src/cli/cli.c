@@ -44,84 +44,71 @@
 #include <errno.h>
 #include "../vendor/zwalker.h"
 #include "../vendor/zhasher.h"
+#include "../util.h"
 
-#define BASIC_HTML \
-	"<html>\n" \
-	"	<head>\n" \
-	"		<title>Hypno Site Test</title>\n" \
-	"	</head>\n" \
-	"	<body>\n" \
-	"		<h2>Hypno Example Site</h2>\n" \
-	"		<p>This is an example page to help users test out Hypno.</p>\n" \
-	"	</body>\n" \
-	"</html>\n"
+#define NAME "hypno-cli"
 
-#define DEFAULT_LUA \
-	"return {\n" \
-	"	db = \"roast.db\",\n" \
-	"	title = \"da food snob\",\n" \
-	"	fqdn = \"dafoodsnob.com\",\n" \
-	"	template_engine = \"roast.db\",\n" \
-	"	static = \"static\",\n" \
-	"	routes = {\n" \
-	"		default = { model=\"roast\",view=\"roast\" },\n" \
-	"		turkey = { model=\"turkey\",view=\"roast\" },\n" \
-	"		chicken = { model=\"chicken\",view=\"roast\" },\n" \
-	"		beef = { model=\"beef\",view=\"roast\" },\n" \
-	"		recipe = {\n" \
-	"			[\":id=number\"] = { model=\"recipe\",view=\"recipe\" },\n" \
-	"		},\n" \
-	"	}	\n" \
-	"}\n"
+#define CONFDIR "/etc/hypno/"
+
+#define SHAREDIR "/usr/local/share/hypno/"
 
 #define ERRPRINTF(...) \
-	fprintf( stderr, "%s: ", "hcli" ); \
+	fprintf( stderr, "%s: ", NAME ); \
 	fprintf( stderr, __VA_ARGS__ ); \
 	fprintf( stderr, "%s", "\n" );
 
-struct app {
-	const char *name;
-	const char  type;  //DIR, FILE
-	const char *content;
-};
+#define HELP \
+	"-d, --dir <arg>          Define where to create a new application.\n"\
+	"-n, --domain-name <arg>  Define a specific domain for the app.\n"\
+	"    --title <arg>        Define a <title> for the app.\n"\
+	"-s, --static <arg>       Define a static path. (Use multiple -s's to\n"\
+	"                         specify multiple paths).\n"\
+	"-b, --database <arg>     Define a specific database connection.\n"\
+	"-x, --dump-args          Dump passed arguments.\n"
+	//'t', "template-engine", "Define an alternate template engine" 
 
 char *arg_srcdir = NULL;
+char *arg_domain = NULL;
+char *arg_title = NULL;
+char *arg_database = NULL;
 char arg_verbose = 0;
-const int H_DIR = 31;
-const int H_FILE = 32;
+char arg_dump = 0;
+char *arg_static[10] = { NULL };
+
+struct app {
+	const char *name;
+	enum {
+		H_DIR = 1
+	,	H_FILE
+	} type;
+	const char *path;
+	const unsigned char *content;
+};
 
 struct app defaults[] = {
 	{ "/app/", H_DIR, NULL },
-	{ "/views/", H_DIR, NULL },
-	{ "/log/", H_DIR, NULL },
-	{ "/middleware/", H_DIR, NULL },
+	{ "/assets/", H_DIR, NULL },
+	{ "/db/", H_DIR, NULL },
 	{ "/misc/", H_DIR, NULL },
-	{ "/static/", H_DIR, NULL },
-	{ "/static/index.html", H_FILE, BASIC_HTML },
-	{ "/app/hello.lua", H_FILE, NULL },
-	{ "/views/hello.tpl", H_FILE, NULL },
-	{ "/config.lua", H_FILE, DEFAULT_LUA },
+	{ "/private/", H_DIR, NULL },
+	{ "/sql/", H_DIR, NULL },
+	{ "/views/", H_DIR, NULL },
+	{ "/app/hello.lua", H_FILE, SHAREDIR "app.hello.lua" },
+	{ "/views/hello.tpl", H_FILE, SHAREDIR "app.hello.tpl" },
+	{ "/config.lua", H_FILE, SHAREDIR "config.lua" },
+	{ "/config.example.lua", H_FILE, SHAREDIR "config.example.lua" },
+	{ "/ROBOTS.TXT", H_FILE, SHAREDIR "ROBOTS.TXT" },
+	{ "/favicon.ico", H_FILE, SHAREDIR "favicon.ico" },
 	{ NULL }
 };
 
 
-void help (void) {
-	fprintf( stderr, "%s: No options received.\n", __FILE__ );
-	const char *fmt = "-%c, --%-10s       %-30s\n";
-	fprintf( stderr, fmt, 'd', "dir", "Define where to create a new application" );
-	exit( 0 );
-	return;
-}
-
 
 int dir_cmd( struct app *layout, char *err, int errlen ) {
-
-
 	while ( layout->name ) { 	
 		char rname[ 2048 ] = { 0 };
 		snprintf( rname, sizeof( rname ) - 1, "%s%s", arg_srcdir, layout->name );
 		//fprintf( stdout, "resource name: %s\n", rname );
-#if 1
 		if ( layout->type == H_DIR ) {	
 			if ( mkdir( rname, 0755 ) == -1 ) {
 				snprintf( err, errlen, "Directory creation failure at %s: %s", rname, strerror( errno ));
@@ -129,89 +116,133 @@ int dir_cmd( struct app *layout, char *err, int errlen ) {
 			}
 		}
 		else if ( layout->type == H_FILE ) {
-			int fd = 0;
-			const char *content = layout->content;
+			int fd = 0, len = 0;
+			const unsigned char *content = NULL; 
+			//TODO: Work on my dereferencing, there's no reason I should need this
+			char lerr[ 1024 ] = { 0 }; 
+
+			if ( !( content = read_file( layout->path, &len, lerr, sizeof( lerr ) ) ) ) {
+				memcpy( err, lerr, strlen( lerr ) );
+				return 0;
+			}
+
 			if ( ( fd = open( rname, O_CREAT | O_RDWR, 0755 ) ) == -1 ) {
 				snprintf( err, errlen, "Failed to open file at %s: %s", rname, strerror( errno ));
 				return 0;
 			} 
 
-			if ( content ) {
-				if ( write( fd, content, strlen( content ) ) == -1 ) {
-					snprintf( err, errlen, "Failed to write to file at %s: %s", rname, strerror( errno ));
-					return 0;
-				}
-			} 
+			if ( write( fd, content, len ) == -1 ) {
+				snprintf( err, errlen, "Failed to write to file at %s: %s", rname, strerror( errno ));
+				return 0;
+			}
 
 			if ( close( fd ) == -1 ) {
 				snprintf( err, errlen, "Could not close file at %s: %s", rname, strerror( errno ));
 				return 0;
 			} 
 		}
-#endif
 		layout++;
 	}	
 	return 1;
 }
 
-#if 0
-//After compiling an app, test it here with a route and all... (similar to the tests)
-int dltest_cmd ( const char *name ) {
 
-	if ( !( p = dlopen( filename, RTLD_NOW ) ) )
-		return http_set_error( res, 500, "Could not open application." );
-
-	//Execution looks like
-#if 0
-
-#endif
-
-	if ( dlclose( p ) == -1 ) {
-		snprintf( err, sizeof( err ), "Failed to close application: %s\n", strerror( errno ) );
-		return http_set_error( res, 500, err );
+//Dump all command line arguments
+void dump () {
+	fprintf( stderr, "Directory: %s\n", arg_srcdir );
+	fprintf( stderr, "Domain Name: %s\n", arg_domain );
+	fprintf( stderr, "Title: %s\n", arg_title );
+	fprintf( stderr, "Database: %s\n", arg_database );
+	fprintf( stderr, "Static paths:\n" );
+	for ( char **sp = arg_static; *sp; sp++ ) {
+		fprintf( stderr, "%s\n", *sp );
 	}
+}
 
-	return 1;
-} 
-#endif
 
-int main (int argc, char *argv[]) {
+int main ( int argc, char *argv[] ) {
+	char err[ 2048 ] = { 0 };
+	struct stat sb;
+
 	//Process all your options...
-	( argc < 2 ) ? help() : 0;
+	if ( argc < 2 ) {
+		fprintf( stderr, "No options received:\n" );
+		fprintf( stderr, "%s", HELP );
+		return 1;
+	}
+ 
 	while ( *argv ) {
-		if ( strcmp( *argv, "--help" ) == 0 ) 
-			help();	
-		else if ( strcmp( *argv, "--verbose" ) == 0 ) 
+		if ( strcmp( *argv, "-v" ) == 0 || strcmp( *argv, "--verbose" ) == 0 ) 
 			arg_verbose = 1;
-		else if ( strcmp( *argv, "--dir" ) == 0 ) {
+		else if ( strcmp( *argv, "-h" ) == 0 || strcmp( *argv, "--help" ) == 0 ) {
+			fprintf( stderr, "%s", HELP );
+			return 1;
+		}
+		else if ( strcmp( *argv, "-d" ) == 0 || strcmp( *argv, "--dir" ) == 0 ) {
 			argv++;
 			if ( !*argv ) {
 				ERRPRINTF( "Expected argument for --dir!" );
-				return 0;
+				return 1;
 			} 
 			arg_srcdir = *argv;
+		}
+		else if ( strcmp( *argv, "-n" ) == 0 || strcmp( *argv, "--domain-name" ) == 0 ) {
+			argv++;
+			if ( !*argv ) {
+				ERRPRINTF( "Expected argument for --domain-name!" );
+				return 1;
+			} 
+			arg_domain = *argv;
+		}
+		else if ( strcmp( *argv, "--title" ) == 0 ) {
+			argv++;
+			if ( !*argv ) {
+				ERRPRINTF( "Expected argument for --title!" );
+				return 1;
+			} 
+			arg_title = *argv;
+		}
+		else if ( strcmp( *argv, "-b" ) == 0 || strcmp( *argv, "--database" ) == 0 ) {
+			argv++;
+			if ( !*argv ) {
+				ERRPRINTF( "Expected argument for --database!" );
+				return 1;
+			} 
+			arg_database = *argv;
+		}
+		else if ( strcmp( *argv, "-s" ) == 0 || strcmp( *argv, "--static" ) == 0 ) {
+			static char **as = arg_static;
+			argv++;
+			if ( !*argv ) {
+				ERRPRINTF( "Expected argument for --static!" );
+				return 1;
+			} 
+			*(as++) = *argv;
 		}
 		argv++;
 	}
 	
-	char err[ 2048 ] = { 0 };
 	if ( !arg_srcdir ) {
 		ERRPRINTF( "No source directory specified." );
-		return 0;
+		return 1;
 	}
 
-	struct stat sb;
-	if ( stat( arg_srcdir, &sb ) == -1 ) {
-		fprintf( stderr, "Source directory '%s' does not exist.\n", arg_srcdir );
+	if ( stat( arg_srcdir, &sb ) ) {
+		fprintf( stderr, "Source directory '%s' already exists.\n", arg_srcdir );
+		return 1;	
+	} 
+	else {
+		( arg_verbose ) ? fprintf( stderr, "Source directory '%s' does not exist.\n", arg_srcdir ) : 0;
 		if ( mkdir( arg_srcdir, 0755 ) == -1 ) {
 			ERRPRINTF( "Failed to create source directory '%s': %s.", arg_srcdir, strerror(errno) );
-			return 0;
+			return 1;
 		}
 	}
 
 	if ( !dir_cmd( defaults, err, sizeof(err) ) ) {
 		ERRPRINTF( "%s.", err );
-		return 0;
+		return 1;
 	}
+
 	return 0;
 }
