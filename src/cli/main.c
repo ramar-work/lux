@@ -44,6 +44,8 @@
 	fprintf( stderr, __VA_ARGS__ ) && \
 	fprintf( stderr, "\n" )
 
+#define LIBDIR "/var/lib/hypno"
+
 #ifdef LEAKTEST_H
  #define CONN_CONTINUE int i=0; i<1; i++
  #define CONN_CLOSE 1
@@ -262,7 +264,7 @@ int cmd_libs( struct values *v, char *err, int errlen ) {
 
 		//Look for the symbol 'app'
 		if ( !( f->filter = dlsym( lib, appn ) ) ) {
-			fprintf( stderr, "dlsym app error: %s\n", strerror( errno ) );
+			fprintf( stderr, "dlsym app error: %s: %s\n", fpath, strerror( errno ) );
 			dlclose( lib );
 			continue;
 		}
@@ -455,13 +457,18 @@ int main (int argc, char *argv[]) {
 	}
 
 	//Open the libraries (in addition to stuff)
-	if ( values.libdir ) {
-		//Load shared libraries
-		if ( !cmd_libs( &values, err, sizeof( err ) ) ) {
-			eprintf( "%s", err );
-			return 1;
-		}
+	if ( !values.libdir ) {
+		values.libdir = LIBDIR;
 	}
+
+	//Load shared libraries
+	if ( !cmd_libs( &values, err, sizeof( err ) ) ) {
+		eprintf( "%s", err );
+		return 1;
+	}
+
+fprintf( stderr, "%s\n", values.libdir );
+exit( 0);
 
 	//Dump the configuration if necessary
 	if ( values.dump ) {
