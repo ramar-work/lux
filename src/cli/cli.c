@@ -74,16 +74,26 @@ char *arg_database = NULL;
 char arg_verbose = 0;
 char arg_dump = 0;
 char *arg_static[10] = { NULL };
+const char ch = '@';
+
+
+struct kv { 
+	int size; 
+	unsigned char *value; 
+}	point[ 64 ] = {0};
+
 
 struct app {
 	const char *name;
 	enum {
 		H_DIR = 1
 	,	H_FILE
+	,	H_BINFILE
 	} type;
 	const char *path;
 	const unsigned char *content;
 };
+
 
 struct app defaults[] = {
 	{ "/app/", H_DIR, NULL },
@@ -94,16 +104,66 @@ struct app defaults[] = {
 	{ "/sql/", H_DIR, NULL },
 	{ "/views/", H_DIR, NULL },
 	{ "/app/hello.lua", H_FILE, SHAREDIR "app.hello.lua" },
-	{ "/views/hello.tpl", H_FILE, SHAREDIR "app.hello.tpl" },
+	{ "/views/hello.tpl", H_FILE, SHAREDIR "views.hello.tpl" },
 	{ "/config.lua", H_FILE, SHAREDIR "config.lua" },
 	{ "/config.example.lua", H_FILE, SHAREDIR "config.example.lua" },
 	{ "/ROBOTS.TXT", H_FILE, SHAREDIR "ROBOTS.TXT" },
-	{ "/favicon.ico", H_FILE, SHAREDIR "favicon.ico" },
+	{ "/favicon.ico", H_BINFILE, SHAREDIR "favicon.ico" },
+	{ NULL }
+};
+
+
+struct kset {
+	const char *key;
+	char **ptr;
+	int len;
+} kset[] = {
+	{ "db", &arg_database, 2 },
+	{ "fqdn", &arg_domain, 4 },
+	{ "title", &arg_title, 5 },
 	{ NULL }
 };
 
 
 
+//Return the basename
+char *basename ( char *path ) {
+	int len = strlen( path );
+	char *p = path + len; 
+	for ( ; len > 0 && *p != '/'; p--, --len );
+	return ( *p == '/' ) ? ++p : p;
+}
+
+
+//Return an unsigned char with find and replace activated 
+struct kv * replace ( unsigned char *f ) {
+	unsigned char *f1 = f;
+	int size = 0;
+	struct kv *p = point;
+	memset( p, 0, sizeof( point ) /	sizeof( struct kv ) ); 
+
+	for ( int inner = 0; *f; f++ ) {
+		if ( *f == ch && ( *f = '"' ) ) {
+			if ( !inner )
+				p->size = ++size, p->value = f1;
+			else {
+				f1++;
+				for ( struct kset *k = kset; k->key; k++ ) {
+					if ( !memcmp( f1, k->key, k->len ) ) {
+						p->size = strlen( *k->ptr ), p->value = (uint8_t *)*k->ptr;
+					}
+				}
+			}
+			inner = !inner, f1 = f, size = 0, p++;
+		}
+		size++;
+	}
+	p->size = size, p->value = f1, ++p, p->size = -1, p->value = NULL;
+	return point;
+}
+
+
+//Create a new directory
 int dir_cmd( struct app *layout, char *err, int errlen ) {
 	while ( layout->name ) { 	
 		char rname[ 2048 ] = { 0 };
@@ -115,11 +175,11 @@ int dir_cmd( struct app *layout, char *err, int errlen ) {
 				return 0;
 			}
 		}
-		else if ( layout->type == H_FILE ) {
+		else { 
 			int fd = 0, len = 0;
-			const unsigned char *content = NULL; 
+			unsigned char *content = NULL; 
 			//TODO: Work on my dereferencing, there's no reason I should need this
-			char lerr[ 1024 ] = { 0 }; 
+			char lerr[ 1024 ] = { 0 };
 
 			if ( !( content = read_file( layout->path, &len, lerr, sizeof( lerr ) ) ) ) {
 				memcpy( err, lerr, strlen( lerr ) );
@@ -131,15 +191,23 @@ int dir_cmd( struct app *layout, char *err, int errlen ) {
 				return 0;
 			} 
 
-			if ( write( fd, content, len ) == -1 ) {
+			fprintf( stderr, "writing file: %s\n", layout->path );
+			if ( layout->type == H_BINFILE && write( fd, content, len ) == -1 ) {
 				snprintf( err, errlen, "Failed to write to file at %s: %s", rname, strerror( errno ));
 				return 0;
+			}
+			else {
+				for ( struct kv *c = replace( content ); c->size > -1; c++ ) {
+					write( fd, c->value, c->size );
+				}
 			}
 
 			if ( close( fd ) == -1 ) {
 				snprintf( err, errlen, "Could not close file at %s: %s", rname, strerror( errno ));
 				return 0;
-			} 
+			}
+	
+			free( content );
 		}
 		layout++;
 	}	
@@ -174,6 +242,8 @@ int main ( int argc, char *argv[] ) {
 	while ( *argv ) {
 		if ( strcmp( *argv, "-v" ) == 0 || strcmp( *argv, "--verbose" ) == 0 ) 
 			arg_verbose = 1;
+		else if ( strcmp( *argv, "-x" ) == 0 || strcmp( *argv, "--dump-args" ) == 0 ) 
+			arg_dump = 1;
 		else if ( strcmp( *argv, "-h" ) == 0 || strcmp( *argv, "--help" ) == 0 ) {
 			fprintf( stderr, "%s", HELP );
 			return 1;
@@ -227,7 +297,7 @@ int main ( int argc, char *argv[] ) {
 		return 1;
 	}
 
-	if ( stat( arg_srcdir, &sb ) ) {
+	if ( stat( arg_srcdir, &sb ) != -1 ) {
 		fprintf( stderr, "Source directory '%s' already exists.\n", arg_srcdir );
 		return 1;	
 	} 
@@ -237,6 +307,15 @@ int main ( int argc, char *argv[] ) {
 			ERRPRINTF( "Failed to create source directory '%s': %s.", arg_srcdir, strerror(errno) );
 			return 1;
 		}
+	}
+
+	//Fill in argument defaults?
+	arg_database = arg_database ? arg_database : "none" ;
+	arg_domain = arg_domain ? arg_domain : basename( arg_srcdir );
+	arg_title = arg_title ? arg_title : basename( arg_srcdir );
+
+	if ( arg_dump ) {
+		dump();
 	}
 
 	if ( !dir_cmd( defaults, err, sizeof(err) ) ) {
