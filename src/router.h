@@ -1,26 +1,18 @@
-//router.h
-#include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
-#include "util.h"
-#include "loader.h"
-#include "mvc.h"
+/* ------------------------------------------------------ *
+ * router.h
+ * ========
+ * 
+ * Resolves received routes according to a list of arrays.
+ * 
+ * You can pass in a custom receiver function if the datatype
+ * is not something simple like a list of strings.
+ *
+ * ------------------------------------------------------ */
+#include <stdlib.h>
+#include <zwalker.h> 
 
 #ifndef ROUTER_H
 #define ROUTER_H
-
-#define DUMPACTION( NUM ) \
-	( NUM == ACT_ID    ) ? "ACT_ID" : \
-	( NUM == ACT_WILDCARD ) ? "ACT_WILDCARD" : \
-	( NUM == ACT_SINGLE   ) ? "ACT_SINGLE" : \
-	( NUM == ACT_EITHER   ) ? "ACT_EITHER" : \
-	( NUM == ACT_RAW  ) ? "ACT_RAW" : \
-	( NUM == ACT_NONE ) ? "ACT_NONE" : "UNKNOWN" 
-
-#define DUMPMATCH( NUM ) \
-	( NUM == RE_NUMBER    ) ? "RE_NUMBER" : \
-	( NUM == RE_STRING ) ? "RE_STRING" : \
-	( NUM == RE_ANY   ) ? "RE_ANY" : \
-	( NUM == RE_NONE ) ? "RE_NONE" : "UNKNOWN" 
 
 typedef enum {
 	RE_NONE = 0,
@@ -38,11 +30,6 @@ typedef enum {
 	ACT_RAW,
 } RouterStatus;
 
-struct routeh { 
-	char *name; 
-	struct mvc *mvc;
-};
-
 struct element {
 	int len;
 	RouterStatus type;
@@ -56,13 +43,19 @@ struct urimap {
 	struct element **list;
 };
 
-#if 0
-void dump_routeh ( struct routeh ** );
-void free_routeh ( struct routeh ** );
-#endif
-void build_routeh ( struct routeh ** );
-struct routeh * resolve_routeh ( struct routeh **, const char * );
-void dump_routehs ( struct routeh **set ) ;
-void free_urimap ( struct urimap * ) ;
 
+const char * route_resolve ( const char *, const char * );
+void * route_complex_resolve ( const char *, void **, const char *(*)(void *) );
+const char * route_rword( void * );
+
+#define route_resolve_list( a, b ) \
+	(const char *)route_complex_resolve( a, (void **)b, route_rword )
+
+#define route_resolve_stringlist( a, b ) \
+	(const char *)route_complex_resolve( a, (void **)b, route_rword )
+#if 0
+//c is the member we want
+#define route_resolve( a, b, c ) \
+	route_complex_resolve( a, (void **)b, c )
+#endif
 #endif

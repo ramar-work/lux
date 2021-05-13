@@ -1,3 +1,39 @@
+/* -------------------------------------------------------- *
+ * socket.c
+ * ========
+ * 
+ * Summary 
+ * -------
+ * Socket abstractions.
+ * NOTE: May retire these in the future. 
+ * 
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to 
+ * deal in the Software without restriction, including without limitation the 
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ * sell copies of the Software, and to permit persons to whom the Software is 
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in 
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+ * THE SOFTWARE.
+ *
+ * 
+ * Changelog 
+ * ----------
+ * 
+ * -------------------------------------------------------- */
 #include "socket.h"
 
 #if 0
@@ -145,8 +181,16 @@ struct sockAbstr * populate_socket ( struct sockAbstr *sa, int protocol, int soc
 	sa->iptype = PF_INET;
 	sa->reuse = SO_REUSEADDR;
 	sa->port = port;
-	sa->ctx = NULL;
+	memset( sa->iip, 0, 16 ); 
 	return sa;
+}
+
+
+int get_iip_of_socket( struct sockAbstr *a ) {
+	//struct sockaddr_in *cin = (struct sockaddr_in *)&a->addrinfo;
+	char *ip = inet_ntoa( a->sin->sin_addr );
+	memcpy( a->iip, ip, strlen( ip ) );
+	return 1;
 }
 
 
@@ -197,10 +241,12 @@ struct sockAbstr * open_listening_socket ( struct sockAbstr *sa, char *err, int 
 		return NULL;
 	}
 
+#if 1
 	if ( fcntl( sa->fd, F_SETFD, O_NONBLOCK ) == -1 ) {
 		snprintf( err, errlen, "fcntl error: %s\n", strerror(errno) ); 
 		return NULL;
 	}
+#endif
 
 	if (( status = bind( sa->fd, (struct sockaddr *)si, sizeof(struct sockaddr_in))) == -1 ) {
 		snprintf( err, errlen, "Couldn't bind socket to address! Error: %s\n", strerror( errno ) );

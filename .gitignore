@@ -1,14 +1,11 @@
 # Track nothing and add by force
 *
-!src
-!Makefile
+!example/*
+!src/*
+!configure.ac
+!configure
+!Makefile.in
 !*.md
 !*.c
 !*.h
-*.o
-*.exe
-*.db
-*.test
-.*.swp
-.*.swo
-.*.swf
+

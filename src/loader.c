@@ -1,10 +1,44 @@
-//loader.c - Load config files written with Lua
+/* ------------------------------------------- * 
+ * loader.c 
+ * =========
+ * 
+ * Summary 
+ * -------
+ * Loads config files written with Lua into a structure that C can easily talk 
+ * to.
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to 
+ * deal in the Software without restriction, including without limitation the 
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ * sell copies of the Software, and to permit persons to whom the Software is 
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in 
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+ * THE SOFTWARE.
+ *
+ * CHANGELOG 
+ * ---------
+ * No entries yet.
+ * ------------------------------------------- */
 #include "loader.h"
 
 //Get integer value from a table
-int loader_get_int_value ( Table *t, const char *key, int notFound ) {
+int loader_get_int_value ( zTable *t, const char *key, int notFound ) {
 	int i = lt_geti( t, key );
-	LiteRecord *p = NULL;
+	zhRecord *p = NULL;
 	if ( i == -1 ) {
 		return notFound;
 	}
@@ -18,9 +52,9 @@ int loader_get_int_value ( Table *t, const char *key, int notFound ) {
 
 
 //Get string value from a table
-char * loader_get_char_value ( Table *t, const char *key ) {
+char * loader_get_char_value ( zTable *t, const char *key ) {
 	int i = lt_geti( t, key );
-	LiteRecord *p = NULL;
+	zhRecord *p = NULL;
 	if ( i == -1 ) {
 		return NULL;
 	}
@@ -34,7 +68,7 @@ char * loader_get_char_value ( Table *t, const char *key ) {
 
 
 //Drop things back to zero
-static int loader_check_eot( LiteKv *kv, int *depth ) {
+static int loader_check_eot( zKeyval *kv, int *depth ) {
 	if ( *depth && kv->key.type == LITE_TRM )
 		(*depth)--;
 	else if ( *depth && kv->value.type == LITE_TBL ){
@@ -53,7 +87,7 @@ static int loader_check_eot( LiteKv *kv, int *depth ) {
 
 
 //Runs on tables...
-static int loader_iterator( LiteKv *kv, int i, void *p ) {
+static int loader_iterator( zKeyval *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p;
 
 #if 1
@@ -81,8 +115,8 @@ static int loader_iterator( LiteKv *kv, int i, void *p ) {
 
 
 //Get an array of things
-void ** loader_get_table_value( Table *t, const char *key, int(*fp)(LiteKv *,int,void *)) {
-	FPRINTF( "start populating from table.\n" );
+void ** loader_get_table_value( zTable *t, const char *key, int(*fp)(zKeyval *,int,void *)) {
+	//FPRINTF( "start populating from table.\n" );
 	int i = 0; 
 	void **p = NULL;
 	struct fp_iterator fp_data = { 0, 1, &p, fp, t };
@@ -97,17 +131,17 @@ void ** loader_get_table_value( Table *t, const char *key, int(*fp)(LiteKv *,int
 		return p; 
 	}
 
-	FPRINTF( "done populating from table.\n" );
+	//FPRINTF( "done populating from table.\n" );
 	return p;
 }
 
 
 //Copy iterator
-static int copy_iterator( LiteKv *kv, int i, void *p ) {
+static int copy_iterator( zKeyval *kv, int i, void *p ) {
 	struct fp_iterator *f = (struct fp_iterator *)p; 
-	Table **t = (Table **)f->userdata;
-	FPRINTF( "Table at %s: %p\n", __func__, *t );
-	FPRINTF( "Running copy_iterator.\n" );
+	zTable **t = (zTable **)f->userdata;
+	//FPRINTF( "zTable at %s: %p\n", __func__, *t );
+	//FPRINTF( "Running copy_iterator.\n" );
 
 	//like earlier, calculate until the depth is zero again
 	if ( !loader_check_eot( kv, &f->depth ) ) {
@@ -137,24 +171,24 @@ static int copy_iterator( LiteKv *kv, int i, void *p ) {
 	else if ( kv->value.type == LITE_USR )
 		lt_addudvalue( *t, kv->value.v.vusrdata );
 	else if ( kv->value.type == LITE_TBL ) {
-		FPRINTF( "Got table...\n" );
+		//FPRINTF( "Got table...\n" );
 		lt_descend( *t );
 		//you could run the copy iterator here
 		return 1;
 	}
 
 	lt_finalize( *t );
-	FPRINTF( "Done running copy_iterator.\n" );
+	//FPRINTF( "Done running copy_iterator.\n" );
 	return 1;
 }
 
 
 //Shallow copy
-Table *loader_shallow_copy ( Table *t, int start, int end ) {
+zTable *loader_shallow_copy ( zTable *t, int start, int end ) {
 	//Finally, fp->depth should be zero when done, but starting at one may save time
-	Table *nt = malloc( sizeof ( Table ) );
+	zTable *nt = malloc( sizeof ( zTable ) );
 	lt_init( nt, NULL, 256 );
-	FPRINTF( "Table at %s: %p\n", __func__, nt );
+	//FPRINTF( "zTable at %s: %p\n", __func__, nt );
 	struct fp_iterator fp_data = { end - start, 1, &nt, NULL, t };	
 
 	//Copy this
@@ -172,60 +206,59 @@ Table *loader_shallow_copy ( Table *t, int start, int end ) {
 
 #if 0
 //Set found keys
-int loader_set_keys ( Table *t, const struct rule *rule ) {
+int loader_set_keys ( zTable *t, const struct rule *rule ) {
 	return 0;
 }
 
 
 //If a key is necessary, we need to search for it
-int loader_check_keys ( Table *t, const struct rule *rule ) {
+int loader_check_keys ( zTable *t, const struct rule *rule ) {
 	return 0;
 }
 #endif
 
 
 //Loading can be done from just about anything...
-int loader_run ( Table *t, const struct rule *rule ) {
-	FPRINTF( "Initializing configuration.\n" );
+int loader_run ( zTable *t, const struct rule *rule ) {
+	//FPRINTF( "Initializing configuration.\n" );
 
 	while ( rule->key ) {
 		//Find the key in the table 	
-		FPRINTF( "Searching for key '%s'.\n", rule->key );
+		//FPRINTF( "Searching for key '%s'.\n", rule->key );
 		int ii = lt_geti( t, rule->key );
 		if ( ii == -1 ) {
-			FPRINTF( "Key '%s' not found.\n", rule->key );
+			//FPRINTF( "Key '%s' not found.\n", rule->key );
 			rule++;
 			continue;	
 		}
 
 		//Set the key somehow (assuming that the user did things right)
 		if ( !rule->type ) { 
-			FPRINTF( "Type not set for rule key '%s'\n", rule->key );
+			0; //FPRINTF( "Type not set for rule key '%s'\n", rule->key );
 		}
 		else if ( *rule->type == 's' ) {
-			FPRINTF( "Got value '%s' for rule key '%s'\n", *rule->v.s, rule->key ); 
-			*rule->v.s = strdup( loader_get_char_value( t, rule->key ) ); 
+			char *s = loader_get_char_value( t, rule->key );
+			*rule->v.s = strdup( s );
+			//FPRINTF( "Got value '%s' for rule key '%s'\n", *rule->v.s, rule->key ); 
 		}
 		else if ( *rule->type == 'i' ) { 
-			FPRINTF( "Got value '%d' for rule key '%s'\n", *rule->v.i, rule->key ); 
+			//FPRINTF( "Got value '%d' for rule key '%s'\n", *rule->v.i, rule->key ); 
 			*rule->v.i = loader_get_int_value( t, rule->key, -99 ); 
 		}
 		//Save a table (you can send a function pointer)
 		else if ( *rule->type == 't' ) {
 			if ( !rule->handler )
-				FPRINTF( "No handler for value '%p' at rule key '%s\n", *rule->v.t, rule->key );
+				0; //FPRINTF( "No handler for value '%p' at rule key '%s\n", *rule->v.t, rule->key );
 			else { 
-				FPRINTF( "Got value '%p' & function '%p' for rule key '%s'\n", 
-					*rule->v.t, rule->handler, rule->key ); 
+				//FPRINTF( "Got value '%p' & function '%p' for rule key '%s'\n", *rule->v.t, rule->handler, rule->key ); 
 				*rule->v.t = loader_get_table_value( t, rule->key, rule->handler ); 
 			}
 		}
 		else if ( *rule->type == 'x' ) {
 			if ( !rule->handler )
-				FPRINTF( "No handler for value '%p' at rule key '%s\n", *rule->v.t, rule->key );
+				0; //FPRINTF( "No handler for value '%p' at rule key '%s\n", *rule->v.t, rule->key );
 			else { 
-				FPRINTF( "Got value '%p' & function '%p' for rule key '%s'\n", 
-					*rule->v.t, rule->handler, rule->key ); 
+				//FPRINTF( "Got value '%p' & function '%p' for rule key '%s'\n", *rule->v.t, rule->handler, rule->key ); 
 					
 				struct fp_iterator f = { 0, 0, rule->v.t, rule->handler };
 				int count = lt_counta( t, ii );
@@ -251,7 +284,7 @@ int loader_run ( Table *t, const struct rule *rule ) {
 		rule++;
 	}
 
-	FPRINTF( "Done building configuration.\n" );
+	//FPRINTF( "Done building configuration.\n" );
 	return 1;
 }
 
@@ -261,7 +294,7 @@ void loader_free ( const struct rule *rule ) {
 	while ( rule->key ) {
 		//Set the key somehow (assuming that the user did things right)
 		if ( !rule->type ) { 
-			FPRINTF( "Type not set for rule key '%s'\n", rule->key );
+			0;//FPRINTF( "Type not set for rule key '%s'\n", rule->key );
 		}
 		else if ( *rule->type == 's' ) {
 			free( *rule->v.s );
@@ -290,6 +323,7 @@ void loader_free ( const struct rule *rule ) {
 		else {
 			FPRINTF( "Unknown type set for rule key '%s'\n", rule->key );
 		}
+		rule++;
 	}
 }
 

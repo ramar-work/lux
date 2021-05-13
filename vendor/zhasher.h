@@ -182,7 +182,7 @@
  	lt_within_long( t, (uint8_t *)str, strlen(str))
 
 #if 1
-#define SHOWDATA(...)
+ #define SHOWDATA(...)
 #else
 #define SHOWDATA(...) do { \
  fprintf(stderr, "%-30s [ %s %d ] ( %s ) ", __func__, __FILE__, __LINE__, __CURRENT_TIME__ ); \
@@ -202,19 +202,19 @@ enum {
 };
 
 //Define a type polymorph with a bunch of things to help type inference
-typedef struct LiteValue LiteValue;
-typedef struct LiteBlob LiteBlob;
-typedef struct LiteTable LiteTable;
-typedef struct LiteKv LiteKv;
-typedef union  LiteRecord LiteRecord;
-//typedef struct LiteNode LiteNode;
+typedef struct zhValue zhValue;
+typedef struct zhBlob zhBlob;
+typedef struct zhTable zhTable;
+typedef struct zKeyval zKeyval;
+typedef union zhRecord zhRecord;
+//typedef struct zhNode zhNode;
 
 typedef struct { 
 	enum { LT_DUMP_SHORT, LT_DUMP_LONG } dumptype; 
 	enum { LT_CONDENSED, LT_VERBOSE } indextype;
 	const char *customfmt;
 	int level; 
-} LtInner;
+} zhInner;
 
 //Table for table values
 typedef enum {
@@ -228,7 +228,7 @@ typedef enum {
   LITE_TBL,     //A "table"
   LITE_TRM,     //Table terminator (NULL alone can't be described)
   LITE_NOD,     //A node
-} LiteType;
+} zhType;
 
 typedef struct {
   unsigned int  total  ,     //Size allocated (the bound)
@@ -245,8 +245,8 @@ typedef struct {
                 buflen ;
   unsigned char *src   ;     //Source for when you need it
   unsigned char *buf   ;     //Pointer for trimmed keys and values
-  LiteKv        *head  ;     //Pointer to the first element
-  LiteTable     *current;    //Pointer to the first element
+  zKeyval        *head  ;     //Pointer to the first element
+  zhTable     *current;    //Pointer to the first element
  #ifndef ERR_H
   int error;
 	#ifndef ERRV_H
@@ -254,20 +254,20 @@ typedef struct {
 	#endif 
  #endif
   
-} Table;
+} zTable;
 
-struct LiteTable {
+struct zhTable {
   uint32_t  count;
   long      ptr;
-  LiteTable *parent;
+  zhTable *parent;
 };
 
-struct LiteBlob {
+struct zhBlob {
   int size;
   uint8_t *blob;
 };
 
-union LiteRecord {
+union zhRecord {
   int         vint;
   float       vfloat;
   char       *vchar;
@@ -275,68 +275,68 @@ union LiteRecord {
   void       *vnull;
 #endif
   void       *vusrdata;
-  LiteBlob    vblob;
-  LiteTable   vtable;
+  zhBlob    vblob;
+  zhTable   vtable;
   long        vptr;
 #if 0
-  LiteNode    vnode;
+  zhNode    vnode;
 #endif
 };
 
-struct LiteValue {
-  LiteType    type;
-  LiteRecord  v;
+struct zhValue {
+  zhType    type;
+  zhRecord  v;
 };
 
-struct LiteKv {
+struct zKeyval {
   int hash[LT_MAX_HASH];
-  LiteKv *parent;  
-  LiteValue key; 
-  LiteValue value;
+  zKeyval *parent;  
+  zhValue key; 
+  zhValue value;
 };
 
-LiteType lt_add (Table *, int, LiteType, int, float, char *, unsigned char *, unsigned int , void *, Table *, char *);
-Table *lt_init (Table *, LiteKv *, int) ;
-void lt_printall ( Table *t );
-void lt_finalize (Table *t) ;
-int __lt_dump ( LiteKv *kv, int i, void *p );
-extern LtInner __ltComplex; 
-extern LtInner __ltHistoric; 
-extern LtInner __ltSimple; 
-int lt_exec_complex (Table *t, int start, int end, void *p, int (*fp)( LiteKv *kv, int i, void *p ) );
-int lt_move(Table *t, int dir) ;
-LiteKv *lt_retkv (Table *t, int index);
-LiteType lt_rettype( Table *t, int side, int index );
-const char *lt_rettypename( Table *t, int side, int index );
-void lt_lock (Table *t); 
-int lt_get_long_i (Table *t, unsigned char *find, int len);
-unsigned char *lt_get_full_key ( Table *t, int hash, unsigned char *buf, int bs );
-LiteKv *lt_next (Table *t);
-LiteKv *lt_current (Table *t);
-void lt_reset (Table *t);
-int lt_set (Table *t, int index);
-int lt_absset( Table *t, int index ) ;
-int lt_get_raw (Table *t, int index);
-LiteValue *lt_retany (Table *t, int index);
-LiteRecord *lt_ret (Table *t, LiteType type, int index);
-const char *lt_strerror (Table *t);
-void lt_clearerror (Table *t);
-void lt_setsrc (Table *t, void *src);
-void lt_free (Table *t);
-unsigned char *lt_trim (uint8_t *msg, char *trim, int len, int *nlen);
-LiteKv *lt_items_i (Table *t, uint8_t *src, int len);
-LiteKv *lt_items_by_index (Table *t, int ind);
-int lt_count_elements ( Table *t, int index );
-//Table *lt_copy (Table *t, int from, int to); 
-int lt_exists (Table *t, int index);
-int lt_count_at_index ( Table *t, int index, int type );
-int lt_countall ( Table *t );
-//Table *lt_within_long ( Table *t, uint8_t *src, int len );
-Table *lt_within_long( Table *st, uint8_t *src, int len );
-const char *lt_typename (int type);
+zhType lt_add (zTable *, int, zhType, int, float, char *, unsigned char *, unsigned int , void *, zTable *, char *);
+zTable *lt_init (zTable *, zKeyval *, int) ;
+void lt_printall (zTable *);
+void lt_finalize (zTable *) ;
+int __lt_dump (zKeyval *, int, void *);
+extern zhInner __ltComplex; 
+extern zhInner __ltHistoric; 
+extern zhInner __ltSimple; 
+int lt_exec_complex (zTable *, int, int, void *, int (*fp)(zKeyval *, int, void *) );
+int lt_move(zTable *, int) ;
+zKeyval *lt_retkv (zTable *, int);
+zhType lt_rettype (zTable *, int, int);
+const char *lt_rettypename (zTable *, int, int);
+void lt_lock (zTable *); 
+int lt_get_long_i (zTable *, unsigned char *, int);
+unsigned char *lt_get_full_key (zTable *, int, unsigned char *, int);
+zKeyval *lt_next (zTable *);
+zKeyval *lt_current (zTable *);
+void lt_reset (zTable *);
+int lt_set (zTable *, int);
+int lt_absset (zTable *, int);
+int lt_get_raw (zTable *, int);
+zhValue *lt_retany (zTable *, int );
+zhRecord *lt_ret (zTable *, zhType, int );
+const char *lt_strerror (zTable *);
+void lt_clearerror (zTable *);
+void lt_setsrc (zTable *, void *);
+void lt_free (zTable *);
+unsigned char *lt_trim (uint8_t *, char *, int, int *);
+zKeyval *lt_items_i (zTable *, uint8_t *, int);
+zKeyval *lt_items_by_index (zTable *, int);
+int lt_count_elements ( zTable *, int);
+int lt_exists (zTable *, int);
+int lt_count_at_index ( zTable *, int, int);
+int lt_countall ( zTable * );
+zTable *lt_within_long( zTable *, uint8_t *, int);
+const char *lt_typename (int);
+//Table *lt_copy (zTable *t, int from, int to); 
+//Table *lt_within_long ( zTable *t, uint8_t *src, int len );
 #ifdef DEBUG_H
  /*This is only enabled when debugging*/
- void lt_printt (Table *t);
+ void lt_printt (zTable *);
 #endif
 
 #endif

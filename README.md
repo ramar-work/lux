@@ -1,268 +1,270 @@
 # hypno
 
-Another attempt at writing some better server software in Lua of all languages...
+A low maintenance web server and library for web development.
 
 
-## Build
+## Building
 
-Builds on:
--   OSX 
-- x Linux
--   Windows
+hypno depends on the following:
 
-Some work needs to be done here.
+- Lua v5.3 or greater
+- GnuTLS 2.0 or greater
 
 
-## Using the CLI
+### Linux
 
-Hypno can create its own application directories like other big frameworks. 
+Hypno is slowly moving over to GNU autoconf for a consistent build process.
+Even in its current state, it still needs no exotic flags to build on
+different platforms.
 
-It's usage is something like this:
 
-Flags                 | Function
------                 | --------
--c, --create [dir]    | Create a new application directory here.
--e, --eat [url]       | Feed this a certain URL and see how it evaluates.
--l, --list            | List all sites and their statuses.
--a, --at [dir]        | Create a new application directory here.
--n, --name [name]     | Use this as a site name.
--d, --domain [domain] | Use this domain.
--v, --verbose         | Be verbose.
--h, --help            | Show help and quit.
+#### Debian 
 
-So, if I want to create a new site that can be served from anywhere, this
-command would let that happen.
+Instructions for Debian ought to translate to other apt-based distributions.
 
 <pre>
-$ ./hypno -c $HOME/mydir
+# Install the following dependencies
+$ apt install liblua5.3-dev gnutls-dev make
+
+# Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
+
+# Make and install
+$ cd hypno && make && make install
+
+# Run the examples at port 2222
+$ make examples
 </pre>
 
 
+#### Fedora
 
-## Serving Something
+Instructions for Debian ought to translate to other yum-based distributions.
 
-Files in hypno are routes.  And do routey things.
-
-
-## Caveats
-
-Many.
-
-
-## Rationale
-
-Why Build Another Server?
--------------------------
-I built this because after months of trying to write a product using CF or node, I'm still having dumb problems and bad build processes. 
-
-It was fairly challenging to create.  But the process of serving sites boils down to: 
-- opening a socket
-- parsing a message
-- processing it via any means (could be raw HTML, scripting language, sending binary, database routine, etc)
-- send the message back to the requestor
-- close that process and listen again
-
-
-Why use Lua?
-------------
-- It builds fine on OSX and Linux with a little bit of help
-- It's dynamic.  So even though Go is a much better language on many levels, and C is more fun, it's easy to get changes in.
-- Most union and set primitives are already written (with the exception of sort, extract and map) 
-- Even though file system support is not included, the C library that hypno is built on top already includes this.
-- Pretty easy to bind C to Lua.  
-- Pretty easy to embed Lua into C, doing the same with PHP or Python requires a bit more legwork.
-- The idea of a single unified data structure is appealing for beginners and I personally like the flexibility it offers.
-
-
-Why not Javascript?
--------------------
-- Javascript is a complicated language.
-- For all of the things the language offers, it still manages not to ship with filesystem or database primitives.
-- I have started to like Javascript less and less the longer I spend doing web development.
-- Tooling, type safety and optimization all seem to be afterthoughts and only can be implemented through the use of third party libraries.  (There isn't even a real syntax checker outside of the browser.)
-- Only one library exists that makes Javascript easy to bind to C (duktape - which is great!)
-
-
-## How This Works
-
-hypno is written from the ground up as an "all-in-one" website delivery tool.  It uses C for the hard and somewhat uninteresting stuff (like opening sockets, resource management, scripting language evaluation and HTTP parsing) and uses Lua for anything that could be classified as application layer material.  Configuration is done using simple files and tries to keep language idioms to an absolute minimum.
-
-It (somewhat forcefully) enforces a model-view-controller paradigm for application design.  When new projects are created, the tool allocates disk space specifically for models, views and middleware.
-
-All of hypno's sites rely on a file in the site root titled 'data.lua'.   Once the server receives a request for a particular domain name, the data.lua in the site root for that domain is parsed and evaluated.  If errors are present within the file, a 500 code will be sent back along with a pretty error message spelling out what actually happened.
-
-Routing and site organization all happen from this file.  Here is an example:
 <pre>
-# hahaha, there is absolutely NOTHING here yet...
+# Install dependencies
+$ yum install lua-devel gnutls-devel make
+
+# Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
+
+# Make and install
+$ cd hypno && make && make install
+
+# Run the examples to see the code in action.
+$ make examples
 </pre>
 
 
-## TODO
+#### Arch & others
 
-### Checklist
+Arch happens to be the distribution that hypno is developed on and
+it is a fairly straightforward process to build there.  
+<pre>
+# Install dependencies
+$ pacman -Sy lua gnutls
 
-x Write, debug and test table aggregation
+# Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
 
-- Write, debug and test MVC execution chain
-		Some problems here:
-			rendering multiple levels deep does not work
-			seeing the same issue that I saw months ago when looping, start index seems to be off
-			also don't completely finish the render
+# Make and install
+$ cd hypno && make && make install
 
-- Write, debug and test data.lua evaluation
+# Run the examples to see the code in action.
+$ make examples
+</pre>
 
-- Write, debug and test database drivers (SQLite should be built-in)
-
-- Write, debug and test built-in routes (/dump, /debug, /info, whatever else) 
-
-- Write sorts (certain methods may be wiser)
-
-- Write string routines
-
-- Write table extensions
-
-- Write email primitives
-	Hopefully a strong library already exists for this
-
-- Write binary data generation routines (for testing, but instrumental because of how things should work)
-	Writing against ImageMagick is the least resistance path for dynamic image generation
-	GIF
-	http://www.onicos.com/staff/iz/formats/gif.html
-	http://giflib.sourceforge.net/whatsinagif/lzw_image_data.html
-
-	However, I forgot that I'll probably want to write audio data (WAV, MP3 and FLAC)
-
-	WAV
-	https://gist.github.com/Jon-Schneider/8b7c53d27a7a13346a643dac9c19d34f
-	http://www.topherlee.com/software/pcm-tut-wavformat.html
-	http://www-mmsp.ece.mcgill.ca/Documents/AudioFormats/WAVE/WAVE.html
-	https://sites.google.com/site/musicgapi/technical-documents/wav-file-format
-
-	And common compression schemes (zip, lzma, gzip, etc)
-	ZIP
-	https://github.com/kuba--/zip
-	https://code.google.com/archive/p/miniz/downloads
-	https://zlib.net/ (hard to use possibly, hence why the two above exist, but its on most systems)
-	http://7-zip.org/download.html (and here's another, which deals with .xz as well)
-
-- Write encoding primitives ( base64, sha1sum, md5, etc )
-	base64 is a search away
-
-	the other two are probably covered in that big crypto book
-
-- Write curl/wget/socket.get things and test APIs
-	Paypal offers credit card numbers...
-	https://www.paypalobjects.com/en_AU/vhelp/paypalmanager_help/credit_card_numbers.htm
-
-### Aggregation
-
-Debugged this, and now am ready to implement a solution.
-
-
-### Test Suite
-
-Most of these work fine, but:
-tests/sql.c and tests/depth.c rely on shell scripts and installed user programs to generate test data.
-Generating the data for these tests with C will solve speed and consistency problems.
-
-
-### Packaging, Shipping and Maintenance
-
-Linux is a mess.  So shipping Lua with the program might work best.   Single filing Lua is not going to be simple or plain.
-That will need some kind of script.
-
-
-### Stuff that's Leftover
-
-Choosing Lua has been with many plusses and many negatives.  Some of the negatives mean:
-
-- writing sort routines
-- writing string manipulation functions
-- writing some heavily needed table utilities
-- write email primitives
-
-To get this done, also requires:
-- easy to build SSL
-- JSON/XML parser 
-- JS parser (maybe)
-
-
-### Proposed CLI (Usage)
-
-- handle a socket
-	-s, -k = start, kill a server via hypno
-	open it 
-	receive data from it
-	see what came parsed
-	send data through it
-	close it
-
-- database drivers:
-	-t [ mysql, sqlite3, postgresql, etc ] = test database drivers via hypno-test
-	sqlite3
-	mysql
-	postgresql
-	maybe one of the nosqls depending on need
-
-- routing
-	-u <file> = test a router setup via hypno (no json)
-	interpret the routes in a file as they relate to code
-
-- templating
-	-f <file> = test templates with data and files, 
-	-d {} or "select * from etc;" =  you'll need some sort of lua data 
-	be able to do raw replacements
-	be able to do scripting in the language (use the language)
-	
-- tooling
-	this can be done from c too... no reason not to, but it can always be removed
-	-c <dir> ...
-	or
-	--create-from <file> 
-	shell script for now... is fine....
-	can't move quickly w/o it
-	create new directories and route structures
-	remove directories
-	possibly view what's in those directories
-
-- handle the request / response chain
-	obvs, there's nothing here...
-	give the user some variables to choose from
-	be able to set things that the user should be able to set
-	after parsing, basic routes are always needed:
-	/dump
-	/debug
-	/etc...
-
-- run unit tests
-	-t = run unit tests via hypno...	
+SuSE, Slackware, Gentoo and others have not been tested yet, but the 
+steps boil down roughly to the same thing.
 
 
 
-## Tests
+### Windows (via Cygwin)
 
-Right now all tests have to be run from the top-level directory.  There are two programs shipped that test certain parts of hypno.  `router` tests the router evaluation.  `chains` tests the MVC execution chain. `agg` tests table aggregation.  After compilation, each new program will show up in the top-level directory.
+The Cygwin build is pretty close to what it would be on a typical
+Linux system.  Dependencies can be grabbed either through the command-line
+or through setup.exe.  That said, if you are not already using 
+<a href="https://github.com/transcode-open/apt-cyg">apt-cyg</a>, 
+you're missing out.
 
-x agg
-x render
-x router
-x sql
+To install the dependencies via `apt-cyg`, try the following:
+<pre>
+$ apt-cyg install gnutls-devel lua-devel lua
+</pre>
 
-C chains
+To install the via the setup.exe program, just search for the following
+names: `gnutls-devel`, `lua-devel`, `lua`.
+
+The program should find the newest versions and install them.
+
+You will also need `gcc` and `make` if you do not typically build software
+in your Cygwin environment. 
+
+The rest of the build steps are follow what would be done a regular Linux
+system.
+
+<pre>
+# Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
+
+# Make and install
+$ cd hypno && make && make install
+
+# Run the examples at port 2222
+$ make examples
+</pre>
+
+NOTE: In my opinion, running Hypno on Cygwin is really just
+useful for quick tests.  The emulation and utilities used to get that
+Linux feel just aren't fast enough for production-level performance.
 
 
-render sucks... need to fix this...
+### OSX
 
-debug what the hell is going on with pointer loop?
+The OSX build needs a bit of work.   Building Lua manually and linking against
+that seems to be the best solution for now. 
+
+The OSX build also requires brew, which requires XCode and XCode's command line 
+tools.
+
+#### Getting Dependencies via Brew
+
+The GnuTLS dependency can be grabbed via Brew.  Hypno will also require `pkg-config`
+to find all of the libraries after installation.
+
+<pre>
+$ brew install gnutls pkg-config
+</pre>
+
+Unfortunately, the Lua package downloaded with Homebrew does not ship with 
+it's headers or a library.  So we'll need to create one ourselves.
+
+#### Getting and Building Lua
+
+There are three steps to building Lua manually.
+
+1. Visit http://www.lua.org/download.html
+2. Download Lua 5.3.6 from http://www.lua.org/ftp/lua-5.3.6.tar.gz
+3. Build the library and install it.
+
+We can do all of this via the command line.
+<pre>
+$ curl -R -O http://www.lua.org/ftp/lua-5.3.6.tar.gz
+$ tar xzf lua-5.3.6.tar.gz && cd lua-5.3.6
+$ make macosx && make install
+</pre>
+
+#### Building Hypno
+
+Building Hypno now will be simliar to other Linux based builds.
+
+<pre>
+# Get hypno via Git
+$ git clone https://github.com/zaiah-dj/hypno.git
+
+# Make and install
+$ cd hypno && make && make install
+
+# Run the examples at port 2222
+$ make examples
+</pre>
 
 
-## Results
+<!-- ## Using the CLI -->
+<!--  -->
+<!-- Hypno can create its own application directories like other big frameworks.  It's usage is something like this: -->
+<!--  -->
+<!-- Flags                 | Function -->
+<!-- -----                 | -------- -->
+<!-- -c, --create [dir]    | Create a new application directory here. -->
+<!-- -e, --eat [url]       | Feed this a certain URL and see how it evaluates. -->
+<!-- -l, --list            | List all sites and their statuses. -->
+<!-- -a, --at [dir]        | Create a new application directory here. -->
+<!-- -n, --name [name]     | Use this as a site name. -->
+<!-- -d, --domain [domain] | Use this domain. -->
+<!-- -v, --verbose         | Be verbose. -->
+<!-- -h, --help            | Show help and quit. -->
+<!--  -->
+<!-- So, if I want to create a new site that can be served from anywhere, this command would let that happen. -->
 
-Thu, Jan  4, 2018  9:27:58 PM
 
-spent about 2.5 hours getting back up to speed on hypno's codebase and working with a better test for aggregation.  working on a test program now that will randomly generate stack values.  The next step will be putting all of these values into one table. 
+## Usage
+
+### Server
+
+Hypno currently ships with a server (hypno-server) capable of:
+
+- Serving static web pages.
+- Serving web applications via a shared object.
+- Serving a list of files in a directory.
+- Handling redirects.
+- Serving TLS encrypted traffic.
+
+The commands are listed below: 
+<pre>
+-s, --start                  Start the server              
+-c, --config <arg>           Use this Lua file for configuration
+-p, --port <arg>             Start using a different port  
+-u, --user <arg>             Choose an alternate user to start as
+-d, --dump                   Dump configuration            
+    --no-fork                Do not fork                   
+    --use-ssl                Use SSL                       
+    --debug                  set debug rules               
+-h, --help                   Show the help menu.  
+</pre>
 
 
-Mon, Jan  8, 2018 10:03:43 PM
+### Admin
 
-Finished aggregation.  Run `agg` to see it work.
+Hypno also ships with a command line interface (hypno-cli) which will eventually
+be capable of:
+
+- Stress testing applications via the command line
+- Modifying instances / applications
+- Modifying domains within local DNS
+
+
+### Configuration
+
+Hypno leans on Lua's speed and simplicity for configuration tasks. 
+See the example/ directory for what a typical server configuration
+file looks like.
+
+
+<!-- ## Rationale -->
+<!--  -->
+<!-- Why Build Another Server? -->
+<!-- ------------------------- -->
+<!-- This was built as a cleaner answer to web frameworks written with Node.js, PHP, Lucee or other popular tools.  I wanted something simple to build which didn't require lots of dependencies.  -->
+<!--  -->
+<!-- The process of serving sites boils down to:  -->
+<!-- - opening a socket -->
+<!-- - parsing a message -->
+<!-- - generating a response -->
+<!-- - sending the message back to the requestor -->
+<!-- - closing the socket -->
+<!--  -->
+<!-- Knowing this, I figured that there must be a better way to go about it than what we have today. -->
+<!--  -->
+<!--  -->
+<!-- Why use Lua? -->
+<!-- ------------ -->
+<!-- - Lua builds fine on OSX and Linux. -->
+<!-- - Packages and extensinons for Lua are available everywhere for a variety of operating systems. -->
+<!-- - Lua is interpreted. -->
+<!-- - Lua is fast. -->
+<!-- - Most union and set primitives are already written (with the exception of sort, extract and map)  -->
+<!-- - Pretty easy to bind C to Lua.   -->
+<!-- - Pretty easy to embed Lua into C, doing the same with PHP or Python requires a bit more legwork. -->
+<!-- - Lua relies heavily on the tables, a single unified data structure that is appealing to beginners and professionals alike. -->
+<!--  -->
+<!--  -->
+<!-- Why not Javascript? -->
+<!-- ------------------- -->
+<!-- - Javascript has become overly complicated over the years. -->
+<!-- - For all of the things the language offers, it still manages not to ship with filesystem or database primitives. -->
+<!-- - I have started to like Javascript less and less the longer I spend doing web development. -->
+<!-- - Tooling, type safety and optimization all seem to be afterthoughts and only can be implemented through the use of third party libraries.  (There isn't even a real syntax checker outside of the browser.) -->
+<!-- - Only one library exists that makes Javascript easy to bind to C (duktape - which is great!) -->
+
+

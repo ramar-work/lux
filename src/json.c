@@ -46,7 +46,7 @@ static unsigned char *json_trim (uint8_t *msg, char *trim, int len, int *nlen)
 
 #if 0
 /*Slower, but cleaner*/
-int json_reset ( Table *t, uint8_t **b, int *a, int side  )
+int json_reset ( zTable *t, uint8_t **b, int *a, int side  )
 {
 	dump( *b, *a, "Adding value" );
 	if ( side )
@@ -103,7 +103,7 @@ int json_count ( uint8_t *src, int len )
 
 
 //A very raw version that uses no special anything
-int json_json ( Table *t, uint8_t *src, int len )
+int json_json ( zTable *t, uint8_t *src, int len )
 {
 	//Define
 	Depth depther[ JSON_MAX_DEPTH ];
@@ -264,7 +264,7 @@ int json_json ( Table *t, uint8_t *src, int len )
 
 
 //...
-void json_free ( Table *t )
+void json_free ( zTable *t )
 {
 	lt_free( t );
 }
@@ -275,7 +275,7 @@ void json_free ( Table *t )
 int main ( int argc, char *argv[] ) 
 {
 	//...
-	Table t;
+	zTable t;
 	char *file = NULL;
 	unsigned char *src = NULL, *ns = NULL;
 	int bytes=0, fd = 0;

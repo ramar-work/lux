@@ -1,3 +1,4 @@
+//util.c
 #include "util.h"
 
 //Print binary data (in hex) using name of variable as key
@@ -12,8 +13,9 @@ uint8_t * srand_uint8t( uint8_t *src, int srclen, uint8_t *buf, int buflen ) {
 		return NULL;
 	}
 	
-	srclen --;
 	uint8_t *b = buf;
+	srclen -= 1;
+
 	while ( --buflen ) {
 		struct timespec ts;
 		clock_gettime(CLOCK_REALTIME, &ts);
@@ -35,27 +37,27 @@ uint8_t *read_file ( const char *filename, int *len, char *err, int errlen ) {
 	//Check for the file 
 	if ( (fstat = stat( filename, &sb )) == -1 ) {
 		//fprintf( stderr, "FILE STAT ERROR: %s\n", strerror( errno ) );
-		snprintf( err, errlen, "FILE STAT ERROR: %s\n", strerror( errno ) );
+		snprintf( err, errlen, "Stat error on %s: %s\n", filename, strerror( errno ) );
 		return NULL;	
 	}
 
 	//Check for the file 
 	if ( (fd = open( filename, O_RDONLY )) == -1 ) {
-		snprintf( err, errlen, "FILE OPEN ERROR: %s\n", strerror( errno ) );
+		snprintf( err, errlen, "File open error on %s: %s\n", filename, strerror( errno ) );
 		return NULL;	
 	}
 
 	//Allocate a buffer
 	fileSize = sb.st_size + 1;
 	if ( !(buf = malloc( fileSize )) || !memset(buf, 0, fileSize)) {
-		snprintf( err, errlen, "COULD NOT OPEN VIEW FILE: %s\n", strerror( errno ) );
+		snprintf( err, errlen, "allocation error: %s, %s\n", filename, strerror( errno ) );
 		close( fd );
 		return NULL;	
 	}
 
 	//Read the entire file into memory, b/c we'll probably have space 
 	if ( (bytesRead = read( fd, buf, sb.st_size )) == -1 ) {
-		snprintf( err, errlen, "COULD NOT READ ALL OF VIEW FILE: %s\n", strerror( errno ) );
+		snprintf( err, errlen, "read error: %s, %s\n", filename, strerror( errno ) );
 		free( buf );
 		close( fd );
 		return NULL;	
@@ -70,6 +72,34 @@ uint8_t *read_file ( const char *filename, int *len, char *err, int errlen ) {
 
 	*len = sb.st_size;
 	return buf;
+}
+
+
+//Safely convert numeric buffers...
+int * satoi( const char *value, int *p ) {
+	//Make sure that content-length numeric
+	const char *v = value;
+	while ( *v ) {
+		if ( (int)*v < 48 || (int)*v > 57 ) return NULL;
+		v++;
+	}
+	*p = atoi( value );
+	return p; 
+}
+
+
+//Safely convert numeric buffers...
+int * datoi( const char *value ) {
+	//Make sure that content-length numeric
+	const char *v = value;
+	while ( *v ) {
+		if ( (int)*v < 48 || (int)*v > 57 ) return NULL;
+		v++;
+	}
+
+	int *p = malloc( sizeof(int) );
+	*p = atoi( value );
+	return p; 
 }
 
 

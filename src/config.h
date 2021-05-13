@@ -1,28 +1,26 @@
-#include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
-#include "luabind.h"
-#include "util.h"
-#include "router.h"
-#include "hosts.h"
+//config.h - configuration for other stuff
 
-#ifndef CONFIG_H
-#define CONFIG_H
+//How long should each client be allowed to persist
+#define CLIENT_REQUEST_TIMEOUT 5
 
-void *get_values ( Table *t, const char *key, void *userdata, int (*fp)(LiteKv *, int, void *) );
+//Where are the default htdocs?
+#define HTDOCS_DIR /var/www
 
-struct config {
-	const char *path;
-	const char *root_default;
-	struct routeh **routes;
-	struct host **hosts;
-#if 0
-	//Questionable as to whether or not I'll need these...
-	void *ssl;
-	int fd;	
-#endif
-};
+//How often should a process poll for new data?
+#define POLL_INTERVAL 100000000
 
-struct config * build_config ( char *, char *, int );
-void free_config( struct config * );
+//Activate / deactivate database engines
+#define NOMYSQL_H
+#define NOPGSQL_H
+#define NOSQLITE_H
 
-#endif
+//Forks or threads
+#define FORK_H
+//#define HFORK_H
+//#define HTHREAD_H
+
+//Enable or disable certain filters
+#define USEFILTER_C
+#define USEFILTER_LUA
+#define USEFILTER_STATIC
+#define USEFILTER_ECHO
