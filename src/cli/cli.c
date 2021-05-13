@@ -188,7 +188,7 @@ int dir_cmd( struct app *layout, char *err, int errlen ) {
 				return 0;
 			}
 
-			if ( ( fd = open( rname, O_CREAT | O_RDWR, 0755 ) ) == -1 ) {
+			if ( ( fd = open( rname, O_CREAT | O_RDWR, 0644 ) ) == -1 ) {
 				snprintf( err, errlen, "Failed to open file at %s: %s", rname, strerror( errno ));
 				return 0;
 			} 
