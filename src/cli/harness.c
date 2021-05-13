@@ -26,12 +26,14 @@
 	"                         a request. (GET is default)\n" \
 	"-p, --protocol <arg>     Specify alternate protocols (HTTP/1.0, 2.0, etc)\n" \
 	"-F, --form <arg>         Specify a body to use when making requests.\n" \
-	"-B, --binary <arg>       Specify a body to use when making requests. (assumes multipart)\n" \
+	"-b, --binary <arg>       Specify a body to use when making requests. (assumes multipart)\n" \
 	"                         (Use multiple invocations for additional arguments)\n" \
-	"-H, --header <arg>       Specify a header to use when making requests.\n" \
+	"-e, --header <arg>       Specify a header to use when making requests.\n" \
 	"                         (Use multiple invocations for additional arguments)\n" \
 	"-M, --multipart          Use a multipart request when using POST or PUT\n" \
 	"-S, --msg-only           Show only the message, no header info\n" \
+	"-B, --body-to <arg>      Output body to file at <arg>\n" \
+	"-H, --headers-to <arg>   Output headers to file at <arg>\n" \
 	"-v, --verbose            Be wordy.\n" \
 	"-h, --help               Show help and quit.\n"
 
@@ -51,6 +53,8 @@ struct arg {
 	int blen;
 	int hlen;
 	int msgonly;
+	char *headerf;
+	char *bodyf;
 	int dump;
 	char **headers;
 	char **body;
@@ -116,6 +120,7 @@ int main ( int argc, char * argv[] ) {
 	char *fname, err[ 2048 ] = { 0 };
 	struct cdata conn;
 	struct lconfig sconf;
+	int header_fd=1, body_fd=1;
 
 	if ( argc < 2 ) {
 		fprintf( stderr, PP ":\n%s\n", HELP );
@@ -139,13 +144,17 @@ int main ( int argc, char * argv[] ) {
 			arg.multipart = 1;
 		else if ( !strcmp( *argv, "-S" ) || !strcmp( *argv, "--msg-only" ) )
 			arg.msgonly = 1;
+		else if ( !strcmp( *argv, "-H" ) || !strcmp( *argv, "--headers-to" ) )
+			arg.headerf = *( ++argv );
+		else if ( !strcmp( *argv, "-B" ) || !strcmp( *argv, "--body-to" ) )
+			arg.bodyf = *( ++argv );
 		else if ( !strcmp( *argv, "-r" ) || !strcmp( *argv, "--random" ) )
 			arg.randomize = 1;
 		else if ( !strcmp( *argv, "-v" ) || !strcmp( *argv, "--verbose" ) )
 			arg.verbose = 1;
 		else if ( !strcmp( *argv, "-D" ) || !strcmp( *argv, "--dump" ) )
 			arg.dump = 1;
-		else if ( !strcmp( *argv, "-H" ) || !strcmp( *argv, "--headers" ) ) {
+		else if ( !strcmp( *argv, "-E" ) || !strcmp( *argv, "--headers" ) ) {
 			char * a = *( ++argv );
 			add_item( &arg.headers, a, unsigned char *, &arg.hlen );
 		}
@@ -153,7 +162,7 @@ int main ( int argc, char * argv[] ) {
 			char * a = *( ++argv );
 			add_item( &arg.body, a, unsigned char *, &arg.blen );
 		}
-		else if ( !strcmp( *argv, "-B" ) || !strcmp( *argv, "--binary" ) ) {
+		else if ( !strcmp( *argv, "-b" ) || !strcmp( *argv, "--binary" ) ) {
 			char * a = *( ++argv );
 			add_item( &arg.body, a, unsigned char *, &arg.blen ); 
 			arg.multipart = 1;
@@ -328,6 +337,29 @@ int main ( int argc, char * argv[] ) {
 	conn.ipv4 = "192.168.0.1";
 	//conn.ipv6 = '192.168.0.1';
 
+	//Open any needed files (dying if you fail to do so)
+	if ( arg.headerf ) {
+		if ( *arg.headerf	== '-' )
+			header_fd = 1;	
+		else if ( ( header_fd = open( arg.headerf, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH ) ) == -1 ) {
+			fprintf( stderr, PP ": Opening header file %s - %s", arg.headerf, strerror( errno ) ); 
+			http_free_request( &req );
+			http_free_response( &res );
+			return 1;
+		}
+	}
+
+	if ( arg.bodyf ) {
+		if ( *arg.bodyf	== '-' )
+			body_fd = 1;	
+		else if ( ( body_fd = open( arg.bodyf, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH ) ) == -1 ) {
+			fprintf( stderr, PP ": Opening body file %s - %s", arg.bodyf, strerror( errno ) ); 
+			http_free_request( &req );
+			http_free_response( &res );
+			return 1;
+		}
+	}
+
 	if ( !filter( 0, &req, &res, &conn ) ) {
 		fprintf( stderr, PP ": HTTP funct '%s' failed to execute\n", FSYMBOL );
 		write( 1, res.msg, res.mlen );
@@ -338,13 +370,19 @@ int main ( int argc, char * argv[] ) {
 	}
 
 	//Show whatever message should have come out
-	if ( !arg.msgonly ) 
-		write( 1, res.msg, res.mlen );
-	else {
-		int sp = res.mlen - res.clen;	
-		write( 1, &res.msg[ sp ], res.mlen - sp );
+	if ( arg.headerf ) {
+		write( header_fd, res.msg, res.mlen - res.clen );
 	}
-	fflush( stdout );
+
+	if ( arg.msgonly || arg.bodyf ) {
+		int sp = res.mlen - res.clen;	
+		write( body_fd, &res.msg[ sp ], res.mlen - sp );
+	}
+	else if ( !arg.headerf ) {
+		write( body_fd, res.msg, res.mlen );
+		fflush( stdout );
+	}
+
 
 	if ( dlclose( app ) == -1 ) {
 		http_free_request( &req );
@@ -356,6 +394,15 @@ int main ( int argc, char * argv[] ) {
 	//Destroy res, req and anything else allocated
 	http_free_request( &req );
 	http_free_response( &res );
+
+	//Close files
+	if ( header_fd > 2 ) {
+		close( header_fd );
+	}
+
+	if ( body_fd > 2 ) {
+		close( body_fd );
+	}
 
 	//After we're done, look at the response
 	return 0;

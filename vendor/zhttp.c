@@ -109,6 +109,7 @@ static const char *http_status[] = {
 	[HTTP_504] = "Gateway Timeout"
 };
 
+const char text_html[] = "text/html";
 
 //Set http errors
 static int set_http_error( zhttp_t *entity, HTTP_Error code ) {
@@ -242,12 +243,12 @@ static char * zhttp_msg_get_value ( const char *value, const char *chrs, unsigne
 		}
 
 		//Prepare for edge cases...
-		if ( ( bContent = malloc( end + 1 ) ) == NULL ) {
-			return ""; 
+		if ( ( bContent = malloc( len ) ) == NULL ) {
+			return NULL; 
 		}
 
 		//Prepare the raw buffer..
-		memset( bContent, 0, end + 1 );	
+		memset( bContent, 0, len );	
 		memcpy( bContent, msg, end );
 	}
 
@@ -422,7 +423,7 @@ static int parse_body( zhttp_t *entity, char *err, int errlen ) {
 	if ( memcmp( multipart, entity->ctype, strlen(multipart) ) == 0 ) {
 		char bd[ 128 ];
 		memset( &bd, 0, sizeof( bd ) );
-		sprintf( bd, "--%s", entity->boundary );
+		snprintf( bd, 64, "--%s", entity->boundary );
 		const int bdlen = strlen( bd );
 		int len1 = entity->clen, pp = 0;
 
@@ -559,7 +560,15 @@ static int parse_http_header ( zhttp_t *entity, char *err, int errlen ) {
 
 		entity->clen = clen;
 		entity->ctype = zhttp_msg_get_value( "Content-Type: ", ";\r", entity->msg, entity->hlen );
-		entity->boundary = zhttp_msg_get_value( "boundary=", "\r", entity->msg, entity->hlen );
+	#if 1
+		//This is a pretty ugly way to do this; but until I move over to all static allocations, this will have to do.
+		char *b = NULL;
+		b = zhttp_msg_get_value( "boundary=", "\r", entity->msg, entity->hlen );
+		if ( b ) {
+			memcpy( entity->boundary, b, strlen( b ) );
+			free( b );
+		}
+	#endif
 		free( clenbuf );
 	}
 	return 1;	
@@ -622,9 +631,6 @@ zhttp_t * http_finalize_request ( zhttp_t *entity, char *err, int errlen ) {
 	zhttpr_t **body = entity->body;
 	char clen[ 32 ] = {0};
 
-	if ( entity->boundary )
-		free( entity->boundary );
-
 	if ( !entity->protocol )
 		entity->protocol = "HTTP/1.1";
 
@@ -645,8 +651,10 @@ zhttp_t * http_finalize_request ( zhttp_t *entity, char *err, int errlen ) {
 		}
 
 		if ( ( multipart = ( memcmp( entity->ctype, "multi", 5 ) == 0 ) ) ) {
-			entity->boundary = zhttp_rand_chars( 32 );
+			char *b = zhttp_rand_chars( 32 );
+			memcpy( entity->boundary, b, strlen( b ) );
 			memset( entity->boundary, '-', 6 );
+			free( b );
 		}
 	}
 
@@ -757,7 +765,6 @@ zhttp_t * http_finalize_request ( zhttp_t *entity, char *err, int errlen ) {
 
 	free( msg );
 	free( hmsg );
-	//free( entity->boundary );
 	return entity;
 }
 
@@ -787,7 +794,6 @@ zhttp_t * http_finalize_response ( zhttp_t *entity, char *err, int errlen ) {
 		return NULL;
 	}
 
-	//ZHTTP_PRINTF( "HTTP BODY ptr: %p, size: %d\n", (*entity->body)->value, (*entity->body)->size ); 
 	if ( body && *body && ( !(*body)->value || !(*body)->size ) ) {
 		snprintf( err, errlen, "%s", "No body length specified with response." );
 		return NULL;
@@ -828,8 +834,7 @@ zhttp_t * http_finalize_response ( zhttp_t *entity, char *err, int errlen ) {
 		return NULL;
 	}
 
-	entity->msg = msg;
-	entity->mlen = msglen;
+	entity->msg = msg, entity->mlen = msglen;
 	return entity;
 }
 
@@ -849,7 +854,6 @@ char * http_set_char( char **k, const char *v ) {
 //...
 void * http_set_record
  ( zhttp_t *entity, zhttpr_t ***list, int type, const char *k, unsigned char *v, int vlen, int free ) {
-	int len = 0;
 	zhttpr_t *r = NULL;
 
 	//Block bad types in lieu of an enum
@@ -860,23 +864,17 @@ void * http_set_record
 	if ( !k || ( !v && vlen < 0 ) )
 		return NULL;
 
-	//We use entity->boundary as a hack to store the current index.
-	if ( !entity->boundary ) {
-		entity->boundary = malloc( 4 );
-		memset( entity->boundary, 0, 4 );
-	}
-
 	//Create a record
 	if ( !( r = malloc( sizeof( zhttpr_t ) ) ) ) {
 		return NULL;
 	}
 
 	//Set the members
-	len = entity->boundary[ type ];
-	r->field = zhttp_dupstr( k ), r->size = vlen, r->value = v;
-
+	int len = 0;
+	len = entity->lengths[ type ];
+	r->field = zhttp_dupstr( k ), r->size = vlen, r->value = v, r->free = free;
 	zhttp_add_item( list, r, zhttpr_t *, &len );
-	entity->boundary[ type ] = len; //entity->size = vlen;
+	entity->lengths[ type ] = len; //entity->size = vlen;
 	return r;
 }
 
@@ -885,7 +883,7 @@ void * http_set_record
 static void http_free_records( zhttpr_t **records ) {
 	zhttpr_t **r = records;
 	while ( r && *r ) {
-		if ( *(*r)->field == '.' || (*r)->free ) {
+		if ( (*r)->free ) {
 			free( (*r)->value );
 		}
 
@@ -914,13 +912,6 @@ void http_free_body ( zhttp_t *entity ) {
 	entity->host ? free( entity->host ) : 0;
 	entity->method ? free( entity->method ) : 0;
 	entity->protocol ? free( entity->protocol ) : 0;
-	#if 0
-	//TODO: This is causing some problems, and I'm unsure why...
-	if ( entity->boundary ) {
-		fprintf( stderr, "eb is: %p\n", entity->boundary );
-		free( entity->boundary );
-	}
-	#endif
 
 	http_free_records( entity->headers );
 	http_free_records( entity->url );
@@ -939,20 +930,9 @@ int http_set_error ( zhttp_t *entity, int status, char *message ) {
 	memset( err, 0, sizeof( err ) );
 	ZHTTP_PRINTF( "status: %d, mlen: %ld, msg: '%s'\n", status, strlen(message), message );
 
-	if ( !http_set_status( entity, status ) ) {
-		ZHTTP_PRINTF( "SET STATUS FAILED!" );
-		return 0;
-	}
-
-	if ( !http_set_ctype( entity, "text/html" ) ) {
-		ZHTTP_PRINTF( "SET CONTENT FAILED!" );
-		return 0;
-	}
-
-	if ( !http_copy_content( entity, (unsigned char *)message, strlen( message ) ) ) {
-		ZHTTP_PRINTF( "SET CONTENT FAILED!" );
-		return 0;
-	}
+	http_set_status( entity, status );
+	http_set_ctype( entity, text_html );
+	http_copy_content( entity, (unsigned char *)message, strlen( message ) );
 
 	if ( !http_finalize_response( entity, err, sizeof(err) ) ) {
 		ZHTTP_PRINTF( "FINALIZE FAILED!: %s", err );

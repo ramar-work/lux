@@ -80,9 +80,9 @@
 	
 #define http_set_host(ENTITY,VAL) \
 	http_set_char( &(ENTITY)->host, VAL )
-	
+
 #define http_set_content(ENTITY,VAL,VLEN) \
-	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", VAL, VLEN, 1 )
+	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", VAL, VLEN, 0 )
 
 #define http_copy_content(ENTITY,VAL,VLEN) \
 	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", zhttp_dupblk((unsigned char *)VAL, VLEN), VLEN, 1 )
@@ -90,16 +90,14 @@
 #define http_copy_tcontent(ENTITY,VAL) \
 	http_set_record( ENTITY, &(ENTITY)->body, 1, ".", zhttp_dupstr(VAL), strlen(VAL), 1 )
 
-
 #define http_set_formvalue(ENTITY,KEY,VAL,VLEN) \
-	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, VAL, VLEN, 1 )
+	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, VAL, VLEN, 0 )
 
 #define http_copy_formvalue(ENTITY,KEY,VAL,VLEN) \
 	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, zhttp_dupblk((unsigned char *)VAL, VLEN), VLEN, 1 )
 
 #define http_copy_tformvalue(ENTITY,KEY,VAL) \
 	http_set_record( ENTITY, &(ENTITY)->body, 1, KEY, zhttp_dupstr(VAL), strlen(VAL), 1 )
-
 
 #define http_set_header(ENTITY,KEY,VAL) \
 	http_set_record( ENTITY, &(ENTITY)->headers, 0, KEY, (unsigned char *)VAL, strlen(VAL), 0 )
@@ -109,7 +107,6 @@
 
 #define http_copy_theader(ENTITY,KEY,VAL) \
 	http_set_record( ENTITY, &(ENTITY)->headers, 0, KEY, zhttp_dupstr(VAL), strlen(VAL), 1 )
-
 
 #define http_set_uripart(ENTITY,KEY,VAL) \
 	http_set_record( ENTITY, &(ENTITY)->url, 2, KEY, (unsigned char *)VAL, strlen(VAL), 0 )
@@ -223,7 +220,8 @@ typedef struct HTTPBody {
 	char *host;
 	char *method;
 	char *protocol;
-	char *boundary;
+	char boundary[ 128 ];
+	char lengths[ 4 ];
 	int clen;  //content length
 	int mlen;  //message length (length of the entire received message)
 	int	hlen;  //header length
@@ -259,6 +257,8 @@ void *http_set_record( zhttp_t *, zhttpr_t ***, int, const char *, unsigned char
 int http_set_error ( zhttp_t *entity, int status, char *message );
 
 unsigned char * zhttp_dupblk( const unsigned char *v, int vlen ) ;
+
+unsigned char *zhttp_append_to_uint8t ( unsigned char **, int *, unsigned char *, int );
 
 #ifdef DEBUG_H
  void print_httprecords ( zhttpr_t ** );

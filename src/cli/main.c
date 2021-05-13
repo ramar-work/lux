@@ -264,7 +264,7 @@ int cmd_libs( struct values *v, char *err, int errlen ) {
 
 		//Look for the symbol 'app'
 		if ( !( f->filter = dlsym( lib, appn ) ) ) {
-			fprintf( stderr, "dlsym app error: %s: %s\n", fpath, strerror( errno ) );
+			fprintf( stderr, "dlsym app error: %s\n", dlerror() );
 			dlclose( lib );
 			continue;
 		}
@@ -466,9 +466,6 @@ int main (int argc, char *argv[]) {
 		eprintf( "%s", err );
 		return 1;
 	}
-
-fprintf( stderr, "%s\n", values.libdir );
-exit( 0);
 
 	//Dump the configuration if necessary
 	if ( values.dump ) {
