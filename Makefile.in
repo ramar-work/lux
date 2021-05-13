@@ -125,8 +125,11 @@ debug-gcc: main
 # install - Installs targets to $PREFIX/{bin,share} and /var/lib
 install:
 	cp $(srcdir)/bin/* $(PREFIX)/bin/
-	cp -r $(srcdir)/share $(PREFIX)/share/$(NAME)
-	mkdir /var/lib/$(NAME)/
+	-test -d $(PREFIX)/share/$(NAME)/ || mkdir -p $(PREFIX)/share/$(NAME)/
+	test -d $(PREFIX)/share/$(NAME)/
+	cp $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
+	-test -d /var/lib/$(NAME)/ || mkdir /var/lib/$(NAME)/
+	test -d /var/lib/$(NAME)/
 	cp $(srcdir)/lib/* /var/lib/$(NAME)/
 	chown -R $(USER):$(GROUP) /var/lib/$(NAME)/
 
