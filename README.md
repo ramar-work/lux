@@ -154,6 +154,7 @@ $ tar xzf lua-5.3.6.tar.gz && cd lua-5.3.6
 $ make macosx && make install
 </pre>
 
+
 #### Building Hypno
 
 Building Hypno now will be simliar to other Linux based builds.
@@ -189,6 +190,60 @@ $ make examples
 
 
 ## Usage
+
+
+### App Development
+
+Hypno's greatest use is as a general purpose web application server.  It can be extended to serve applications in a variety of languages, but first and foremost relies on Lua for the generation of what we'll call models.  For those familiar with the concept of MVC, a model is nothing more than a set of business logic.   Views by default are handled with a Mustache-esque (<a href="https://mustache.github.io">Mustache</a>) templating language.  
+
+Hypno relies on three tools to work together in tandem: a server (hypno-server), a cli tool for administration (hypno-cli), and a testing engine (hypno-harness).   More information can be found #here, #here and #here. 
+
+The folllowing command will create a new instance for your web application.
+
+<pre>
+$ hypno-cli -d /path/to/your/directory
+</pre>
+
+There are some additional options that will allow you to customize the domain name used, any static paths, and more.
+
+If we `cd` into the newly created directory, we'll have a simple structure that looks something like this:
+
+<pre>
+app/
+assets/
+config.example.lua
+config.lua
+db/
+favicon.ico
+lib/
+misc/
+private/
+ROBOTS.TXT
+sql/
+src/
+views/
+</pre>
+
+Each one of the folders serves its own purpose, but that is slightly beyond the scope of this initial documentation.  See #here for more.
+
+
+### Configuration
+
+The file `config.lua` contains the application's title, fully qualified domain name, routes (manually specified) and a database connector depending on what kind of backend is in use (see #connectors for more info).  It also specifies some default static paths that are needed for a majority of front-facing web applications.  These are `favicon.ico`, ROBOTS.TXT and anything under the `assets/` directory.  Editing the `/assets` path will, of course, modify which resources are accessible.  (See #more here) 
+
+### Models
+
+Most any Lua code can be used when writing business logic, and packages can be installed via LuaRocks for extended functionality.  Additionally, Hypno comes with a large set of extensions that allow for a more cohesive experience when doing certain operations.  For example, the db module allows for fairly seamless (though simplistic one-time) connections to a few different dbms systems.   Sessions and common encoding/decoding routines also ship with Hypno, so unless there is a need for an encoding that does not exist, the engine will be able to serve most needs.
+
+
+### Views
+
+### Extensions
+
+### SQL 
+
+
+## Tech Details
 
 ### Server
 

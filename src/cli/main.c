@@ -232,7 +232,7 @@ int cmd_libs( struct values *v, char *err, int errlen ) {
 
 	//Open directory
 	if ( !( dir = opendir( v->libdir ) ) ) {
-		snprintf( err, errlen, "%s", strerror( errno ) );
+		snprintf( err, errlen, "lib fail: %s", strerror( errno ) );
 		return 0;
 	}
 

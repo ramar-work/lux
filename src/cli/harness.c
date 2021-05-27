@@ -180,9 +180,8 @@ int main ( int argc, char * argv[] ) {
 	}
 
 	//Catch any problems
-	if ( !arg.method ) {
-		arg.method = "GET";
-	}
+	if ( !arg.method )
+		arg.method = ( arg.body ) ? "POST" : "GET";
 	else if ( !method_is_valid( arg.method ) ) {
 		fprintf( stderr, PP ": Wrong method requested: %s\n", arg.method );
 		return 1;

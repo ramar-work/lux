@@ -44,7 +44,7 @@ CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security $(IFLAGS)
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
 	-Wno-format-truncation -Wno-return-local-addr -O2 $(IFLAGS)
 
-CFLAGS = $(GCCFLAGS)
+#CFLAGS = $(GCCFLAGS)
 
 CC = gcc
 
