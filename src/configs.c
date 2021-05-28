@@ -23,7 +23,7 @@ static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
 	zTable *st = NULL, *nt = NULL;
 
 	//If current index is a table
-	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
+	if ( kv->key.type == ZTABLE_TXT && kv->value.type == ZTABLE_TBL && f->depth == 2 ) {
 		struct lconfig *w = malloc( sizeof( struct lconfig ) );
 		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
 		//FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count ); 
@@ -200,7 +200,7 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 	}
 
 	//Convert configuration into a table
-	if ( !lua_to_table( L, 1, t ) ) {
+	if ( !lua_to_ztable( L, 1, t ) ) {
 		snprintf( err, errlen, "Failed to convert Lua config data to table.\n" );
 		free_t( t );
 		free( config );

@@ -1,7 +1,7 @@
 //Compile me with: 
 //gcc -ldl -lpthread -o router vendor/single.o vendor/sqlite3.o router.c && ./router
 #include "../../vendor/zwalker.h"
-#include "../../vendor/zhasher.h"
+#include "../../vendor/ztable.h"
 #include "../util.h"
 #include "../router.h"
 

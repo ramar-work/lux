@@ -43,7 +43,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
+#include "../vendor/ztable.h"
 #include "../util.h"
 
 #define NAME "hypno-cli"
@@ -152,7 +152,7 @@ struct kv * replace ( unsigned char *f ) {
 				f1++;
 				for ( struct kset *k = kset; k->key; k++ ) {
 					if ( !memcmp( f1, k->key, k->len ) ) {
-						p->size = strlen( *k->ptr ), p->value = (uint8_t *)*k->ptr;
+						p->size = strlen( *k->ptr ), p->value = (unsigned char *)*k->ptr;
 					}
 				}
 			}

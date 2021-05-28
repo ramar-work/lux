@@ -49,6 +49,8 @@
 #endif
 
 
+static const char def_mimetype[] = "application/octet-stream";
+
 char *getExtension ( char *filename ) {
 	char *extension = &filename[ strlen( filename ) ];
 	int fpathlen = strlen( filename );
@@ -94,14 +96,10 @@ unsigned char * getdoc ( const char *path ) {
 const int filter_static ( int dd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
 	(void)dd;
 	struct stat sb;
-	int fd = 0;
-	int size = 0;
-	char err[ 2048 ] = { 0 };
-	char fpath[ 2048 ] = { 0 };
-	char *fname = rq->path;
-	char *extension = NULL;
-	const char *mimetype_default = mmtref( "application/octet-stream" );
-	const char *mimetype = NULL;
+	int fd = 0, size = 0;
+	char err[ 2048 ] = {0}, fpath[ 2048 ] = {0};
+	char *extension = NULL, *fname = rq->path;
+	struct mime_t *mimetype = (struct mime_t *)zmime_get_default();
 	uint8_t *content = NULL;
 	struct lconfig *host = conn->hconfig;
 
@@ -127,11 +125,10 @@ const int filter_static ( int dd, struct HTTPBody *rq, struct HTTPBody *rs, stru
 
 	//Crudely check the extension before serving.
 	//FPRINTF( "Made request for file at path: %s\n", fpath );
-	mimetype = mimetype_default;
+	//mimetype = mimetype_default;
 	if ( ( extension = getExtension( fpath ) ) ) {
-		extension++;
-		if ( ( mimetype = mmimetype_from_file( extension ) ) == NULL ) {
-			mimetype = mimetype_default;
+		if ( !( mimetype = (struct mime_t *)zmime_get_by_extension( ++extension ) ) ) {
+			mimetype = (struct mime_t *)zmime_get_default();
 		}
 	}
 	
@@ -179,7 +176,7 @@ const int filter_static ( int dd, struct HTTPBody *rq, struct HTTPBody *rs, stru
 
 	//Just set content messages...
 	http_set_status( rs, 200 );
-	http_set_ctype( rs, mimetype );
+	http_set_ctype( rs, mimetype->mimetype );
 	http_set_content( rs, content, size ); 
 
 	if ( !http_finalize_response( rs, err, sizeof( err ) ) ) {

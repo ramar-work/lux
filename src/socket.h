@@ -41,7 +41,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
+#include "../vendor/ztable.h"
 
 #ifndef SOCKET_H
 #define SOCKET_H

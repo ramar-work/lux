@@ -39,11 +39,11 @@
 #include <gnutls/gnutls.h>
 #include <sys/stat.h>
 #include <stddef.h>
-#include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
-#include "socket.h"
-#include "server.h"
-#include "util.h"
+#include <zwalker.h>
+#include <ztable.h>
+#include "../socket.h"
+#include "../server.h"
+#include "../util.h"
 
 #ifndef CTXHTTPS_H
 #define CTXHTTPS_H

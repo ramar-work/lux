@@ -32,13 +32,13 @@
  * ----------
  * 
  * -------------------------------------------------------- */
-#include "luabind.h"
+#include <zhttp.h>
+#include <zwalker.h>
+#include <ztable.h>
+#include "lua.h"
 #include "socket.h"
 #include "util.h"
 #include "configs.h"
-#include "../vendor/zhttp.h"
-#include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
 
 #ifndef SERVER_H
 #define SERVER_H

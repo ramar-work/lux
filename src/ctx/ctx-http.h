@@ -38,9 +38,9 @@
  * 
  * ------------------------------------------- */
 #include <time.h>
-#include "socket.h"
-#include "server.h"
-#include "../vendor/zhttp.h"
+#include <zhttp.h>
+#include "../socket.h"
+#include "../server.h"
 
 #ifndef CTXHTTP_H
 #define CTXHTTP_H

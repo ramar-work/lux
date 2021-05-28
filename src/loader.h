@@ -32,7 +32,7 @@
  * ---------
  * No entries yet.
  * ------------------------------------------- */
-#include "../vendor/zhasher.h"
+#include "../vendor/ztable.h"
 #include "util.h"
 
 #ifndef LOADER_H

@@ -1,19 +1,13 @@
 //util.c
 #include "util.h"
 
-//Print binary data (in hex) using name of variable as key
-#define nbprintf(v, n) \
-	fprintf (stderr,"%-30s: ", k); \
-	for (int i=0; i < n; i++) fprintf( stderr, "%02x", v[i] ); \
-	fprintf (stderr, "\n")
 
-
-uint8_t * srand_uint8t( uint8_t *src, int srclen, uint8_t *buf, int buflen ) {
+unsigned char * srand_uint8t( unsigned char *src, int srclen, unsigned char *buf, int buflen ) {
 	if ( !buf || !memset( buf, 0, buflen ) ) { 
 		return NULL;
 	}
 	
-	uint8_t *b = buf;
+	unsigned char *b = buf;
 	srclen -= 1;
 
 	while ( --buflen ) {
@@ -27,10 +21,10 @@ uint8_t * srand_uint8t( uint8_t *src, int srclen, uint8_t *buf, int buflen ) {
 
 
 //TODO: None of these should take an error buffer.  They are just utilities...
-uint8_t *read_file ( const char *filename, int *len, char *err, int errlen ) {
+unsigned char *read_file ( const char *filename, int *len, char *err, int errlen ) {
 	//Check for and load whatever file
 	int fd, fstat, bytesRead, fileSize;
-	uint8_t *buf = NULL;
+	unsigned char *buf = NULL;
 	struct stat sb;
 	memset( &sb, 0, sizeof( struct stat ) );
 
@@ -146,7 +140,7 @@ char *get_lstr( char **str, char chr, int *lt ) {
 
 
 //Extract value (a simpler code that can be used to grab values)
-char *msg_get_value ( const char *value, const char *chrs, uint8_t *msg, int len ) {
+char *msg_get_value ( const char *value, const char *chrs, unsigned char *msg, int len ) {
 	int start=0, end=0;
 	char *bContent = NULL;
 
@@ -185,7 +179,7 @@ char *msg_get_value ( const char *value, const char *chrs, uint8_t *msg, int len
 
 
 //Just copy the key
-char *copystr ( uint8_t *src, int len ) {
+char *copystr ( unsigned char *src, int len ) {
 	len++;
 	char *dest = malloc( len );
 	memset( dest, 0, len );
@@ -194,7 +188,7 @@ char *copystr ( uint8_t *src, int len ) {
 }
 
 
-uint8_t *append_to_uint8t ( uint8_t **dest, int *len, uint8_t *src, int srclen ) {
+unsigned char *append_to_uint8t ( unsigned char **dest, int *len, unsigned char *src, int srclen ) {
 	if ( !( *dest = realloc( *dest, (*len) + srclen ) ) ) {	
 		return NULL;
 	}
@@ -216,11 +210,11 @@ char *append_strings_to_char (char **dest, int *len, char *delim, ... ) {
 	p = va_arg( args, char * );
 
 	while ( p ) { 
-		if ( delim && !append_to_uint8t( (uint8_t **)dest, len, (uint8_t *)delim, strlen( delim ) ) ) {
+		if ( delim && !append_to_uint8t( (unsigned char **)dest, len, (unsigned char *)delim, strlen( delim ) ) ) {
 			return NULL;
 		}
 
-		if ( !append_to_uint8t( (uint8_t **)dest, len, (uint8_t *)p, strlen( p ) ) ) {
+		if ( !append_to_uint8t( (unsigned char **)dest, len, (unsigned char *)p, strlen( p ) ) ) {
 			return NULL;
 		}
 
@@ -228,7 +222,7 @@ char *append_strings_to_char (char **dest, int *len, char *delim, ... ) {
 	} 
 
 	va_end( args );
-	return (char *)append_to_uint8t( (uint8_t **)dest, len, (uint8_t *)"\0", 1 );
+	return (char *)append_to_uint8t( (unsigned char **)dest, len, (unsigned char *)"\0", 1 );
 }
 #endif
 
@@ -258,9 +252,9 @@ void * add_item_to_list( void ***list, void *element, int size, int * len ) {
 }
 
 //Trim any characters 
-unsigned char *trim (uint8_t *msg, char *trim, int len, int *nlen) {
+unsigned char *trim (unsigned char *msg, char *trim, int len, int *nlen) {
 	//Define stuff
-	uint8_t *m = msg;
+	unsigned char *m = msg;
 	int nl= len;
 	//Move forwards and backwards to find whitespace...
 	while ( memchr(trim, *(m + ( nl - 1 )), 4) && nl-- ) ; 

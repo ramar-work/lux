@@ -66,21 +66,36 @@
  * ------------------------------------------------------- */
 #include "zrender.h"
 
+typedef enum error {
+	ZRENDER_NONE
+,	ZRENDER_MALLOC
+, ZRENDER_SYNTAX_END_BEFORE_START
+} zRenderError;
+
+static const char *errors[] = {
+	[ ZRENDER_NONE ] = "No errors."
+,	[ ZRENDER_MALLOC ] = "Memory allocation error."
+, [ ZRENDER_SYNTAX_END_BEFORE_START ] = "Loop end sequence detected at line %d, but no loop start found\n"
+};
+
 //Write full path to a node
-static char * lookup_xmap ( struct xmap *xp ) {
+static char * lookup_xmap ( struct xmap *xp, char *xb, int xblen ) {
 	struct xdesc *tp = xp->parent;	
 	int px = 0, len = 0;
 	struct parent { int l, i; char *c; } parents[ 64 ] = { 0 };
 
 	//Really should check this...
-	char *e, *d = malloc( 1024 );
-	memset( d, 0, 1024 );
-	e = d;
+	char e[xblen];
+	char *d = memset(e, 0, xblen);
+	//e = d;
 
 	//Move backwards among parents until we reach the top
 	while ( tp->pxmap ) {
 		struct parent *x = &parents[ px ];
-		x->c = (char *)(tp->pxmap)->ptr, x->l = (tp->pxmap)->len, x->i = tp->index, px++;
+		x->c = (char *)(tp->pxmap)->ptr; 
+		x->l = (tp->pxmap)->len; 
+		x->i = tp->index; 
+		px++;
 		tp = (tp->pxmap)->parent;
 	}
 
@@ -95,8 +110,11 @@ static char * lookup_xmap ( struct xmap *xp ) {
 	//Add the last key
 	memcpy( d, xp->ptr, xp->len ) ? d += xp->len, len += xp->len : 0; 
 
+	//TODO: This is an extra step
+	memcpy( xb, e, len ); 
+
 	//Write the whole thing
-	return e;
+	return xb;
 }
 
 
@@ -150,6 +168,20 @@ static struct xmap * init_xmap() {
 	return ( !p ) ? NULL : memset( p, 0, sizeof( struct xmap ) ); 
 }
 
+//Clone xmap?
+static struct xmap * clone_xmap( struct xmap *x ) {
+	struct xmap * p = malloc ( sizeof( struct xmap ) );
+	if ( !p ) {
+		return NULL; 
+	}
+	memset( p, 0, sizeof( struct xmap ) ); 
+	p->ptr = x->ptr;
+	p->parent = x->parent;
+	p->len = x->len;
+	p->type = x->type;
+	return p;
+}
+
 
 //Destroy the premap
 static void free_premap( struct premap **premap ) {
@@ -166,6 +198,9 @@ static void free_premap( struct premap **premap ) {
 static void free_xmap( struct xmap **map ) {
 	struct xmap **p = map;
 	while ( p && *p ) {
+		if ( (*p)->free ) {
+			free( (*p)->ptr );
+		}
 		free( *p );
 		p++;
 	}
@@ -176,18 +211,25 @@ static void free_xmap( struct xmap **map ) {
 //Hmm, this works for tables, but not for any other data structure....
 static void extract_value ( zRender *rz, int hash, struct xmap *xp ) {
 	zKeyval *lt = lt_retkv( rz->userdata, hash );
-	if ( lt->value.type == LITE_TXT && lt->value.v.vchar != NULL )
-		xp->len = strlen( lt->value.v.vchar ), xp->ptr = (unsigned char *)lt->value.v.vchar;
-	else if ( lt->value.type == LITE_BLB )
-		xp->len = lt->value.v.vblob.size, xp->ptr = lt->value.v.vblob.blob;
-	else if ( lt->value.type == LITE_INT ) {
+	if ( lt->value.type == ZTABLE_TXT && lt->value.v.vchar != NULL ) {
+		xp->len = strlen( lt->value.v.vchar ); 
+		xp->ptr = (unsigned char *)lt->value.v.vchar;
+	}
+	else if ( lt->value.type == ZTABLE_BLB ) {
+		xp->len = lt->value.v.vblob.size; 
+		xp->ptr = lt->value.v.vblob.blob; 
+		xp->free = 0;
+	}
+	else if ( lt->value.type == ZTABLE_INT ) {
 		char intptr[32] = {0}; 
-		xp->len = snprintf( intptr, sizeof(intptr), "%d", lt->value.v.vint ); 
+		xp->len = snprintf( intptr, sizeof( intptr ), "%d", lt->value.v.vint ); 
 		xp->ptr = (unsigned char *)strdup( intptr );
+		xp->free = 1;
 	}
 	else {
 		xp->ptr = (unsigned char *)"";
-		xp->len = 0; 
+		xp->len = 0;
+		xp->free = 0; 
 	}
 }
 
@@ -238,6 +280,12 @@ const char * zrender_strerror( zRender *z ) {
 }
 
 
+int zrender_set_error( zRender *z, zRenderError e ) {
+	//vsnprintf( z->errmsg, ZRENDER_ERR_BUFLEN, errors[ e ] );
+	z->error = e; 
+	return -1;
+} 
+
 
 //Use the default templating language (mustache)
 void zrender_set_default_dialect( zRender *rz ) {
@@ -286,6 +334,7 @@ int zrender_set_marks( zRender *rz, const unsigned char *src, unsigned int srcle
 				//TODO: Add exact positioning later
 				const char fmt[] = "Loop end sequence detected at line %d, but no loop start found\n";
 				snprintf( rz->errmsg, 1024, fmt, nl ); 
+				
 				return 0;	
 			}
 			#endif
@@ -325,111 +374,95 @@ int zrender_convert_marks( zRender *rz ) {
 	struct premap **pmap = rz->premap;
 	struct xmap **xmap = NULL;
 	struct xdesc xdarray[32], *xdptr = memset( xdarray, 0, sizeof( struct xdesc ) * 32 );
-	int xmaplen = 0;
-
+	const struct xdesc *zdptr = xdptr;
+	
 	//Loop through all premaps
-	while ( pmap && *pmap ) {
+	for ( int nlen = 0, hash = -1, xmaplen = 0, render = 1; pmap && *pmap; ) {
 		struct xmap *xp = init_xmap();
 		struct premap *pp = *pmap;
+		unsigned char *t = NULL;
+		char xb[ 1024 ] = { 0 };
 		xp->parent = NULL;
-		
+
 		//Raw write first
-		if ( *pp->ptr != '{' )
-			xp->type = RW, xp->len = pp->len, xp->ptr = pp->ptr, pmap++;
-		else {
-			int nlen = 0, hash = -1;
-			unsigned char *t = zr_trim( pp->ptr, "{} ", pp->len, &nlen );
-	
-			//LOOP START	
-			if ( ( xp->type = rz->xmapset[ *t ] ) == LS ) {
-				//These are set so that we'll know which ref to look at
-				//This also needs only be done ONE time (the first time it's encountered)
-				xp->ptr = zr_trim( t, "# ", nlen, &nlen );
-				xp->len = nlen; 
-				xp->parent = xdptr;
-				if ( *xp->ptr != '.' )
-					hash = lt_get_long_i( rz->userdata, xp->ptr, xp->len );
-				else {
-					char *lookup = lookup_xmap( xp );
-					hash = lt_geti( rz->userdata, lookup );
-					free( lookup ); //rebuillding each time is going to get repetitive
-				}
-#if 0
-fprintf( stderr, "PARENT at first LS: %p, '", xp->parent );
-write( 2, xp->ptr, xp->len ); 
-write( 2, "'\n", 2 ); 
-#endif
-				if ( hash != -1 ) {
-					//get the data at that point
-					xdptr++;
-					xdptr->children = lt_counti( rz->userdata, hash );
-					//xdptr->index = !xdptr->index ? 0 : xdptr->index; 
-					xdptr->pxmap = xp;
-					xdptr->cxmap = pmap;
-#if 0
-fprintf( stderr, "LOOPSTART: pmap: %p, %p\n", pmap, xdptr->cxmap ); 
-fprintf( stderr, "LOOPSTART: children: %d, index: %d\n", xdptr->children, xdptr->index ); 
-#endif
-				}
+		if ( *pp->ptr != '{' ) {
+			if ( !render ) 
+				free( xp );
+			else {
+				xp->type = RW, xp->len = pp->len, xp->ptr = pp->ptr; 
+				zr_add_item( &xmap, xp, struct xmap *, &xmaplen );
+			}
+			pmap++;
+			continue;
+		}
+
+		//Get the "magic" character
+		t = zr_trim( pp->ptr, "{} ", pp->len, &nlen );
+		xp->type = rz->xmapset[ *t ];
+
+		if ( xp->type == LE ) {
+			xp->len = 0, xp->ptr = NULL, xp->parent = xdptr, xdptr->index++;
+			if ( xdptr->index < xdptr->children ) 
+				pmap = xdptr->cxmap;
+			else {
+				xdptr->index = 0;
 				pmap++;
 			}
-			//LOOP END
-			else if ( xp->type == LE ) {
-				xp->len = 0, xp->ptr = NULL, xp->parent = xdptr, xdptr->index++;
-#if 0
-fprintf( stderr, "LOOPEND(1): pmap: %p, %p\n", pmap, xdptr->cxmap ); 
-#endif
-				if ( xdptr->index < xdptr->children ) 
-					pmap = xdptr->cxmap;
-				else {
-					xdptr->index = 0;
-					pmap++;
-				}
-#if 0
-fprintf( stderr, "LOOPEND(2): pmap: %p, %p\n", pmap, xdptr->cxmap );
-#endif
+			//TODO: This needs a proper fix.  All this does is cure the symptom...
+			if ( xdptr != zdptr ) {	
 				xdptr--;
 			}
-			else if ( xp->type == SX ) {
-				xp->len = nlen, xp->ptr = t;
-				if ( ( hash = lt_get_long_i( rz->userdata, xp->ptr, xp->len ) ) == -1 ) 
-					xp->len = 0, xp->ptr = NULL;
-				else {
-					extract_value( rz, hash, xp );
-				}
-				pmap++;
-			}
-			else if ( xp->type == CX ) {
-				//if we're not in a loop, you should stop
-				xp->len = nlen, xp->ptr = t, xp->parent = xdptr;
-
-				//find the full lookup string
-				char *lookup = lookup_xmap( xp );
-				hash = lt_geti( rz->userdata, lookup );
-#if 0
-fprintf( stderr, "CX LOOKUP: %s (%d)\n", lookup, hash );
-#endif
-				//then get the hash
-				if ( hash == -1 ) 
-					xp->len = 0, xp->ptr = NULL;
-				else {
-					extract_value( rz, hash, xp );
-					xp->parent = xdptr;
-				}
-
-				//Free and move pointer up
-				free( lookup );
-				pmap++;
-			}
-#if 0
-			else if ( xp->type == BL )
-			else if ( xp->type == EK )
-			else if ( xp->type == EK )
-#endif
-			else {
-				xp->len = 1, xp->ptr = t, xp->parent = NULL, pmap++;
-			}
+			render = 1;
 		}
+		else if ( xp->type == LS ) {
+			xp->ptr = zr_trim( t, "# ", nlen, &nlen ), xp->parent = xdptr, xp->len = nlen; 
+			if ( *xp->ptr != '.' )
+				hash = lt_get_long_i( rz->userdata, xp->ptr, xp->len );
+			else {
+				hash = lt_geti( rz->userdata, lookup_xmap( xp, xb, sizeof( xb ) ) );
+			}
+
+			if ( hash == -1 ) 
+				render = 0;
+			else {
+				//get the data at that point
+				xdptr++;
+				xdptr->children = lt_counti( rz->userdata, hash );
+				//xdptr->index = !xdptr->index ? 0 : xdptr->index; 
+				xdptr->pxmap = xp;
+				xdptr->cxmap = pmap;
+			}
+			pmap++;
+		}
+		else if ( xp->type == SX ) {
+			xp->len = nlen, xp->ptr = t;
+			if ( ( hash = lt_get_long_i( rz->userdata, xp->ptr, xp->len ) ) == -1 ) 
+				xp->len = 0, xp->ptr = NULL;
+			else {
+				extract_value( rz, hash, xp );
+			}
+			pmap++;
+		}
+		else if ( xp->type == CX ) {
+			xp->len = nlen, xp->ptr = t, xp->parent = xdptr;
+			if ( ( hash = lt_geti( rz->userdata, lookup_xmap( xp, xb, sizeof( xb ) ) ) ) == -1 )
+				xp->len = 0, xp->ptr = NULL;
+			else {
+				extract_value( rz, hash, xp );
+				xp->parent = xdptr;
+			}
+
+			pmap++;
+		}
+#if 0
+		else if ( xp->type == BL )
+		else if ( xp->type == EK )
+		else if ( xp->type == EK )
+#endif
+		else {
+			xp->len = 1, xp->ptr = t, xp->parent = NULL, pmap++;
+		}
+		
 		zr_add_item( &xmap, xp, struct xmap *, &xmaplen );
 	}
 
@@ -559,9 +592,10 @@ void print_premap ( struct premap **p ) {
 void print_xmap ( struct xmap **p ) {
 	while ( p && *p ) {
 		fprintf( stderr, "%p => ", *p );
-		fprintf( stderr, "%-10s, ", print_xmap_type( (*p)->type ) );
-		fprintf( stderr, "%3d, ", (*p)->len );
-		fprintf( stderr, "%-15p, ", (*p)->parent );
+		fprintf( stderr, "type: %-10s, ", print_xmap_type( (*p)->type ) );
+		fprintf( stderr, "len : %4d, ", (*p)->len );
+		fprintf( stderr, "par: %-15p, ", (*p)->parent );
+		fprintf( stderr, "con: " );
 		write( 2, (*p)->ptr, (*p)->len < XMAP_DUMP_LEN ? (*p)->len : XMAP_DUMP_LEN );
 		write( 2, "...\n", 4 );
 		if ( (*p)->parent ) {

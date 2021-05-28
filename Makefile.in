@@ -35,7 +35,7 @@ GROUP = http
 # Everything else
 IFLAGS = -Ivendor -I/usr/include/lua5.3
 
-LDFLAGS = -ldl -lpthread
+LDFLAGS = -ldl -lpthread -lgnutls
 
 DEBUGFLAGS = -DDEBUG_H
 
@@ -44,30 +44,32 @@ CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security $(IFLAGS)
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
 	-Wno-format-truncation -Wno-return-local-addr -O2 $(IFLAGS)
 
-#CFLAGS = $(GCCFLAGS)
+CFLAGS = $(GCCFLAGS)
 
 CC = gcc
 
 SRC = \
 	@srcdir@/vendor/sqlite3.c \
 	@srcdir@/vendor/zrender.c \
-	@srcdir@/vendor/zhasher.c \
+	@srcdir@/vendor/ztable.c \
 	@srcdir@/vendor/zwalker.c \
 	@srcdir@/vendor/zhttp.c \
+	@srcdir@/vendor/zmime.c \
 	@srcdir@/src/configs.c \
-	@srcdir@/src/luabind.c \
-	@srcdir@/src/mime.c \
+	@srcdir@/src/lua.c \
 	@srcdir@/src/socket.c \
 	@srcdir@/src/util.c \
-	@srcdir@/src/ctx-http.c \
-	@srcdir@/src/ctx-https.c \
 	@srcdir@/src/server.c \
 	@srcdir@/src/loader.c \
 	@srcdir@/src/router.c \
+	@srcdir@/src/ctx/ctx-http.c \
+	@srcdir@/src/ctx/ctx-https.c \
+	@srcdir@/src/lua/lib.c \
 	@srcdir@/src/filters/filter-static.c \
 	@srcdir@/src/filters/filter-echo.c \
 	@srcdir@/src/filters/filter-dirent.c \
-	@srcdir@/src/filters/filter-redirect.c
+	@srcdir@/src/filters/filter-redirect.c \
+	@srcdir@/src/filters/filter-lua.c
 
 OBJ = ${SRC:.c=.o}
 
@@ -173,7 +175,7 @@ deps:
 
 # clean - Get rid of object files and tests 
 clean:
-	-@find $(srcdir)/src/ -maxdepth 1 -type f -name "*.o" | xargs rm
+	-@find $(srcdir)/src/ -maxdepth 2 -type f -name "*.o" | xargs rm
 	-@find $(srcdir)/bin/ -maxdepth 1 -type f | xargs rm
 	-@find $(srcdir)/vendor/ -maxdepth 1 -type f -name "*.o" ! -name "sqlite3.o" | xargs rm
 

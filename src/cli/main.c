@@ -27,17 +27,20 @@
  * Windows will need some additional help and Cygwin as well.
  * 
  * -------------------------------------------------------- */
-#include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
-#include "../ctx-http.h"
-#include "../ctx-https.h"
+#include <zwalker.h>
+#include <ztable.h>
+#include <dlfcn.h>
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
 #include "../socket.h"
 #include "../server.h"
+#include "../ctx/ctx-http.h"
+#include "../ctx/ctx-https.h"
 #include "../filters/filter-static.h"
 #include "../filters/filter-echo.h"
 #include "../filters/filter-dirent.h"
 #include "../filters/filter-redirect.h"
-#include <dlfcn.h>
 
 #define eprintf(...) \
 	fprintf( stderr, "%s: ", "hypno" ) && \

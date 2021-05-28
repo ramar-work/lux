@@ -42,10 +42,12 @@
  *
  * ------------------------------------------------------- */
 #include "zwalker.h"
-#include "zhasher.h"
+#include "ztable.h"
 
 #ifndef ZRENDER_H
 #define ZRENDER_H
+
+#define ZRENDER_ERR_BUFLEN 1024
 
 #define zr_add_item(LIST,ELEMENT,SIZE,LEN) \
  add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
@@ -80,16 +82,16 @@ struct xdesc {
 
 struct xmap {
 	unsigned char *ptr;
-	short len;
-	short type;
 	struct xdesc *parent;
+	int len;
+	char type, free;
 };
 
 typedef struct zRender {
 	const char *zStart; 
 	const char *zEnd;
 	int error;
-	char errmsg[1024];
+	char errmsg[ ZRENDER_ERR_BUFLEN ];
 
 	void *userdata;
 	struct premap **premap;	
@@ -122,7 +124,7 @@ void zrender_free( zRender *);
 
 
 #ifdef DEBUG_H
- #define XMAP_DUMP_LEN 3
+ #define XMAP_DUMP_LEN 20 
  void print_premap ( struct premap ** );
  void print_xmap ( struct xmap ** );
  const char * print_xmap_type ( short );

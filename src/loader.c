@@ -43,7 +43,7 @@ int loader_get_int_value ( zTable *t, const char *key, int notFound ) {
 		return notFound;
 	}
 
-	if (( p = lt_ret( t, LITE_INT, i ))->vint == 0 ) {
+	if (( p = lt_ret( t, ZTABLE_INT, i ))->vint == 0 ) {
 		return notFound;
 	}
 
@@ -59,7 +59,7 @@ char * loader_get_char_value ( zTable *t, const char *key ) {
 		return NULL;
 	}
 
-	if (( p = lt_ret( t, LITE_TXT, i ))->vchar == NULL ) {
+	if (( p = lt_ret( t, ZTABLE_TXT, i ))->vchar == NULL ) {
 		return NULL;
 	}
 
@@ -69,14 +69,14 @@ char * loader_get_char_value ( zTable *t, const char *key ) {
 
 //Drop things back to zero
 static int loader_check_eot( zKeyval *kv, int *depth ) {
-	if ( *depth && kv->key.type == LITE_TRM )
+	if ( *depth && kv->key.type == ZTABLE_TRM )
 		(*depth)--;
-	else if ( *depth && kv->value.type == LITE_TBL ){
+	else if ( *depth && kv->value.type == ZTABLE_TBL ){
 		(*depth)++;
 	}
 #if 0
-	else if ( !(*depth) && kv->key.type == LITE_TXT && !strcmp( kv->key.v.vchar, n ) ) {
-		if ( kv->value.type == LITE_TBL ) {
+	else if ( !(*depth) && kv->key.type == ZTABLE_TXT && !strcmp( kv->key.v.vchar, n ) ) {
+		if ( kv->value.type == ZTABLE_TBL ) {
 			(*depth)++;
 		}
 		return 0;
@@ -96,9 +96,9 @@ static int loader_iterator( zKeyval *kv, int i, void *p ) {
 		return f->depth; //This is an unusual hack, but it works
 	}
 #else
-	if ( f->depth && kv->key.type == LITE_TRM )
+	if ( f->depth && kv->key.type == ZTABLE_TRM )
 		f->depth--;
-	else if ( f->depth && kv->value.type == LITE_TBL ){
+	else if ( f->depth && kv->value.type == ZTABLE_TBL ){
 		f->depth++;
 	}
 
@@ -122,7 +122,7 @@ void ** loader_get_table_value( zTable *t, const char *key, int(*fp)(zKeyval *,i
 	struct fp_iterator fp_data = { 0, 1, &p, fp, t };
 
 	//The index should be there and the type should be a table
-	if ( ( i = lt_geti( t, key ) ) == -1 || lt_valuetypeat( t, i ) != LITE_TBL ) {
+	if ( ( i = lt_geti( t, key ) ) == -1 || lt_valuetypeat( t, i ) != ZTABLE_TBL ) {
 		return NULL;
 	}
 
@@ -148,29 +148,29 @@ static int copy_iterator( zKeyval *kv, int i, void *p ) {
 		return f->depth; //This is an unusual hack, but it works
 	}
 
-	if ( kv->key.type == LITE_INT )
+	if ( kv->key.type == ZTABLE_INT )
 		lt_addintkey( *t, kv->key.v.vint );
-	else if ( kv->key.type == LITE_TXT )
+	else if ( kv->key.type == ZTABLE_TXT )
 		lt_addtextkey( *t, kv->key.v.vchar );
-	else if ( kv->key.type == LITE_BLB ) 
+	else if ( kv->key.type == ZTABLE_BLB ) 
 		lt_addblobkey( *t, kv->key.v.vblob.blob, kv->key.v.vblob.size );
-	else if ( kv->key.type == LITE_TRM ) {
+	else if ( kv->key.type == ZTABLE_TRM ) {
 		lt_ascend( *t );
 		//lt_finalize( *t );
 		return 1;
 	}
 
-	if ( kv->value.type == LITE_INT )
+	if ( kv->value.type == ZTABLE_INT )
 		lt_addintvalue( *t, kv->value.v.vint );
-	else if ( kv->value.type == LITE_TXT )
+	else if ( kv->value.type == ZTABLE_TXT )
 		lt_addtextvalue( *t, kv->value.v.vchar );
-	else if ( kv->value.type == LITE_BLB ) 
+	else if ( kv->value.type == ZTABLE_BLB ) 
 		lt_addblobvalue( *t, kv->value.v.vblob.blob, kv->value.v.vblob.size );
-	else if ( kv->value.type == LITE_FLT )
+	else if ( kv->value.type == ZTABLE_FLT )
 		lt_addfloatvalue( *t, kv->value.v.vfloat );	
-	else if ( kv->value.type == LITE_USR )
+	else if ( kv->value.type == ZTABLE_USR )
 		lt_addudvalue( *t, kv->value.v.vusrdata );
-	else if ( kv->value.type == LITE_TBL ) {
+	else if ( kv->value.type == ZTABLE_TBL ) {
 		//FPRINTF( "Got table...\n" );
 		lt_descend( *t );
 		//you could run the copy iterator here

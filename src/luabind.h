@@ -1,5 +1,5 @@
 #include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
+#include "../vendor/ztable.h"
 #include <errno.h>
 #include <sys/stat.h>
 #include <lua.h>

@@ -9,10 +9,17 @@
 #include <time.h>
 #include <sys/time.h>
 #include "../vendor/zwalker.h"
-#include "../vendor/zhasher.h"
+#include "../vendor/ztable.h"
 
 #ifndef UTIL_H
 #define UTIL_H
+
+//Print binary data (in hex) using name of variable as key
+#define nbprintf(v, n) \
+	fprintf (stderr,"%-30s: ", k); \
+	for (int i=0; i < n; i++) fprintf( stderr, "%02x", v[i] ); \
+	fprintf (stderr, "\n")
+
 
 #define ADDITEM(TPTR,SIZE,LIST,LEN,FAIL) \
 	if (( LIST = realloc( LIST, sizeof( SIZE ) * ( LEN + 1 ) )) == NULL ) { \
@@ -51,45 +58,45 @@
 	TPTR->rbptr = NULL;
 
 #define srand_nums(BUF,BUFLEN) \
-	(char *)srand_uint8t( (uint8_t *)"0123456789", sizeof("0123456789"), (uint8_t *)BUF, BUFLEN )
+	(char *)srand_uint8t( (unsigned char *)"0123456789", sizeof("0123456789"), (unsigned char *)BUF, BUFLEN )
 
 #define srand_letters(BUF,BUFLEN) \
-	(char *)srand_uint8t( (uint8_t *)"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", \
-		sizeof("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), (uint8_t *)BUF, BUFLEN )
+	(char *)srand_uint8t( (unsigned char *)"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", \
+		sizeof("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), (unsigned char *)BUF, BUFLEN )
 
 #define srand_chars(BUF,BUFLEN) \
-	(char *)srand_uint8t( (uint8_t *)"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", \
-		sizeof("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"), (uint8_t *)BUF, BUFLEN )
+	(char *)srand_uint8t( (unsigned char *)"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", \
+		sizeof("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"), (unsigned char *)BUF, BUFLEN )
 
 #define mrand_nums(BUFLEN) \
-	(char *)srand_uint8t( (uint8_t *)"0123456789", sizeof("0123456789"), malloc(BUFLEN), BUFLEN )
+	(char *)srand_uint8t( (unsigned char *)"0123456789", sizeof("0123456789"), malloc(BUFLEN), BUFLEN )
 
 #define mrand_chars(BUFLEN) \
-	(char *)srand_uint8t( (uint8_t *)"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", \
+	(char *)srand_uint8t( (unsigned char *)"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", \
 		sizeof("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"), malloc(BUFLEN), BUFLEN )
 
 #define mrand_letters(BUFLEN) \
-	(char *)srand_uint8t( (uint8_t *)"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", \
+	(char *)srand_uint8t( (unsigned char *)"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", \
 		sizeof("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"), malloc(BUFLEN), BUFLEN )
 
 #define append_to_char(DEST,DESTLEN,SRC) \
-	append_to_uint8t( (uint8_t **)DEST,DESTLEN,(uint8_t *)SRC,strlen(SRC) )
+	append_to_uint8t( (unsigned char **)DEST,DESTLEN,(unsigned char *)SRC,strlen(SRC) )
 
 #define dupstr(a) \
-	copystr( (uint8_t *)a, strlen(a) )	
+	copystr( (unsigned char *)a, strlen(a) )	
 
-uint8_t *read_file ( const char *filename, int *len, char *err, int errlen );
+unsigned char *read_file ( const char *filename, int *len, char *err, int errlen );
 int safeatoi( const char *value );
 int * satoi( const char *value, int *p );
 int * datoi( const char *value );
 char *get_lstr( char **str, char chr, int *lt );
-char *msg_get_value ( const char *value, const char *chrs, uint8_t *msg, int len );
-char *copystr ( uint8_t *src, int len ) ;
-uint8_t *append_to_uint8t ( uint8_t **, int *, uint8_t *, int ); 
-unsigned char * srand_uint8t( uint8_t *, int, uint8_t *, int );
+char *msg_get_value ( const char *value, const char *chrs, unsigned char *msg, int len );
+char *copystr ( unsigned char *src, int len ) ;
+unsigned char *append_to_uint8t ( unsigned char **, int *, unsigned char *, int ); 
+unsigned char * srand_uint8t( unsigned char *, int, unsigned char *, int );
 void *add_item_to_list( void ***, void *, int , int * );
 char *append_strings_to_char (char **dest, int *len, char *delim, ... );
-uint8_t *trim (uint8_t *msg, char *trim, int len, int *nlen);
+unsigned char *trim (unsigned char *msg, char *trim, int len, int *nlen);
 #endif
 
 

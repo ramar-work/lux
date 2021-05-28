@@ -1,8 +1,8 @@
 #include <limits.h>
 #include <stdlib.h>
-#include "luabind.h"
+#include <ztable.h>
+#include "lua.h"
 #include "loader.h"
-#include "../vendor/zhasher.h"
 
 #ifndef LCONFIG_H
 #define LCONFIG_H
