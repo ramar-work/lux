@@ -1,11 +1,18 @@
 # Track nothing and add by force
-*
-!example/*
-!src/*
-!configure.ac
-!configure
-!Makefile.in
-!*.md
-!*.c
-!*.h
+Makefile
+TODO
+src.vim
+configure.scan
+*.log
 *.o
+
+autom4te.cache/
+artwork/
+bin/
+build/
+docs/
+example/
+include/
+lib/
+src/tim
+tests/
