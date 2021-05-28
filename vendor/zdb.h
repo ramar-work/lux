@@ -41,8 +41,8 @@
 #include <strings.h>
 #include <zwalker.h>
 
-#ifndef HDATABASE_H
-#define HDATABASE_H
+#ifndef ZDATABASE_H
+#define ZDATABASE_H
 
 #define ZDB_ERRBUF_LEN 256 
 
@@ -54,7 +54,7 @@
 
 #define ZDB_ENABLE_SQLITE
 
-#define ZDB_ENABLE_MYSQL
+#undef ZDB_ENABLE_MYSQL
 
 #define zdbv_add_item(LIST,ELEMENT,SIZE,LEN) \
 	zdb_add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
@@ -146,6 +146,9 @@ void zdbv_free ( zdbv_t ** );
 
 void zdb_free ( zdb_t * ) ;
 
+#ifdef ZTABLE_H
+zTable * zdb_to_ztable ( zdb_t *, const char * );
+#endif
 
 //By default, SQLite3 will always be enabled...
 #ifdef ZDB_ENABLE_SQLITE

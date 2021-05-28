@@ -51,6 +51,7 @@ CC = gcc
 SRC = \
 	@srcdir@/vendor/zrender.c \
 	@srcdir@/vendor/ztable.c \
+	@srcdir@/vendor/zdb.c \
 	@srcdir@/vendor/zwalker.c \
 	@srcdir@/vendor/zhttp.c \
 	@srcdir@/vendor/zmime.c \
@@ -64,6 +65,7 @@ SRC = \
 	@srcdir@/src/ctx/ctx-http.c \
 	@srcdir@/src/ctx/ctx-https.c \
 	@srcdir@/src/lua/lib.c \
+	@srcdir@/src/lua/db.c \
 	@srcdir@/src/filters/filter-static.c \
 	@srcdir@/src/filters/filter-echo.c \
 	@srcdir@/src/filters/filter-dirent.c \

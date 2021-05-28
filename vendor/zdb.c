@@ -110,11 +110,13 @@ static void * zdb_init( zdb_t *zdb, zdbb_t type ) {
 		zdb->close = zdb_sqlite_close;
 		zdb->exec = zdb_sqlite_exec;
 	}
+#ifdef ZDB_ENABLE_MYSQL
 	else if ( zdb->type == ZDB_MYSQL ) {
 		zdb->open = zdb_mysql_open; 
 		zdb->close = zdb_mysql_close;
 		zdb->exec = zdb_mysql_exec;
 	}
+#endif
 	else {
 		zdb->error = ZDB_ERROR_UNSUPPORTED_BACKEND;
 		return NULL;
@@ -334,7 +336,7 @@ zdbconn_t * zdb_init_conn ( zdbconn_t *conn, const char *connstr, char *err, int
 		}
 	}
 
-	zdbconn_print( conn );
+	//zdbconn_print( conn );
 	return conn; 
 }
 

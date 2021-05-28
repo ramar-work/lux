@@ -61,7 +61,6 @@
 
 #define LD_ERRBUF_LEN 1024
 
-
 struct route_t { 
 	int iroute_tlen;
 	struct iroute_t { char *route; int index; } **iroute_tlist;
@@ -123,4 +122,5 @@ struct luadata_t {
 
 int http_error( struct HTTPBody *, int, char *, ... );
 
+const int filter_lua( int , zhttp_t *, zhttp_t *, struct cdata * );
 #endif
