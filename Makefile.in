@@ -7,7 +7,7 @@
 ## Hypno on most machines. 
 ##
 ## @author
-## Copyright 2020 Tubular Modular Inc. dba Collins Design
+## Copyright 2021 Tubular Modular Inc. dba Collins Design
 ## --------------------------------------------------------- ##
 
 # Package-specific
@@ -193,8 +193,6 @@ plat:
 	make -f build/Makefile.arch boom
 	echo $(OS)	
 	
-
-
 #if 0
 # pkg - Make a package of the latest tagged version for distribution
 pkg:
