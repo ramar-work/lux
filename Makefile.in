@@ -35,7 +35,7 @@ GROUP = http
 # Everything else
 IFLAGS = -Ivendor -I/usr/include/lua5.3
 
-LDFLAGS = -ldl -lpthread -lgnutls
+LDFLAGS = -ldl -lpthread -lgnutls -lsqlite3
 
 DEBUGFLAGS = -DDEBUG_H
 
@@ -49,7 +49,6 @@ CFLAGS = $(GCCFLAGS)
 CC = gcc
 
 SRC = \
-	@srcdir@/vendor/sqlite3.c \
 	@srcdir@/vendor/zrender.c \
 	@srcdir@/vendor/ztable.c \
 	@srcdir@/vendor/zwalker.c \
