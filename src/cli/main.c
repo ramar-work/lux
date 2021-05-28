@@ -86,7 +86,7 @@ struct filter filters[16] = {
 ,	{ "echo", filter_echo }
 ,	{ "dirent", filter_dirent }
 ,	{ "redirect", filter_redirect }
-//,	{ "lua", filter_lua }
+,	{ "lua", filter_lua }
 , { NULL }
 , { NULL }
 , { NULL }
