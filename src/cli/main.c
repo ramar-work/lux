@@ -41,6 +41,7 @@
 #include "../filters/filter-echo.h"
 #include "../filters/filter-dirent.h"
 #include "../filters/filter-redirect.h"
+#include "../filters/filter-lua.h"
 
 #define eprintf(...) \
 	fprintf( stderr, "%s: ", "hypno" ) && \
