@@ -139,6 +139,9 @@ filter_dirent ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata
 		lt_finalize( &t );
 
 		//get permissions 
+		#if 1
+		char permissions[ 11 ] = "drwxrwxrwx\0";
+		#else
 		char permissions[ 11 ] = {0};
 		permissions[ 0 ] = 'd';
 		permissions[ 1 ] = 'r';
@@ -150,6 +153,7 @@ filter_dirent ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata
 		permissions[ 7 ] = 'r';
 		permissions[ 8 ] = 'w';
 		permissions[ 9 ] = 'x';
+		#endif
 		lt_addtextkey( &t, "permissions" );
 		lt_addtextvalue( &t, permissions );
 		lt_finalize( &t );
@@ -192,7 +196,6 @@ filter_dirent ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata
 	lt_ascend( &t );
 	lt_lock( &t );
 	zTable *tt = &t;
-	lt_dump( tt );
 
 	//This may have helped more
 	unsigned char *buf = NULL;
