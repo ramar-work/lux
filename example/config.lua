@@ -27,15 +27,6 @@ return {
 			filter = "static"
 		},
 		
-		--[[
-		-- See LuaMVC in action
-		["i_dont_exist.hypno"] = { 
-			dir = "luamvc",
-			root_default = "/index.html",
-			filter = "lua"
-		},
-		--]]
-
 		-- Redirect does nothing of real importance
 		["redirect.hypno"] = { 
 			-- Where to redirect?
@@ -60,6 +51,13 @@ return {
 			dir = "html",
 			root_default = "/index.html",
 			filter = "static"
+		},
+	
+		-- See the static filter in action
+		["lua.hypno"] = { 
+			dir = "lua",
+			root_default = "/index.html",
+			filter = "lua"
 		},
 	
 		-- SSL capable hosts look like this

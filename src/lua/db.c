@@ -153,7 +153,6 @@ int db_exec ( lua_State *L ) {
 				lt_free( t ), lt_free( tt );
 				return luaL_error( L, "Invalid type of bindarg at key '%s'", key ); 
 			}
-fprintf( stderr, "setting bindargs: %s\n", tv->field ); write( 2, tv->value, tv->len );
 			add_item( &zdbbind, tv, zdbv_t *, &zlen );
 		}
 	}

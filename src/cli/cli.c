@@ -42,8 +42,8 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <errno.h>
-#include "../vendor/zwalker.h"
-#include "../vendor/ztable.h"
+#include <zwalker.h>
+#include <ztable.h>
 #include "../util.h"
 
 #define NAME "hypno-cli"

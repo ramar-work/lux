@@ -8,6 +8,11 @@
 #include <zhttp.h>
 #include "../util.h"
 #include "../server.h"
+#include "../filters/filter-static.h"
+#include "../filters/filter-echo.h"
+#include "../filters/filter-dirent.h"
+#include "../filters/filter-redirect.h"
+#include "../filters/filter-lua.h"
 
 #define PP "harness"
 
@@ -16,7 +21,8 @@
 #define NSYMBOL "libname"
 
 #define HELP \
-	"-l, --library <arg>      Specify path to library (required).\n" \
+	"-f, --filter <arg>       Specify a filter for testing (required).\n" \
+	"-l, --library <arg>      Specify path to library.\n" \
 	"-d, --directory <arg>    Specify path to web app directory (required).\n" \
 	"-u, --uri <arg>          Specify a URI (required).\n" \
 	"-c, --content-type <arg> Specify a content-type for testing.\n" \
@@ -37,6 +43,25 @@
 	"-v, --verbose            Be wordy.\n" \
 	"-h, --help               Show help and quit.\n"
 
+//Define a list of filters
+struct filter filters[16] = { 
+	{ "static", filter_static }
+,	{ "echo", filter_echo }
+,	{ "dirent", filter_dirent }
+,	{ "redirect", filter_redirect }
+,	{ "lua", filter_lua }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+, { NULL }
+};
 
 struct arg {
 	char *lib;
@@ -47,6 +72,7 @@ struct arg {
 	char *method;
 	char *protocol;
 	char *uri;
+	char *filter;
 	int verbose;
 	int randomize;
 	int multipart;
@@ -115,9 +141,9 @@ int main ( int argc, char * argv[] ) {
 	struct arg arg = {0};
 	int blen = 0;
 	void *app = NULL;
-	int (*filter)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
+	const int (*filter)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
 	struct HTTPBody req = {0}, res = {0};
-	char *fname, err[ 2048 ] = { 0 };
+	char *fname = NULL, err[ 2048 ] = { 0 };
 	struct cdata conn;
 	struct lconfig sconf;
 	int header_fd=1, body_fd=1;
@@ -132,6 +158,8 @@ int main ( int argc, char * argv[] ) {
 			arg.lib = *( ++argv );
 		else if ( !strcmp( *argv, "-d" ) || !strcmp( *argv, "--directory" ) )
 			arg.path = *( ++argv );
+		else if ( !strcmp( *argv, "-f" ) || !strcmp( *argv, "--filter" ) )
+			arg.filter = *( ++argv );
 		else if ( !strcmp( *argv, "-u" ) || !strcmp( *argv, "--uri" ) )
 			arg.uri = *( ++argv );
 		else if ( !strcmp( *argv, "-c" ) || !strcmp( *argv, "--content-type" ) )
@@ -187,11 +215,6 @@ int main ( int argc, char * argv[] ) {
 		return 1;
 	}
 
-	if ( !arg.lib ) {
-		fprintf( stderr, PP ": No library specified.\n" );
-		return 1;
-	} 
-
 	if ( !arg.path ) {
 		fprintf( stderr, PP ": Directory to application not specified.\n" );
 		return 1;
@@ -203,6 +226,31 @@ int main ( int argc, char * argv[] ) {
 		fprintf( stderr, PP ": URI is unspecified (only specify what comes after the domain).\n" );
 		return 1;
 	}
+
+#if 1
+	if ( !arg.filter ) {
+		fprintf( stderr, PP ": No filter (or library) specified.\n" );
+		return 1;
+	} 
+
+	if ( arg.filter ) {
+		filter = NULL;
+		for ( struct filter *f = filters; f->name; f++ ) {
+			if ( strcmp( f->name, arg.filter ) == 0 ) {
+				filter = f->filter, fname = (char *)f->name;
+				break;
+			}
+		}
+		if ( !filter ) {
+			fprintf( stderr, PP ": Filter '%s' not supported.\n", arg.filter );
+			return 1;
+		}
+	}
+#else
+	if ( !arg.lib ) {
+		fprintf( stderr, PP ": No library specified.\n" );
+		return 1;
+	} 
 
 	//Load the app, find the symbol and run the code...
 	if ( !( app = dlopen( arg.lib, RTLD_LAZY ) ) ) {
@@ -223,6 +271,7 @@ int main ( int argc, char * argv[] ) {
 		fprintf( stderr, PP ": symbol '%s' not found in filter: %s\n", FSYMBOL, strerror(errno) );
 		return 1;
 	}
+#endif
 
 	//Populate the request structure.  Normally, one will never populate this from scratch
 	req.path = zhttp_dupstr( arg.uri );
@@ -382,13 +431,14 @@ int main ( int argc, char * argv[] ) {
 		fflush( stdout );
 	}
 
-
-	if ( dlclose( app ) == -1 ) {
+#if 0
+	if ( arg.lib && dlclose( app ) == -1 ) {
 		http_free_request( &req );
 		http_free_response( &res );
 		fprintf( stderr, PP ": Failed to close application: %s\n", strerror( errno ) );
 		return 1;
 	}
+#endif
 
 	//Destroy res, req and anything else allocated
 	http_free_request( &req );

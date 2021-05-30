@@ -170,6 +170,8 @@ void *zdb_mysql_exec( zdb_t *, const char *, zdbv_t ** );
 
 #ifdef DEBUG_H
 void zdbconn_print ( zdbconn_t * ) ;
+#else
+ #define zdbconn_print(...)
 #endif
 
 #define zdb_open_sqlite(a,b) 

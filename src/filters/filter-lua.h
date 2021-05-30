@@ -122,5 +122,6 @@ struct luadata_t {
 
 int http_error( struct HTTPBody *, int, char *, ... );
 
-const int filter_lua( int , zhttp_t *, zhttp_t *, struct cdata * );
+const int filter_lua
+( int , struct HTTPBody *, struct HTTPBody *, struct cdata * );
 #endif
