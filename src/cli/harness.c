@@ -14,7 +14,7 @@
 #include "../filters/filter-redirect.h"
 #include "../filters/filter-lua.h"
 
-#define PP "harness"
+#define PP "hypno-harness"
 
 #define FSYMBOL "filter"
 

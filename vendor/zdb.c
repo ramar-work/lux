@@ -221,6 +221,7 @@ void zdb_dump( zdb_t *zdb ) {
 	fprintf( stderr, "zdb->ptr = %p\n", zdb->ptr );
 	fprintf( stderr, "zdb->type = %d\n", zdb->type );
 	fprintf( stderr, "zdb->rows = %d\n", zdb->rows );
+	fprintf( stderr, "zdb->mapsize = %d\n", zdb->mapsize );
 	fprintf( stderr, "zdb->affected = %d\n", zdb->affected );
 	fprintf( stderr, "zdb->llen = %d\n", zdb->llen );
 	fprintf( stderr, "%s\n", "zdb->conn" );
@@ -381,7 +382,8 @@ zdbconn_t * zdb_init_conn ( zdbconn_t *conn, const char *connstr, char *err, int
 #ifdef ZTABLE_H
 zTable * zdb_to_ztable ( zdb_t *zdb, const char *key ) {
 	zTable *t = NULL;
-	const int mod = 4056;
+	//TODO: This is going to eat some memory...
+	const int mod = zdb->mapsize * 2;
 	int next = 0, row = 0;
 
 	//TODO: mod needs to be based on the result count
@@ -529,6 +531,7 @@ void *zdb_sqlite_exec( zdb_t *zdb, const char *query, zdbv_t **records ) {
 
 	//Mark the structure when done
 	zdb->affected = sqlite3_changes( zdb->ptr );
+	zdb->mapsize = columnCount * zdb->rows;
 
 	sqlite3_finalize( stmt );
 	return zdb->results;

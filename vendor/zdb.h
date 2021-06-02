@@ -117,6 +117,7 @@ typedef struct zdb_t {
 	zdbb_t type;  // The type of db driver 
 	int rows; // Result set count
 	int affected; // Result set count
+	int mapsize;  // Total count of elements
 	int error;
 	short llen;
 	const char **headers;

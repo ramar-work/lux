@@ -50,6 +50,15 @@
 
 #define LIBDIR "/var/lib/hypno"
 
+#define HELP \
+	"-d, --dir <arg>          Define where to create a new application.\n"\
+	"-n, --domain-name <arg>  Define a specific domain for the app.\n"\
+	"    --title <arg>        Define a <title> for the app.\n"\
+	"-s, --static <arg>       Define a static path. (Use multiple -s's to\n"\
+	"                         specify multiple paths).\n"\
+	"-b, --database <arg>     Define a specific database connection.\n"\
+	"-x, --dump-args          Dump passed arguments.\n"
+
 #ifdef LEAKTEST_H
  #define CONN_CONTINUE int i=0; i<1; i++
  #define CONN_CLOSE 1

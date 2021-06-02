@@ -35,7 +35,7 @@ GROUP = http
 # Everything else
 IFLAGS = -Ivendor -I/usr/include/lua5.3
 
-LDFLAGS = -ldl -lpthread -lgnutls -lsqlite3
+LDFLAGS = -ldl -lpthread -lgnutls -lsqlite3 -larchive
 
 DEBUGFLAGS = -DDEBUG_H
 
@@ -101,9 +101,10 @@ endif
 # main - Compiles all code needed to get hypno running
 main: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/main.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) 
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ)
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) 
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ)
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ)
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ)
 
 # debug - Builds code with debugging flags on
 debug: debug-clang
