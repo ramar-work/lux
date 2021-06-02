@@ -20,29 +20,16 @@
 	for (int i=0; i < n; i++) fprintf( stderr, "%02x", v[i] ); \
 	fprintf (stderr, "\n")
 
-
-#define ADDITEM(TPTR,SIZE,LIST,LEN,FAIL) \
-	if (( LIST = realloc( LIST, sizeof( SIZE ) * ( LEN + 1 ) )) == NULL ) { \
-		fprintf (stderr, "Could not reallocate new rendering struct...\n" ); \
-		return FAIL; \
-	} \
-	LIST[ LEN ] = TPTR; \
-	LEN++;
-
 #ifdef DEBUG_H
  #define FPRINTF(...) \
 	fprintf( stderr, "DEBUG: %s[%d]: ", __FILE__, __LINE__ ) && \
 	fprintf( stderr, __VA_ARGS__ )
-
- #define add_item(LIST,ELEMENT,SIZE,LEN) \
-	fprintf( stderr, "%s[%d]: ", __FILE__, __LINE__ ) && \
-	fprintf( stderr, "Adding a new item %p to list: %p\n", ELEMENT, LIST ) && \
-		add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 #else
  #define FPRINTF(...)
- #define add_item(LIST,ELEMENT,SIZE,LEN) \
-	add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 #endif
+
+#define add_item(LIST,ELEMENT,SIZE,LEN) \
+ add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 
 #define ENCLOSE(SRC, POS, LEN) \
 	write( 2, "'", 1 ); \
