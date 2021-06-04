@@ -693,13 +693,13 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			else if ( ccount ) {
 				lua_setglobal( ld.state, mkey );
 			}
-
 			model = 1;
 		}
 	}
 
+
 	//In the case of no model, initialize one anyway
-	if ( !lt_init( ld.zmodel, NULL, !model ? 32 : 2048 ) ) {
+	if ( !lt_init( ld.zmodel, NULL, !model ? 32 : 8190 ) ) {
 		free_ld( &ld );
 		return http_error( res, 500, "Could not allocate table for model." );
 	}
@@ -717,7 +717,11 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 	//Load all views
 	lt_lock( ld.zmodel );
-	//lt_fdump( ld.zmodel, 1 );
+#if 0
+	//If this is always the same, then the bug is elsewhere...
+	lt_fdump( ld.zmodel, 1 );
+	return http_error( res, 200, "model->count: %d\n", ld.zmodel->count );
+#endif
 
 	int view = 0;
 	for ( struct imvc_t **v = ld.pp.imvc_tlist; *v; v++ ) {

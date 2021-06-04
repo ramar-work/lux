@@ -383,7 +383,7 @@ zdbconn_t * zdb_init_conn ( zdbconn_t *conn, const char *connstr, char *err, int
 zTable * zdb_to_ztable ( zdb_t *zdb, const char *key ) {
 	zTable *t = NULL;
 	//TODO: This is going to eat some memory...
-	const int mod = zdb->mapsize * 2;
+	const int mod = zdb->mapsize * 4;
 	int next = 0, row = 0;
 
 	//TODO: mod needs to be based on the result count
