@@ -35,7 +35,7 @@ GROUP = http
 # Everything else
 IFLAGS = -Ivendor -I/usr/include/lua5.3
 
-LDFLAGS = -ldl -lpthread -lgnutls -lsqlite3 -larchive
+LDFLAGS = -ldl -lpthread -lgnutls -lsqlite3 -larchive -llua
 
 DEBUGFLAGS = -DDEBUG_H
 
@@ -55,13 +55,13 @@ SRC = \
 	@srcdir@/vendor/zwalker.c \
 	@srcdir@/vendor/zhttp.c \
 	@srcdir@/vendor/zmime.c \
+	@srcdir@/vendor/router.c \
 	@srcdir@/src/configs.c \
 	@srcdir@/src/lua.c \
 	@srcdir@/src/socket.c \
 	@srcdir@/src/util.c \
 	@srcdir@/src/server.c \
 	@srcdir@/src/loader.c \
-	@srcdir@/src/router.c \
 	@srcdir@/src/ctx/ctx-http.c \
 	@srcdir@/src/ctx/ctx-https.c \
 	@srcdir@/src/lua/lib.c \
