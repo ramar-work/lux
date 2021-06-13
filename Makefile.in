@@ -229,8 +229,15 @@ changelog:
 	@printf "\n<link rel=stylesheet href=changelog.css>\n"
 #endif
 
+docs:
+	-mkdir www/
+	markdown README.md > www/main.tpl
+
 Makefile: Makefile.in config.status
 	./config.status $@
 
 config.status: configure
 	./config.status --recheck
+
+README.md: docs
+	printf '' >/dev/null

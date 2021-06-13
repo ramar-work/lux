@@ -33,6 +33,9 @@
 #include <lua.h>
 #include <lualib.h>
 #include <lauxlib.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <pwd.h>
 #include "../socket.h"
 #include "../server.h"
 #include "../ctx/ctx-http.h"
@@ -57,7 +60,18 @@
 	"-s, --static <arg>       Define a static path. (Use multiple -s's to\n"\
 	"                         specify multiple paths).\n"\
 	"-b, --database <arg>     Define a specific database connection.\n"\
-	"-x, --dump-args          Dump passed arguments.\n"
+	"-x, --dump-args          Dump passed arguments.\n" \
+	"-s, --start              Start the server\n" \
+	"-c, --config <arg>       Use this Lua file for configuration\n" \
+	"-p, --port <arg>         Start using a different port \n" \
+	"-u, --user <arg>         Choose an alternate user to start as\n" \
+	"-x, --dump               Dump configuration at startup\n" \
+	"-k, --kill               Kill a running server\n" \
+	"-l, --libs <arg>         Point to libraries at <arg>\n" \
+	"    --no-fork            Do not fork\n" \
+	"    --use-ssl            Use SSL\n" \
+	"    --debug              set debug rules\n" \
+	"-h, --help               Show the help menu.\n"
 
 #ifdef LEAKTEST_H
  #define CONN_CONTINUE int i=0; i<1; i++
@@ -75,6 +89,7 @@ const char appn[] = "filter";
 
 struct values {
 	int port;
+	pid_t pid;
 	int ssl;
 	int start;
 	int kill;
@@ -111,6 +126,10 @@ struct filter filters[16] = {
 };
 
 
+int cmd_kill();
+
+int procpid = 0;
+
 //In lieu of an actual ctx object, we do this to mock pre & post which don't exist
 const int fkctpre( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c ) {
 	return 1;
@@ -120,6 +139,10 @@ const int fkctpost( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c) {
 	return 1;
 }
 
+void sigkill( int signum ) {
+	fprintf( stderr, "Killing the server..." );
+	cmd_kill();
+}
 
 
 //Return fi
@@ -139,9 +162,16 @@ struct senderrecvr sr[] = {
 };
 
 
+int cmd_kill ( ) {
+	return 0;
+}
+
 
 //Loop should be extracted out
 int cmd_server ( struct values *v, char *err, int errlen ) {
+#if 1
+	//Change root here?
+
 	//Define
 	struct sockAbstr su = {0};
 	struct senderrecvr *ctx = NULL;
@@ -161,10 +191,104 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 	//Open a socket		
 	if ( !open_listening_socket( &su, err, errlen ) ) {
-		eprintf( "%s", err );
+		eprintf( "socket open error: %s", err );
 		close_listening_socket( &su, err, sizeof(err) );
 		return 0;
 	}
+
+#if 1
+	struct passwd *p = getpwnam( v->user );
+	int gid, uid;
+	if ( !p ) {
+		eprintf( "user %s not found.\n", v->user );
+		return 0;
+	}
+
+fprintf( stderr, "username: %s\n", p->pw_name	 );
+fprintf( stderr, "user id: %d\n", p->pw_uid );
+fprintf( stderr, "group id: %d\n", p->pw_gid );
+
+	if ( !( uid = p->pw_uid ) || !( gid = p->pw_gid ) ) {
+		eprintf( "got incorrect uid / gid for user %s.\n", v->user );
+		return 0;
+	}
+	
+#if 1
+	if ( !v->fork ) { 
+		//Record the PID somewhere
+		int len, fd = 0;
+		char buf[64] = { 0 };
+		//char pidfile[2048] = { 0 }; 
+		char *pidfile = "/var/run/hypno.pid";
+
+		//Would this ever return zero?
+		v->pid = getpid();
+
+		if ( ( fd = open( pidfile, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR ) ) == -1 ) {
+			eprintf( "Failed to access PID file: %s.", strerror(errno));
+			return 0;
+		}
+
+		len = snprintf( buf, 63, "%d", v->pid );
+
+		//Write the pid down
+		if ( write( fd, buf, len ) == -1 ) {
+			eprintf( "Failed to log PID: %s.", strerror(errno));
+			return 0;
+		}
+	
+		//The parent exited successfully.
+		if ( close(fd) == -1 ) { 
+			eprintf( "Could not close parent socket: %s", strerror(errno));
+			return 0;
+		}
+
+		//Change proc info after we're done
+		setuid( uid );
+		setgid( gid );
+	}
+#endif
+#else
+	//Change process owner (may have to be done with either fork or something else)
+	if ( values.fork ) {
+		//Create another process with user and group 
+		pid_t spid; 
+		if ( ( spid = fork() ) == -1 ) {
+			FPRINTF( "Failed to start new process for server: %s\n", strerror(errno) );
+			return 0;
+		}
+		else if ( cpid == 0 ) {
+			//Change the owner and group of the opened socket?
+			return 0;
+		}
+		else {
+			//Record the PID somewhere
+			int len, fd = 0;
+			char buf[64] = { 0 };
+			//char pidfile[2048] = { 0 }; 
+			char *pidfile = "/var/run/hypno.pid";
+
+			if ( ( fd = open( pidfile, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR ) ) == -1 ) {
+				eprintf( "Failed to access PID file: %s.", strerror(errno));
+				return 0;
+			}
+
+			len = snprintf( buf, 63, "%d", spid );
+
+			//Write the pid down
+			if ( write( fd, buf, len ) == -1 ) {
+				eprintf( "Failed to log PID: %s.", strerror(errno));
+				return 0;
+			}
+		
+			//The parent exited successfully.
+			if ( close(fd) == -1 ) { 
+				eprintf( "Could not close parent socket: %s", strerror(errno));
+				return 0;
+			}
+		}
+	}
+#endif
 
 	//This can have one global variable
 	for ( CONN_CONTINUE ) {
@@ -214,26 +338,26 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 					if ( close( fd ) == -1 ) {
 						FPRINTF( "Error when closing child socket.\n" );
 					}
+					FPRINTF( "Connection is done. count is %d\n", connection.count );
 					break;
 				}
-
-				FPRINTF( "Connection is done. count is %d\n", connection.count );
 			}
+			break;
 		}
 	}
 
 	//Close the socket
 	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
+		FPRINTF( "FAILURE\n" ); 
 		eprintf( "Couldn't close parent socket. Error: %s", err );
 		return 0;
 	}
-	
+#endif	
 	return 1;
 }
 
 
 
-//...
 int cmd_libs( struct values *v, char *err, int errlen ) {
 	//Define
 	DIR *dir;
@@ -312,32 +436,7 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 }
 
 
-
-//Display help
-int help () {
-	fprintf( stderr, "%s: No options received.\n", __FILE__ );
-	const char *fmt = "%s --%-16s       %-30s\n";
-	fprintf( stderr, fmt, "-s,", "start", "Start the server" );
-	fprintf( stderr, fmt, "-c,", "config <arg>", "Use this Lua file for configuration" );
-	fprintf( stderr, fmt, "-p,", "port <arg>", "Start using a different port" );
-	fprintf( stderr, fmt, "-u,", "user <arg>", "Choose an alternate user to start as" );
-	fprintf( stderr, fmt, "-x,", "dump", "Dump configuration at startup" );
-	fprintf( stderr, fmt, "-k,", "kill", "Kill a running server" );
-	fprintf( stderr, fmt, "-l,", "libs <arg>", "Point to libraries at <arg>" );
-	fprintf( stderr, fmt, "   ", "no-fork", "Do not fork" );
-	fprintf( stderr, fmt, "   ", "use-ssl", "Use SSL" );
-	fprintf( stderr, fmt, "   ", "debug", "set debug rules" );
-	fprintf( stderr, fmt, "-h,", "help", "Show the help menu." );
-#if 0
-	fprintf( stderr, fmt, "-f," "fork", "Daemonize the server when starting" );
-	fprintf( stderr, fmt, "dir <arg>", "Use this directory to serve from" );
-#endif
-	return 0;	
-}
-
-
-
-//
+//...
 void print_options ( struct values *v ) {
 	const char *fmt = "%-10s: %s\n";
 	fprintf( stderr, "%s invoked with options:\n", __FILE__ );
@@ -397,7 +496,8 @@ int main (int argc, char *argv[]) {
 	int *port = NULL; 
 
 	if ( argc < 2 ) {
-		return help();
+		fprintf( stderr, HELP );
+		return 1;	
 	}
 	
 	while ( *argv ) {
@@ -457,10 +557,23 @@ int main (int argc, char *argv[]) {
 		argv++;
 	}
 
+	//Register SIGINT
+	signal( SIGINT, sigkill );
 
 	//Set all of the socket stuff
 	if ( !values.port ) {
 		values.port = defport;
+	}
+
+	//Set a default user and group
+	if ( !values.user ) {
+		//both of these need to come from me
+		//get the id from getuid and set it that way
+		;//values.user = (char *)defuser;
+	}
+
+	if ( !values.group ) {
+		;//values.group = (char *)defgroup;
 	}
 
 	//Pull in a configuration
@@ -497,7 +610,6 @@ int main (int argc, char *argv[]) {
 			return 1;
 		}
 	}
-
 
 	if ( values.kill ) {
 		eprintf ( "%s\n", "--kill not yet implemented." );

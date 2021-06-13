@@ -1,0 +1,207 @@
+/* ---------------------------------------------- *
+default.css
+===========
+
+Author
+------
+Antonio R. Collins II (rc@tubularmodular.com, ramar.collins@gmail.com)
+
+Copyright
+---------
+Copyright 2016-Present, "Tubular Modular"
+Original Author Date: Tue Jul 26 07:26:29 2016 -0400
+
+Summary
+-------
+Default stylesheet for new ColdMVC apps.  Integrates
+Eric Meyer's CSS Reset code courtesy of this page:
+http://meyerweb.com/eric/tools/css/reset/
+
+ * ---------------------------------------------- */
+html, body, div, 
+h1, h2, h3, h4, h5, h6, 
+p, pre,
+a, img, b, u, i, center, dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend, table, caption, 
+tbody, tfoot, thead, tr, th, td, article, aside, 
+canvas, details, embed, figure, figcaption, 
+footer, header, hgroup, menu, nav, output, ruby, 
+section, summary, time, mark, audio, video {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	font-size: 100%;
+	font: inherit;
+	vertical-align: baseline;
+}
+/* HTML5 display-role reset for older browsers */
+article, aside, details, figcaption, figure, 
+footer, header, hgroup, menu, nav, section {
+	display: block;
+}
+body {
+	line-height: 1;
+}
+ol, ul {
+	list-style: none;
+}
+blockquote, q {
+	quotes: none;
+}
+blockquote:before, blockquote:after, q:before, q:after {
+	content: '';
+	content: none;
+}
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+
+/*global*/
+html {
+	font-family: Helvetica;
+	background-color: #ddd;
+}
+
+pre {
+	font-family: "Lucida Console", "Lucida Sans Typewriter", monaco, "Bitstream Vera Sans Mono", monospace;
+	width: 95%;
+	margin: 0 auto;
+	background-color: white;
+	color: black;
+	margin-top: 10;
+	padding: 5;
+}
+
+/*full-screen on most normal things*/
+.center
+{
+	text-align: center;
+}
+
+.container
+{
+	width: 59%;
+	background-color: #333;
+	color: white;
+	height: 100%;
+	float: left;
+}
+
+.other-container
+{
+	position: relative;
+	width: 39%;
+	padding-top: 10;
+	margin-bottom: 10;
+	float: right;
+}
+
+.container-section
+{
+	position: relative;
+	width: 95%;
+	padding-top: 10;
+	margin: 0 auto;
+	margin-bottom: 10;
+}
+
+.container-dark-line {
+	border-top: 5px solid #333;
+}
+
+.container-light-line {
+	border-top: 5px solid #ccc;
+}
+
+.container p
+{
+	font-size: 1.5em;
+}
+
+h1, h2, h3, h4, h5 {
+	transition: font-size 0.2s;	
+}
+
+p {
+	transition: font-size 0.2s,
+							width 0.2s;
+}
+
+a {
+	transition: background-color 0.2s,
+							color 0.2s;
+}
+
+h1 { font-size: 16em; font-weight: bold; text-align: center; }
+h2 { font-size: 5em; }
+h3 { font-size: 4em; }
+h4 { font-size: 3em; }
+h5 { font-size: 2em; }
+
+a {
+	font-family: "Lucida Console", "Lucida Sans Typewriter", monaco, "Bitstream Vera Sans Mono", monospace;
+	line-height: 40px;
+	background-color: #333;
+	font-size: 1.4em;
+	color: white;
+	text-align: center;
+	padding: 10px;
+}
+
+a:hover {
+	background-color: white;
+	color: black;
+}
+
+p {
+	font-family: "Lucida Console", "Lucida Sans Typewriter", monaco, "Bitstream Vera Sans Mono", monospace;
+	font-size: 1.4em;
+	margin-top: 30px;
+}
+
+ul li {
+	margin: 5;
+	margin-left: 0;
+}
+
+.gets
+{
+	transition: display 0.2s;
+	display: none;
+}
+
+
+/*mobile*/
+@media ( max-width: 736px ) {
+	.container {
+		width: 100%;
+		height: 100%;
+		padding-bottom: 20px;
+	}
+
+	.other-container {
+		background-color: #ccc;
+		width: 100%;
+		height: 100%;
+		padding-bottom: 20px;
+	}
+
+	h1 { font-size: 8em; 
+			 font-weight: bold; padding-bottom: 30; padding-top: 100px; }
+
+	.gets
+	{
+		display: block;
+		position: absolute;
+		bottom: 10;
+		right: 10;
+	}
+}
+
+@media (min-width: 737px) and ( max-width: 1200px ) {
+	h1 { font-size: 10em; 
+			 font-weight: bold; 
+			 padding-top: 100px; }
+}
