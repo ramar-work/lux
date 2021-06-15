@@ -613,7 +613,6 @@ int main (int argc, char *argv[]) {
 
 	//Set pid file
 	if ( !values.pidfile ) {
-		//values.pidfile = PIDFILE;
 		struct timespec t;
 		clock_gettime( CLOCK_REALTIME, &t );
 		unsigned long time = t.tv_nsec % 3333;
