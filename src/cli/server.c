@@ -47,11 +47,21 @@
 #include "../filters/filter-lua.h"
 
 #define eprintf(...) \
-	fprintf( stderr, "%s: ", "hypno" ) && \
+	fprintf( stderr, "%s: ", NAME "-server" ) && \
 	fprintf( stderr, __VA_ARGS__ ) && \
 	fprintf( stderr, "\n" )
 
+#define NAME "hypno"
+
 #define LIBDIR "/var/lib/hypno"
+
+#define PIDFILE "/var/run/hypno.pid"
+
+#if 0
+#define PIDDIR "/var/run"
+#else
+#define PIDDIR "/tmp"
+#endif
 
 #define HELP \
 	"-d, --dir <arg>          Define where to create a new application.\n"\
@@ -87,6 +97,8 @@ const char libn[] = "libname";
 
 const char appn[] = "filter";
 
+char pidbuf[128] = {0};
+
 struct values {
 	int port;
 	pid_t pid;
@@ -95,10 +107,12 @@ struct values {
 	int kill;
 	int fork;
 	int dump;
+	int uid, gid;
 	char *user;
 	char *group;
 	char *config;
 	char *libdir;
+	char *pidfile;
 #ifdef DEBUG_H
 	int pfork;
 #endif
@@ -204,9 +218,11 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;
 	}
 
-fprintf( stderr, "username: %s\n", p->pw_name	 );
-fprintf( stderr, "user id: %d\n", p->pw_uid );
-fprintf( stderr, "group id: %d\n", p->pw_gid );
+#if 0
+	fprintf( stderr, "username: %s\n", p->pw_name	 );
+	fprintf( stderr, "user id: %d\n", p->pw_uid );
+	fprintf( stderr, "group id: %d\n", p->pw_gid );
+#endif
 
 	if ( !( uid = p->pw_uid ) || !( gid = p->pw_gid ) ) {
 		eprintf( "got incorrect uid / gid for user %s.\n", v->user );
@@ -218,13 +234,11 @@ fprintf( stderr, "group id: %d\n", p->pw_gid );
 		//Record the PID somewhere
 		int len, fd = 0;
 		char buf[64] = { 0 };
-		//char pidfile[2048] = { 0 }; 
-		char *pidfile = "/var/run/hypno.pid";
 
 		//Would this ever return zero?
 		v->pid = getpid();
 
-		if ( ( fd = open( pidfile, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR ) ) == -1 ) {
+		if ( ( fd = open( v->pidfile, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR ) ) == -1 ) {
 			eprintf( "Failed to access PID file: %s.", strerror(errno));
 			return 0;
 		}
@@ -423,9 +437,10 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 	fprintf( stderr, "Using SSL?:          %s\n", v->ssl ? "T" : "F" );
 	fprintf( stderr, "Daemonized:          %s\n", v->fork ? "T" : "F" );
 	fprintf( stderr, "Request Model:       %s\n", "Fork" );
-	fprintf( stderr, "User:                %s\n", v->user );
-	fprintf( stderr, "Group:               %s\n", v->group );
+	fprintf( stderr, "User:                %s (%d)\n", v->user, v->uid );
+	fprintf( stderr, "Group:               %s (%d)\n", v->group, v->gid );
 	fprintf( stderr, "Config:              %s\n", v->config );
+	fprintf( stderr, "PID file:            %s\n", v->pidfile );
 	fprintf( stderr, "Library Directory:   %s\n", v->libdir );
 
 	fprintf( stderr, "Filters enabled:\n" );
@@ -529,6 +544,14 @@ int main (int argc, char *argv[]) {
 			}
 			values.config = *argv;
 		}
+		else if ( !strcmp( *argv, "--pidfile" ) ) {
+			argv++;
+			if ( !*argv ) {
+				eprintf( "Expected argument for --port!" );
+				return 0;
+			}
+			values.pidfile = *argv;
+		}
 		else if ( !strcmp( *argv, "-p" ) || !strcmp( *argv, "--port" ) ) {
 			argv++;
 			if ( !*argv ) {
@@ -567,13 +590,14 @@ int main (int argc, char *argv[]) {
 
 	//Set a default user and group
 	if ( !values.user ) {
-		//both of these need to come from me
-		//get the id from getuid and set it that way
-		;//values.user = (char *)defuser;
+		values.user = getpwuid( getuid() )->pw_name;
+		values.uid = getuid();
 	}
 
 	if ( !values.group ) {
-		;//values.group = (char *)defgroup;
+		//values.group = getpwuid( getuid() )->pw_gid ;
+		values.gid = getgid();
+		values.group = getpwuid( values.gid )->pw_name ;
 	}
 
 	//Pull in a configuration
@@ -585,6 +609,16 @@ int main (int argc, char *argv[]) {
 	//Open the libraries (in addition to stuff)
 	if ( !values.libdir ) {
 		values.libdir = LIBDIR;
+	}
+
+	//Set pid file
+	if ( !values.pidfile ) {
+		//values.pidfile = PIDFILE;
+		struct timespec t;
+		clock_gettime( CLOCK_REALTIME, &t );
+		unsigned long time = t.tv_nsec % 3333;
+		snprintf( pidbuf, sizeof( pidbuf ) - 1, "%s/%s-%ld", PIDDIR, NAME, time );
+		values.pidfile = pidbuf;
 	}
 
 	//Load shared libraries

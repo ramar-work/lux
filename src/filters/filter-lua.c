@@ -7,6 +7,39 @@ static const char mkey[] = "model";
 static const char rkey[] = "routes";
 static const char ctype_def[] = "text/html";
 
+struct ab {
+	int msglen;
+	unsigned char *msg;	
+};
+
+static int make_c ( zKeyval *kv, int i, void *p ) {
+	struct ab *ab = (struct ab *)p;
+	if ( kv->key.type == ZTABLE_TXT )
+		;
+	else if ( kv->key.type == ZTABLE_INT ) {
+
+	}
+
+	if ( kv->value.type == ZTABLE_INT ) 
+		;
+	else if ( kv->value.type == ZTABLE_FLT ) 
+		;
+	else if ( kv->value.type == ZTABLE_TXT ) 
+		zhttp_append_to_uint8t( &ab->msg, &ab->msglen, (unsigned char *)kv->value.v.vchar, strlen( kv->value.v.vchar )); 
+	else if ( kv->value.type == ZTABLE_BLB ) {
+		zhttp_append_to_uint8t( &ab->msg, &ab->msglen, kv->value.v.vblob.blob, kv->value.v.vblob.size ); 
+	} 
+	return 1;	
+}
+
+//Create a message out of a zTable
+struct ab * ztable_to_msg ( zTable *t ) {
+	struct ab *ab = NULL;
+	lt_exec_complex( t, 1, t->count, &ab, make_c );
+	return ab;
+}
+
+
 //HTTP error
 int http_error( struct HTTPBody *res, int status, char *fmt, ... ) { 
 	va_list ap;
@@ -717,6 +750,10 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 	//Load all views
 	lt_lock( ld.zmodel );
+
+	//Write something to turn this into something else
+	lt_dump( ld.zmodel );
+
 #if 0
 	//If this is always the same, then the bug is elsewhere...
 	lt_fdump( ld.zmodel, 1 );
