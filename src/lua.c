@@ -310,22 +310,39 @@ int ztable_to_lua ( lua_State *L, zTable *t ) {
 	return 1;
 }
 
+#if 0
+#ifndef DEBUG_H
+#define TELL(fmt,a)
+	1
+#else
+static char B[ 1024 ];
+#define TELL(fmt,a) \
+	memset( B, 0, sizeof(B) ) && snprintf( B, sizeof(B), fmt, a ) && fprintf( stderr, "%s", B )
+#endif
+#endif
 
+#define TELL(fmt,a) 1
 
 //Convert Lua tables to regular tables
 int lua_to_ztable ( lua_State *L, int index, zTable *t ) {
+
+	if ( !lua_checkstack( L, 3 ) ) {
+		fprintf( stderr, "STACK OUT OF SPACE!" );	
+		return 0;
+	}
+
 	lua_pushnil( L );
 
 	while ( lua_next( L, index ) != 0 ) {
 		int kt = lua_type( L, -2 ); 
 		int vt = lua_type( L, -1 );
-		//fprintf( stderr, "%s -> %s\n", lua_typename( L, kt ), lua_typename( L, vt ) );
+lua_istack( L );
 
 		//Get key (remember Lua indices always start at 1.  Hence the minus.
 		if ( kt == LUA_TNUMBER )
-			lt_addintkey( t, lua_tointeger( L, -2 ) - 1 );
+			TELL( "(%lld)", lua_tointeger( L, -2 ) - 1 ) && lt_addintkey( t, lua_tointeger( L, -2 ) - 1 );
 		else if ( kt == LUA_TSTRING )
-			lt_addtextkey( t, (char *)lua_tostring( L, -2 ));
+			TELL( "(%s)", lua_tostring( L, -2 ) ) && lt_addtextkey( t, (char *)lua_tostring( L, -2 ));
 		else {
 			//Invalid key type
 			fprintf( stderr, "Got invalid key in table!" );
@@ -333,11 +350,14 @@ int lua_to_ztable ( lua_State *L, int index, zTable *t ) {
 		}
 
 		//Get value
-		if ( vt == LUA_TNUMBER )
-			lt_addintvalue( t, lua_tointeger( L, -1 ));
+		if ( vt == LUA_TNUMBER ) {
+			TELL( " (%lld)\n", lua_tointeger( L, -1 ) ) && lt_addintvalue( t, lua_tointeger( L, -1 ));
+			lt_finalize( t );
+		}
 		else if ( vt  == LUA_TSTRING ) {
 		#if 1
-			lt_addtextvalue( t, (char *)lua_tostring( L, -1 ));
+			TELL( " (%s)\n", lua_tostring( L, -1 ) ) && lt_addtextvalue( t, (char *)lua_tostring( L, -1 ));
+			lt_finalize( t );
 		#else
 			const char *a = NULL;
 			if ( ( a = lua_tostring( L, -1 ) ) )
@@ -348,22 +368,23 @@ int lua_to_ztable ( lua_State *L, int index, zTable *t ) {
 		#endif
 		}
 		else if ( vt == LUA_TTABLE ) {
+			TELL( " (table at %d)\n", index ); 
 			lt_descend( t );
+//fprintf( stderr, "AFTER DESCENT\n==================\n" );
+//lt_kfdump( t, 2 );
 			//tables with nothing should not recurse...
 			lua_to_ztable( L, index + 2, t ); 
 			lt_ascend( t );
+//fprintf( stderr, "AFTER ASCENT\n==================\n" );
+//lt_kfdump( t, 2 );
 		}
 		else {
 			fprintf( stderr, "Got invalid value in table!" );
 			return 0;
 		}
 
-		//FPRINTF( "popping last two values...\n" );
-		if ( vt == LUA_TNUMBER || vt == LUA_TSTRING ) {
-			lt_finalize( t );
-		}
-		lua_pop(L, 1);
+		lua_pop( L, 1 );
 	}
-	lt_lock( t );
+	//lt_lock( t );
 	return 1;
 }

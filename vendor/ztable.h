@@ -55,10 +55,10 @@
 
 #define ZTABLE_ERRV_LENGTH 127 
 
-#define LT_POLYMORPH_BUFLEN 2048
+#define LT_BUFLEN 2047 
 
-#ifndef LT_MAX_HASH
- #define LT_MAX_HASH 7 
+#ifndef LT_MAX_COLLISIONS
+ #define LT_MAX_COLLISIONS 10
 #endif
 
 #define lt_counti(t, i) \
@@ -77,12 +77,16 @@
 	lt_exec_complex( t, 0, t->index, a, b )
 
 #define lt_dump(t) \
-	lt_exec( t, &__ltHistoric, __lt_dump )
+	!( __ltHistoric.level = 0 ) && fprintf( stderr, "LEVEL IS %d\n", __ltHistoric.level ) && lt_exec( t, &__ltHistoric, __lt_dump )
 
 #define lt_fdump(t, i) \
-	( __ltHistoric.fd = i ) && lt_exec( t, &__ltHistoric, __lt_dump ) && fflush( stdout )
+	!( __ltHistoric.level = 0 ) && ( __ltHistoric.fd = i ) && lt_exec( t, &__ltHistoric, __lt_dump ) && fflush( stdout )
+
+#define lt_kfdump(t, i) \
+	!( __ltComplex.level = 0 ) && ( __ltComplex.fd = i ) && lt_exec( t, &__ltComplex, __lt_dump ) && fflush( stdout )
+
 #define lt_kdump(t) \
-	lt_exec( t, &__ltComplex, __lt_dump )
+	!( __ltComplex.level = 0 ) && lt_exec( t, &__ltComplex, __lt_dump )
 
 #define lt_sdump(t) \
 	lt_exec( t, &__ltSimple, __lt_dump )
@@ -302,13 +306,15 @@
 	lt_deep_copy (t, start, t->count )
 
 enum {
-	ZTABLE_ERR_NONE,
+	ZTABLE_ERR_NONE = 0,
 	ZTABLE_ERR_LT_ALLOCATE,
 	ZTABLE_ERR_LT_OUT_OF_SPACE,
 	ZTABLE_ERR_LT_INVALID_VALUE,
 	ZTABLE_ERR_LT_INVALID_TYPE,
 	ZTABLE_ERR_LT_INVALID_INDEX,
 	ZTABLE_ERR_LT_OUT_OF_SLICE,
+	ZTABLE_ERR_LT_MAX_COLLISIONS,
+	ZTABLE_ERR_LT_INVALID_KEY,
 	ZTABLE_ERR_LT_INDEX_MAX,
 };
 
@@ -324,11 +330,8 @@ typedef struct zKeyval zKeyval;
 typedef union zhRecord zhRecord;
 
 typedef struct { 
-	enum { LT_DUMP_SHORT, LT_DUMP_LONG } dumptype; 
-	enum { LT_CONDENSED, LT_VERBOSE } indextype;
-	const char *customfmt;
-	int fd; 
-	int level; 
+	enum { LT_DUMP_SHORT, LT_DUMP_LONG } dumptype;
+	char fd, level; 
 } zhInner;
 
 //Table for table values
@@ -358,20 +361,23 @@ typedef struct {
 	int start  ;     //Table bounds are here if "lt_within" is used
 	int end    ;
 	int buflen ;
+#ifdef DEBUG_H
+	int collisions;
+#endif
   unsigned char *src; //Source for when you need it
   unsigned char *buf; //Pointer for trimmed keys and values
   zKeyval *head; //Pointer to the first element
   zhTable *current; //Pointer to the current element
 	void *ptr; //A random void pointer...
-  char error;
+  int error;
 #ifdef ZTABLE_ERR_EXP 
 	char errmsg[ ZTABLE_ERRV_LENGTH ];
 #endif
 } zTable;
 
 struct zhTable {
-  unsigned int  count;
-  long      ptr;
+  unsigned int count;
+  long ptr;
   zhTable *parent;
 };
 
@@ -399,10 +405,19 @@ struct zhValue {
 };
 
 struct zKeyval {
-  int hash[LT_MAX_HASH];
-  zKeyval *parent;  
   zhValue key; 
   zhValue value;
+  zKeyval *parent;  
+	//This works b/c we can hash at lt_lock... 
+	//Can't tell if there's a way to use allocation to get this done
+	int index[ LT_MAX_COLLISIONS ];
+#ifdef DEBUG_H
+	//int collisions;
+	//int ???;
+#endif
+
+  //zKeyval *next[ LT_MAX_COLLISIONS ];
+  //int hash[LT_MAX_COLLISIONS];
 };
 
 extern zhInner __ltComplex; 
@@ -415,6 +430,8 @@ zhType lt_add (zTable *, int, zhType,
 	int, float, char *, unsigned char *, unsigned int , void *, zTable *, char *);
 
 zTable *lt_init (zTable *, zKeyval *, int) ;
+
+zTable *lt_make ( int ) ;
 
 void lt_printall (zTable *);
 
@@ -432,7 +449,7 @@ zhType lt_rettype (zTable *, int, int);
 
 const char *lt_rettypename (zTable *, int, int);
 
-void lt_lock (zTable *); 
+int lt_lock (zTable *); 
 
 int lt_get_long_i (zTable *, unsigned char *, int);
 
@@ -478,14 +495,16 @@ const char *lt_typename (int);
 
 zTable *lt_deep_copy (zTable *t, int from, int to); 
 
-#ifdef ZTABLE_ERR_EXP 
 const char *lt_strerror (zTable *);
 
 void lt_clearerror (zTable *);
-#endif
 
 #ifdef DEBUG_H
- void lt_printt (zTable *);
+void lt_printt (zTable *);
+
+void lt_free_keys ( const char ** );
+
+const char ** lt_get_keys ( zTable * );
 #endif
 
 #endif

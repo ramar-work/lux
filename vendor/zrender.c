@@ -66,18 +66,6 @@
  * ------------------------------------------------------- */
 #include "zrender.h"
 
-typedef enum error {
-	ZRENDER_NONE
-,	ZRENDER_MALLOC
-, ZRENDER_SYNTAX_END_BEFORE_START
-} zRenderError;
-
-static const char *errors[] = {
-	[ ZRENDER_NONE ] = "No errors."
-,	[ ZRENDER_MALLOC ] = "Memory allocation error."
-, [ ZRENDER_SYNTAX_END_BEFORE_START ] = "Loop end sequence detected at line %d, but no loop start found\n"
-};
-
 //Write full path to a node
 static char * lookup_xmap ( struct xmap *xp, char *xb, int xblen ) {
 	struct xdesc *tp = xp->parent;	
@@ -280,12 +268,6 @@ const char * zrender_strerror( zRender *z ) {
 }
 
 
-int zrender_set_error( zRender *z, zRenderError e ) {
-	//vsnprintf( z->errmsg, ZRENDER_ERR_BUFLEN, errors[ e ] );
-	z->error = e; 
-	return -1;
-} 
-
 
 //Use the default templating language (mustache)
 void zrender_set_default_dialect( zRender *rz ) {
@@ -334,7 +316,6 @@ int zrender_set_marks( zRender *rz, const unsigned char *src, unsigned int srcle
 				//TODO: Add exact positioning later
 				const char fmt[] = "Loop end sequence detected at line %d, but no loop start found\n";
 				snprintf( rz->errmsg, 1024, fmt, nl ); 
-				
 				return 0;	
 			}
 			#endif

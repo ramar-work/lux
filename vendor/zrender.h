@@ -47,8 +47,6 @@
 #ifndef ZRENDER_H
 #define ZRENDER_H
 
-#define ZRENDER_ERR_BUFLEN 1024
-
 #define zr_add_item(LIST,ELEMENT,SIZE,LEN) \
  add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 
@@ -91,7 +89,7 @@ typedef struct zRender {
 	const char *zStart; 
 	const char *zEnd;
 	int error;
-	char errmsg[ ZRENDER_ERR_BUFLEN ];
+	char errmsg[1024];
 
 	void *userdata;
 	struct premap **premap;	

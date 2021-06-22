@@ -30,10 +30,17 @@ int db_exec ( lua_State *L ) {
 #endif
 
 	//Convert to C table for slightly easier key extraction	
-	if ( !lua_to_ztable( L, 1, t ) ) {
+	if ( !lua_to_ztable( L, 1, t ) || !lt_lock( t ) ) {
 		lt_free( t );
 		return luaL_error( L, "Failed to convert to zTable" );
 	}
+
+	//lt_lock( t );
+#if 0
+	//Lock and dump?
+	lt_dump( t );
+	getchar();
+#endif
 
 	//After we're done getting the table, that should be it
 	lua_pop( L, 1 );	
@@ -176,6 +183,9 @@ int db_exec ( lua_State *L ) {
 		( len ) ? free( (void *)query ) : 0;
 		return luaL_error( L, "conversion error: %s", zdb.err );
 	}
+
+	lt_kfdump( results, 2 );
+//getchar();
 
 	//It's infinitely easier to write this first...
 	if ( !ztable_to_lua( L, results ) ) {

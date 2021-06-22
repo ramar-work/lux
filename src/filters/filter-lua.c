@@ -306,6 +306,23 @@ int load_lua_config( struct luadata_t *l ) {
 		return 0;
 	}
 
+	lt_lock( l->zconfig );
+
+#if 0
+	struct timespec tt = {0};
+	clock_gettime( CLOCK_REALTIME, &tt ); 
+	srand( tt.tv_nsec );
+	char fb[ 1024 ] = {0};
+	snprintf( fb, sizeof(fb), "/tmp/luatest-%d", rand() );
+	int fd = open( fb, O_CREAT | O_RDWR, 0755 );
+	if ( fd == -1 ) {
+		fprintf( stderr, "%s\n", strerror( errno ) );
+		exit( 1 );
+	}
+	lt_kfdump( l->zconfig, fd );
+	close( fd );
+#endif
+
 	//Set other keys here
 	if ( ( db = lt_text( l->zconfig, "db" ) ) ) {
 		memcpy( (void *)l->db, db, strlen( db ) ); 
@@ -730,9 +747,9 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		}
 	}
 
-
 	//In the case of no model, initialize one anyway
-	if ( !lt_init( ld.zmodel, NULL, !model ? 32 : 8190 ) ) {
+	//if ( !lt_init( ld.zmodel, NULL, !model ? 32 : 8190 ) ) {
+	if ( !lt_init( ld.zmodel, NULL, 8193 ) ) {
 		free_ld( &ld );
 		return http_error( res, 500, "Could not allocate table for model." );
 	}
@@ -742,6 +759,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	if ( lua_isnil( ld.state, -1 ) )
 		lua_pop( ld.state, 1 );
 	else { 
+fprintf( stderr, "converting model to ztable\n");
 		if ( !lua_to_ztable( ld.state, 1, ld.zmodel ) ) {
 			free_ld( &ld );
 			return http_error( res, 500, "Error in model conversion." );
@@ -751,12 +769,28 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//Load all views
 	lt_lock( ld.zmodel );
 
-	//Write something to turn this into something else
-	lt_dump( ld.zmodel );
-
 #if 0
+	lt_kfdump( ld.zmodel, 2 );
+#else
+	struct timespec tt = {0};
+	clock_gettime( CLOCK_REALTIME, &tt ); 
+	srand( tt.tv_nsec );
+	char fb[ 1024 ] = {0};
+	snprintf( fb, sizeof(fb), "/tmp/modeltest-%d", rand() );
+	int mfd = open( fb, O_CREAT | O_RDWR, 0755 );
+	if ( mfd == -1 ) {
+		fprintf( stderr, "%s\n", strerror( errno ) );
+		exit( 1 );
+	}
+	lt_kfdump( ld.zmodel, mfd );
+	close( mfd );
+#endif
+
+#if 1
 	//If this is always the same, then the bug is elsewhere...
-	lt_fdump( ld.zmodel, 1 );
+	//lt_fdump( ld.zmodel, 1 );
+free_ld( &ld );
+exit(0);
 	return http_error( res, 200, "model->count: %d\n", ld.zmodel->count );
 #endif
 
