@@ -336,7 +336,6 @@ int lua_to_ztable ( lua_State *L, int index, zTable *t ) {
 	while ( lua_next( L, index ) != 0 ) {
 		int kt = lua_type( L, -2 ); 
 		int vt = lua_type( L, -1 );
-lua_istack( L );
 
 		//Get key (remember Lua indices always start at 1.  Hence the minus.
 		if ( kt == LUA_TNUMBER )
@@ -370,13 +369,9 @@ lua_istack( L );
 		else if ( vt == LUA_TTABLE ) {
 			TELL( " (table at %d)\n", index ); 
 			lt_descend( t );
-//fprintf( stderr, "AFTER DESCENT\n==================\n" );
-//lt_kfdump( t, 2 );
 			//tables with nothing should not recurse...
 			lua_to_ztable( L, index + 2, t ); 
 			lt_ascend( t );
-//fprintf( stderr, "AFTER ASCENT\n==================\n" );
-//lt_kfdump( t, 2 );
 		}
 		else {
 			fprintf( stderr, "Got invalid value in table!" );
@@ -385,6 +380,5 @@ lua_istack( L );
 
 		lua_pop( L, 1 );
 	}
-	//lt_lock( t );
 	return 1;
 }

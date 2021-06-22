@@ -759,7 +759,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	if ( lua_isnil( ld.state, -1 ) )
 		lua_pop( ld.state, 1 );
 	else { 
-fprintf( stderr, "converting model to ztable\n");
 		if ( !lua_to_ztable( ld.state, 1, ld.zmodel ) ) {
 			free_ld( &ld );
 			return http_error( res, 500, "Error in model conversion." );
@@ -769,8 +768,8 @@ fprintf( stderr, "converting model to ztable\n");
 	//Load all views
 	lt_lock( ld.zmodel );
 
-#if 0
-	lt_kfdump( ld.zmodel, 2 );
+#if 1
+	//lt_kfdump( ld.zmodel, 2 );
 #else
 	struct timespec tt = {0};
 	clock_gettime( CLOCK_REALTIME, &tt ); 
@@ -784,14 +783,8 @@ fprintf( stderr, "converting model to ztable\n");
 	}
 	lt_kfdump( ld.zmodel, mfd );
 	close( mfd );
-#endif
-
-#if 1
-	//If this is always the same, then the bug is elsewhere...
-	//lt_fdump( ld.zmodel, 1 );
-free_ld( &ld );
-exit(0);
-	return http_error( res, 200, "model->count: %d\n", ld.zmodel->count );
+	free_ld( &ld );
+	exit(0);
 #endif
 
 	int view = 0;
