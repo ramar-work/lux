@@ -200,7 +200,7 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 	}
 
 	//Convert configuration into a table
-	if ( !lua_to_ztable( L, 1, t ) ) {
+	if ( !lua_to_ztable( L, 1, t ) || !lt_lock( t ) ) {
 		snprintf( err, errlen, "Failed to convert Lua config data to table.\n" );
 		free_t( t );
 		free( config );
