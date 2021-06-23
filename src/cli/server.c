@@ -34,6 +34,8 @@
 #include <lualib.h>
 #include <lauxlib.h>
 #include <signal.h>
+#include <strings.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <pwd.h>
@@ -141,7 +143,7 @@ struct filter filters[16] = {
 };
 
 
-int cmd_kill();
+int cmd_kill ( struct values *, char *, int );
 
 int procpid = 0;
 
@@ -156,7 +158,8 @@ const int fkctpost( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c) {
 
 void sigkill( int signum ) {
 	fprintf( stderr, "Killing the server..." );
-	cmd_kill();
+	char err[ 2048 ] = {0};
+	cmd_kill( NULL, err, sizeof( err ) );
 }
 
 
@@ -177,7 +180,61 @@ struct senderrecvr sr[] = {
 };
 
 
-int cmd_kill ( ) {
+int cmd_kill ( struct values *v, char *err, int errlen ) {
+	//Open a file
+	struct stat sb;
+	DIR *dir = NULL;
+	const char *dname = PIDDIR; 
+
+	if ( !( dir = opendir( dname ) ) ) {
+		snprintf( err, errlen, "Failed to open PID directory: %s\n", strerror( errno ) );
+		return 0;	
+	}
+
+	for ( struct dirent *d; ( d = readdir( dir ) ); ) {
+		if ( *d->d_name	== '.' ) {
+			continue;
+		}
+
+	#ifdef DEBUG_H
+		fprintf( stderr, "Checking %s/%s\n", dname, d->d_name );
+	#endif
+
+		if ( memstrat( d->d_name, "hypno-", strlen( d->d_name ) ) > -1 ) {
+			fprintf( stderr, "I found a PID file at: %s/%s\n", dname, d->d_name );
+			//Read the contents in and kill from here?
+			char fpid[ 64 ] = {0}, fname[ 2048 ] = {0};
+			int pid, fd = 0;
+			snprintf( fname, sizeof( fname ), "%s/%s", dname, d->d_name );
+			if ( ( fd = open( fname, O_RDONLY ) ) == -1 ) {
+				snprintf( err, errlen, "Failed to open PID file: %s\n", strerror( errno ) );
+				return 0;
+			}
+
+			if ( read( fd, fpid, sizeof( fpid ) ) == -1 ) {
+				snprintf( err, errlen, "Failed to read PID file: %s\n", strerror( errno ) );
+				return 0;
+			} 
+
+			if ( ( pid = safeatoi( fpid ) ) < 2 ) {
+				snprintf( err, errlen, "Server process ID is invalid.\n" );
+				return 0;
+			}
+
+			//Do we go until it's dead?
+			if ( kill( pid, SIGKILL ) == -1 ) {
+				snprintf( err, errlen, "Could not kill process %d: %s", pid, strerror( errno ) );
+				return 0;
+			}
+
+			close( fd );
+			closedir( dir );	
+			return 1;
+		}
+	}	
+	
+	closedir( dir );	
+	snprintf( err, errlen, "No server appears to be running right now." );
 	return 0;
 }
 
@@ -605,24 +662,9 @@ int main (int argc, char *argv[]) {
 		values.group = getpwuid( values.gid )->pw_name ;
 	}
 
-	//Pull in a configuration
-	if ( !values.config ) {
-		eprintf( "No configuration specified." );
-		return 1;
-	}
-
 	//Open the libraries (in addition to stuff)
 	if ( !values.libdir ) {
 		values.libdir = LIBDIR;
-	}
-
-	//Set pid file
-	if ( !values.pidfile ) {
-		struct timespec t;
-		clock_gettime( CLOCK_REALTIME, &t );
-		unsigned long time = t.tv_nsec % 3333;
-		snprintf( pidbuf, sizeof( pidbuf ) - 1, "%s/%s-%ld", PIDDIR, NAME, time );
-		values.pidfile = pidbuf;
 	}
 
 #if 0
@@ -645,6 +687,21 @@ int main (int argc, char *argv[]) {
 			//start a fork...
 		}
 	#endif
+		//Set pid file
+		if ( !values.pidfile ) {
+			struct timespec t;
+			clock_gettime( CLOCK_REALTIME, &t );
+			unsigned long time = t.tv_nsec % 3333;
+			snprintf( pidbuf, sizeof( pidbuf ) - 1, "%s/%s-%ld", PIDDIR, NAME, time );
+			values.pidfile = pidbuf;
+		}
+
+		//Pull in a configuration
+		if ( !values.config ) {
+			eprintf( "No configuration specified." );
+			return 1;
+		}
+
 		if ( !cmd_server( &values, err, sizeof(err) ) ) {
 			eprintf( "%s", err );
 			return 1;
@@ -652,8 +709,11 @@ int main (int argc, char *argv[]) {
 	}
 
 	if ( values.kill ) {
-		eprintf ( "%s\n", "--kill not yet implemented." );
-		return 1;
+		//eprintf ( "%s\n", "--kill not yet implemented." );
+		if ( !cmd_kill( &values, err, sizeof( err ) ) ) {
+			eprintf( "%s", err );
+			return 1;
+		}
 	}
 
 	return 0;

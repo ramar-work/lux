@@ -138,7 +138,7 @@ static unsigned int lt_hashu ( unsigned char *ustr, int len, int size ) {
 
 
 //Build a string or some other index in reverse
-static int build_backwards (zKeyval *t, unsigned char *buf, int bs) { 
+int build_backwards (zKeyval *t, unsigned char *buf, int bs) { 
 	//This should return if there is no value...
 	int size = 0, mm = bs;
 	zKeyval *p =  t;
@@ -1181,7 +1181,6 @@ int __lt_dump ( zKeyval *kv, int ii, void *p ) {
 			}
 		}
 	}
-
 	write( pp->fd, b, w );
 	write( pp->fd, "\n", 1 );
 	return 1;

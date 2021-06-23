@@ -1,16 +1,22 @@
 #include "filter-lua.h"
 
 static const char rname[] = "route";
+
 static const char def[] = "default";
+
 static const char confname[] = "config.lua";
+
 static const char mkey[] = "model";
+
 static const char rkey[] = "routes";
+
 static const char ctype_def[] = "text/html";
 
 struct ab {
 	int msglen;
 	unsigned char *msg;	
 };
+
 
 static int make_c ( zKeyval *kv, int i, void *p ) {
 	struct ab *ab = (struct ab *)p;
@@ -121,18 +127,6 @@ int make_read_only ( lua_State *L, const char *table ) {
 
 
 
-
-
-#if 0
-//Load Lua libraries
-static lua_State * lua_load_libs( lua_State **L ) {
-	if ( !( *L = luaL_newstate() ) ) {
-		return NULL;
-	}	
-	luaL_openlibs( *L );
-	return *L;
-}
-#endif
 //Should return an error b/c there are some situations where this does not work.
 int lua_loadlibs( lua_State *L, struct lua_fset *set, int standard ) {
 	//Load the standard libraries

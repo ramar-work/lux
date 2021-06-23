@@ -331,7 +331,7 @@ typedef union zhRecord zhRecord;
 
 typedef struct { 
 	enum { LT_DUMP_SHORT, LT_DUMP_LONG } dumptype;
-	char fd, level; 
+	char fd, level, *buffer; 
 } zhInner;
 
 //Table for table values
@@ -498,6 +498,8 @@ zTable *lt_deep_copy (zTable *t, int from, int to);
 const char *lt_strerror (zTable *);
 
 void lt_clearerror (zTable *);
+
+int build_backwards (zKeyval *, unsigned char *, int );
 
 #ifdef DEBUG_H
 void lt_printt (zTable *);
