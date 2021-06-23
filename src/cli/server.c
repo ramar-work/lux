@@ -34,6 +34,7 @@
 #include <lualib.h>
 #include <lauxlib.h>
 #include <signal.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <pwd.h>
 #include "../socket.h"
@@ -181,11 +182,73 @@ int cmd_kill ( ) {
 }
 
 
+//We can drop privileges permanently
+int revoke_priv ( struct values *v, char *err, int errlen ) {
+	//You're root, but you need to drop to v->user, v->group
+	//This can fail in a number of ways:
+	//- you're not root, 
+	//- the user or group specified does not exist
+	//- completely different thing could go wrong
+	//Privilege seperation should be done here.
+	struct passwd *p = getpwnam( v->user );
+	gid_t ogid = v->gid, ngid;
+	uid_t ouid = v->uid, nuid; 
+
+	//uid and gid should be blank if a user was specified
+	if ( ouid == -1 ) {
+		ogid = getegid(), ouid = geteuid();	
+	}
+
+	//Die if we can't find the user that we're supposed to run as
+	if ( !p ) {
+		snprintf( err, errlen, "user %s not found.\n", v->user );
+		return 0;
+	}
+
+	//This is the user to switch to
+	ngid = p->pw_gid, nuid = p->pw_uid;
+
+	//Finally, if the two aren't the same, switch to the new one
+	if ( ngid != ogid ) {
+		char *gname = getpwuid( ngid )->pw_name;
+	#if 1
+		if ( setegid( ngid ) == -1 || setgid( ngid ) == -1 ) {
+	#else
+		if ( setreuid( ngid, ngid ) == -1 ) {
+	#endif
+			snprintf( err, errlen, "Failed to set run-as group '%s': %s\n", gname, strerror( errno ) );
+			return 0;
+		}
+	} 
+
+	//seteuid does not work, why?
+	if ( nuid != ouid ) {
+	#if 1
+		if ( seteuid( nuid ) == -1 || setuid( nuid ) == -1 ) {
+	#else
+		if ( setreuid( nuid, nuid ) == -1 ) {
+	#endif
+			snprintf( err, errlen, "Failed to set run-as user '%s': %s\n", p->pw_name, strerror( errno ) );
+			return 0;
+		}
+	}
+	return 1;
+}
+
+
+#if 0
+void see_runas_user ( struct values *v ) {
+	fprintf( stderr, "username: %s\n", p->pw_name	 );
+	fprintf( stderr, "current user id: %d\n", ouid );
+	fprintf( stderr, "current group id: %d\n", ogid );
+	fprintf( stderr, "runas user id: %d\n", p->pw_uid );
+	fprintf( stderr, "runas group id: %d\n", p->pw_gid );
+}
+#endif
+
+
 //Loop should be extracted out
 int cmd_server ( struct values *v, char *err, int errlen ) {
-#if 1
-	//Change root here?
-
 	//Define
 	struct sockAbstr su = {0};
 	struct senderrecvr *ctx = NULL;
@@ -205,31 +268,18 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 	//Open a socket		
 	if ( !open_listening_socket( &su, err, errlen ) ) {
-		eprintf( "socket open error: %s", err );
-		close_listening_socket( &su, err, sizeof(err) );
+		//eprintf( "socket open error: %s", err );
+		char throwaway[ 1024 ] = {0};
+		close_listening_socket( &su, throwaway, sizeof(throwaway) );
 		return 0;
 	}
 
-#if 1
-	struct passwd *p = getpwnam( v->user );
-	int gid, uid;
-	if ( !p ) {
-		eprintf( "user %s not found.\n", v->user );
+	//Drop privileges
+	if ( !revoke_priv( v, err, errlen ) ) {
 		return 0;
 	}
 
-#if 0
-	fprintf( stderr, "username: %s\n", p->pw_name	 );
-	fprintf( stderr, "user id: %d\n", p->pw_uid );
-	fprintf( stderr, "group id: %d\n", p->pw_gid );
-#endif
-
-	if ( !( uid = p->pw_uid ) || !( gid = p->pw_gid ) ) {
-		eprintf( "got incorrect uid / gid for user %s.\n", v->user );
-		return 0;
-	}
-	
-#if 1
+	//Write a PID file
 	if ( !v->fork ) { 
 		//Record the PID somewhere
 		int len, fd = 0;
@@ -256,15 +306,10 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			eprintf( "Could not close parent socket: %s", strerror(errno));
 			return 0;
 		}
-
-		//Change proc info after we're done
-		setuid( uid );
-		setgid( gid );
 	}
-#endif
-#else
+#if 0
 	//Change process owner (may have to be done with either fork or something else)
-	if ( values.fork ) {
+	else {
 		//Create another process with user and group 
 		pid_t spid; 
 		if ( ( spid = fork() ) == -1 ) {
@@ -366,7 +411,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		eprintf( "Couldn't close parent socket. Error: %s", err );
 		return 0;
 	}
-#endif	
 	return 1;
 }
 
@@ -465,48 +509,9 @@ void print_options ( struct values *v ) {
 }
 
 
-//We can also choose to daemonize the server or not.
-//But is this too complicated?
-#if 0
-int daemonizer() {
-	//If I could open a socket and listen successfully, then write the PID
-	#if 0
-	if ( values.fork ) {
-		pid_t pid = fork();
-		if ( pid == -1 ) {
-			fprintf( stderr, "Failed to daemonize server process: %s", strerror(errno) );
-			return 0;
-		}
-		else if ( !pid ) {
-			//Close the parent?
-			return 0;
-		}
-		else if ( pid ) {
-			int len, fd = 0;
-			char buf[64] = { 0 };
-
-			if ( (fd = open( pidfile, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR )) == -1 )
-				return ERRL( "Failed to access PID file: %s.", strerror(errno));
-
-			len = snprintf( buf, 63, "%d", pid );
-
-			//Write the pid down
-			if (write( fd, buf, len ) == -1)
-				return ERRL( "Failed to log PID: %s.", strerror(errno));
-		
-			//The parent exited successfully.
-			if ( close(fd) == -1 )
-				return ERRL( "Could not close parent socket: %s", strerror(errno));
-			return SUC_PARENT;
-		}
-	}
-	#endif
-}
-#endif
-
 
 int main (int argc, char *argv[]) {
-	struct values values = { 0 };
+	struct values values = { .gid = -1, .uid = -1 };
 	char err[ 2048 ] = { 0 };
 	int *port = NULL; 
 
@@ -620,11 +625,13 @@ int main (int argc, char *argv[]) {
 		values.pidfile = pidbuf;
 	}
 
+#if 0
 	//Load shared libraries
 	if ( !cmd_libs( &values, err, sizeof( err ) ) ) {
 		eprintf( "%s", err );
 		return 1;
 	}
+#endif
 
 	//Dump the configuration if necessary
 	if ( values.dump ) {
