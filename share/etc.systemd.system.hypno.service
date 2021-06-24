@@ -1,0 +1,15 @@
+[Unit]
+Description=Hypno, a Lua-based web and application server.
+DefaultDependencies=no
+After=network.target
+
+[Service]
+#User=ramar
+#Group=ramar
+Type=simple
+ExecStart=/usr/local/bin/hypno-server --start --port 80 --user http --group http
+Restart=on-failure
+PIDFile=/tmp/hypno.pid
+
+[Install]
+WantedBy=multi-user.target

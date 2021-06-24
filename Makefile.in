@@ -22,6 +22,8 @@ EXEC_PREFIX = @exec_prefix@
 
 BINDIR = @bindir@
 
+WEBDIR = /var/www
+
 # VPATH-specific
 srcdir = @srcdir@
 
@@ -134,6 +136,8 @@ install:
 	-test -d $(PREFIX)/share/$(NAME)/ || mkdir -p $(PREFIX)/share/$(NAME)/
 	test -d $(PREFIX)/share/$(NAME)/
 	cp $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
+	mv $(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service /etc/systemd/system/
+	-mkdir -p $(WEBDIR)/ && chown $(USER):$(GROUP) $(WEBDIR)/
 	-test -d /var/lib/$(NAME)/ || mkdir /var/lib/$(NAME)/
 	test -d /var/lib/$(NAME)/
 	-cp $(srcdir)/lib/* /var/lib/$(NAME)/
