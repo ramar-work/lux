@@ -290,7 +290,7 @@ int revoke_priv ( struct values *v, char *err, int errlen ) {
 	//seteuid does not work, why?
 	if ( nuid != ouid ) {
 	#if 1
-		if ( 0 /*seteuid( nuid ) == -1*/ || setuid( nuid ) == -1 ) {
+		if ( /*seteuid( nuid ) == -1 || */ setuid( nuid ) == -1 ) {
 	#else
 		if ( setreuid( nuid, nuid ) == -1 ) {
 	#endif
@@ -339,7 +339,8 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		close_listening_socket( &su, throwaway, sizeof(throwaway) );
 		return 0;
 	}
-#if 0
+
+#if 1
 	//Drop privileges
 	if ( !revoke_priv( v, err, errlen ) ) {
 		return 0;
@@ -474,11 +475,10 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 					break;
 				}
 			}
-		#if 1	
 			FPRINTF( "Child process is exiting.\n" );
+		#if 1	
 			break;
 		#else
-			FPRINTF( "Child process is exiting.\n" );
 			_exit( 0 );
 		#endif
 		}
@@ -499,7 +499,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	}
 
 	//Close the socket
-	FPRINTF( "PARENT SHOULD NEVER GET HERE!\n" );
 	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
 		FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
 		return 0;
