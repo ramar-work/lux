@@ -7,9 +7,8 @@ After=network.target
 #User=ramar
 #Group=ramar
 Type=simple
-ExecStart=/usr/local/bin/hypno-server --start --port 80 --user http --group http
+ExecStart=/usr/local/bin/hypno-server --start --port 80 --user http --group http --config /var/www/config.lua
 Restart=on-failure
-PIDFile=/tmp/hypno.pid
 
 [Install]
 WantedBy=multi-user.target
