@@ -184,7 +184,7 @@ int db_exec ( lua_State *L ) {
 		return luaL_error( L, "conversion error: %s", zdb.err );
 	}
 
-	lt_kfdump( results, 2 );
+//lt_kfdump( results, 2 );
 //getchar();
 
 	//It's infinitely easier to write this first...
