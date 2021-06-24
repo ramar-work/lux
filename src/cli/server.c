@@ -227,7 +227,16 @@ int cmd_kill ( struct values *v, char *err, int errlen ) {
 				return 0;
 			}
 
-			close( fd );
+			if ( close( fd ) == -1 ) {
+				snprintf( err, errlen, "Could not close file %s: %s", fname, strerror( errno ) );
+				return 0;
+			}
+
+			if ( remove( fname ) == -1 ) {
+				snprintf( err, errlen, "Could not remove file %s: %s", fname, strerror( errno ) );
+				return 0;
+			} 
+
 			closedir( dir );	
 			return 1;
 		}
@@ -281,7 +290,7 @@ int revoke_priv ( struct values *v, char *err, int errlen ) {
 	//seteuid does not work, why?
 	if ( nuid != ouid ) {
 	#if 1
-		if ( seteuid( nuid ) == -1 || setuid( nuid ) == -1 ) {
+		if ( 0 /*seteuid( nuid ) == -1*/ || setuid( nuid ) == -1 ) {
 	#else
 		if ( setreuid( nuid, nuid ) == -1 ) {
 	#endif

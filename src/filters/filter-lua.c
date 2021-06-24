@@ -781,6 +781,8 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	exit(0);
 #endif
 
+	//TODO: routes with no special keys need not be added
+
 	int view = 0;
 	for ( struct imvc_t **v = ld.pp.imvc_tlist; *v; v++ ) {
 		if ( *(*v)->file == 'v' ) {
@@ -804,8 +806,10 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			}
 
 			if ( !( render = zrender_render( rz, src, strlen((char *)src), &renlen ) ) ) {
+				char errbuf[ 2048 ] = { 0 };
+				snprintf( errbuf, sizeof( errbuf ), "%s", rz->errmsg );
 				zrender_free( rz ), free( src ), free_ld( &ld );
-				return http_error( res, 500, "%s", "Renderer error." );
+				return http_error( res, 500, "%s", errbuf );
 			}
 
 			zhttp_append_to_uint8t( &content, &clen, render, renlen ); 
