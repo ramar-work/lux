@@ -715,7 +715,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			}
 
 			//...
-			fprintf( stderr, "Executing model %s\n", mpath );
+			FPRINTF( "Executing model %s\n", mpath );
 			if ( !lua_exec_file( ld.state, mpath, ld.err, sizeof( ld.err ) ) ) {
 				free_ld( &ld );
 				return http_error( res, 500, "%s", ld.err );
@@ -799,7 +799,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 				snprintf( vpath, sizeof( vpath ), "%s/%s/%s.%s", ld.root, "views", ld.aroute, (*v)->ext );
 			}
 
-			//fprintf( stderr, "Loading view at: %s\n", vpath );
+			FPRINTF( "Loading view at: %s\n", vpath );
 			if ( !( src = read_file( vpath, &len, ld.err, LD_ERRBUF_LEN )	) || !len ) {
 				zrender_free( rz ), free( src ), free_ld( &ld );
 				return http_error( res, 500, "Error opening view '%s': %s", vpath, ld.err );

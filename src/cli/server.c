@@ -339,11 +339,12 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		close_listening_socket( &su, throwaway, sizeof(throwaway) );
 		return 0;
 	}
-
+#if 0
 	//Drop privileges
 	if ( !revoke_priv( v, err, errlen ) ) {
 		return 0;
 	}
+#endif
 
 	//Write a PID file
 	if ( !v->fork ) { 
@@ -414,6 +415,10 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		}
 	}
 #endif
+	
+	int parent = 0;
+	//TODO: Using threads may make this easier... https://www.geeksforgeeks.org/zombie-processes-prevention/
+	signal( SIGCHLD, SIG_IGN );
 
 	//This can have one global variable
 	for ( CONN_CONTINUE ) {
@@ -432,25 +437,27 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		if ( ( cpid = fork() ) == -1 ) {
 			//TODO: There is most likely a reason this didn't work.
 			FPRINTF( "Failed to setup new child connection. %s\n", strerror(errno) );
-			return 0;
+			break;	
 		}
 		else if ( cpid == 0 ) {
-			//TODO: Additional logging ought to happen here.
-			FPRINTF( "In parent...\n" );
-			//Close the file descriptor here?
-			if ( close( fd ) == -1 ) {
-				FPRINTF( "Parent couldn't close socket.\n" );
-			}
-		}
-		else if ( cpid ) {
 			struct cdata connection = {0};	
 			connection.flags = O_NONBLOCK;
 			connection.ctx = ctx;
 		
+			//TODO: This needs to use the child socket (fd), not su.
+			//That whole structure should have been closed already...	
+			#if 0
 			//Get IP here and save it for logging purposes
 			if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
 				FPRINTF( "Error in getting IP address of connecting client.\n" );
 			}
+
+			//Close the socket
+			if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
+				FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
+				return 0;
+			}
+			#endif
 
 			for ( ;; ) {
 				//additionally, this one should block
@@ -467,16 +474,37 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 					break;
 				}
 			}
+		#if 1	
+			FPRINTF( "Child process is exiting.\n" );
 			break;
+		#else
+			FPRINTF( "Child process is exiting.\n" );
+			_exit( 0 );
+		#endif
+		}
+		else { 
+			//TODO: Additional logging ought to happen here.
+			parent = 1;	
+			//Close the file descriptor here?
+			if ( close( fd ) == -1 ) {
+				FPRINTF( "Parent couldn't close socket.\n" );
+			}
+			#if 0
+			if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
+				FPRINTF( "Error in getting IP address of connecting client.\n" );
+			}
+			#endif
+			FPRINTF( "Waiting for new connection.\n" );
 		}
 	}
 
 	//Close the socket
+	FPRINTF( "PARENT SHOULD NEVER GET HERE!\n" );
 	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
-		FPRINTF( "FAILURE\n" ); 
-		eprintf( "Couldn't close parent socket. Error: %s", err );
+		FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
 		return 0;
 	}
+
 	return 1;
 }
 
@@ -725,6 +753,7 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
+	FPRINTF( "I am (hopefully) a child that reached the end...\n" );
 	return 0;
 }
 
