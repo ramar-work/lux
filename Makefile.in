@@ -236,8 +236,8 @@ changelog:
 #endif
 
 docs:
-	-mkdir www/
-	markdown README.md > www/main.tpl
+	-mkdir docs/
+	markdown README.md > docs/index.html
 
 Makefile: Makefile.in config.status
 	./config.status $@
@@ -247,3 +247,5 @@ config.status: configure
 
 README.md: docs
 	printf '' >/dev/null
+
+.PHONY: docs

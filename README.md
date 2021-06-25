@@ -1,6 +1,6 @@
 # hypno
 
-A low maintenance web server and library for web development.
+A low maintenance library and tools for web development.
 
 
 ## Building
