@@ -229,7 +229,160 @@ Each one of the folders serves its own purpose, but that is slightly beyond the 
 
 ### Configuration
 
-The file `config.lua` contains the application's title, fully qualified domain name, routes (manually specified) and a database connector depending on what kind of backend is in use (see #connectors for more info).  It also specifies some default static paths that are needed for a majority of front-facing web applications.  These are `favicon.ico`, ROBOTS.TXT and anything under the `assets/` directory.  Editing the `/assets` path will, of course, modify which resources are accessible.  (See #more here) 
+The file `config.lua` contains the application's title, fully qualified domain name, routes (manually specified) and a database connector depending on what kind of backend is in use (see #connectors for more info).  An example config file is below. 
+
+<pre>
+return {
+	-- Database(s) in use 
+	db = "sqlite3://db/roast.db",
+
+	-- Title of our site
+	title = "domo.fm",
+
+	-- Fully qualified domain for our site
+	fqdn = "domo.fm",
+
+	-- Static assets
+	static = { "favicon.ico", "ROBOTS.TXT", "/assets" },
+
+	-- List of routes for our site
+	routes = {
+		-- home
+		["/"] = { model="clients",view="index" },
+		["login"] = { model="login",view="index" },
+		["logout"] = { model="logout",view="index" },
+		["dump"] = { model="dump",view="dump" },
+		["add-user"] = { model="add-user",view="index" },
+		["remove-user"] = { model="remove-user",view="index" },
+		["profile"] = { 
+			[":id"] = {
+				model="user"
+			, view="user" 
+			}
+		}
+	}
+}
+</pre>
+
+As you can see, our config file also specifies some default static paths that are needed for a majority of front-facing web applications.  These are `favicon.ico`, ROBOTS.TXT and anything under the `assets/` directory.  Editing the `/assets` path will, of course, modify which resources are accessible.  (See #more here) 
+
+Notice the `db` key and value.   Hypno comes with both SQLite and MySQL drivers out of the box, and we can choose either by specifying the type of driver via URI and either a file or connection string depending on the desired backend.
+
+Lastly, the config file expects a few keys by default, but we are free to add much more as needed.  For example, if we would like to keep track of a Google site verification ID, it can be done via something like the following:
+
+<pre>
+return {
+	-- Database(s) in use 
+	db = "sqlite3://db/roast.db",
+
+	-- Let's add a Google verification key here.
+	google_site_verification = "28349243-0234234-23423940",
+
+	-- The rest of the keys
+	...
+}
+</pre>
+
+Since the config table is accessible to all Lua models, we can access this key from one of our models via `config.google_site_verification`.
+
+
+### Routes 
+
+Routes defined in `config.lua` follow a simple key value type of format.  For example, the following declaration:
+
+<pre>
+return {
+	-- ....omitting the rest of the keys for brevity 
+	routes = {
+		["/"] = { 
+			model = "home"
+		, view = "home"
+		}
+	,	["namaste"] = {
+			model = "peace"
+		,	view = "peace"
+		}
+	}
+}
+</pre>
+
+...will define two routes for this website.  One for root (/) and one for /namaste.   
+
+hypno generates messages by executing the code in the files defined by the model key, and either returning that in a serialized format, or loading a view and sending the model output through that.  This means for our "/namaste" endpoint above, that hypno expects to find a file titled '$DIR/app/peace.lua' when looking for a model.  If hypno does not find it, it will return a 500 error, since the engine cannot find a required file.  Since we've also defined a view, hypno will expect to find a file titled '$DIR/views/peace.tpl'.   Errors in the template will return a 500, explaining what went wrong.  Likewise, a 500 will also be returned if the view file is not found.
+
+The routes table also comes with some helpful conventions to make it easier to design large sites.  One convention is using a comma seperated list to let multiple routes point to the same set of files.  The following example will allow our site to serve requests for '/', '/nirvana', '/namaste', '/enlightenment'.
+
+<pre> 
+return {
+	-- ....omitting the rest of the keys for brevity 
+	routes = {
+		["/"] = { 
+			model = "home"
+		, view = "home"
+		}
+	,	["namaste,nirvana,enlightenment"] = {
+			model = "peace"
+		,	view = "peace"
+		}
+	}
+}
+</pre> 
+
+Reusing the same example, with a slight modification, let's illustrate one way to serve different models.
+
+<pre> 
+return {
+	-- ....omitting the rest of the keys for brevity 
+	routes = {
+		["/"] = { 
+			model = "home"
+		, view = "home"
+		}
+	,	["namaste,nirvana,enlightenment"] = {
+			model = "@" -- What does this do?
+		,	view = "peace"
+		}
+	}
+}
+</pre> 
+
+Whenever the '@' symbol is specified in a model or view, hypno will search for a file matching the <i>active route</i>.  Using the the code above, if we get a request for '/namaste', hypno now will expect a file named '$DIR/app/namaste.lua' to exist.  <i>One caveat to the '@' symbol evaluation, is that it does not work well with the home page requests.   This will change in a future version of hypno, but for right now, <b>just don't do it</b>.</i>
+
+Lastly, the `model` and `view` do not always have to point to a string.   We can use both strings and tables and come up with some interesting combinations.  Let's say, for example, that we have a specific header that we want to load when serving requests for the home page.
+
+<pre> 
+return {
+	-- ....omitting the rest of the keys for brevity 
+	routes = {
+		["/"] = { 
+			model = "home" 
+		, view = { "my-header", "home" }
+		}
+	,	["namaste,nirvana,enlightenment"] = {
+			model = "@" -- What does this do?
+		,	view = "peace"
+		}
+	}
+}
+</pre> 
+
+Using the code above, our site will now load both '$DIR/views/my-header.tpl' and '$DIR/views/home.tpl' when getting a request forthe home page.   This can be extended even further with the '@' notation, allowing you to serve websites with a common template.  Making one last modification to our code above, we can modify the route table to load a header and footer when serving requests for '/namaste', '/nirvana' and '/enlightenment'.
+
+<pre> 
+return {
+	-- ....omitting the rest of the keys for brevity 
+	routes = {
+		["/"] = { 
+			model = "home" 
+		, view = "home"
+		}
+	,	["namaste,nirvana,enlightenment"] = {
+			model = { "always-load-me", "@" }
+		,	view = { "head", "@", "tail" }
+		}
+	}
+}
+</pre> 
 
 ### Models
 
@@ -238,7 +391,49 @@ Most any Lua code can be used when writing business logic, and packages can be i
 
 ### Views
 
+Views are composed of simple mustache-like templates matching the keys that are returned from your models.  For example if we have code like this in a file called `example.lua`:
+
+<pre>
+return {
+	number = 234234
+, title = "List of Healthy and Unhealthy Foods"
+, set = {
+		{ calories = 15, food = "Seltzer" }
+	,	{ calories = 1457, food = "Burger" }
+	,	{ calories = 712, food = "Bowl of Pho" }
+	}
+}
+</pre>
+
+a template containing the following markup:
+<pre>
+&lt;html&gt;
+&lt;h2&gt;{{ title }}&lt;/h2&gt;
+&lt;ul&gt;
+{{ #set }}
+	&lt;li&gt;A "{{ .food }}" has {{ .calories }} calories.&lt;/li&gt;
+{{ /set }}
+&lt;/ul&gt;
+Document #{{ number }}
+&lt;/html&gt;
+</pre>
+
+will render something like this:
+<pre>
+<html>
+<h2>List of Healthy and Unhealthy Foods</h2>
+<ul>
+	<li>A "Seltzer" has 15 calories</li>
+	<li>A "Burger" has 1457 calories</li>
+	<li>A "Bowl of Pho" has 712 calories</li>
+</ul>
+</html>
+</pre>
+
+
 ### Extensions
+
+
 
 ### SQL 
 
