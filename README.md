@@ -264,7 +264,7 @@ return {
 }
 </pre>
 
-As you can see, our config file also specifies some default static paths that are needed for a majority of front-facing web applications.  These are `favicon.ico`, ROBOTS.TXT and anything under the `assets/` directory.  Editing the `/assets` path will, of course, modify which resources are accessible.  (See #more here) 
+As you can see, our config file also specifies some default static paths that are needed for a majority of front-facing web applications.  These are `favicon.ico`, `ROBOTS.TXT` and anything under the `assets/` directory.  Editing the `/assets` path will, of course, modify which resources are accessible.
 
 Notice the `db` key and value.   Hypno comes with both SQLite and MySQL drivers out of the box, and we can choose either by specifying the type of driver via URI and either a file or connection string depending on the desired backend.
 
@@ -308,9 +308,9 @@ return {
 
 ...will define two routes for this website.  One for root (/) and one for /namaste.   
 
-hypno generates messages by executing the code in the files defined by the model key, and either returning that in a serialized format, or loading a view and sending the model output through that.  This means for our "/namaste" endpoint above, that hypno expects to find a file titled '$DIR/app/peace.lua' when looking for a model.  If hypno does not find it, it will return a 500 error, since the engine cannot find a required file.  Since we've also defined a view, hypno will expect to find a file titled '$DIR/views/peace.tpl'.   Errors in the template will return a 500, explaining what went wrong.  Likewise, a 500 will also be returned if the view file is not found.
+hypno generates messages by executing the code in the files defined by the model key, and either returning that in a serialized format, or loading a view and sending the model output through that.  This means for our "/namaste" endpoint above, that hypno expects to find a file titled `$DIR/app/peace.lua` when looking for a model.  If hypno does not find it, it will return a 500 error, since the engine cannot find a required file.  Since we've also defined a view, hypno will expect to find a file titled `$DIR/views/peace.tpl`.   Errors in the template will return a 500, explaining what went wrong.  Likewise, a 500 will also be returned if the view file is not found.
 
-The routes table also comes with some helpful conventions to make it easier to design large sites.  One convention is using a comma seperated list to let multiple routes point to the same set of files.  The following example will allow our site to serve requests for '/', '/nirvana', '/namaste', '/enlightenment'.
+The routes table also comes with some helpful conventions to make it easier to design large sites.  One convention is using a comma seperated list to let multiple routes point to the same set of files.  The following example will allow our site to serve requests for `/`, `/nirvana`, `/namaste`, `/enlightenment`.
 
 <pre> 
 return {
@@ -346,7 +346,7 @@ return {
 }
 </pre> 
 
-Whenever the '@' symbol is specified in a model or view, hypno will search for a file matching the <i>active route</i>.  Using the the code above, if we get a request for '/namaste', hypno now will expect a file named '$DIR/app/namaste.lua' to exist.  <i>One caveat to the '@' symbol evaluation, is that it does not work well with the home page requests.   This will change in a future version of hypno, but for right now, <b>just don't do it</b>.</i>
+Whenever the `@` symbol is specified in a model or view, hypno will search for a file matching the <i>active route</i>.  Using the the code above, if we get a request for `/namaste`, hypno now will expect a file named `$DIR/app/namaste.lua` to exist.  <i>One caveat to the `@` symbol evaluation, is that it does not work well with the home page requests.   This will change in a future version of hypno, but for right now, <b>just don't do it</b>.</i>
 
 Lastly, the `model` and `view` do not always have to point to a string.   We can use both strings and tables and come up with some interesting combinations.  Let's say, for example, that we have a specific header that we want to load when serving requests for the home page.
 
@@ -366,7 +366,7 @@ return {
 }
 </pre> 
 
-Using the code above, our site will now load both '$DIR/views/my-header.tpl' and '$DIR/views/home.tpl' when getting a request forthe home page.   This can be extended even further with the '@' notation, allowing you to serve websites with a common template.  Making one last modification to our code above, we can modify the route table to load a header and footer when serving requests for '/namaste', '/nirvana' and '/enlightenment'.
+Using the code above, our site will now load both `$DIR/views/my-header.tpl` and `$DIR/views/home.tpl` when getting a request forthe home page.   This can be extended even further with the `@` notation, allowing you to serve websites with a common template.  Making one last modification to our code above, we can modify the route table to load a header and footer when serving requests for `/namaste`, `/nirvana` and `/enlightenment`.
 
 <pre> 
 return {
@@ -384,9 +384,29 @@ return {
 }
 </pre> 
 
+
 ### Models
 
 Most any Lua code can be used when writing business logic, and packages can be installed via LuaRocks for extended functionality.  Additionally, Hypno comes with a large set of extensions that allow for a more cohesive experience when doing certain operations.  For example, the db module allows for fairly seamless (though simplistic one-time) connections to a few different dbms systems.   Sessions and common encoding/decoding routines also ship with Hypno, so unless there is a need for an encoding that does not exist, the engine will be able to serve most needs.
+
+There are no real restrictions on models returned, but at the very least we'll need something like the following for a model to work:
+<pre>
+return {}
+</pre>
+
+A more realistic model will look more like this:
+<pre>
+-- Typical model
+return {
+	site_title = "My Fresh, Clean Website"
+, site_author = "Juicy M. Johnson"
+, site_rels = { 
+		{ key = "Fresh" }
+	,	{ key = "Clean" }
+	,	{ key = "Spick & Span" }
+	}
+}
+</pre>
 
 
 ### Views
