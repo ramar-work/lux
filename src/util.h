@@ -1,3 +1,21 @@
+/* ------------------------------------------- * 
+ * util.h
+ * ======
+ * 
+ * Summary 
+ * -------
+ * General utilities
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * 
+ * See LICENSE in the top-level directory for more information.
+ *
+ * CHANGELOG 
+ * ---------
+ * - 
+ * ------------------------------------------- */
 #ifndef _WIN32
  #define _POSIX_C_SOURCE 200809L
 #endif 

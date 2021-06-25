@@ -1,4 +1,22 @@
-//config.h - configuration for other stuff
+/* ------------------------------------------- * 
+ * config.h
+ * ========
+ * 
+ * Summary 
+ * -------
+ * General configuration at compile time
+ * Under construction.
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * 
+ * See LICENSE in the top-level directory for more information.
+ *
+ * CHANGELOG 
+ * ---------
+ * - 
+ * ------------------------------------------- */
 
 //How long should each client be allowed to persist
 #define CLIENT_REQUEST_TIMEOUT 5

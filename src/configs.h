@@ -1,3 +1,22 @@
+/* ------------------------------------------- * 
+ * configs.h 
+ * =========
+ * 
+ * Summary 
+ * -------
+ * -
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * 
+ * See LICENSE in the top-level directory for more information.
+ *
+ * CHANGELOG 
+ * ---------
+ * No entries yet.
+ *
+ * ------------------------------------------- */
 #include <limits.h>
 #include <stdlib.h>
 #include <ztable.h>

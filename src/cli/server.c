@@ -1,10 +1,10 @@
 /* -------------------------------------------------------- *
- * main.c
- * ======
+ * server.c
+ * ========
  * 
  * Summary 
  * -------
- * This is the basis of hypno's web server.
+ * hypno's web server.
  * 
  * Usage
  * -----
@@ -18,14 +18,16 @@
  *   --ssl              Use ssl or not..              
  *   --user <arg>       Choose a user to start as     
  * 
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
  * 
- * Building
- * --------
- * Lua is a necessity because of the configuration parsing. 
- * 
- * Running `make` is all we need for now on Linux and OSX.  
- * Windows will need some additional help and Cygwin as well.
- * 
+ * See LICENSE in the top-level directory for more information.
+ *
+ * CHANGELOG 
+ * ---------
+ * - 
+ *  
  * -------------------------------------------------------- */
 #include <zwalker.h>
 #include <ztable.h>

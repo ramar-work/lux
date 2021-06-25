@@ -1,4 +1,21 @@
-//lconfig.c - Put all the config stuff into the same place
+/* ------------------------------------------- * 
+ * configs.c
+ * =========
+ * 
+ * Summary 
+ * -------
+ * -
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * 
+ * See LICENSE in the top-level directory for more information.
+ *
+ * CHANGELOG 
+ * ---------
+ * - 
+ * ------------------------------------------- */
 #include "configs.h"
 
 //Free config tables

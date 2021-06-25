@@ -1,4 +1,24 @@
-//harness.c - code needed to run test harness stuff
+/* ------------------------------------------- * 
+ * harness.c
+ * =========
+ *
+ * Summary 
+ * -------
+ * Command line tooling to test hypno sites.
+ *
+ * Usage
+ * -----
+ * -
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * See LICENSE in the top-level directory for more information.
+ *
+ * Changelog
+ * ---------
+ * 
+ * ------------------------------------------- */
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>

@@ -2,11 +2,22 @@
  * router.h
  * ========
  * 
+ * Summary 
+ * -------
  * Resolves received routes according to a list of arrays.
  * 
  * You can pass in a custom receiver function if the datatype
  * is not something simple like a list of strings.
  *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * 
+ * See LICENSE in the top-level directory for more information.
+ *
+ * CHANGELOG 
+ * ---------
+ * - 
  * ------------------------------------------------------ */
 #include <stdlib.h>
 #include <zwalker.h> 

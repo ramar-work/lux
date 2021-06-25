@@ -1,3 +1,22 @@
+/* ------------------------------------------- * 
+ * router.c 
+ * =========
+ * 
+ * Summary 
+ * -------
+ * Loads config files written with Lua into a structure that C can easily talk 
+ * to.
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ *
+ * See LICENSE in the top-level directory for more information.
+ *
+ * CHANGELOG 
+ * ---------
+ * -
+ * ------------------------------------------- */
 #include "router.h"
 
 #define router_add_item(LIST, ELEMENT, SIZE, LEN) \

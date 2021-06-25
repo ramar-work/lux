@@ -1,4 +1,21 @@
-//filter-redirect.c
+/* ------------------------------------------- * 
+ * filter-redirect.c
+ * =========
+ * 
+ * Summary 
+ * -------
+ * -
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ *
+ * See LICENSE in the top-level directory for more information.
+ *
+ * CHANGELOG 
+ * ---------
+ * -
+ * ------------------------------------------- */
 #include "filter-redirect.h"
 
 const int 

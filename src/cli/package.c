@@ -1,5 +1,25 @@
-//package.c
-//should be used to compress and decompress stuff
+/* ------------------------------------------- * 
+ * package.c
+ * =========
+ *
+ * Summary 
+ * -------
+ * Command line tooling to create extensions for
+ * hypno.
+ *
+ * Usage
+ * -----
+ * -
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * See LICENSE in the top-level directory for more information.
+ *
+ * Changelog
+ * ---------
+ * 
+ * ------------------------------------------- */
 #include <stdio.h>
 #include <archive.h>
 #include <archive_entry.h>

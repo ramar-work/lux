@@ -1,13 +1,21 @@
-/* -------------------------------------------------------- *
- * filter-redirect.c
- * ======
+/* ------------------------------------------- * 
+ * filter-redirect.h
+ * =========
  * 
  * Summary 
  * -------
- * Enables the server to serve redirects at a server level.
- * 
- * -------------------------------------------------------- */
-
+ * -
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ *
+ * See LICENSE in the top-level directory for more information.
+ *
+ * CHANGELOG 
+ * ---------
+ * -
+ * ------------------------------------------- */
 #include <zhttp.h>
 #include "../server.h"
 
