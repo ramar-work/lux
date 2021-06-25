@@ -30,9 +30,9 @@ srcdir = @srcdir@
 VPATH = @srcdir@
 
 # Security-specific
-USER = http
+SRVUSER = http
 
-GROUP = http
+SRVGROUP = http
 
 # Everything else
 IFLAGS = -Ivendor -I/usr/include/lua5.3
@@ -137,11 +137,11 @@ install:
 	test -d $(PREFIX)/share/$(NAME)/
 	cp $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
 	mv $(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service /etc/systemd/system/
-	-mkdir -p $(WEBDIR)/ && chown $(USER):$(GROUP) $(WEBDIR)/
+	-mkdir -p $(WEBDIR)/ && chown $(SRVUSER):$(SRVGROUP) $(WEBDIR)/
 	-test -d /var/lib/$(NAME)/ || mkdir /var/lib/$(NAME)/
 	test -d /var/lib/$(NAME)/
 	-cp $(srcdir)/lib/* /var/lib/$(NAME)/
-	chown -R $(USER):$(GROUP) /var/lib/$(NAME)/
+	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(NAME)/
 
 # uninstall - Uninstalls hypno
 uninstall:
@@ -156,8 +156,9 @@ examples:
 	@lua -e "a=loadfile( 'example/config.lua' )(); \
 		hosts = {}; for k,v in pairs(a.hosts) do table.insert( hosts, 'http://' .. k ) end; \
 		print( 'Hosts at example/config.lua are:\n' .. table.concat( hosts, '\n' ) );"
-	@$(srcdir)/bin/$(NAME)-server --start --port $(PORT) --config $(srcdir)/example/config.lua 
-	@echo "hypno-server is listening for requests at port 2222"
+	@printf "Starting hypno-server, and listening for requests at port 2222...\n"
+	@$(srcdir)/bin/$(NAME)-server \
+		--start --port $(PORT) --config $(srcdir)/example/config.lua --user $$USER
 
 # repl - Build and test libraries for REPL usage
 #	test -f sqlite3.o || $(CC) $(CFLAGS) -fPIC -c vendor/sqlite3.c -o shared/sqlite3.o
