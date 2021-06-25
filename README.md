@@ -451,18 +451,15 @@ will render something like this:
 </pre>
 
 
-### Extensions
+
+## Tools 
+
+Hypno comes with 3 different command line tools to help serve applications, which are discussed below.
 
 
+### hypno-server
 
-### SQL 
-
-
-## Tech Details
-
-### Server
-
-Hypno currently ships with a server (hypno-server) capable of:
+`hypno-server` handles: 
 
 - Serving static web pages.
 - Serving web applications via a shared object.
@@ -484,21 +481,54 @@ The commands are listed below:
 </pre>
 
 
-### Admin
+### hypno-harness
 
-Hypno also ships with a command line interface (hypno-cli) which will eventually
-be capable of:
+`hypno-harness` handles: 
 
-- Stress testing applications via the command line
-- Modifying instances / applications
-- Modifying domains within local DNS
+- Testing of different routes from the command line (without a running server)
+
+<pre>
+hypno-harness:
+-f, --filter <arg>       Specify a filter for testing (required).
+-l, --library <arg>      Specify path to library.
+-d, --directory <arg>    Specify path to web app directory (required).
+-u, --uri <arg>          Specify a URI (required).
+-c, --content-type <arg> Specify a content-type for testing.
+-n, --host <arg>         Specify a hostname for use w/ the request.
+-a, --alias <arg>        Specify an alternate hostname for use w/ the request.
+-m, --method <arg>       Specify an HTTP method to be used when making
+                         a request. (GET is default)
+-p, --protocol <arg>     Specify alternate protocols (HTTP/1.0, 2.0, etc)
+-F, --form <arg>         Specify a body to use when making requests.
+-b, --binary <arg>       Specify a body to use when making requests. (assumes multipart)
+                         (Use multiple invocations for additional arguments)
+-e, --header <arg>       Specify a header to use when making requests.
+                         (Use multiple invocations for additional arguments)
+-M, --multipart          Use a multipart request when using POST or PUT
+-S, --msg-only           Show only the message, no header info
+-B, --body-to <arg>      Output body to file at <arg>
+-H, --headers-to <arg>   Output headers to file at <arg>
+-v, --verbose            Be wordy.
+-h, --help               Show help and quit.
+</pre>
 
 
-### Configuration
+### hypno-cli
 
-Hypno leans on Lua's speed and simplicity for configuration tasks. 
-See the example/ directory for what a typical server configuration
-file looks like.
+`hypno-cli` handles: 
+
+- Creating & modifying instances / applications
+
+<pre>
+No options received:
+-d, --dir <arg>          Define where to create a new application.
+-n, --domain-name <arg>  Define a specific domain for the app.
+    --title <arg>        Define a <title> for the app.
+-s, --static <arg>       Define a static path. (Use multiple -s's to
+                         specify multiple paths).
+-b, --database <arg>     Define a specific database connection.
+-x, --dump-args          Dump passed arguments.
+</pre>
 
 
 <!-- ## Rationale -->
