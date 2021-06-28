@@ -37,7 +37,7 @@ SRVGROUP = http
 # Everything else
 IFLAGS = -Ivendor -I/usr/include/lua5.3
 
-LDFLAGS = -ldl -lpthread -lgnutls -lsqlite3 -larchive -llua
+LDFLAGS = -L/usr/lib/x86_64-linux-gnu -ldl -lpthread -lgnutls -lsqlite3 -larchive -llua
 
 DEBUGFLAGS = -DDEBUG_H
 
@@ -136,7 +136,7 @@ install:
 	-test -d $(PREFIX)/share/$(NAME)/ || mkdir -p $(PREFIX)/share/$(NAME)/
 	test -d $(PREFIX)/share/$(NAME)/
 	cp $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
-	mv $(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service /etc/systemd/system/
+	mv $(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service /etc/systemd/system/hypno.service
 	-mkdir -p $(WEBDIR)/ && chown $(SRVUSER):$(SRVGROUP) $(WEBDIR)/
 	-test -d /var/lib/$(NAME)/ || mkdir /var/lib/$(NAME)/
 	test -d /var/lib/$(NAME)/
@@ -205,8 +205,7 @@ plat:
 #if 0
 # pkg - Make a package of the latest tagged version for distribution
 pkg:
-	git archive --format tar HEAD `git tag | tail -n 1` | \
-		gzip > $(NAME)-`git tag | tail -n 1`.tar.gz
+	git archive --format tar HEAD | gzip > build/$(NAME)-`git tag | tail -n 1`.tar.gz
 
 # pkgtest - Make a package of the latest version of dev
 pkgtest:
