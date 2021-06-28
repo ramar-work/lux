@@ -521,50 +521,14 @@ hypno-harness:
 
 <pre>
 No options received:
--d, --dir <arg>          Define where to create a new application.
--n, --domain-name <arg>  Define a specific domain for the app.
-    --title <arg>        Define a <title> for the app.
--s, --static <arg>       Define a static path. (Use multiple -s's to
+-d, --dir &lt;arg&gt;          Define where to create a new application.
+-n, --domain-name &lt;arg&gt;  Define a specific domain for the app.
+    --title &lt;arg&gt;        Define a &lt;title&gt; for the app.
+-s, --static &lt;arg&gt;       Define a static path. (Use multiple -s's to
                          specify multiple paths).
--b, --database <arg>     Define a specific database connection.
+-b, --database &lt;arg&gt;     Define a specific database connection.
 -x, --dump-args          Dump passed arguments.
 </pre>
 
-
-<!-- ## Rationale -->
-<!--  -->
-<!-- Why Build Another Server? -->
-<!-- ------------------------- -->
-<!-- This was built as a cleaner answer to web frameworks written with Node.js, PHP, Lucee or other popular tools.  I wanted something simple to build which didn't require lots of dependencies.  -->
-<!--  -->
-<!-- The process of serving sites boils down to:  -->
-<!-- - opening a socket -->
-<!-- - parsing a message -->
-<!-- - generating a response -->
-<!-- - sending the message back to the requestor -->
-<!-- - closing the socket -->
-<!--  -->
-<!-- Knowing this, I figured that there must be a better way to go about it than what we have today. -->
-<!--  -->
-<!--  -->
-<!-- Why use Lua? -->
-<!-- ------------ -->
-<!-- - Lua builds fine on OSX and Linux. -->
-<!-- - Packages and extensinons for Lua are available everywhere for a variety of operating systems. -->
-<!-- - Lua is interpreted. -->
-<!-- - Lua is fast. -->
-<!-- - Most union and set primitives are already written (with the exception of sort, extract and map)  -->
-<!-- - Pretty easy to bind C to Lua.   -->
-<!-- - Pretty easy to embed Lua into C, doing the same with PHP or Python requires a bit more legwork. -->
-<!-- - Lua relies heavily on the tables, a single unified data structure that is appealing to beginners and professionals alike. -->
-<!--  -->
-<!--  -->
-<!-- Why not Javascript? -->
-<!-- ------------------- -->
-<!-- - Javascript has become overly complicated over the years. -->
-<!-- - For all of the things the language offers, it still manages not to ship with filesystem or database primitives. -->
-<!-- - I have started to like Javascript less and less the longer I spend doing web development. -->
-<!-- - Tooling, type safety and optimization all seem to be afterthoughts and only can be implemented through the use of third party libraries.  (There isn't even a real syntax checker outside of the browser.) -->
-<!-- - Only one library exists that makes Javascript easy to bind to C (duktape - which is great!) -->
-
+<link rel="stylesheet" href="main.css">
 

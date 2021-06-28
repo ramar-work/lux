@@ -1,6 +1,6 @@
 <h1>hypno</h1>
 
-<p>A low maintenance web server and library for web development.</p>
+<p>A low maintenance library and tools for web development.</p>
 
 <h2>Building</h2>
 
@@ -499,14 +499,14 @@ Document #{{ number }}
 <p>will render something like this:</p>
 
 <pre>
-<html>
-<h2>List of Healthy and Unhealthy Foods</h2>
-<ul>
-    <li>A "Seltzer" has 15 calories</li>
-    <li>A "Burger" has 1457 calories</li>
-    <li>A "Bowl of Pho" has 712 calories</li>
-</ul>
-</html>
+&lthtml&gt;
+&lth2&gt;List of Healthy and Unhealthy Foods&lt/h2&gt;
+&ltul&gt;
+    &ltli&gt;A "Seltzer" has 15 calories&lt/li&gt;
+    &ltli&gt;A "Burger" has 1457 calories&lt/li&gt;
+    &ltli&gt;A "Bowl of Pho" has 712 calories&lt/li&gt;
+&lt/ul&gt;
+&lt/html&gt;
 </pre>
 
 
@@ -531,9 +531,9 @@ Document #{{ number }}
 
 <pre>
 -s, --start                  Start the server              
--c, --config <arg>           Use this Lua file for configuration
--p, --port <arg>             Start using a different port  
--u, --user <arg>             Choose an alternate user to start as
+-c, --config &ltarg&gt;           Use this Lua file for configuration
+-p, --port &ltarg&gt;             Start using a different port  
+-u, --user &ltarg&gt;             Choose an alternate user to start as
 -d, --dump                   Dump configuration            
     --no-fork                Do not fork                   
     --use-ssl                Use SSL                       
@@ -553,25 +553,25 @@ Document #{{ number }}
 
 <pre>
 hypno-harness:
--f, --filter <arg>       Specify a filter for testing (required).
--l, --library <arg>      Specify path to library.
--d, --directory <arg>    Specify path to web app directory (required).
--u, --uri <arg>          Specify a URI (required).
--c, --content-type <arg> Specify a content-type for testing.
--n, --host <arg>         Specify a hostname for use w/ the request.
--a, --alias <arg>        Specify an alternate hostname for use w/ the request.
--m, --method <arg>       Specify an HTTP method to be used when making
+-f, --filter &ltarg&gt;       Specify a filter for testing (required).
+-l, --library &ltarg&gt;      Specify path to library.
+-d, --directory &ltarg&gt;    Specify path to web app directory (required).
+-u, --uri &ltarg&gt;          Specify a URI (required).
+-c, --content-type &ltarg&gt; Specify a content-type for testing.
+-n, --host &ltarg&gt;         Specify a hostname for use w/ the request.
+-a, --alias &ltarg&gt;        Specify an alternate hostname for use w/ the request.
+-m, --method &ltarg&gt;       Specify an HTTP method to be used when making
                          a request. (GET is default)
--p, --protocol <arg>     Specify alternate protocols (HTTP/1.0, 2.0, etc)
--F, --form <arg>         Specify a body to use when making requests.
--b, --binary <arg>       Specify a body to use when making requests. (assumes multipart)
+-p, --protocol &ltarg&gt;     Specify alternate protocols (HTTP/1.0, 2.0, etc)
+-F, --form &ltarg&gt;         Specify a body to use when making requests.
+-b, --binary &ltarg&gt;       Specify a body to use when making requests. (assumes multipart)
                          (Use multiple invocations for additional arguments)
--e, --header <arg>       Specify a header to use when making requests.
+-e, --header &ltarg&gt;       Specify a header to use when making requests.
                          (Use multiple invocations for additional arguments)
 -M, --multipart          Use a multipart request when using POST or PUT
 -S, --msg-only           Show only the message, no header info
--B, --body-to <arg>      Output body to file at <arg>
--H, --headers-to <arg>   Output headers to file at <arg>
+-B, --body-to &ltarg&gt;      Output body to file at &ltarg&gt;
+-H, --headers-to &ltarg&gt;   Output headers to file at &ltarg&gt;
 -v, --verbose            Be wordy.
 -h, --help               Show help and quit.
 </pre>
@@ -588,121 +588,14 @@ hypno-harness:
 
 <pre>
 No options received:
--d, --dir <arg>          Define where to create a new application.
--n, --domain-name <arg>  Define a specific domain for the app.
-    --title <arg>        Define a <title> for the app.
--s, --static <arg>       Define a static path. (Use multiple -s's to
+-d, --dir &lt;arg&gt;          Define where to create a new application.
+-n, --domain-name &lt;arg&gt;  Define a specific domain for the app.
+    --title &lt;arg&gt;        Define a &lt;title&gt; for the app.
+-s, --static &lt;arg&gt;       Define a static path. (Use multiple -s's to
                          specify multiple paths).
--b, --database <arg>     Define a specific database connection.
+-b, --database &lt;arg&gt;     Define a specific database connection.
 -x, --dump-args          Dump passed arguments.
 </pre>
 
 
-
-
-<!-- ## Rationale -->
-
-
-<!--  -->
-
-
-<!-- Why Build Another Server? -->
-
-
-<!-- ------------------------- -->
-
-
-<!-- This was built as a cleaner answer to web frameworks written with Node.js, PHP, Lucee or other popular tools.  I wanted something simple to build which didn't require lots of dependencies.  -->
-
-
-<!--  -->
-
-
-<!-- The process of serving sites boils down to:  -->
-
-
-<!-- - opening a socket -->
-
-
-<!-- - parsing a message -->
-
-
-<!-- - generating a response -->
-
-
-<!-- - sending the message back to the requestor -->
-
-
-<!-- - closing the socket -->
-
-
-<!--  -->
-
-
-<!-- Knowing this, I figured that there must be a better way to go about it than what we have today. -->
-
-
-<!--  -->
-
-
-<!--  -->
-
-
-<!-- Why use Lua? -->
-
-
-<!-- ------------ -->
-
-
-<!-- - Lua builds fine on OSX and Linux. -->
-
-
-<!-- - Packages and extensinons for Lua are available everywhere for a variety of operating systems. -->
-
-
-<!-- - Lua is interpreted. -->
-
-
-<!-- - Lua is fast. -->
-
-
-<!-- - Most union and set primitives are already written (with the exception of sort, extract and map)  -->
-
-
-<!-- - Pretty easy to bind C to Lua.   -->
-
-
-<!-- - Pretty easy to embed Lua into C, doing the same with PHP or Python requires a bit more legwork. -->
-
-
-<!-- - Lua relies heavily on the tables, a single unified data structure that is appealing to beginners and professionals alike. -->
-
-
-<!--  -->
-
-
-<!--  -->
-
-
-<!-- Why not Javascript? -->
-
-
-<!-- ------------------- -->
-
-
-<!-- - Javascript has become overly complicated over the years. -->
-
-
-<!-- - For all of the things the language offers, it still manages not to ship with filesystem or database primitives. -->
-
-
-<!-- - I have started to like Javascript less and less the longer I spend doing web development. -->
-
-
-<!-- - Tooling, type safety and optimization all seem to be afterthoughts and only can be implemented through the use of third party libraries.  (There isn't even a real syntax checker outside of the browser.) -->
-
-
-<!-- - Only one library exists that makes Javascript easy to bind to C (duktape - which is great!) -->
-
-
-
+<p><link rel="stylesheet" href="main.css"></p>

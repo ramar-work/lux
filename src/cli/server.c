@@ -419,7 +419,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	}
 #endif
 	
-	int parent = 0;
 	//TODO: Using threads may make this easier... https://www.geeksforgeeks.org/zombie-processes-prevention/
 	signal( SIGCHLD, SIG_IGN );
 
@@ -486,7 +485,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		}
 		else { 
 			//TODO: Additional logging ought to happen here.
-			parent = 1;	
 			//Close the file descriptor here?
 			if ( close( fd ) == -1 ) {
 				FPRINTF( "Parent couldn't close socket.\n" );

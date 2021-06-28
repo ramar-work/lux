@@ -235,8 +235,22 @@ changelog:
 #endif
 
 docs:
-	-mkdir docs/
-	markdown README.md > docs/index.html
+	-@mkdir docs/
+	FF=/tmp/readme.`date +%F`.$$RANDOM.md; \
+	markdown README.md > $$FF && \
+	for n in `grep --line-number 'pre>' $$FF | \
+		sed '{ s#<pre>#,#; s#</pre>#|# }' | \
+		awk -F ':' '{ printf "%d%s", $$1, $$2 }' | \
+		sed '{ s/ //g; s/|/ /g }'`; \
+	do \
+		L=`echo $$n | awk -F ',' '{ print $$1 }'`; \
+		R=`echo $$n | awk -F ',' '{ print $$2 }'`; \
+		sed -i "{ \
+			$$(( $$L + 1 )),$$(( $$R - 1 ))s/</\&lt/g; \
+			$$(( $$L + 1 )),$$(( $$R - 1 ))s/>/\&gt;/g \
+		}" $$FF; \
+	done && \
+	mv $$FF docs/index.html
 
 Makefile: Makefile.in config.status
 	./config.status $@
