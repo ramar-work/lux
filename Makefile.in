@@ -17,8 +17,8 @@ BINDIR = @bindir@
 WEBDIR = /var/www
 srcdir = @srcdir@
 VPATH = @srcdir@
-SRVUSER = http
-SRVGROUP = http
+SRVUSER = ramar
+SRVGROUP = ramar
 IFLAGS = -Ivendor -I/usr/include/lua5.3
 LDFLAGS = -L/usr/lib/x86_64-linux-gnu -ldl -lpthread -lgnutls -lsqlite3 -larchive -llua
 DEBUGFLAGS = -DDEBUG_H
@@ -47,6 +47,7 @@ SRC = \
 	@srcdir@/src/lua/db.c \
 	@srcdir@/src/lua/echo.c \
 	@srcdir@/src/lua/lua.c \
+	@srcdir@/src/lua/filesystem.c \
 	@srcdir@/src/filters/filter-static.c \
 	@srcdir@/src/filters/filter-echo.c \
 	@srcdir@/src/filters/filter-dirent.c \
@@ -110,11 +111,8 @@ install:
 	-test -d $(PREFIX)/share/$(NAME)/ || mkdir -p $(PREFIX)/share/$(NAME)/
 	test -d $(PREFIX)/share/$(NAME)/
 	cp $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
-	sed '{ \
-		s/@@PREFIX@@/$(PREFIX); \
-		s/@@SRVUSER@@/$(SRVUSER)/; \
-		s/@@SRVGROUP@@/$(SRVGROUP)/; \
-	}' $(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service > /etc/systemd/system/hypno.service
+	sed '{ s#__PREFIX__#$(PREFIX)#; s#__SRVUSER__#$(SRVUSER)#; s#__SRVGROUP__#$(SRVGROUP)# }' \
+		$(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service > /etc/systemd/system/hypno.service
 	-mkdir -p $(WEBDIR)/ && chown $(SRVUSER):$(SRVGROUP) $(WEBDIR)/
 	-test -d /var/lib/$(NAME)/ || mkdir /var/lib/$(NAME)/
 	test -d /var/lib/$(NAME)/

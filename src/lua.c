@@ -357,10 +357,44 @@ int lua_to_ztable ( lua_State *L, int index, zTable *t ) {
 			lua_to_ztable( L, index + 2, t ); 
 			lt_ascend( t );
 		}
+		else if ( vt == LUA_TBOOLEAN ) {
+			char *v = lua_toboolean( L, -1 ) ? "true" : "false"; 
+			lt_addtextvalue( t, v );
+			lt_finalize( t );
+		}
+	#if 0
+		else if ( vt == LUA_TFUNCTION ) {
+			//Somehow we have to inject scope...
+			//Then we need to execute
+			lua_pcall( L, 1, 1 );
+			//We can execute immediately, or wait until the environment is on
+			//(or just use a file)  
+		}
+		else if ( vt == LUA_TUSERDATA | vt == LUA_TLIGHTUSERDATA ) {
+			lua_addudvalue( t, lua_touserdata( L, -1 ) );
+			lt_finalize( t ); 
+		}
+		else if ( vt == LUA_TNONE | vt == LUA_TNIL ) {
+
+		}
+		else if ( vt == LUA_TTHREAD ) {
+			fprintf( stderr, "Threads in zTables are unsupported as of yet!" );
+			return 0;
+		}
 		else {
 			fprintf( stderr, "Got invalid value in table!" );
 			return 0;
 		}
+	#else
+		else {
+			fprintf( stderr, "Got invalid value in table!" );
+			//return 0;
+			char buf[ 1024 ] = {0}, *type = (char *)lua_typename( L, vt );
+			snprintf( buf, sizeof( buf ), "%s%s%s", "[[[", type, "]]]" ); 
+			lt_addtextvalue( t, buf );
+			lt_finalize( t );
+		}
+	#endif
 
 		lua_pop( L, 1 );
 	}

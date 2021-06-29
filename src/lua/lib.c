@@ -20,11 +20,13 @@
 #include "echo.h"
 #include "db.h"
 #include "lua.h"
+#include "filesystem.h"
 
 struct lua_fset functions[] = {
 	{ "echo", echo_set }
 , { "db", db_set }
 , { "lua", lua_set }
+, { "fs", fs_set }
 ,	{ NULL }
 };
 

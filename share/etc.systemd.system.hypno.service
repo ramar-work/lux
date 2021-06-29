@@ -5,7 +5,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=@@PREFIX@@/bin/hypno-server --start --port 80 --user @@SRVUSER@@ --group @@SRVGROUP@@ --config /var/www/config.lua
+ExecStart=__PREFIX__/bin/hypno-server --start --port 80 --user __SRVUSER__ --group __SRVGROUP__ --config /var/www/config.lua
 Restart=on-failure
 
 [Install]

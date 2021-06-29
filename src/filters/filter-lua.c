@@ -664,6 +664,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "%s", "Failed to copy routes from config." );
 	}
 
+	lt_kfdump( ld.zroutes, 1 );
 	//Turn the routes into a list of strings, and search for a match
 	struct route_t p = { .src = ld.zroutes };
 	lt_exec_complex( ld.zroutes, 1, ld.zroutes->count, &p, make_route_list );
@@ -780,7 +781,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	lt_lock( ld.zmodel );
 
 #if 1
-	//lt_kfdump( ld.zmodel, 2 );
+	lt_kfdump( ld.zmodel, 2 );
 #else
 	struct timespec tt = {0};
 	clock_gettime( CLOCK_REALTIME, &tt ); 
