@@ -146,12 +146,7 @@ int make_read_only ( lua_State *L, const char *table ) {
 
 
 //Should return an error b/c there are some situations where this does not work.
-int lua_loadlibs( lua_State *L, struct lua_fset *set, int standard ) {
-	//Load the standard libraries
-	if ( standard )	{
-		luaL_openlibs( L );
-	}
-
+int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
 	//Now load everything written elsewhere...
 	for ( ; set->namespace; set++ ) {
 //fprintf( stderr, "namespace: %s\n", set->namespace );
@@ -642,6 +637,10 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "%s", "Failed to initialize Lua environment." );
 	}
 
+	//Load the standard libraries first
+	luaL_openlibs( ld.state );
+
+	//Then start loading our configuration
 	if ( !load_lua_config( &ld ) ) {
 		free_ld( &ld );
 		return http_error( res, 500, "%s\n", ld.err );
@@ -712,7 +711,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	}
 
 	//Load standard libraries
-	if ( !lua_loadlibs( ld.state, functions, 1 ) ) {
+	if ( !lua_loadlibs( ld.state, functions ) ) {
 		free_ld( &ld );
 		return http_error( res, 500, "Failed to initialize Lua standard libs." ); 
 	}

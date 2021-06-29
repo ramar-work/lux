@@ -9,47 +9,24 @@
 ## @author
 ## Copyright 2021 Tubular Modular Inc. dba Collins Design
 ## --------------------------------------------------------- ##
-
-# Package-specific
 NAME = @PACKAGE_NAME@
-
 VERSION = @PACKAGE_VERSION@ 
-
-# Prefix-specific
 PREFIX = @prefix@
-
 EXEC_PREFIX = @exec_prefix@
-
 BINDIR = @bindir@
-
 WEBDIR = /var/www
-
-# VPATH-specific
 srcdir = @srcdir@
-
 VPATH = @srcdir@
-
-# Security-specific
 SRVUSER = http
-
 SRVGROUP = http
-
-# Everything else
 IFLAGS = -Ivendor -I/usr/include/lua5.3
-
 LDFLAGS = -L/usr/lib/x86_64-linux-gnu -ldl -lpthread -lgnutls -lsqlite3 -larchive -llua
-
 DEBUGFLAGS = -DDEBUG_H
-
 CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security $(IFLAGS)
-
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
 	-Wno-format-truncation -Wno-return-local-addr -O2 $(IFLAGS)
-
 CFLAGS = $(GCCFLAGS)
-
 CC = gcc
-
 SRC = \
 	@srcdir@/vendor/zrender.c \
 	@srcdir@/vendor/ztable.c \
@@ -77,11 +54,8 @@ SRC = \
 	@srcdir@/src/filters/filter-lua.c
 
 OBJ = ${SRC:.c=.o}
-
 TARGET = main
-
 TESTS = luabind router util #server render filter config 
-
 UNAME = $(shell uname)
 
 # Handle slight differences between Debian and others...
@@ -136,17 +110,23 @@ install:
 	-test -d $(PREFIX)/share/$(NAME)/ || mkdir -p $(PREFIX)/share/$(NAME)/
 	test -d $(PREFIX)/share/$(NAME)/
 	cp $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
-	mv $(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service /etc/systemd/system/hypno.service
+	sed '{ \
+		s/@@PREFIX@@/$(PREFIX); \
+		s/@@SRVUSER@@/$(SRVUSER)/; \
+		s/@@SRVGROUP@@/$(SRVGROUP)/; \
+	}' $(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service > /etc/systemd/system/hypno.service
 	-mkdir -p $(WEBDIR)/ && chown $(SRVUSER):$(SRVGROUP) $(WEBDIR)/
 	-test -d /var/lib/$(NAME)/ || mkdir /var/lib/$(NAME)/
 	test -d /var/lib/$(NAME)/
 	-cp $(srcdir)/lib/* /var/lib/$(NAME)/
 	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(NAME)/
 
+
 # uninstall - Uninstalls hypno
 uninstall:
 	-rm -rf /var/lib/$(NAME)/ $(PREFIX)/share/$(NAME)/	
 	-rm $(PREFIX)/bin/$(NAME)-{cli,harness,server}
+
 
 # examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
 examples: PORT=2222
