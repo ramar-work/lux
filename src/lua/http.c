@@ -300,6 +300,7 @@ void print_www ( wwwResponse *r ) {
 	fprintf( stderr, "redrUri:%s\n", r->redirect_uri	 );
 #if 0
 	fprintf( stderr, "\nbody\n" ); write( 2, r->body, 200 );
+		freeaddrinfo( servinfo );
 	fprintf( stderr, "\ndata\n" ); write( 2, r->data, 400 );
 #endif
 }
@@ -471,7 +472,7 @@ int load_www ( const char *p, wwwResponse *r ) {
 			return ERR( r->err, "%s\n", "Allocation failure." );
 		} 
 
-		for ( ;; ) {	
+		for ( ;; ) {
 			uint8_t xbuf[ 4096 ];
 			memset( xbuf, 0, sizeof(xbuf) );
 			int blen = recv( sockfd, xbuf, sizeof(xbuf), 0 );
@@ -505,7 +506,10 @@ int load_www ( const char *p, wwwResponse *r ) {
 			}
 
 			//read into a bigger buffer	
-			msg = realloc( msg, r->len + blen );
+			if ( !( msg = realloc( msg, r->len + blen ) ) ) {
+				return ERR( r->err, "%s\n", "Realloc of destination buffer failed." );
+			}
+
 			memcpy( &msg[ r->len ], xbuf, blen ); 
 			r->len += blen;
 
@@ -515,6 +519,11 @@ int load_www ( const char *p, wwwResponse *r ) {
 				SSLPRINTF( "Full HTTP message received\n" );
 				break;
 			}
+		}
+
+		//Close the fd
+		if ( close( sockfd ) == -1 ) {
+
 		}
 	}
 	else {
@@ -628,6 +637,7 @@ int load_www ( const char *p, wwwResponse *r ) {
 			fprintf(stderr, "client: failed to connect\n");
 			return 1;
 		}
+		freeaddrinfo( servinfo );
 #endif
 
 		//Set up GnuTLS to read things
@@ -772,12 +782,22 @@ int load_www ( const char *p, wwwResponse *r ) {
 
 		if ( err != GNUTLS_E_SUCCESS ) {
 			return ERR( r->err, "%s\n",  gnutls_strerror( ret ) );
-		} 	
+		}
+
+		//Close the file and free all of GnuTLS's structures
+		if ( close( sockfd ) == -1 ) {
+
+		}
+		gnutls_deinit( session );
+		gnutls_certificate_free_credentials( xcred );
+		gnutls_global_deinit();
 	}
 
 	//Now, both requests ought to be done.  Set things here.
 	r->data = msg;
+	print_www( r );
 	extract_body( r );
+	print_www( r );
 	return 1;
 }
 
@@ -802,11 +822,11 @@ int http_request ( lua_State *L ) {
 	lua_pushstring( L, "results" );
 	lua_newtable( L );
 
-	lua_pushstring( L, "contents" );
+	lua_pushstring( L, "body" );
 	lua_pushlstring( L, (char *)w.body, w.clen );
 	lua_settable( L, 3 );
 	
-	lua_pushstring( L, "length" );
+	lua_pushstring( L, "size" );
 	lua_pushinteger( L, w.clen );
 	lua_settable( L, 3 );
 
@@ -822,9 +842,14 @@ int http_request ( lua_State *L ) {
 	lua_pushstring( L, "msglength" );
 	lua_pushinteger( L, w.len );
 	lua_settable( L, 3 );
+
+	lua_pushstring( L, "msg" );
+	lua_pushlstring( L, (char *)w.data, w.len );
+	lua_settable( L, 3 );
 #endif
 
 	lua_settable( L, 1 );
+		
 	free( w.data );
 	return 1;
 }
