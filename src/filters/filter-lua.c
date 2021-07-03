@@ -587,7 +587,7 @@ struct lua_readonly_t {
 	int (*exec)( struct luadata_t * );
 	//int (*exec)( lua_State *, struct HTTPBody *, const char *, const char * );	
 } lua_readonly[] = {
-	{ "http", init_lua_http }
+	{ "request", init_lua_http }
 , { "route", init_lua_routes }
 , { "config", init_lua_config }
 , { "shadow", init_lua_shadowpath }

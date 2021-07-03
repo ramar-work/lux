@@ -21,12 +21,14 @@
 #include "db.h"
 #include "lua.h"
 #include "filesystem.h"
+#include "http.h"
 
 struct lua_fset functions[] = {
 	{ "echo", echo_set }
 , { "db", db_set }
 , { "lua", lua_set }
 , { "fs", fs_set }
+, { "http", http_set }
 ,	{ NULL }
 };
 

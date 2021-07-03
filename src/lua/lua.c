@@ -127,6 +127,8 @@ static int __lua_dump ( zKeyval *kv, int ii, void *p ) {
 	return 1;
 }
 
+
+
 //Do the same job as a regular dump, but to a buffer
 int lua_dump_var ( lua_State *L ) {
 	luaL_checktype( L, 1, LUA_TTABLE );
@@ -167,6 +169,7 @@ int lua_dump_var ( lua_State *L ) {
 	}
 
 	free( d.buffer );
+	lt_free( t );
 	return 1;
 }
 
