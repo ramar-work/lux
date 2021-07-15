@@ -36,7 +36,7 @@
 #include <signal.h>
 #include <arpa/inet.h>
 #include <zwalker.h>
-#include <zmime.h>
+#include <zhttp.h>
 #include "../lua.h"
 
 #ifndef WEB_H
