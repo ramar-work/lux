@@ -45,7 +45,6 @@ int json_decode ( lua_State *L ) {
 		return luaL_error( L, "Failed to convert to Lua." );
 	}
 
-	lt_kfdump( t, 2 );
 	lt_free( t ), free( t );
 	return 1;
 }
@@ -53,7 +52,22 @@ int json_decode ( lua_State *L ) {
 
 int json_encode ( lua_State *L ) {
 	luaL_checktype( L, 1, LUA_TTABLE );
-	return 0;
+	char * src = NULL, err[ 1024 ] = {0};
+	zTable *zt = NULL;
+	//lua to ztable
+	if ( !lua_to_ztable( L, 1, zt ) ) {
+		return luaL_error( L, "conversion to binary structure failed." ); 
+	}
+
+	lua_pop( L, 1 );
+
+	//encode said table if that did not fail
+	if ( !( src = zjson_encode( zt, err, sizeof( err ) ) ) ) {
+		return luaL_error( L, "Encoding failed." );
+	}
+
+	lua_pushstring( L, src );
+	return 1;
 }
 
 
@@ -66,7 +80,6 @@ int json_check ( lua_State *L ) {
 struct luaL_Reg json_set[] = {
  	{ "decode", json_decode }
 ,	{ "encode", json_encode }
-,	{ "check", json_check }
 ,	{ NULL }
 };
 

@@ -19,6 +19,11 @@
  * Changelog
  * ---------
  * 
+ * TODO
+ * ---------
+ * - Compress a package (by selectively pulling things?)
+ * - Create a new package (by creating a new template)
+ * - De-cmopress a pcakage (to a specific location)
  * ------------------------------------------- */
 #include <stdio.h>
 #include <archive.h>
