@@ -349,7 +349,11 @@ int main ( int argc, char * argv[] ) {
 	if ( method_expects_body( req.method ) && arg.body ) {
 		//Make it multipart if requested
 		if ( arg.multipart ) {
-			req.ctype = "multipart/form-data";
+			//Need to free the original ctype
+			if ( req.ctype ) {
+				free( req.ctype );
+			}
+			req.ctype = zhttp_dupstr( "multipart/form-data" );
 		}
 
 		//Save all bodies 
@@ -461,6 +465,9 @@ int main ( int argc, char * argv[] ) {
 #endif
 
 	//Destroy res, req and anything else allocated
+	//print_httpbody( &req );
+	//print_httpbody( &res );
+
 	http_free_request( &req );
 	http_free_response( &res );
 

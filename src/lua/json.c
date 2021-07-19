@@ -67,6 +67,7 @@ int json_encode ( lua_State *L ) {
 	}
 
 	lua_pushstring( L, src );
+	free( src );
 	return 1;
 }
 

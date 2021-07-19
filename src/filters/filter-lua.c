@@ -554,13 +554,26 @@ int init_lua_http ( struct luadata_t *l ) {
 
 	//Then add key for others
 	for ( int pos=3, i = 0; i < 3; i++ ) {
-		lua_pushstring( l->state, str[i] ), lua_newtable( l->state );
-		for ( struct HTTPRecord **r = ii[i]; r && *r; r++ ) {
-			lua_pushstring( l->state, (*r)->field );
-			lua_pushlstring( l->state, ( char * )(*r)->value, (*r)->size );
-			lua_settable( l->state, pos );
+		struct HTTPRecord **r = ii[i];
+		if ( r && *r ) {
+			lua_pushstring( l->state, str[i] ), lua_newtable( l->state );
+			for ( ; r && *r; r++ ) {
+				lua_pushstring( l->state, (*r)->field );
+			#if 0
+				lua_pushlstring( l->state, ( char * )(*r)->value, (*r)->size );
+			#else
+				lua_newtable( l->state );
+				lua_pushstring( l->state, "value" ); 
+				lua_pushlstring( l->state, ( char * )(*r)->value, (*r)->size );
+				lua_settable( l->state, pos + 2 ); 	
+				lua_pushstring( l->state, "size" ); 
+				lua_pushinteger( l->state, (*r)->size );
+				lua_settable( l->state, pos + 2 ); 	
+			#endif
+				lua_settable( l->state, pos );
+			}
+			lua_settable( l->state, 1 );
 		}
-		lua_settable( l->state, 1 );
 	}
 
 	//Set global name
@@ -628,7 +641,8 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	unsigned char *content = NULL;
 
 	//Initialize the data structure
-	ld.req = req, ld.res = res; 
+	memset( &ld.res, 0, sizeof( zhttp_t ) );
+	ld.req = req, ld.res = res;
 	ld.zconfig = &zc, ld.zmodel = &zm, ld.zroutes = NULL;
 	memcpy( (void *)ld.root, conn->hconfig->dir, strlen( conn->hconfig->dir ) );
 
@@ -664,7 +678,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "%s", "Failed to copy routes from config." );
 	}
 
-	lt_kfdump( ld.zroutes, 1 );
+	//lt_kfdump( ld.zroutes, 1 );
 	//Turn the routes into a list of strings, and search for a match
 	struct route_t p = { .src = ld.zroutes };
 	lt_exec_complex( ld.zroutes, 1, ld.zroutes->count, &p, make_route_list );
@@ -781,7 +795,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	lt_lock( ld.zmodel );
 
 #if 1
-	lt_kfdump( ld.zmodel, 2 );
+	//lt_kfdump( ld.zmodel, 2 );
 #else
 	struct timespec tt = {0};
 	clock_gettime( CLOCK_REALTIME, &tt ); 
