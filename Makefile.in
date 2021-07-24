@@ -49,6 +49,7 @@ SRC = \
 	@srcdir@/src/lua/echo.c \
 	@srcdir@/src/lua/lua.c \
 	@srcdir@/src/lua/json.c \
+	@srcdir@/src/lua/rand.c \
 	@srcdir@/src/lua/filesystem.c \
 	@srcdir@/src/lua/http.c \
 	@srcdir@/src/filters/filter-static.c \

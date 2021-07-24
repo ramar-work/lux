@@ -296,6 +296,71 @@ int fs_stat ( lua_State *L ) {
 }
 
 
+int fs_list ( lua_State *L ) {
+	DIR *dir;
+	struct dirent *dd;
+	luaL_checktype( L, 1, LUA_TSTRING );
+	const char *dirname = NULL; 
+	lua_pop( L, 1 );
+
+	if ( !( dirname = ( char * )sw_path( L, lua_tostring( L, 1 ) ) ) ) {
+		return luaL_error( L, "Could not find shadow directory" );
+	}
+
+	//Try to open the directory
+	if ( !( dir = opendir( dirname ) ) ) {
+		return luaL_error( L, "Could not open directory: %s: %s", dirname, strerror( errno ) );
+	}
+
+	//Loop through all the entries and add them to table
+	lua_newtable( L );
+	lua_pushstring( L, "results" );
+	lua_newtable( L );
+
+	for ( char *typename = NULL; ( dd = readdir( dir ) ); ) {
+		//Omit . & ..
+		if ( strlen( dd->d_name ) <= 2 && *dd->d_name == '.' ) {
+			continue;
+		}
+
+		lua_pushstring( L, "inode" );
+		lua_pushnumber( L, dd->d_ino );
+		lua_settable( L, 3 );
+		
+		lua_pushstring( L, "name" );
+		lua_pushstring( L, dd->d_name );
+		lua_settable( L, 3 );
+
+		//TODO: Some systems don't have support for d_type
+		if ( dd->d_type == DT_BLK )
+			typename = "block";	
+		else if ( dd->d_type == DT_CHR )
+			typename = "character";	
+		else if ( dd->d_type == DT_DIR )
+			typename = "directory";	
+		else if ( dd->d_type == DT_FIFO )
+			typename = "fifo";	
+		else if ( dd->d_type == DT_LNK )
+			typename = "link";	
+		else if ( dd->d_type == DT_REG )
+			typename = "file";	
+		else if ( dd->d_type == DT_SOCK )
+			typename = "unixsocket";	
+		else {
+			typename = "unknown";	
+		}
+
+		lua_pushstring( L, "type" );
+		lua_pushstring( L, typename );
+		lua_settable( L, 3 );
+	}
+
+	lua_settable( L, 1 );
+	closedir( dir );		
+	return 1;
+}
+
+
 #if 0
 int fs_open ( lua_State *L ) {
 	luaL_checktype( L, 1, LUA_TSTRING );
@@ -309,14 +374,14 @@ int fs_close ( lua_State *L ) {
 }
 #endif
 
+
 struct luaL_Reg fs_set[] = {
  	{ "read", fs_read }
 ,	{ "write", fs_write }
 ,	{ "stat", fs_stat }
 ,	{ "pwd", fs_pwd }
-
-#if 0
 ,	{ "list", fs_list }
+#if 0
 ,	{ "mkdir", fs_mkdir }
 ,	{ "rmdir", fs_rmdir }
 ,	{ "delete", fs_remove }

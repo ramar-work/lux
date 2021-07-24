@@ -110,8 +110,9 @@ int db_exec ( lua_State *L ) {
 	}
 
 	//Then get the query
-	if ( ( pos = lt_geti( t, "string" ) ) > -1 ) 
+	if ( ( pos = lt_geti( t, "string" ) ) > -1 ) {
 		query = lt_text_at( t, pos );
+	}
 	else if ( ( pos = lt_geti( t, "file" ) ) > -1 ) {
 		char *f = NULL;
 		if ( ( f = lt_text_at( t, pos ) ) )
@@ -142,10 +143,10 @@ int db_exec ( lua_State *L ) {
 		lt_next(tt);
 
 		//Loop through everything
-		for ( zdbv_t *tv = malloc( sizeof( zdbv_t ) ); ( kv = lt_next( tt ) ) && kv->key.type != ZTABLE_TRM; ) {
-			char key[ 64 ] = { 0 };
+		for ( zdbv_t *tv = NULL; ( kv = lt_next( tt ) ) && kv->key.type != ZTABLE_TRM; ) {
+			char key[ 128 ] = { 0 };
 			//if the key is text, do something, if not do something
-			if ( !tv ) {
+			if ( !( tv = malloc( sizeof( zdbv_t ) ) ) ) {
 				lt_free( t ), lt_free( tt );
 				return luaL_error( L, "Allocation failure." );
 			}
@@ -153,13 +154,15 @@ int db_exec ( lua_State *L ) {
 			tv->field = NULL, tv->value = NULL;	
 			//if the key is text, do something, if not do something
 			if ( kv->key.type == ZTABLE_TXT ) {
-				snprintf( key, 63, ":%s", kv->key.v.vchar );	
+				snprintf( key, sizeof(key) - 1, ":%s", kv->key.v.vchar );	
 				tv->field = zhttp_dupstr( key );
 			}
+		#if 0
 			else if ( kv->key.type == ZTABLE_INT ) {
-				snprintf( key, 63, ":%d", kv->key.v.vint );
+				snprintf( key, sizeof(key) - 1, ":%d", kv->key.v.vint );
 				tv->field = zhttp_dupstr( key );
 			}
+		#endif
 
 			if ( kv->value.type == ZTABLE_TBL ) {
 				fprintf( stderr, "you are a table...\n" );	
@@ -193,6 +196,7 @@ int db_exec ( lua_State *L ) {
 		return luaL_error( L, "SQL execution error: %s", zdb.err );
 	}
 
+	//TODO: freeing query in this manner may cause issues when using a string as the argument
 	if ( len ) {
 		free( (void *)query );
 	}

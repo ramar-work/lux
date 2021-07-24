@@ -552,7 +552,34 @@ int init_lua_http ( struct luadata_t *l ) {
 	//Add one table for all structures
 	lua_newtable( l->state );
 
-	//Then add key for others
+	//Add general request info
+	lua_pushstring( l->state, "contenttype" );
+	lua_pushstring( l->state, l->req->ctype );
+	lua_settable( l->state, 1 );
+	lua_pushstring( l->state, "ctype" );
+	lua_pushstring( l->state, l->req->ctype );
+	lua_settable( l->state, 1 );
+	lua_pushstring( l->state, "length" );
+	lua_pushinteger( l->state, l->req->clen );
+	lua_settable( l->state, 1 );
+	lua_pushstring( l->state, "path" );
+	lua_pushstring( l->state, l->req->ctype );
+	lua_settable( l->state, 1 );
+	lua_pushstring( l->state, "method" );
+	lua_pushstring( l->state, l->req->method );
+	lua_settable( l->state, 1 );
+	lua_pushstring( l->state, "status" );
+	lua_pushinteger( l->state, l->req->status );
+	lua_settable( l->state, 1 );
+	lua_pushstring( l->state, "protocol" );
+	lua_pushstring( l->state, l->req->protocol );
+	lua_settable( l->state, 1 );
+	lua_pushstring( l->state, "host" );
+	lua_pushstring( l->state, l->req->host );
+	lua_settable( l->state, 1 );
+	
+
+	//Add simple keys for headers and URL
 	for ( int pos=3, i = 0; i < 3; i++ ) {
 		struct HTTPRecord **r = ii[i];
 		if ( r && *r ) {
@@ -678,8 +705,9 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "%s", "Failed to copy routes from config." );
 	}
 
-	//lt_kfdump( ld.zroutes, 1 );
 	//Turn the routes into a list of strings, and search for a match
+	lt_lock( ld.zroutes );
+	//lt_kfdump( ld.zroutes, 1 );
 	struct route_t p = { .src = ld.zroutes };
 	lt_exec_complex( ld.zroutes, 1, ld.zroutes->count, &p, make_route_list );
 	
@@ -731,6 +759,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "Failed to initialize Lua standard libs." ); 
 	}
 
+
 	//Execute each model
 	int ccount = 0, tcount = 0, model = 0;
 	for ( struct imvc_t **m = ld.pp.imvc_tlist; m && *m; m++ ) {
@@ -774,11 +803,12 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	}
 
 	//In the case of no model, initialize one anyway
-	//if ( !lt_init( ld.zmodel, NULL, !model ? 32 : 8190 ) ) {
 	if ( !lt_init( ld.zmodel, NULL, 8193 ) ) {
 		free_ld( &ld );
 		return http_error( res, 500, "Could not allocate table for model." );
 	}
+
+	//Get the content type from request scope
 
 	//Push whatever model is there
 	lua_getglobal( ld.state, mkey ); 
@@ -795,7 +825,8 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	lt_lock( ld.zmodel );
 
 #if 1
-	//lt_kfdump( ld.zmodel, 2 );
+	lt_kfdump( ld.zmodel, 2 );
+getchar();
 #else
 	struct timespec tt = {0};
 	clock_gettime( CLOCK_REALTIME, &tt ); 
@@ -816,7 +847,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//TODO: routes with no special keys need not be added
 
 	int view = 0;
-	for ( struct imvc_t **v = ld.pp.imvc_tlist; *v; v++ ) {
+	for ( struct imvc_t **v = ld.pp.imvc_tlist; v && *v; v++ ) {
 		if ( *(*v)->file == 'v' ) {
 			int len = 0, renlen = 0;
 			char vpath[ 2048 ] = {0};

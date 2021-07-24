@@ -24,6 +24,7 @@
 #include <ztable.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <dirent.h>
 #include "../lua.h"
 #include "../util.h"
 
@@ -34,6 +35,7 @@ int fs_open ( lua_State * );
 int fs_read ( lua_State * );
 int fs_close ( lua_State * );
 int fs_stat ( lua_State * );
+int fs_list ( lua_State * );
 int fs_write ( lua_State * );
 extern struct luaL_Reg fs_set[];
 

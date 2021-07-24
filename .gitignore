@@ -18,3 +18,4 @@ src/tim
 tests/
 vendor/*tar.gz
 vendor/*zip
+vendor/libgit*

@@ -23,6 +23,7 @@
 #include "filesystem.h"
 #include "http.h"
 #include "json.h"
+#include "rand.h"
 
 struct lua_fset functions[] = {
 	{ "echo", echo_set }
@@ -31,6 +32,7 @@ struct lua_fset functions[] = {
 , { "fs", fs_set }
 , { "http", http_set }
 , { "json", json_set }
+, { "rand", rand_set }
 ,	{ NULL }
 };
 
