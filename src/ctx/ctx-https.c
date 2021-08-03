@@ -124,6 +124,9 @@ static int process_credentials ( struct gnutls_abstr *g, struct sconfig *conf ) 
 
 const int 
 pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *conn ) {
+	//The hosts SHOULD be here
+	//So the SNI lookup can happen here...
+
 	//Define
 	struct gnutls_abstr *g = NULL;
 	int ret, size = sizeof( struct gnutls_abstr );

@@ -33,6 +33,7 @@
 #include <sys/stat.h>
 #include <stdarg.h>
 #include <router.h>
+#include <dirent.h>
 #include "../util.h"
 #include "../server.h"
 #include "../lua.h"
