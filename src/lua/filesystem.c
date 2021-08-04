@@ -88,7 +88,9 @@ int fs_pwd ( lua_State *L ) {
 	}
 
 #if 1
-	realpath( fspath, rp );
+	if ( !realpath( fspath, rp ) ) {
+		return luaL_error( L, "realpath() failed: %s", strerror( errno ) );
+	}
 	lua_pushstring( L, rp );	
 	free( fspath );
 	return 1;
