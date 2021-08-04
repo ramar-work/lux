@@ -61,6 +61,26 @@ return {
 		},
 	
 		-- SSL capable hosts look like this
+		["selfsigned.local"] = { 
+			dir = "ssl",
+			root_default = "/index.html",
+			--ca_bundle = "misc/ssl/self-signed/self-signed.ca-bundle",
+			cert_file = "misc/ssl/self-signed/self-signed.crt",
+			key_file = "misc/ssl/self-signed/self-signed.pem",
+			filter = "static"
+		},
+
+		-- SSL capable hosts look like this
+		["selfsignedtwo.local"] = { 
+			dir = "ssl",
+			root_default = "/index2.html",
+			--ca_bundle = "misc/ssl/self-signed/self-signed-2.ca-bundle",
+			cert_file = "misc/ssl/self-signed-2/self-signed-2.crt",
+			key_file = "misc/ssl/self-signed-2/self-signed-2.pem",
+			filter = "static"
+		},
+
+		-- SSL capable hosts look like this
 		["supergreatwok.xyz"] = { 
 			dir = "ssl",
 			root_default = "/index.html",

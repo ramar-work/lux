@@ -70,7 +70,7 @@ static int process_credentials ( struct gnutls_abstr *g, struct sconfig *conf ) 
 		FPRINTF( "key_file: %s\n", (*h)->key_file );
 	}
 #endif
-	for ( struct lconfig **h = conf->hosts; *h ; h++ ) {
+	for ( struct lconfig **h = conf->hosts; h && *h ; h++ ) {
 		FPRINTF( "Host %s will init SSL: %s\n", (*h)->name, ( (*h)->dir && (*h)->cert_file ) ? "Y" : "N" );
 		if ( (*h)->dir && (*h)->cert_file  ) {
 			//Make a filename
@@ -93,7 +93,7 @@ static int process_credentials ( struct gnutls_abstr *g, struct sconfig *conf ) 
 			FPRINTF( "ca bundle: %s\n", ca );
 			FPRINTF( "cert: %s\n", cert );
 			FPRINTF( "key: %s\n", key );
-			char *w[] = { cert, key, ca, NULL };
+			char *w[] = { cert, key, /*ca, */NULL };
 			for ( char **ww = w; *ww; ww++ ) {
 				struct stat sb = {0};
 				if ( stat( *ww, &sb ) == -1 ) {
@@ -103,13 +103,14 @@ static int process_credentials ( struct gnutls_abstr *g, struct sconfig *conf ) 
 			}
 		#endif
 			//Defined here, but nice if this is not the case...
-			int cp, status;
-
+			int cp=0, status=0;
+#if 0
 			//TODO: This should match the number of TLS enabled clients
 			if ( ( cp = gnutls_certificate_set_x509_trust_file( g->x509_cred, ca, GNUTLS_X509_FMT_PEM ) ) < 0 ) {
 				FPRINTF( "Could not set trust for '%s': %s\n", (*h)->name, gnutls_strerror( cp ) );
 				return 0;
 			}
+#endif
 
 			FPRINTF( "Certificates processed: %d\n", cp );
 			if ( ( status = gnutls_certificate_set_x509_key_file( g->x509_cred, cert, key, GNUTLS_X509_FMT_PEM ) ) < 0 ) {
@@ -184,12 +185,38 @@ pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *conn 
 	gnutls_handshake_set_timeout( g->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT ); 
   gnutls_transport_set_int( g->session, fd );
 
+	//Try to get the server name here?
 	//Do the actual handshake with an open file descriptor
 #if 0
 	while ( ( ret = gnutls_handshake( g->session ) ) == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED );
 #else
 	do {
 		ret = gnutls_handshake( g->session );
+
+		//It looks like GnuTLS does this in the background
+		//It MIGHT be helpful to check that host and data match
+	#ifndef DISABLE_SNI
+		//char data[4096] = {0};
+		unsigned int sni_type = GNUTLS_NAME_DNS;
+		size_t dsize = sizeof( g->sniname ) - 1;	
+		if ( ( ret = gnutls_server_name_get( g->session, g->sniname, &dsize, &sni_type, 0 ) ) < 0 ) {
+			fprintf( stderr, "Could not get server name: %s\n", gnutls_strerror( ret ) );
+			//return 0;
+			//If the client does not use sni, then we should probably stop
+		}
+		//fprintf( stderr, "sni ind = '%s'\n", data );
+	#if 0
+		//Check against host data, and perhaps send the cert to the client for check?
+		if ( 0 ) {
+			//should this result in a 404?
+			for ( struct lconfig **h = conf->hosts; h && *h ; h++ ) {
+				if ( !strcmp( data, (*h)->name ) || !strcmp( data, (*h)->alias ) ) {
+
+				}
+			}
+		}
+	#endif		
+	#endif
 	}
 	while ( ret == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED );	
 #endif
@@ -221,8 +248,15 @@ read_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *co
 	clock_gettime( CLOCK_REALTIME, &timer );	
 
 	//Allocate space for the first call
-	if ( !( rq->msg = malloc( size ) ) )
+	if ( !( rq->msg = malloc( size ) ) ) {
 		return http_set_error( rs, 500, "Could not allocate initial read buffer." ); 
+	}
+
+	//Bad certs can leave us with this sorry state
+	if ( !g || !g->session ) {
+		//set conn->count to stop here...
+		return http_set_error( rs, 500, "SSL/TLS handshake error encountered." ); 
+	}
  
 	//Read first
 	for ( ;; ) {	
@@ -272,6 +306,13 @@ read_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *co
 		else {
 			rq->mlen += rd;
 			struct HTTPBody *tmp = http_parse_request( rq, err, sizeof(err) ); 
+
+			//Check that the hostname matches the SNI name
+			if ( strcmp( tmp->host, g->sniname ) ) {
+				conn->count = -3;
+				snprintf( err, sizeof( err ), "Requested cert host '%s' does not match hostname '%s'.", tmp->host, g->sniname ); 
+				return http_set_error( rs, 500, err );
+			}
 	
 			//TODO: Is this handling everything?
 			if ( tmp->error == ZHTTP_NONE ) { 

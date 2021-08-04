@@ -234,11 +234,11 @@ void zdb_dump( zdb_t *zdb ) {
 
 
 void zdbv_dump ( zdbv_t **list ) {
-	int a = 1;
+	int a = 1, b = 0;
 	for ( zdbv_t **r = list; r && *r; r++ ) {
 		fprintf( stderr, "rec %d: '%s' => '", a++, (*r)->field );
-		write( 2, (*r)->value, (*r)->len ); 
-		write( 2, "'\n", 2 );
+		b = write( 2, (*r)->value, (*r)->len ); 
+		b = write( 2, "'\n", 2 );
 	} 
 }
 

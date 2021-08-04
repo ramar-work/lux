@@ -53,6 +53,7 @@ struct gnutls_abstr {
 	gnutls_certificate_credentials_t x509_cred;
   gnutls_priority_t priority_cache;
 	gnutls_session_t session;
+	char sniname[ 4096 ]; // The SNI name?
 #if 0
 	const char *cafile;
 	const char *crlfile; 

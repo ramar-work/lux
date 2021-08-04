@@ -62,6 +62,7 @@ OBJ = ${SRC:.c=.o}
 TARGET = main
 TESTS = luabind router util #server render filter config 
 UNAME = $(shell uname)
+DOMAIN = localhost 
 
 # Handle slight differences between Debian and others...
 ifeq ($(UNAME),Linux)
@@ -242,5 +243,15 @@ config.status: configure
 
 README.md: docs
 	printf '' >/dev/null
+
+# By default, we need to be running https
+# A command-line for generating self signed certs is below
+cert: CERTNAME=cert
+cert:
+	-mkdir tmp/
+	openssl req -x509 -newkey rsa:4096 \
+		-keyout tmp/$(CERTNAME).pem \
+		-out tmp/$(CERTNAME).crt \
+		-days 365 -nodes -subj '/CN=$(DOMAIN)'
 
 .PHONY: docs

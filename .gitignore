@@ -16,6 +16,8 @@ include/
 lib/
 src/tim
 tests/
+tmp/
 vendor/*tar.gz
 vendor/*zip
 vendor/libgit*
+vendor/src/
