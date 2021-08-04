@@ -276,7 +276,7 @@ void *zdb_exec( zdb_t *zdb, const char *query, zdbv_t **records ) {
 void zdbv_loop ( zdbv_t ** list ) {
 	for ( zdbv_t **l = list; l && *l; l++ ) {
 		fprintf( stderr, "%s: ", (*l)->field );
-		write( 2, (*l)->value, (*l)->len );
+		int b = write( 2, (*l)->value, (*l)->len );
 		fprintf( stderr, "\n" );
 	}
 }
