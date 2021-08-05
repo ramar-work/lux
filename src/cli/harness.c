@@ -182,6 +182,8 @@ int main ( int argc, char * argv[] ) {
 			arg.filter = *( ++argv );
 		else if ( !strcmp( *argv, "-u" ) || !strcmp( *argv, "--uri" ) )
 			arg.uri = *( ++argv );
+		else if ( !strcmp( *argv, "-n" ) || !strcmp( *argv, "--host" ) )
+			arg.host = *( ++argv );
 		else if ( !strcmp( *argv, "-c" ) || !strcmp( *argv, "--content-type" ) )
 			arg.ctype = *( ++argv );
 		else if ( !strcmp( *argv, "-m" ) || !strcmp( *argv, "--method" ) )
@@ -299,6 +301,9 @@ int main ( int argc, char * argv[] ) {
 	req.host = !arg.host ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.host );
 	req.method = zhttp_dupstr( arg.method );
 	req.protocol = !arg.protocol ? zhttp_dupstr( "HTTP/1.1" ) : zhttp_dupstr( arg.protocol );
+
+fprintf( stderr, "%s\n", req.host );
+getchar();
 #if 0
 	req.alias = !arg.alias ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.alias );
 #endif

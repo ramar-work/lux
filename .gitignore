@@ -21,3 +21,5 @@ vendor/*tar.gz
 vendor/*zip
 vendor/libgit*
 vendor/src/
+vendor/lib*
+vendor/lua*

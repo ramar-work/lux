@@ -483,6 +483,7 @@ static int parse_http_header ( zhttp_t *entity, char *err, int errlen ) {
 	//Define stuffs
 	const char *methods = "HEAD,GET,POST,PUT,PATCH,DELETE";
 	const char *protocols = "HTTP/1.1,HTTP/1.0,HTTP/1,HTTP/0.9";
+	char *port = NULL;
 	int walker = 0;
 	zWalker z = {0};
 
@@ -541,7 +542,13 @@ static int parse_http_header ( zhttp_t *entity, char *err, int errlen ) {
 	}
 
 	//Get host requested (not always going to be there)
-	entity->host = zhttp_msg_get_value( "Host: ", "\r", entity->msg, entity->hlen );
+	entity->host = zhttp_msg_get_value( "Host: ", "\r", entity->msg, entity->hlen );	
+	if ( entity->host && ( port = index( entity->host, ':' ) ) ) {
+		//Remove colon
+		entity->port = atoi( port + 1 );
+		memset( port, 0, strlen( port ) ); 
+	//entity->port = 80 || 443 || entity->host:*
+	}
 
 	//If we expect a body, parse it
 	if ( memstr( "POST,PUT,PATCH", entity->method, strlen( "POST,PUT,PATCH" ) ) ) {

@@ -1409,9 +1409,6 @@ int http_request ( lua_State *L ) {
 		return luaL_error( L, err ); 
 	}
 
-	fprintf( stderr, "MESSAGE CONTENTS\n" );
-	write( 2, qhttp.msg, qhttp.mlen );
-
 	//This is just going to send the request
 	if ( !secure ) {
 		//I don't really want to die here...

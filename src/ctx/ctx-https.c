@@ -204,7 +204,6 @@ pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *conn 
 			//return 0;
 			//If the client does not use sni, then we should probably stop
 		}
-		//fprintf( stderr, "sni ind = '%s'\n", data );
 	#if 0
 		//Check against host data, and perhaps send the cert to the client for check?
 		if ( 0 ) {

@@ -76,7 +76,7 @@ static zTable * get_config_limits( lua_State *L ) {
 
 
 int fs_pwd ( lua_State *L ) {
-	char *fspath = NULL, fp[ 2048 ] = {0}, rp[ 2048 ] = {0};
+	char *fspath = NULL, fp[ PATH_MAX ] = {0}, rp[ PATH_MAX ] = {0};
 	struct stat sb;
 
 	//Check for a string argument

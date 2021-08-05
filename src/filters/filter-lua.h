@@ -73,7 +73,7 @@ struct mvc_t {
 
 
 struct luadata_t {
-	struct HTTPBody *req, *res;
+	zhttp_t *req, *res;
 	lua_State *state;
 #if 0
 	const char *aroute;

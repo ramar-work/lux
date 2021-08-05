@@ -482,10 +482,11 @@ static const int send_static ( struct HTTPBody *res, const char *dir, const char
 
 //...
 void dump_records( struct HTTPRecord **r ) {
+	int b = 0;
 	for ( struct HTTPRecord **a = r; a && *a; a++ ) {
 		fprintf( stderr, "%p: %s -> ", *a, (*a)->field ); 
-		write( 2, (*a)->value, (*a)->size );
-		write( 2, "\n", 1 );
+		b = write( 2, (*a)->value, (*a)->size );
+		b = write( 2, "\n", 1 );
 	}
 }
 
@@ -739,7 +740,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	unsigned char *content = NULL;
 
 	//Initialize the data structure
-	memset( &ld.res, 0, sizeof( zhttp_t ) );
+	memset( res, 0, sizeof( zhttp_t ) );
 	ld.req = req, ld.res = res;
 	ld.zconfig = &zc, ld.zmodel = &zm, ld.zroutes = NULL;
 	memcpy( (void *)ld.root, conn->hconfig->dir, strlen( conn->hconfig->dir ) );
@@ -759,7 +760,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	}
 
 //excess path handling has to be done here...
-return http_error( res, 200, "nothing at all" );
+//return http_error( res, 200, "nothing at all" );
 
 	//Need to delegate to static handler when request points to one of the static paths
 	if ( path_is_static( &ld ) ) {
@@ -788,7 +789,7 @@ return http_error( res, 200, "nothing at all" );
 	//We'll need to resolve routes after getting the entire list...
 
 
-return http_error( res, 200, "never" ); 
+//return http_error( res, 200, "never" ); 
 	
 	//Loop through the routes
 	ld.pp.depth = 1;
