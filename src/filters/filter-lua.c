@@ -733,6 +733,11 @@ int free_ld ( struct luadata_t *l ) {
 //The entry point for a Lua application
 const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
+
+print_httpbody( req );
+return http_error( res, 200, "Return a message..." );
+
+
 	//Define variables and error positions...
 	zTable zc = {0}, zm = {0};
 	struct luadata_t ld = {0};

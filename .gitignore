@@ -5,6 +5,7 @@ src.vim
 configure.scan
 *.log
 *.o
+*.swp
 
 autom4te.cache/
 artwork/
@@ -23,3 +24,4 @@ vendor/libgit*
 vendor/src/
 vendor/lib*
 vendor/lua*
+vendor/*

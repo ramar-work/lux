@@ -381,8 +381,9 @@ static int parse_body( zhttp_t *entity, char *err, int errlen ) {
 	memset( &set, 0, sizeof( zWalker ) );
 	int len = 0;
 	unsigned char *p = &entity->msg[ entity->hlen + 4 ];
-	const char *idem = "POST,PUT,PATCH";
-	const char *multipart = "multipart/form-data";
+	const char idem[] = "POST,PUT,PATCH";
+	const char multipart[] = "multipart/form-data";
+	const char x_www_form[] = "application/x-www-form-urlencoded"; 
 
 	//TODO: If this is a xfer-encoding chunked msg, entity->clen needs to get filled in when done.
 	//TODO: Bitmasking is 1% more efficient, go for it.
@@ -402,25 +403,26 @@ static int parse_body( zhttp_t *entity, char *err, int errlen ) {
 	}
 
 	//url encoded is a little bit different.  no real reason to use the same code...
-	if ( strcmp( entity->ctype, "application/x-www-form-urlencoded" ) == 0 ) {
+	if ( strcmp( entity->ctype, x_www_form ) == 0 ) {
 		zhttpr_t *b = NULL;
 		while ( memwalk( &set, p, (unsigned char *)"=&", entity->clen, 2 ) ) {
 			unsigned char *m = &p[ set.pos ];  
-			if ( set.chr == '=' ) {
-				//TODO: Should be checking that allocation was successful
-				b = init_record();
-				b->field = zhttp_copystr( m, set.size - 1 );
-			}
+			//TODO: Should be checking that allocation was successful
+			if ( set.chr == '=' )
+				b = init_record(), b->field = zhttp_copystr( m, set.size - 1 );
 			else { 
-				b->value = m;
-				b->size = set.size - (( set.chr == '&' ) ? 1 : 2);
-				zhttp_add_item( &entity->body, b, zhttpr_t *, &len );
-				b = NULL;
+				if ( !b )
+					break;
+				else {	
+					b->value = m;
+					b->size = set.size - (( set.chr == '&' ) ? 1 : 2);
+					zhttp_add_item( &entity->body, b, zhttpr_t *, &len );
+					b = NULL;
+				}
 			}
 		}
 	}
-	
-	if ( memcmp( multipart, entity->ctype, strlen(multipart) ) == 0 ) {
+	else if ( memcmp( multipart, entity->ctype, strlen(multipart) ) == 0 ) {
 		char bd[ 128 ];
 		memset( &bd, 0, sizeof( bd ) );
 		snprintf( bd, 64, "--%s", entity->boundary );
@@ -472,6 +474,13 @@ static int parse_body( zhttp_t *entity, char *err, int errlen ) {
 			}
 			++pp, len1 -= pp, p += pp;	
 		}
+	}
+	else {
+		zhttpr_t *b = init_record(); 
+		b->field = zhttp_dupstr( "body" );
+		b->value = p;
+		b->size = entity->clen;
+		zhttp_add_item( &entity->body, b, zhttpr_t *, &len ); 
 	}
 	return 1;
 }

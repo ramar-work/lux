@@ -53,10 +53,15 @@ return {
 			filter = "static"
 		},
 	
-		-- See the static filter in action
+		-- A Lua directory...
 		["lua.hypno"] = { 
 			dir = "lua",
-			root_default = "/index.html",
+			filter = "lua"
+		},
+
+		-- A Lua directory...
+		["carolinascholar.local"] = { 
+			dir = "carolinascholar.com",
 			filter = "lua"
 		},
 	
