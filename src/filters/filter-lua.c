@@ -905,7 +905,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	lt_lock( ld.zmodel );
 
 #if 1
-	lt_kfdump( ld.zmodel, 2 );
+	//lt_kfdump( ld.zmodel, 2 );
 #else
 	struct timespec tt = {0};
 	clock_gettime( CLOCK_REALTIME, &tt ); 

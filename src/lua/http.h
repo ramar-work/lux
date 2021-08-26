@@ -26,7 +26,6 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#include <gnutls/gnutls.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
@@ -38,6 +37,9 @@
 #include <zwalker.h>
 #include <zhttp.h>
 #include "../lua.h"
+#if 0
+#include <gnutls/gnutls.h>
+#endif
 
 #ifndef WEB_H
 #define WEB_H

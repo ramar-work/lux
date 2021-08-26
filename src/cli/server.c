@@ -177,7 +177,7 @@ static int findex() {
 //Define a list of "context types"
 struct senderrecvr sr[] = {
 	{ read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost  }
-, { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls }
+//, { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls }
 ,	{ NULL }
 };
 

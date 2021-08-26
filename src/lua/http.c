@@ -507,6 +507,7 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 }
 
 
+#if 0
 int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char *errmsg, int errlen ) {
 #if 1
 	//Define
@@ -788,6 +789,7 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 #endif
 	return 1;
 }
+#endif
 
 //Load webpages via HTTP/S
 #if 0
@@ -1417,9 +1419,12 @@ int http_request ( lua_State *L ) {
 		}
 	}
 	else {
+		return luaL_error( L, err ); 
+	#if 0
 		if ( !make_https_request( addr, port, &qhttp, &rhttp, err, sizeof(err) ) ) {
 			return luaL_error( L, err ); 
 		}
+	#endif
 	}
 
 	//FINALLY, we need to put all the stuff in the response into a form that

@@ -20,7 +20,8 @@ VPATH = @srcdir@
 SRVUSER = ramar
 SRVGROUP = ramar
 IFLAGS = -Ivendor -I/usr/include/lua5.3
-LDFLAGS = -L/usr/lib/x86_64-linux-gnu -ldl -lpthread -lgnutls -lsqlite3 -larchive -llua
+LDFLAGS = -ldl -lpthread -lgnutls
+#-L/usr/lib/x86_64-linux-gnu -
 DEBUGFLAGS = -DDEBUG_H
 CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security $(IFLAGS)
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
@@ -30,6 +31,7 @@ CC = gcc
 SRC = \
 	@srcdir@/vendor/zrender.c \
 	@srcdir@/vendor/ztable.c \
+	@srcdir@/vendor/sqlite3.c \
 	@srcdir@/vendor/zdb.c \
 	@srcdir@/vendor/zwalker.c \
 	@srcdir@/vendor/zhttp.c \
@@ -43,7 +45,6 @@ SRC = \
 	@srcdir@/src/server.c \
 	@srcdir@/src/loader.c \
 	@srcdir@/src/ctx/ctx-http.c \
-	@srcdir@/src/ctx/ctx-https.c \
 	@srcdir@/src/lua/lib.c \
 	@srcdir@/src/lua/db.c \
 	@srcdir@/src/lua/echo.c \
@@ -60,34 +61,35 @@ SRC = \
 
 OBJ = ${SRC:.c=.o}
 TARGET = main
-TESTS = luabind router util #server render filter config 
+TESTS = luabind router util
 UNAME = $(shell uname)
 DOMAIN = localhost 
 
 # Handle slight differences between Debian and others...
-ifeq ($(UNAME),Linux)
-	DEBUNAME = $(shell uname -a | awk '{ print $$2 }')
-	ifeq ($(DEBUNAME),debian)
-		LDFLAGS += $(shell pkg-config --libs --cflags lua5.3 gnutls) 
-	else
-		LDFLAGS += $(shell pkg-config --libs --cflags lua gnutls) 
-	endif
-endif
-
-ifeq ($(UNAME),Darwin)
-	CC = clang
-	CFLAGS = $(CLANGFLAGS) 
-	LDFLAGS += $(shell pkg-config --libs --cflags lua gnutls) 
-endif
+#ifeq ($(UNAME),Linux)
+#	DEBUNAME = $(shell uname -a | awk '{ print $$2 }')
+#	ifeq ($(DEBUNAME),debian)
+#		LDFLAGS += $(shell pkg-config --libs --cflags lua5.3 gnutls) 
+#	else
+#		LDFLAGS += $(shell pkg-config --libs --cflags lua gnutls) 
+#	endif
+#endif
+#
+#ifeq ($(UNAME),Darwin)
+#	CC = clang
+#	CFLAGS = $(CLANGFLAGS) 
+#	LDFLAGS += $(shell pkg-config --libs --cflags lua gnutls) 
+#endif
 
 
 # main - Compiles all code needed to get hypno running
 main: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) 
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ)
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ)
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ)
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a 
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a 
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a 
+
+#	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ)
 
 # debug - Builds code with debugging flags on
 debug: debug-clang
