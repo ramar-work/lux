@@ -730,13 +730,76 @@ int free_ld ( struct luadata_t *l ) {
 }
 
 
+//...
+int return_as_response ( struct luadata_t *l ) {
+
+	zTable *rt = NULL;
+	int status = 200, clen = 0;
+	char *ctype = "text/html";
+	unsigned char *content = NULL;
+
+	if ( !( rt = lt_make( 1024 ) ) ) {
+		lt_free( rt ), free( rt );
+		snprintf( l->err, LD_ERRBUF_LEN, "Could not generate response table." );
+		return 0;
+	}
+
+	if ( !lua_istable( l->state, 1 ) ) {
+		lt_free( rt ), free( rt );
+		snprintf( l->err, LD_ERRBUF_LEN, "Response is not a table." );
+		return 0;
+	}
+
+	if ( !lua_to_ztable( l->state, 1, rt ) ) {
+		lt_free( rt ), free( rt );
+		snprintf( l->err, LD_ERRBUF_LEN, "Error in model conversion." );
+		return 0;
+	}
+
+	//Get the status
+	int status_i = 0;
+	if ( ( status_i = lt_geti( rt, "status" ) ) > -1 ) {
+		status = lt_int_at( rt, status_i );
+	}
+	
+	//Get the content-type (if there is one)
+	int ctype_i = 0;
+	if ( ( ctype_i = lt_geti( rt, "ctype" ) ) > -1 )
+		ctype = zhttp_dupstr( lt_text_at( rt, ctype_i ) ); 
+	else {
+		ctype = zhttp_dupstr( ctype );
+	}
+
+	//Get the content-length (if there is one)
+	int clen_i = 0;
+	if ( ( clen_i = lt_geti( rt, "clen" ) ) > -1 ) {
+		clen = lt_int_at( rt, clen_i ); 
+	}
+
+	//Get the content
+	int content_i = 0;
+	if ( ( content_i = lt_geti( rt, "content" ) ) > -1 ) {
+		if ( clen_i == -1 )
+			content = (unsigned char *)lt_text_at( rt, content_i );
+		else {
+			content = lt_blob_at( rt, content_i ).blob;
+		} 
+	}
+
+	//Set structures
+	l->res->clen = clen;
+	http_set_status( l->res, status ); 
+	http_set_ctype( l->res, ctype );
+	http_copy_content( l->res, content, clen ); 
+
+	//Return finalized content
+	lt_free( rt ), free( rt );
+	return http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ) ? 1 : 0;
+}
+
+
 //The entry point for a Lua application
 const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
-
-
-print_httpbody( req );
-return http_error( res, 200, "Return a message..." );
-
 
 	//Define variables and error positions...
 	zTable zc = {0}, zm = {0};
@@ -904,6 +967,19 @@ return http_error( res, 200, "Return a message..." );
 			free_ld( &ld );
 			return http_error( res, 500, "Error in model conversion." );
 		}
+	}
+
+	//Push whatever model is there
+	lua_getglobal( ld.state, "response" ); 
+	if ( lua_isnil( ld.state, -1 ) )
+		lua_pop( ld.state, 1 );
+	else {
+		if ( !return_as_response( &ld ) ) {
+			free_ld( &ld );
+			return http_error( res, 500, ld.err );
+		}
+		free_ld( &ld );
+		return 1;
 	}
 
 	//Load all views
