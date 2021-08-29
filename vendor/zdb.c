@@ -630,6 +630,22 @@ void * zdb_mysql_exec( zdb_t *zdb, const char *query, zdbv_t **records ) {
 		return NULL;
 	}
 
+#if 0
+#error "MySQL Bind is ineffective right now"
+
+//To fix this, 
+//1. Copy the query without the named parameters and use the question marks
+//2. Keep a count of how many bind parameters we got (I feel like you'll need it)
+//3. Allocate an array of values matching the number of params we got
+//(This is already done)
+//4. Loop through the array, and check in zdbv_t ** for the matching field
+//	Replace with value (free the original, and (possibly) replace it w/ a 
+//	copy of zdbv_t value... can't tell if this is unnecessary or not)
+//5. Allocate the correct number of MYSQL_BIND structures needed with the
+//	values from the above array...
+//6. Make sure it throws if the values don't match...
+//*. Building type safety in at zdbv_t is easier than going the other way...
+#endif
 	//Find ':' within the query
 	if ( strchr( query, ':' ) ) {
 		//Set up all the bind arguments by name
@@ -640,7 +656,7 @@ void * zdb_mysql_exec( zdb_t *zdb, const char *query, zdbv_t **records ) {
 		int tok = 0, len = 0, bplen = 0;
 
 		for ( ; strwalk( &w, query, bpset ); ) {
-//fprintf( stderr, "chr: '%c' ", w.chr );write( 2, w.src, w.size );
+		//fprintf( stderr, "chr: '%c' ", w.chr );write( 2, w.src, w.size );
 			if ( w.chr == '\'' )
 				tok = 1;
 			else if ( w.chr == ':' ) {
