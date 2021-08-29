@@ -949,6 +949,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			model = 1;
 		}
 	}
+FPRINTF( "Evaluated all models.\n" );
 
 	//In the case of no model, initialize one anyway
 	if ( !lt_init( ld.zmodel, NULL, 8193 ) ) {
@@ -974,11 +975,13 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	if ( lua_isnil( ld.state, -1 ) )
 		lua_pop( ld.state, 1 );
 	else {
+		FPRINTF( "Attempting alternate content return.\n" );
 		if ( !return_as_response( &ld ) ) {
 			free_ld( &ld );
 			return http_error( res, 500, ld.err );
 		}
 		free_ld( &ld );
+		FPRINTF( "We got to a successful point.\n" );
 		return 1;
 	}
 

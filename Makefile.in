@@ -125,6 +125,11 @@ install:
 	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(NAME)/
 
 
+# cygwin-install - Installs hypno as a service suitable for use with Cygwin 
+cygwin-install:
+	cygstart --action=runas cygrunsrv --install hypno --user $(USER) -p /usr/local/bin/hypno-server -a '--start --config /var/www/config.lua'
+
+
 # systemd-install - Installs systemd on Linux systems
 systemd-install:
 	sed '{ s#__PREFIX__#$(PREFIX)#; s#__SRVUSER__#$(SRVUSER)#; s#__SRVGROUP__#$(SRVGROUP)# }' \
