@@ -149,6 +149,11 @@ const int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct
 	int sent = 0, pos = 0, try = 0, total = rs->mlen;
 	unsigned char *ptr = rs->msg;
 
+	//Get the time at the start
+	struct timespec timer = {0};
+	clock_gettime( CLOCK_REALTIME, &timer );	
+
+
 	for ( ;; ) {
 		sent = send( fd, ptr, total, MSG_DONTWAIT );
 		FPRINTF( "Bytes sent: %d\n", sent );
@@ -165,6 +170,31 @@ const int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct
 				break;
 			}
 		}
+#if 1
+		else {
+			if ( !total ) {
+				FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
+				return 1;
+			}
+			
+			if ( errno != EAGAIN || errno != EWOULDBLOCK ) {
+				FPRINTF( "Got socket write error: %s\n", strerror( errno ) );
+				conn->count = -2;
+				return 0;	
+			}
+
+			struct timespec n = {0};
+			clock_gettime( CLOCK_REALTIME, &n );
+			
+			if ( ( n.tv_sec - timer.tv_sec ) > 5 ) {
+				conn->count = -3;
+				return http_set_error( rs, 408, "Timeout reached." );
+			}
+
+			FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
+			nanosleep( &__interval__, NULL );
+		}
+#else 
 		else if ( sent == -1 && ( errno == EAGAIN || errno == EWOULDBLOCK ) ) {
 			FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
 		}
@@ -179,6 +209,7 @@ const int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct
 				return 0;	
 			}
 		}
+#endif
 		try++;
 		FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
 	}
