@@ -823,6 +823,10 @@ print_httpbody( l->res );
 //The entry point for a Lua application
 const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
+
+	print_httpbody( req );
+	return http_error( res, 200, "I am a happy response." );
+
 	//Define variables and error positions...
 	zTable zc = {0}, zm = {0};
 	struct luadata_t ld = {0};
@@ -864,6 +868,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "%s", "Failed to extract path." );
 	}
 
+#if 1
 	//Get the routes from the config file.
 	if ( !( ld.zroutes = lt_copy_by_key( ld.zconfig, rkey ) ) ) {
 		free_ld( &ld );
@@ -873,6 +878,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//Turn the routes into a list of strings, and search for a match
 	lt_lock( ld.zroutes );
 	//lt_kfdump( ld.zroutes, 1 );
+#endif
 	struct route_t p = { .src = ld.zroutes };
 	lt_exec_complex( ld.zroutes, 1, ld.zroutes->count, &p, make_route_list );
 

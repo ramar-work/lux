@@ -200,6 +200,12 @@ plat:
 	echo $(OS)	
 	
 #if 0
+# stress - Stress test the server
+stress: LIMIT=512
+stress: URL="http://carolinascholar.com/login?xasdfas=asdfsa" 
+stress:
+	tests/stress.sh $(LIMIT) $(URL)
+
 # pkg - Make a package of the latest tagged version for distribution
 pkg:
 	git archive --format tar HEAD | gzip > build/$(NAME)-`git tag | tail -n 1`.tar.gz

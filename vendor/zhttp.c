@@ -220,9 +220,9 @@ unsigned char *zhttp_append_to_uint8t ( unsigned char **dest, int *len, unsigned
 //Extract value (a simpler code that can be used to grab values)
 static char * zhttp_msg_get_value ( const char *value, const char *chrs, unsigned char *msg, int len ) {
 	int start=0, end=0;
-	char *bContent = NULL;
+	char *content = NULL;
 
-	if ((start = memstrat( msg, value, len )) > -1) {
+	if ( ( start = memstrat( msg, value, len ) ) > -1) {
 		start += strlen( value );
 		msg += start;
 		int pend = -1;
@@ -243,16 +243,16 @@ static char * zhttp_msg_get_value ( const char *value, const char *chrs, unsigne
 		}
 
 		//Prepare for edge cases...
-		if ( ( bContent = malloc( len ) ) == NULL ) {
+		if ( ( content = malloc( len ) ) == NULL ) {
 			return NULL; 
 		}
 
 		//Prepare the raw buffer..
-		memset( bContent, 0, len );	
-		memcpy( bContent, msg, end );
+		memset( content, 0, len );	
+		memcpy( content, msg, end );
 	}
 
-	return bContent;
+	return content;
 }
 
 
@@ -326,7 +326,11 @@ static int parse_url( zhttp_t *entity, char *err, int errlen ) {
 			}
 			b->field = zhttp_copystr( t, set.size - 1 ); 
 		}
-		else { 
+		else {
+			if ( !b ) {
+				snprintf( err, errlen, "Incomplete or incorrect query string specified in URL" );
+				return set_http_error( entity, ZHTTP_INCOMPLETE_QUERYSTRING );
+			}
 			b->value = t; 
 			b->size = ( set.chr == '&' ) ? set.size - 1 : set.size; 
 			zhttp_add_item( &entity->url, b, zhttpr_t *, &len );
@@ -553,39 +557,62 @@ static int parse_http_header ( zhttp_t *entity, char *err, int errlen ) {
 	//Get host requested (not always going to be there)
 	entity->host = zhttp_msg_get_value( "Host: ", "\r", entity->msg, entity->hlen );	
 	if ( entity->host && ( port = index( entity->host, ':' ) ) ) {
+		//TODO: Switch over to this ASAP!!!!!!!
+	#if 1
 		//Remove colon
 		entity->port = atoi( port + 1 );
 		memset( port, 0, strlen( port ) ); 
+	#else
+		zhttp_satoi( port + 1, entity->port );
+		memset( port, 0, strlen( port ) ); 
+	#endif
 	//entity->port = 80 || 443 || entity->host:*
 	}
 
 	//If we expect a body, parse it
 	if ( memstr( "POST,PUT,PATCH", entity->method, strlen( "POST,PUT,PATCH" ) ) ) {
-		char *clenbuf = NULL; 
-		int clen;	
+		//Get content-length if we didn't already get it
+		if ( !entity->clen ) {
+			int clen;	
+			char *clenbuf = NULL;
 
-		if ( !( clenbuf = zhttp_msg_get_value( "Content-Length: ", "\r", entity->msg, entity->hlen ) ) ) {
-			snprintf( err, errlen, "Content-Length header not present..." );
-			return set_http_error( entity, ZHTTP_INCOMPLETE_HEADER );
+			if ( !( clenbuf = zhttp_msg_get_value( "Content-Length: ", "\r", entity->msg, entity->hlen ) ) ) {
+				snprintf( err, errlen, "Content-Length header not present..." );
+				return set_http_error( entity, ZHTTP_INCOMPLETE_HEADER );
+			}
+
+			if ( !zhttp_satoi( clenbuf, &clen ) ) {
+				snprintf( err, errlen, "Content-Length doesn't appear to be a number." );
+				return set_http_error( entity, ZHTTP_INCOMPLETE_HEADER );
+			}
+
+			entity->clen = clen;
+			free( clenbuf );
 		}
 
-		if ( !zhttp_satoi( clenbuf, &clen ) ) {
-			snprintf( err, errlen, "Content-Length doesn't appear to be a number." );
-			return set_http_error( entity, ZHTTP_INCOMPLETE_HEADER );
+		//Try as hard as possible to get a content type and throw INCOMPLETE_HEADER if it's not there...
+		if ( !entity->ctype ) {
+			const char *ts[] = { "Content-Type: ", "content-type: ", "Content-type: ", NULL };
+			for ( const char **ctypestr = ts; *ctypestr; ctypestr++ ) {
+				if ( ( entity->ctype = zhttp_msg_get_value( *ctypestr, ";\r", entity->msg, entity->hlen ) ) ) {
+					break;
+				}
+			}
+			if ( !entity->ctype ) {
+				snprintf( err, errlen, "No Content-Type specified." );
+				return set_http_error( entity, ZHTTP_INCOMPLETE_HEADER );
+			}
 		}
 
-		entity->clen = clen;
-		entity->ctype = zhttp_msg_get_value( "Content-Type: ", ";\r", entity->msg, entity->hlen );
-	#if 1
-		//This is a pretty ugly way to do this; but until I move over to all static allocations, this will have to do.
-		char *b = NULL;
-		b = zhttp_msg_get_value( "boundary=", "\r", entity->msg, entity->hlen );
-		if ( b ) {
-			memcpy( entity->boundary, b, strlen( b ) );
-			free( b );
+		//Get boundary if we didn't already get it
+		if ( !*entity->boundary ) {
+			char *b = NULL;
+			//This is a pretty ugly way to do this; but until I move over to all static allocations, this will have to do.
+			if ( ( b = zhttp_msg_get_value( "boundary=", "\r", entity->msg, entity->hlen ) ) ) {
+				memcpy( entity->boundary, b, strlen( b ) );
+				free( b );
+			}
 		}
-	#endif
-		free( clenbuf );
 	}
 	return 1;	
 }
