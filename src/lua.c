@@ -294,6 +294,30 @@ int ztable_to_lua ( lua_State *L, zTable *t ) {
 	return 1;
 }
 
+
+//Count the elements in a table.
+int lua_count ( lua_State *L, int i ) {
+	lua_pushnil( L );
+	int count = 0;
+
+	if ( !lua_istable( L, i ) ) {
+		fprintf( stderr, "[%s, %d] Value at %i is not a table\n", __FILE__, __LINE__, i );
+		return 0;
+	}
+
+	//Descend, but keep in mind that we always have a count...
+	for ( int v; lua_next( L, i ); ) {
+		if ( ( v = lua_type( L, -1 ) ) == LUA_TTABLE ) {
+			count += lua_count( L, i + 2 ); 
+		}
+		lua_pop( L, 1 );
+		count++;
+	}
+
+	return count;
+}
+
+
 #if 0
 #ifndef DEBUG_H
 #define TELL(fmt,a)

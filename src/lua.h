@@ -83,6 +83,7 @@ int ztable_to_lua ( lua_State *, zTable * ) ;
 int lua_to_ztable ( lua_State *, int, zTable * ) ;
 int lua_exec_file( lua_State *, const char *, char *, int );
 int lua_merge ( lua_State * );
+int lua_count ( lua_State *, int );
 void lua_istack ( lua_State * );
 
 //int http_error( struct HTTPBody *, int, char *, ... );

@@ -181,7 +181,9 @@ deps:
 clean:
 	-@find $(srcdir)/src/ -maxdepth 2 -type f -name "*.o" | xargs rm
 	-@find $(srcdir)/bin/ -maxdepth 1 -type f | xargs rm
-	-@find $(srcdir)/vendor/ -maxdepth 1 -type f -name "*.o" ! -name "sqlite3.o" | xargs rm
+	-@find $(srcdir)/vendor/ -maxdepth 1 -type f -name "*.o" | xargs rm
+
+#-@find $(srcdir)/vendor/ -maxdepth 1 -type f -name "*.o" ! -name "sqlite3.o" | xargs rm
 
 # list - List all the targets and what they do
 list:

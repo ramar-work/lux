@@ -734,25 +734,38 @@ int free_ld ( struct luadata_t *l ) {
 int return_as_response ( struct luadata_t *l ) {
 
 	zTable *rt = NULL;
-	int status = 200, clen = 0;
+	int count = 0, status = 200, clen = 0;
 	char *ctype = "text/html";
 	unsigned char *content = NULL;
 
-	if ( !( rt = lt_make( 1024 ) ) ) {
-		lt_free( rt ), free( rt );
-		snprintf( l->err, LD_ERRBUF_LEN, "Could not generate response table." );
+#if 1
+	count = 512;
+#else
+	//Get the count to approximate size of conversion needed (and to handle blanks)
+	count = lua_count( l->state, 1 );
+#endif
+
+	if ( !lua_istable( l->state, 1 ) ) {
+		snprintf( l->err, LD_ERRBUF_LEN, "Response is not a table." );
 		return 0;
 	}
 
-	if ( !lua_istable( l->state, 1 ) ) {
+	if ( !( rt = lt_make( count * 2 ) ) ) {
 		lt_free( rt ), free( rt );
-		snprintf( l->err, LD_ERRBUF_LEN, "Response is not a table." );
+		snprintf( l->err, LD_ERRBUF_LEN, "Could not generate response table." );
 		return 0;
 	}
 
 	if ( !lua_to_ztable( l->state, 1, rt ) ) {
 		lt_free( rt ), free( rt );
 		snprintf( l->err, LD_ERRBUF_LEN, "Error in model conversion." );
+		return 0;
+	}
+
+	//Lock the ztable to enable proper hashing and collision mgmt
+	if ( !lt_lock( rt ) ) {
+		//This can fail...
+		snprintf( l->err, LD_ERRBUF_LEN, lt_strerror( rt ) );
 		return 0;
 	}
 
@@ -779,22 +792,31 @@ int return_as_response ( struct luadata_t *l ) {
 	//Get the content
 	int content_i = 0;
 	if ( ( content_i = lt_geti( rt, "content" ) ) > -1 ) {
-		if ( clen_i == -1 )
-			content = (unsigned char *)lt_text_at( rt, content_i );
-		else {
+		if ( clen_i > -1 )
 			content = lt_blob_at( rt, content_i ).blob;
+		else {
+			content = (unsigned char *)lt_text_at( rt, content_i );
+			clen = strlen( (char *)content );
 		} 
 	}
 
 	//Set structures
 	l->res->clen = clen;
+fprintf( stderr, "CLEN IS %d\n", clen );
 	http_set_status( l->res, status ); 
 	http_set_ctype( l->res, ctype );
-	http_copy_content( l->res, content, clen ); 
+	http_set_content( l->res, content, clen ); 
 
 	//Return finalized content
-	lt_free( rt ), free( rt );
+	//lt_free( rt ), free( rt );
+#if 0
 	return http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ) ? 1 : 0;
+#else
+	int s = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ) ? 1 : 0;
+
+print_httpbody( l->res );
+	return s;
+#endif
 }
 
 
@@ -854,11 +876,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	struct route_t p = { .src = ld.zroutes };
 	lt_exec_complex( ld.zroutes, 1, ld.zroutes->count, &p, make_route_list );
 
-	//We'll need to resolve routes after getting the entire list...
-
-
-//return http_error( res, 200, "never" ); 
-	
 	//Loop through the routes
 	ld.pp.depth = 1;
 	int notfound = 1;
@@ -949,15 +966,12 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			model = 1;
 		}
 	}
-FPRINTF( "Evaluated all models.\n" );
 
 	//In the case of no model, initialize one anyway
 	if ( !lt_init( ld.zmodel, NULL, 8193 ) ) {
 		free_ld( &ld );
 		return http_error( res, 500, "Could not allocate table for model." );
 	}
-
-	//Get the content type from request scope
 
 	//Push whatever model is there
 	lua_getglobal( ld.state, mkey ); 
@@ -978,8 +992,10 @@ FPRINTF( "Evaluated all models.\n" );
 		FPRINTF( "Attempting alternate content return.\n" );
 		if ( !return_as_response( &ld ) ) {
 			free_ld( &ld );
+print_httpbody( ld.res );
 			return http_error( res, 500, ld.err );
 		}
+print_httpbody( ld.res );
 		free_ld( &ld );
 		FPRINTF( "We got to a successful point.\n" );
 		return 1;
