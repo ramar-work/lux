@@ -19,8 +19,8 @@ srcdir = @srcdir@
 VPATH = @srcdir@
 SRVUSER = ramar
 SRVGROUP = ramar
-IFLAGS = -Ivendor -I/usr/include/lua5.3
-LDFLAGS = -ldl -lpthread -lgnutls
+IFLAGS = -Ivendor -Ivendor/lua-5.4.3/src -I/usr/include/lua5.3
+LDFLAGS = -ldl -lpthread -lm
 #-L/usr/lib/x86_64-linux-gnu -
 DEBUGFLAGS = -DDEBUG_H
 CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security $(IFLAGS)

@@ -20,7 +20,6 @@
  * ---------
  * - 
  * ------------------------------------------- */
-#include <gnutls/gnutls.h>
 #include <sys/stat.h>
 #include <stddef.h>
 #include <zwalker.h>
@@ -28,6 +27,10 @@
 #include "../socket.h"
 #include "../server.h"
 #include "../util.h"
+
+#ifdef INCLUDE_GNUTLS 
+#include <gnutls/gnutls.h>
+#endif
 
 #ifndef CTXHTTPS_H
 #define CTXHTTPS_H
@@ -49,6 +52,7 @@
 #endif
 #endif
 
+#ifdef INCLUDE_GNUTLS
 struct gnutls_abstr {
 	gnutls_certificate_credentials_t x509_cred;
   gnutls_priority_t priority_cache;
@@ -61,6 +65,7 @@ struct gnutls_abstr {
 	const char *key_file;
 #endif
 };
+#endif
 
 const int pre_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
 

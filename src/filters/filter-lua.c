@@ -317,6 +317,7 @@ int load_lua_config( struct luadata_t *l ) {
 
 	//Get the index (IF we need it)
 	//int rindex = lt_geti( l->zconfig, rkey );
+	//TODO: Catch the failure
 	lt_lock( l->zconfig );
 
 	//Need to make a different table, that stays in Lua
@@ -325,7 +326,9 @@ int load_lua_config( struct luadata_t *l ) {
 		return 0;
 	}
 
+	//TODO: Catch the failure
 	lt_lock( l->zroutes );
+
 	//Pop the remaining Lua stuff
 	lua_pop( l->state, 1 );
 
@@ -388,15 +391,13 @@ int load_lua_config( struct luadata_t *l ) {
 		lt_free( l->zroutes ), free( l->zroutes ); 
 
 		//and add them back
-#if 0
-		l->zroutes = malloc( sizeof( zTable ) );
-		memset( l->zroutes, 0, sizeof( zTable ) );
-		lt_init( l->zroutes, 1024 );
-#else
-		l->zroutes = lt_make( 1024 );
-#endif
+		if ( !( l->zroutes = lt_make( 1024 ) ) ) {
+			snprintf( l->err, LD_ERRBUF_LEN, "Allocation of routes ztable failed." );
+			return 0;
+		}
+
 		if ( !lua_to_ztable( l->state, 1, l->zroutes ) ) {
-			snprintf( l->err, LD_ERRBUF_LEN, "Something somewhere failed because of something." );
+			snprintf( l->err, LD_ERRBUF_LEN, "Routes to ztable conversion failed." );
 			return 0;
 		}
 
@@ -496,60 +497,6 @@ static char * getpath( char *rpath, char *apath, int plen ) {
 	for ( char *p = apath, *path = rpath; *path && *path != '?'; ) *(p++) = *(path++);
 	return apath;
 }
-
-
-#if 0
-static int setroutes ( struct luadata_t *l ) {
-	struct route_t p = { 0 };
-	struct mvc_t pp = {0};
-	zTable *croute = NULL;
-
-	//Get the routes from the config file.
-	if ( !( l->zroutes = lt_copy_by_key( l->zconfig, rkey ) ) ) {
-		l->status = 500;
-		snprintf( l->err, LD_ERRBUF_LEN, "%s", "Failed to copy routes from config." );
-		return 0;
-	}
-
-	//Turn the routes into a list of strings, and search for a match
-	//p.src = zroutes;
-	lt_exec_complex( p.src = l->zroutes, 1, l->zroutes->count, &p, make_route_list );
-	
-	//Loop through each route and find the thing 
-	l->pp.depth = 1;
-	for ( struct iroute_t **lroutes = p.iroute_tlist; *lroutes; lroutes++ ) {
-		if ( ( l->rroute = route_resolve( l->apath, (*lroutes)->route ) ) ) {
-			croute = lt_copy_by_index( l->zroutes, (*lroutes)->index );
-			lt_exec_complex( croute, 1, croute->count, &pp, make_mvc_list );
-			break;
-		}
-	}
-
-	//Die when unavailable...
-	if ( !croute ) {
-		free_route_list( p.iroute_tlist );	
-		l->status = 404;
-		snprintf( l->err, LD_ERRBUF_LEN, "Couldn't find path at %s\n", l->apath );
-		return 0;
-	}
-
-#if 0
-	//If a route was found, break it up
-	if ( !( l->zroute = getproutes( rpath, rroute ) ) ) {
-		free_route_list( p.iroute_tlist );	
-		l->status = 404;
-		snprintf( l->err, LD_ERRBUF_LEN, "Couldn't initialize route map.\n" );
-		return 0;
-	}
-
-	//Mark the active route from here and leave
-	l->aroute = lt_text( l->zroute, "route.active" );	
-#endif
-	free_route_list( p.iroute_tlist );	
-	return 1;
-}
-#endif
-
 
 
 //Initialize routes in Lua
@@ -802,14 +749,13 @@ int return_as_response ( struct luadata_t *l ) {
 
 	//Set structures
 	l->res->clen = clen;
-fprintf( stderr, "CLEN IS %d\n", clen );
 	http_set_status( l->res, status ); 
 	http_set_ctype( l->res, ctype );
-	http_set_content( l->res, content, clen ); 
+	http_copy_content( l->res, content, clen ); 
 
 	//Return finalized content
-	//lt_free( rt ), free( rt );
-#if 0
+	lt_free( rt ), free( rt );
+#if 1
 	return http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ) ? 1 : 0;
 #else
 	int s = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ) ? 1 : 0;
@@ -822,10 +768,6 @@ print_httpbody( l->res );
 
 //The entry point for a Lua application
 const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
-
-
-	print_httpbody( req );
-	return http_error( res, 200, "I am a happy response." );
 
 	//Define variables and error positions...
 	zTable zc = {0}, zm = {0};
@@ -853,9 +795,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "%s\n", ld.err );
 	}
 
-//excess path handling has to be done here...
-//return http_error( res, 200, "nothing at all" );
-
 	//Need to delegate to static handler when request points to one of the static paths
 	if ( path_is_static( &ld ) ) {
 		free_ld( &ld );
@@ -868,17 +807,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "%s", "Failed to extract path." );
 	}
 
-#if 1
-	//Get the routes from the config file.
-	if ( !( ld.zroutes = lt_copy_by_key( ld.zconfig, rkey ) ) ) {
-		free_ld( &ld );
-		return http_error( res, 500, "%s", "Failed to copy routes from config." );
-	}
-
-	//Turn the routes into a list of strings, and search for a match
-	lt_lock( ld.zroutes );
-	//lt_kfdump( ld.zroutes, 1 );
-#endif
 	struct route_t p = { .src = ld.zroutes };
 	lt_exec_complex( ld.zroutes, 1, ld.zroutes->count, &p, make_route_list );
 
@@ -903,13 +831,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		free_ld( &ld );
 		return http_error( res, 404, "Couldn't find path at %s\n", ld.apath );
 	}
-
-#if 0
-	//If a route was found, break it up
-	if ( !( zroute = getproutes( ld.apath, rroute ) ) ) {
-		return http_error( res, 500, "Couldn't initialize route map.\n" );
-	}
-#endif
 
 	//Destroy anything having to do with routes 
 	free_route_list( p.iroute_tlist );	
