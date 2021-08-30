@@ -102,6 +102,8 @@ read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *con
 			clock_gettime( CLOCK_REALTIME, &n );
 
 			if ( errno != EAGAIN && errno != EWOULDBLOCK ) {
+				//TODO: This should be logged somewhere
+				FPRINTF( "Got socket read error: %s\n", strerror( errno ) );
 				conn->count = -2;
 				return 0;
 			}
@@ -120,10 +122,11 @@ read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *con
 	
 			//TODO: Is this handling everything?
 			if ( tmp->error == ZHTTP_NONE ) { 
-				FPRINTF( "All data received\n" );
+				FPRINTF( "All data received (%d bytes)\n", rq->mlen );
 				break;
 			}
 			else if ( tmp->error != ZHTTP_INCOMPLETE_HEADER ) { // && tmp->error !=	ZHTTP_INCOMPLETE_REQUEST
+				//TODO: This should be logged somewhere
 				FPRINTF( "Got fatal HTTP parser error: %s\n", err );
 				conn->count = -3;
 				return http_set_error( rs, 500, err ); 
@@ -153,7 +156,7 @@ const int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct
 	struct timespec timer = {0};
 	clock_gettime( CLOCK_REALTIME, &timer );	
 
-
+	//Start writing data to socket
 	for ( ;; ) {
 		sent = send( fd, ptr, total, MSG_DONTWAIT );
 		FPRINTF( "Bytes sent: %d\n", sent );
@@ -213,6 +216,7 @@ const int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct
 		try++;
 		FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
 	}
+
 	FPRINTF( "Write complete.\n" );
 	return 1;
 }

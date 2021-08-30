@@ -6,6 +6,7 @@ configure.scan
 *.log
 *.o
 *.swp
+Makefile.copy
 
 autom4te.cache/
 artwork/
