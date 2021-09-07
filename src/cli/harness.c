@@ -302,8 +302,6 @@ int main ( int argc, char * argv[] ) {
 	req.method = zhttp_dupstr( arg.method );
 	req.protocol = !arg.protocol ? zhttp_dupstr( "HTTP/1.1" ) : zhttp_dupstr( arg.protocol );
 
-fprintf( stderr, "%s\n", req.host );
-getchar();
 #if 0
 	req.alias = !arg.alias ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.alias );
 #endif

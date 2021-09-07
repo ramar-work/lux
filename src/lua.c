@@ -40,7 +40,8 @@ void lua_istack ( lua_State *L ) {
 void lua_dumpstack ( lua_State *L ) {
 	const char spaces[] = /*"\t\t\t\t\t\t\t\t\t\t"*/"          ";
 	const int top = lua_gettop( L );
-	struct data { unsigned short count, index; } data[64] = {0}, *dd = data;
+	struct data { unsigned short count, index; } data[64], *dd = data;
+	memset( data, 0, sizeof( data ) / sizeof( struct data ) );
 	dd->count = 1;
 
 	//Return early if no values
@@ -105,7 +106,8 @@ void lua_dumpstack ( lua_State *L ) {
 //a single table (removes whatever was there)
 int lua_merge( lua_State *L ) {
 	const int top = lua_gettop( L );
-	struct data { unsigned short index, tinsert, tpull; } data[64] = {0}, *dd = data;
+	struct data { unsigned short index, tinsert, tpull; } data[64], *dd = data;
+	memset( data, 0, sizeof( data ) / sizeof( struct data ) );
 
 	//Return early if no values
 	if ( top < 2 ) {

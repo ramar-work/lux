@@ -56,6 +56,7 @@ static int make_c ( zKeyval *kv, int i, void *p ) {
 	return 1;	
 }
 
+
 //Create a message out of a zTable
 struct ab * ztable_to_msg ( zTable *t ) {
 	struct ab *ab = NULL;
@@ -789,6 +790,14 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//Load the standard libraries first
 	luaL_openlibs( ld.state );
 
+#if 1
+	int s = lua_exec_file( ld.state, "where_are_we.lua", ld.err, LD_ERRBUF_LEN );
+	if ( !s ) {
+		return http_error( res, 500, ld.err );
+	}
+	return http_error( res, 200, "final Lua path..." );
+#endif
+
 	//Then start loading our configuration
 	if ( !load_lua_config( &ld ) ) {
 		free_ld( &ld );
@@ -850,7 +859,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		free_ld( &ld );
 		return http_error( res, 500, "Failed to initialize Lua standard libs." ); 
 	}
-
 
 	//Execute each model
 	int ccount = 0, tcount = 0, model = 0;
@@ -919,10 +927,8 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		FPRINTF( "Attempting alternate content return.\n" );
 		if ( !return_as_response( &ld ) ) {
 			free_ld( &ld );
-print_httpbody( ld.res );
 			return http_error( res, 500, ld.err );
 		}
-print_httpbody( ld.res );
 		free_ld( &ld );
 		FPRINTF( "We got to a successful point.\n" );
 		return 1;
@@ -951,7 +957,6 @@ print_httpbody( ld.res );
 #endif
 
 	//TODO: routes with no special keys need not be added
-
 	int view = 0;
 	for ( struct imvc_t **v = ld.pp.imvc_tlist; v && *v; v++ ) {
 		if ( *(*v)->file == 'v' ) {

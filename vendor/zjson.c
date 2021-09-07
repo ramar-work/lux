@@ -1,6 +1,6 @@
 /* ------------------------------------------- * 
- * json.c 
- * =========
+ * zjson.c 
+ * =======
  * 
  * Summary 
  * -------
@@ -273,7 +273,8 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 		int type, keysize, valsize;
 		char *comma, *key, *val, vint[ 64 ];
 	};
-	struct ww *sr[ 1000 ] = { NULL }, br[ 1000 ] = { 0 };
+	struct ww *sr[ 1000 ] = { NULL }, br[ 1000 ];
+	memset( br, 0, 1000 );
 	struct ww **ptr = sr, *ff = br + 1, *rr = br, *tt = br;
 	char * json = NULL;
 	int jl = 0, jp = 0;
