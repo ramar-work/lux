@@ -320,6 +320,23 @@ int lua_count ( lua_State *L, int i ) {
 }
 
 
+
+//Attempts to retrieve a key from global table and clears the stack if it doesn't match.
+int lua_retglobal( lua_State *L, const char *key, int type ) {
+	lua_getglobal( L, key );
+
+lua_istack( L );
+//getchar();
+
+	if ( lua_isnil( L, 1 ) || lua_type( L, 1 ) != type ) {
+		lua_pop( L, 1 );
+		return 0;
+	}
+	return 1;
+}
+
+
+
 #if 0
 #ifndef DEBUG_H
 #define TELL(fmt,a)
@@ -426,3 +443,26 @@ int lua_to_ztable ( lua_State *L, int index, zTable *t ) {
 	}
 	return 1;
 }
+
+
+
+//Retrieve a value from a table (and return the index it was found at or -1)
+int lua_getv ( lua_State *L, const char *key, int index, int type ) {
+	lua_pushnil( L );
+
+	for ( int kv, vv; lua_next( L, index ) != 0; ) {
+		const char *k = NULL;
+		
+		//If the key matches, then check the value.
+		//You should return the index and wipe it
+		if ( ( kv = lua_type( L, -2 ) ) == LUA_TSTRING && ( k = lua_tostring( L, -2 ) ) ) { 
+			//fprintf( stderr, "key: %s => %s\n", key, k );
+			if ( ( ( vv = lua_type( L, -1 ) ) == type ) && strcmp( key, k ) == 0 ) {
+				return lua_gettop( L );
+			}
+		}
+		lua_pop( L, 1 );
+	}
+
+	return -1;
+} 

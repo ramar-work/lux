@@ -678,6 +678,7 @@ int free_ld ( struct luadata_t *l ) {
 }
 
 
+
 //...
 int return_as_response ( struct luadata_t *l ) {
 
@@ -790,14 +791,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//Load the standard libraries first
 	luaL_openlibs( ld.state );
 
-#if 1
-	int s = lua_exec_file( ld.state, "where_are_we.lua", ld.err, LD_ERRBUF_LEN );
-	if ( !s ) {
-		return http_error( res, 500, ld.err );
-	}
-	return http_error( res, 200, "final Lua path..." );
-#endif
-
 	//Then start loading our configuration
 	if ( !load_lua_config( &ld ) ) {
 		free_ld( &ld );
@@ -860,6 +853,45 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "Failed to initialize Lua standard libs." ); 
 	}
 
+	//Set package path
+	if ( lua_retglobal( ld.state, "package", LUA_TTABLE ) ) {
+		//Get the path of whatever we're talking about
+		int i = lua_getv( ld.state, "path", 1, LUA_TSTRING );
+		char ppath[ PATH_MAX ], *op = (char *)lua_tostring( ld.state, i );
+		memset( ppath, 0, sizeof( ppath ) ); 
+		snprintf( ppath, sizeof( ppath ) - 1, "%s;%s/?;%s/?.lua", op, ld.root, ld.root );
+
+		//Reset the package path here...
+		lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
+		
+		//Re-add to the table
+		lua_pushstring( ld.state, "path" );
+		lua_pushstring( ld.state, ppath );
+		lua_settable( ld.state, 1 );
+
+#if 0
+		//Yolo...
+	lua_pushnil( ld.state );
+	for ( int kv, vv; lua_next( ld.state, 1 ) != 0; ) {
+		const char *k = NULL;
+		
+		//If the key matches, then check the value.
+		//You should return the index and wipe it
+		if ( ( kv = lua_type( ld.state, -2 ) ) == LUA_TSTRING && ( k = lua_tostring( ld.state, -2 ) ) ) { 
+			fprintf( stderr, "key: %s\n", k );
+#if 0
+			if ( ( ( vv = lua_type( L, -1 ) ) == type ) && strcmp( key, k ) == 0 ) {
+				return lua_gettop( L );
+			}
+#endif
+		}
+		lua_pop( ld.state, 1 );
+	}
+#endif
+		lua_setglobal( ld.state, "package" );
+		//return http_error( res, 200, ppath );
+	}
+
 	//Execute each model
 	int ccount = 0, tcount = 0, model = 0;
 	for ( struct imvc_t **m = ld.pp.imvc_tlist; m && *m; m++ ) {
@@ -908,6 +940,15 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "Could not allocate table for model." );
 	}
 
+#if 1
+	//Could be either a table or string... so account for this
+	if ( lua_retglobal( ld.state, mkey, LUA_TTABLE ) ) {
+		if ( !lua_to_ztable( ld.state, 1, ld.zmodel ) ) {
+			free_ld( &ld );
+			return http_error( res, 500, "Error in model conversion." );
+		}
+	}
+#else
 	//Push whatever model is there
 	lua_getglobal( ld.state, mkey ); 
 	if ( lua_isnil( ld.state, -1 ) )
@@ -918,7 +959,21 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			return http_error( res, 500, "Error in model conversion." );
 		}
 	}
+#endif
 
+
+#if 1
+	if ( !lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
+		FPRINTF( "Attempting alternate content return.\n" );
+		if ( !return_as_response( &ld ) ) {
+			free_ld( &ld );
+			return http_error( res, 500, ld.err );
+		}
+		free_ld( &ld );
+		FPRINTF( "We got to a successful point.\n" );
+		return 1;
+	}
+#else
 	//Push whatever model is there
 	lua_getglobal( ld.state, "response" ); 
 	if ( lua_isnil( ld.state, -1 ) )
@@ -933,6 +988,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		FPRINTF( "We got to a successful point.\n" );
 		return 1;
 	}
+#endif
 
 	//Load all views
 	lt_lock( ld.zmodel );
