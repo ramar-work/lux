@@ -23,7 +23,7 @@
  *
  * LICENSE
  * -------
- * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy 
  * of this software and associated documentation files (the "Software"), to 

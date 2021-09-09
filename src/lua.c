@@ -12,7 +12,7 @@
  *
  * LICENSE
  * -------
- * Copyright 2020 Tubular Modular Inc. dba Collins Design
+ * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
  *
  * See LICENSE in the top-level directory for more information.
  *
@@ -41,7 +41,7 @@ void lua_dumpstack ( lua_State *L ) {
 	const char spaces[] = /*"\t\t\t\t\t\t\t\t\t\t"*/"          ";
 	const int top = lua_gettop( L );
 	struct data { unsigned short count, index; } data[64], *dd = data;
-	memset( data, 0, sizeof( data ) / sizeof( struct data ) );
+	memset( data, 0, sizeof( data ) );
 	dd->count = 1;
 
 	//Return early if no values
@@ -107,7 +107,7 @@ void lua_dumpstack ( lua_State *L ) {
 int lua_merge( lua_State *L ) {
 	const int top = lua_gettop( L );
 	struct data { unsigned short index, tinsert, tpull; } data[64], *dd = data;
-	memset( data, 0, sizeof( data ) / sizeof( struct data ) );
+	memset( data, 0, sizeof( data ) );
 
 	//Return early if no values
 	if ( top < 2 ) {
