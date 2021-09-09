@@ -34,9 +34,7 @@ struct lua_fset functions[] = {
 , { "http", http_set }
 , { "json", json_set }
 , { "rand", rand_set }
-#if 1
 , { "hash", hash_set }
-#endif
 ,	{ NULL }
 };
 

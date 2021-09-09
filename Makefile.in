@@ -86,9 +86,9 @@ DOMAIN = localhost
 # main - Compiles all code needed to get hypno running
 main: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a 
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a 
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a 
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a 
 
 #	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ)
 
