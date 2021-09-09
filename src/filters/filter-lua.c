@@ -868,28 +868,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		lua_pushstring( ld.state, "path" );
 		lua_pushstring( ld.state, ppath );
 		lua_settable( ld.state, 1 );
-
-#if 0
-		//Yolo...
-	lua_pushnil( ld.state );
-	for ( int kv, vv; lua_next( ld.state, 1 ) != 0; ) {
-		const char *k = NULL;
-		
-		//If the key matches, then check the value.
-		//You should return the index and wipe it
-		if ( ( kv = lua_type( ld.state, -2 ) ) == LUA_TSTRING && ( k = lua_tostring( ld.state, -2 ) ) ) { 
-			fprintf( stderr, "key: %s\n", k );
-#if 0
-			if ( ( ( vv = lua_type( L, -1 ) ) == type ) && strcmp( key, k ) == 0 ) {
-				return lua_gettop( L );
-			}
-#endif
-		}
-		lua_pop( ld.state, 1 );
-	}
-#endif
 		lua_setglobal( ld.state, "package" );
-		//return http_error( res, 200, ppath );
 	}
 
 	//Execute each model
@@ -940,7 +919,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "Could not allocate table for model." );
 	}
 
-#if 1
 	//Could be either a table or string... so account for this
 	if ( lua_retglobal( ld.state, mkey, LUA_TTABLE ) ) {
 		if ( !lua_to_ztable( ld.state, 1, ld.zmodel ) ) {
@@ -948,22 +926,9 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			return http_error( res, 500, "Error in model conversion." );
 		}
 	}
-#else
-	//Push whatever model is there
-	lua_getglobal( ld.state, mkey ); 
-	if ( lua_isnil( ld.state, -1 ) )
-		lua_pop( ld.state, 1 );
-	else { 
-		if ( !lua_to_ztable( ld.state, 1, ld.zmodel ) ) {
-			free_ld( &ld );
-			return http_error( res, 500, "Error in model conversion." );
-		}
-	}
-#endif
 
-
-#if 1
-	if ( !lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
+	//Stop if the user specifies a 'response' table that's not empty...
+	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
 		FPRINTF( "Attempting alternate content return.\n" );
 		if ( !return_as_response( &ld ) ) {
 			free_ld( &ld );
@@ -973,46 +938,11 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		FPRINTF( "We got to a successful point.\n" );
 		return 1;
 	}
-#else
-	//Push whatever model is there
-	lua_getglobal( ld.state, "response" ); 
-	if ( lua_isnil( ld.state, -1 ) )
-		lua_pop( ld.state, 1 );
-	else {
-		FPRINTF( "Attempting alternate content return.\n" );
-		if ( !return_as_response( &ld ) ) {
-			free_ld( &ld );
-			return http_error( res, 500, ld.err );
-		}
-		free_ld( &ld );
-		FPRINTF( "We got to a successful point.\n" );
-		return 1;
-	}
-#endif
 
-	//Load all views
-	lt_lock( ld.zmodel );
-
-#if 1
-	//lt_kfdump( ld.zmodel, 2 );
-#else
-	struct timespec tt = {0};
-	clock_gettime( CLOCK_REALTIME, &tt ); 
-	srand( tt.tv_nsec );
-	char fb[ 1024 ] = {0};
-	snprintf( fb, sizeof(fb), "/tmp/modeltest-%d", rand() );
-	int mfd = open( fb, O_CREAT | O_RDWR, 0755 );
-	if ( mfd == -1 ) {
-		fprintf( stderr, "%s\n", strerror( errno ) );
-		exit( 1 );
-	}
-	lt_kfdump( ld.zmodel, mfd );
-	close( mfd );
-	free_ld( &ld );
-	exit(0);
-#endif
+	lt_lock( ld.zmodel ); //lt_kfdump( ld.zmodel, 2 );
 
 	//TODO: routes with no special keys need not be added
+	//Load all views
 	int view = 0;
 	for ( struct imvc_t **v = ld.pp.imvc_tlist; v && *v; v++ ) {
 		if ( *(*v)->file == 'v' ) {
