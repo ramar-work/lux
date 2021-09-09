@@ -53,6 +53,7 @@ SRC = \
 	@srcdir@/src/lua/rand.c \
 	@srcdir@/src/lua/filesystem.c \
 	@srcdir@/src/lua/http.c \
+	@srcdir@/src/lua/hash.c \
 	@srcdir@/src/filters/filter-static.c \
 	@srcdir@/src/filters/filter-echo.c \
 	@srcdir@/src/filters/filter-dirent.c \
@@ -155,6 +156,12 @@ examples:
 	@$(srcdir)/bin/$(NAME)-server \
 		--start --port $(PORT) --config $(srcdir)/example/config.lua --user $$USER
 
+
+vendor/sqlite3.o: CFLAGS+=-Wno-misleading-indentation
+vendor/sqlite3.o:
+	$(CC) $(CFLAGS) -c -o vendor/sqlite3.o vendor/sqlite3.c
+
+
 # repl - Build and test libraries for REPL usage
 #	test -f sqlite3.o || $(CC) $(CFLAGS) -fPIC -c vendor/sqlite3.c -o shared/sqlite3.o
 repl:
@@ -236,6 +243,10 @@ changelog:
 	@git log --full-history --author=Antonio | sed '{ s/^   /- /; }'
 	@printf "\n<link rel=stylesheet href=changelog.css>\n"
 #endif
+
+copyright-update:
+	@find src -type f -name "*.[ch]" | \
+		xargs sed -i "s/Copyright 2020-$$(( `date +%Y` - 1 ))/Copyright 2020-`date +%Y`/"
 
 docs:
 	-@mkdir docs/

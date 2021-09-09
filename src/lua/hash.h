@@ -19,3 +19,12 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+#include "../lua.h"
+#include "../util.h"
+
+#ifndef LHASH_H
+#define LHASH_H
+
+extern struct luaL_Reg hash_set[];
+
+#endif
