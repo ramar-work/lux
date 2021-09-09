@@ -325,9 +325,6 @@ int lua_count ( lua_State *L, int i ) {
 int lua_retglobal( lua_State *L, const char *key, int type ) {
 	lua_getglobal( L, key );
 
-lua_istack( L );
-//getchar();
-
 	if ( lua_isnil( L, 1 ) || lua_type( L, 1 ) != type ) {
 		lua_pop( L, 1 );
 		return 0;

@@ -18,11 +18,13 @@
  * ------------------------------------------- */
 #include "hash.h"
 
+#define HYPNO_MAX_ALG_HASH_LENGTH SHA512_DIGEST_LENGTH 
 
 static int calc( lua_State *L, int alg ) {
 	unsigned char *src = NULL, *final = NULL; 
-	unsigned char buf[ SHA512_DIGEST_LENGTH ];
+	unsigned char buf[ HYPNO_MAX_ALG_HASH_LENGTH ];
 	int srclen = 0, buflen, type = lua_type( L, 1 );
+	struct algorithm *c = NULL;
 
 	if ( type != LUA_TSTRING && type != LUA_TTABLE ) {
 		luaL_error( L, "Argument to hash.sha%d() was neither a string or table." );
@@ -30,14 +32,16 @@ static int calc( lua_State *L, int alg ) {
 	}
 	else if ( type == LUA_TSTRING ) {
 		src = (unsigned char *)lua_tostring( L, 1 );
-		srclen = strlen( (char *) buf );
+		srclen = strlen( (char *) src );
+		lua_pop( L, 1 );
 	}	
 	else if ( type == LUA_TTABLE ) {
 		luaL_error( L, "Table as argument is under construction." );
 		return 0;
+		lua_pop( L, 1 );
 	}
 
-	memset( buf, 0, SHA512_DIGEST_LENGTH );
+	memset( buf, 0, HYPNO_MAX_ALG_HASH_LENGTH );
 
 	if ( alg == 1 )
 		final = SHA1( src, srclen, buf ), buflen = SHA_DIGEST_LENGTH;
