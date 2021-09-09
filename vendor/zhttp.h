@@ -41,13 +41,18 @@
 
 #ifdef DEBUG_H
  #include <stdio.h>
- #define ZHTTP_PRINTF(...) \
-	fprintf( stderr, __VA_ARGS__ )
- #define ZHTTP_WRITE(a,b) \
+ #include <errno.h>
+ #include <fcntl.h>
+ #define ZHTTP_PRINTF(fb, ...) \
+	fprintf( fb, __VA_ARGS__ )
+ #define ZHTTP_WRITE(fd,a,b) \
 	write( 2, a, b )
+ #define print_httpbody(a) \
+	print_httpbody_to_file(a, "/dev/stderr")
 #else
- #define ZHTTP_PRINTF(...)
- #define ZHTTP_WRITE(...)
+ #define ZHTTP_PRINTF(fb, ...)
+ #define ZHTTP_WRITE(fd,...)
+ #define print_httpbody(a)
 #endif
 
 #ifndef ZHTTP_H
@@ -264,7 +269,7 @@ unsigned char *zhttp_append_to_uint8t ( unsigned char **, int *, unsigned char *
 
 #ifdef DEBUG_H
  void print_httprecords ( zhttpr_t ** );
- void print_httpbody ( zhttp_t * );
+ void print_httpbody_to_file ( zhttp_t *, const char * );
 #else
  #define print_httprecords(...)
  #define print_httpbody(...)

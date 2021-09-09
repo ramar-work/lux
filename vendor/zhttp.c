@@ -178,7 +178,7 @@ char *zhttp_rand_chars ( int len ) {
 static void * zhttp_add_item_to_list( void ***list, void *element, int size, int * len ) {
 	//Reallocate
 	if (( (*list) = realloc( (*list), size * ( (*len) + 2 ) )) == NULL ) {
-		ZHTTP_PRINTF( "Failed to reallocate block from %d to %d\n", size, size * ((*len) + 2) ); 
+		ZHTTP_PRINTF( stderr, "Failed to reallocate block from %d to %d\n", size, size * ((*len) + 2) ); 
 		return NULL;
 	}
 
@@ -530,7 +530,7 @@ static int parse_http_header ( zhttp_t *entity, char *err, int errlen ) {
 	}
 
 	//Return null if method, path or version are not present
-	ZHTTP_PRINTF( "%p %p %p\n", entity->method, entity->path, entity->protocol ); 
+	ZHTTP_PRINTF( stderr, "%p %p %p\n", entity->method, entity->path, entity->protocol ); 
 	if ( !entity->method || !entity->path || !entity->protocol ) {
 		snprintf( err, errlen, "Method, path or HTTP protocol are not present." );
 		return set_http_error( entity, ZHTTP_MALFORMED_FIRSTLINE );
@@ -630,23 +630,23 @@ zhttp_t * http_parse_request ( zhttp_t *entity, char *err, int errlen ) {
 		return entity;
 	}
 
-	ZHTTP_PRINTF( "Calling parse_url( ... )\n" );
+	ZHTTP_PRINTF( stderr, "Calling parse_url( ... )\n" );
 	if ( !parse_url( entity, err, errlen ) ) {
 		return entity;
 	}
 
-	ZHTTP_PRINTF( "Calling parse_headers( ... )\n" );
+	ZHTTP_PRINTF( stderr, "Calling parse_headers( ... )\n" );
 	if ( !parse_headers( entity, err, errlen ) ) {
 		return entity;
 	}
 
-	ZHTTP_PRINTF( "Calling parse_body( ... )\n" );
+	ZHTTP_PRINTF( stderr, "Calling parse_body( ... )\n" );
 	if ( !parse_body( entity, err, errlen ) ) {
 		return entity;
 	}
 
 	//ZHTTP_PRINTF( "Dump http body." );
-	//print_httpbody( entity );
+	print_httpbody_to_file( entity, "/tmp/zhttp-01" );
 	return entity;
 } 
 
@@ -960,20 +960,20 @@ void http_free_body ( zhttp_t *entity ) {
 int http_set_error ( zhttp_t *entity, int status, char *message ) {
 	char err[ 2048 ];
 	memset( err, 0, sizeof( err ) );
-	ZHTTP_PRINTF( "status: %d, mlen: %ld, msg: '%s'\n", status, strlen(message), message );
+	ZHTTP_PRINTF( stderr, "status: %d, mlen: %ld, msg: '%s'\n", status, strlen(message), message );
 
 	http_set_status( entity, status );
 	http_set_ctype( entity, text_html );
 	http_copy_content( entity, (unsigned char *)message, strlen( message ) );
 
 	if ( !http_finalize_response( entity, err, sizeof(err) ) ) {
-		ZHTTP_PRINTF( "FINALIZE FAILED!: %s", err );
+		ZHTTP_PRINTF( stderr, "FINALIZE FAILED!: %s", err );
 		return 0;
 	}
 
 #if 0
 	fprintf(stderr, "msg: " );
-	ZHTTP_WRITE( entity->msg, entity->mlen );
+	ZHTTP_WRITE( 2, entity->msg, entity->mlen );
 #endif
 	return 0;
 }
@@ -984,51 +984,79 @@ int http_set_error ( zhttp_t *entity, int status, char *message ) {
 void print_httprecords ( zhttpr_t **r ) {
 	if ( *r == NULL ) return;
 	while ( *r ) {
-		ZHTTP_PRINTF( "'%s' -> ", (*r)->field );
+		ZHTTP_PRINTF( stderr, "'%s' -> ", (*r)->field );
 		//ZHTTP_PRINTF( "%s\n", (*r)->field );
-		ZHTTP_WRITE( "'", 1 );
-		ZHTTP_WRITE( (*r)->value, (*r)->size );
-		ZHTTP_WRITE( "'\n", 2 );
+		ZHTTP_WRITE( 2, "'", 1 );
+		ZHTTP_WRITE( 2, (*r)->value, (*r)->size );
+		ZHTTP_WRITE( 2, "'\n", 2 );
 		r++;
 	}
 }
 
 
 //list out everything in an HTTPBody
-void print_httpbody ( zhttp_t *r ) {
-	if ( r == NULL ) return;
-	ZHTTP_PRINTF( "r->mlen: '%d'\n", r->mlen );
-	ZHTTP_PRINTF( "r->clen: '%d'\n", r->clen );
-	ZHTTP_PRINTF( "r->hlen: '%d'\n", r->hlen );
-	ZHTTP_PRINTF( "r->status: '%d'\n", r->status );
-	ZHTTP_PRINTF( "r->ctype: '%s'\n", r->ctype );
-	ZHTTP_PRINTF( "r->method: '%s'\n", r->method );
-	ZHTTP_PRINTF( "r->path: '%s'\n", r->path );
-	ZHTTP_PRINTF( "r->protocol: '%s'\n", r->protocol );
-	ZHTTP_PRINTF( "r->host: '%s'\n", r->host );
-	ZHTTP_PRINTF( "r->boundary: '%s'\n", r->boundary );
+void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
+	FILE *fb = NULL;
+	int fd = 0;
+
+	if ( r == NULL || !path ) {
+		return;
+	}
+
+	if ( strcmp( path, "/dev/stdout" ) )
+		fb = stdout, fd = 1;
+	else if ( strcmp( path, "/dev/stderr" ) )
+		fb = stderr, fd = 2;
+	else {
+		if ( ( fd = open( path, O_RDWR | O_CREAT | O_TRUNC, 0655 ) ) == -1 ) {
+			fprintf( stderr, "[%s:%d] %s\n", __func__, __LINE__, strerror( errno ) );
+			return;
+		}
+
+		if ( ( fb = fdopen( fd, "w" ) ) == NULL ) {
+			fprintf( stderr, "[%s:%d] %s\n", __func__, __LINE__, strerror( errno ) );
+			return;
+		}
+	}
+
+	ZHTTP_PRINTF( fb, "r->mlen: '%d'\n", r->mlen );
+	ZHTTP_PRINTF( fb, "r->clen: '%d'\n", r->clen );
+	ZHTTP_PRINTF( fb, "r->hlen: '%d'\n", r->hlen );
+	ZHTTP_PRINTF( fb, "r->status: '%d'\n", r->status );
+	ZHTTP_PRINTF( fb, "r->ctype: '%s'\n", r->ctype );
+	ZHTTP_PRINTF( fb, "r->method: '%s'\n", r->method );
+	ZHTTP_PRINTF( fb, "r->path: '%s'\n", r->path );
+	ZHTTP_PRINTF( fb, "r->protocol: '%s'\n", r->protocol );
+	ZHTTP_PRINTF( fb, "r->host: '%s'\n", r->host );
+	ZHTTP_PRINTF( fb, "r->boundary: '%s'\n", r->boundary );
 
 	//Print out headers and more
 	const char *names[] = { "r->headers", "r->url", "r->body" };
 	zhttpr_t **rr[] = { r->headers, r->url, r->body };
 	for ( int i=0; i<sizeof(rr)/sizeof(zhttpr_t **); i++ ) {
-		ZHTTP_PRINTF( "%s: %p\n", names[i], rr[i] );
+		ZHTTP_PRINTF( fb, "%s: %p\n", names[i], rr[i] );
 		if ( rr[i] ) {
 			zhttpr_t **w = rr[i];
 			while ( *w ) {
-				ZHTTP_WRITE( " '", 2 ); 
-				ZHTTP_WRITE( (*w)->field, strlen( (*w)->field ) );
-				ZHTTP_WRITE( "' -> '", 6 );
-				ZHTTP_WRITE( (*w)->value, (*w)->size );
-				ZHTTP_WRITE( "'\n", 2 );
+				ZHTTP_WRITE( fd, " '", 2 ); 
+				ZHTTP_WRITE( fd, (*w)->field, strlen( (*w)->field ) );
+				ZHTTP_WRITE( fd, "' -> '", 6 );
+				ZHTTP_WRITE( fd, (*w)->value, (*w)->size );
+				ZHTTP_WRITE( fd, "'\n", 2 );
 				if ( (*w)->type == ZHTTP_MULTIPART ) {
-					ZHTTP_PRINTF( "  Content-Type: %s\n", (*w)->ctype );
-					ZHTTP_PRINTF( "  Filename: %s\n", (*w)->filename );
-					ZHTTP_PRINTF( "  Content-Disposition: %s\n", (*w)->disposition );
+					ZHTTP_PRINTF( fb, "  Content-Type: %s\n", (*w)->ctype );
+					ZHTTP_PRINTF( fb, "  Filename: %s\n", (*w)->filename );
+					ZHTTP_PRINTF( fb, "  Content-Disposition: %s\n", (*w)->disposition );
 				}
 				w++;
 			}
 		}
-	}	
+	}
+
+	if ( fd > 2 ) {
+		fclose( fb );
+		close( fd );
+	}
 }
+
 #endif
