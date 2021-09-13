@@ -66,23 +66,6 @@ TESTS = luabind router util
 UNAME = $(shell uname)
 DOMAIN = localhost 
 
-# Handle slight differences between Debian and others...
-#ifeq ($(UNAME),Linux)
-#	DEBUNAME = $(shell uname -a | awk '{ print $$2 }')
-#	ifeq ($(DEBUNAME),debian)
-#		LDFLAGS += $(shell pkg-config --libs --cflags lua5.3 gnutls) 
-#	else
-#		LDFLAGS += $(shell pkg-config --libs --cflags lua gnutls) 
-#	endif
-#endif
-#
-#ifeq ($(UNAME),Darwin)
-#	CC = clang
-#	CFLAGS = $(CLANGFLAGS) 
-#	LDFLAGS += $(shell pkg-config --libs --cflags lua gnutls) 
-#endif
-
-
 # main - Compiles all code needed to get hypno running
 main: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/

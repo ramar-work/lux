@@ -1,10 +1,12 @@
 # Track nothing and add by force
 Makefile
+TASKS
 TODO
 src.vim
 configure.scan
 *.log
 *.o
+*.a
 *.swp
 Makefile.copy
 
