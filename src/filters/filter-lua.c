@@ -925,6 +925,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			free_ld( &ld );
 			return http_error( res, 500, "Error in model conversion." );
 		}
+		lua_pop( ld.state, 1 );
 	}
 
 	//Stop if the user specifies a 'response' table that's not empty...
@@ -934,6 +935,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			free_ld( &ld );
 			return http_error( res, 500, ld.err );
 		}
+		lua_pop( ld.state, 1 );
 		free_ld( &ld );
 		FPRINTF( "We got to a successful point.\n" );
 		return 1;

@@ -324,9 +324,10 @@ int lua_count ( lua_State *L, int i ) {
 //Attempts to retrieve a key from global table and clears the stack if it doesn't match.
 int lua_retglobal( lua_State *L, const char *key, int type ) {
 	lua_getglobal( L, key );
+	int pos = lua_gettop( L );	
 
-	if ( lua_isnil( L, 1 ) || lua_type( L, 1 ) != type ) {
-		lua_pop( L, 1 );
+	if ( lua_isnil( L, pos ) || lua_type( L, pos ) != type ) {
+		lua_pop( L, pos );
 		return 0;
 	}
 	return 1;
