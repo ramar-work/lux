@@ -385,7 +385,7 @@ static int parse_body( zhttp_t *entity, char *err, int errlen ) {
 	memset( &set, 0, sizeof( zWalker ) );
 	int len = 0;
 	unsigned char *p = &entity->msg[ entity->hlen + 4 ];
-	const char idem[] = "POST,PUT,PATCH";
+	const char idem[] = "POST,PUT,PATCH,DELETE";
 	const char multipart[] = "multipart/form-data";
 	const char x_www_form[] = "application/x-www-form-urlencoded"; 
 
