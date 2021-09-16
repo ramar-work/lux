@@ -570,7 +570,7 @@ static int parse_http_header ( zhttp_t *entity, char *err, int errlen ) {
 	}
 
 	//If we expect a body, parse it
-	if ( memstr( "POST,PUT,PATCH", entity->method, strlen( "POST,PUT,PATCH" ) ) ) {
+	if ( memstr( "POST,PUT,PATCH,DELETE", entity->method, strlen( "POST,PUT,PATCH,DELETE" ) ) ) {
 		//Get content-length if we didn't already get it
 		if ( !entity->clen ) {
 			int clen;	
