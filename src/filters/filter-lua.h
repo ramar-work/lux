@@ -29,6 +29,7 @@
 #include <ztable.h>
 #include <zrender.h>
 #include <zmime.h>
+#include <zjson.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <stdarg.h>
@@ -95,11 +96,11 @@ struct luadata_t {
 #if 1
 	int status; //can return a different status
 	//other zTables could go here...
-	zTable *zconfig;
-	zTable *zroutes;
-	zTable *zroute;
-	zTable *zmodel;
-	zTable *zhttp; //you might not need this anymore...
+	ztable_t *zconfig;
+	ztable_t *zroutes;
+	ztable_t *zroute;
+	ztable_t *zmodel;
+	ztable_t *zhttp; //you might not need this anymore...
 #endif
 	struct mvc_t pp; 
 	char err[ LD_ERRBUF_LEN ];
