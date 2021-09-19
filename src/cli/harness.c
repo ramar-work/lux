@@ -313,19 +313,19 @@ int main ( int argc, char * argv[] ) {
 	#else
 		int i = 0, run = 1;
 		if ( ( i = lt_geti( lt, "ctype" )	) > -1 )
-			arg.ctype = lt_text_at( lt, i );
+			arg.ctype = zhttp_dupstr( lt_text_at( lt, i ) );
 
 		if ( ( i = lt_geti( lt, "host" )	) > -1 )
-			arg.host = lt_text_at( lt, i );
+			arg.host = zhttp_dupstr( lt_text_at( lt, i ) );
 
 		if ( ( i = lt_geti( lt, "uri" )	) > -1 )
-			arg.uri = lt_text_at( lt, i );
+			arg.uri = zhttp_dupstr( lt_text_at( lt, i ) );
 
 		if ( ( i = lt_geti( lt, "method" )	) > -1 )
-			arg.method = lt_text_at( lt, i );
+			arg.method = zhttp_dupstr( lt_text_at( lt, i ) );
 
 		if ( ( i = lt_geti( lt, "protocol" )	) > -1 )
-			arg.protocol = lt_text_at( lt, i );
+			arg.protocol = zhttp_dupstr( lt_text_at( lt, i ) );
 
 		//If the content-type is a serializable type, let's do something with that here
 		if ( arg.ctype && ( !strcmp( arg.ctype, CTYPE_JSON ) || !strcmp( arg.ctype, CTYPE_XML ) ) ) {
@@ -367,6 +367,7 @@ int main ( int argc, char * argv[] ) {
 				b->value = (unsigned char *)str;
 				req.clen = b->size = strlen( str );
 				add_item( &req.body, b, zhttpr_t *, &blen ); 
+				arg.body = NULL;
 			}
 		}		
 
@@ -467,6 +468,8 @@ int main ( int argc, char * argv[] ) {
 
 	//Populate the request structure.  Normally, one will never populate this from scratch
 	req.path = zhttp_dupstr( arg.uri );
+		
+	//TODO: When coming from Lua file, all of this will result in a leak... 
 	req.ctype = !arg.ctype ? zhttp_dupstr( "text/html" ) : zhttp_dupstr( arg.ctype );
 	req.host = !arg.host ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.host );
 	req.method = zhttp_dupstr( arg.method );
