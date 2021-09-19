@@ -26,6 +26,10 @@
 #include <errno.h>
 #include <zwalker.h>
 #include <zhttp.h>
+#include <zjson.h>
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
 #include "../util.h"
 #include "../server.h"
 #include "../filters/filter-static.h"
@@ -33,12 +37,18 @@
 #include "../filters/filter-dirent.h"
 #include "../filters/filter-redirect.h"
 #include "../filters/filter-lua.h"
+#include "../lua.h"
+#include "../lua.h"
 
 #define PP "hypno-harness"
 
 #define FSYMBOL "filter"
 
 #define NSYMBOL "libname"
+
+#define CTYPE_JSON "application/json"
+
+#define CTYPE_XML "application/xml"
 
 #define HELP \
 	"-f, --filter <arg>       Specify a filter for testing (required).\n" \
@@ -56,10 +66,13 @@
 	"                         (Use multiple invocations for additional arguments)\n" \
 	"-e, --header <arg>       Specify a header to use when making requests.\n" \
 	"                         (Use multiple invocations for additional arguments)\n" \
+	"-t, --test <arg>         Use <arg> to run a test.\n" \
 	"-M, --multipart          Use a multipart request when using POST or PUT\n" \
 	"-S, --msg-only           Show only the message, no header info\n" \
 	"-B, --body-to <arg>      Output body to file at <arg>\n" \
 	"-H, --headers-to <arg>   Output headers to file at <arg>\n" \
+	"-X, --dump-args          Dump the supplied arguments.\n" \
+	"-D, --dump-http          Dump the HTTP request that was created and stop.\n" \
 	"-v, --verbose            Be wordy.\n" \
 	"-h, --help               Show help and quit.\n"
 
@@ -93,6 +106,7 @@ struct arg {
 	char *protocol;
 	char *uri;
 	char *filter;
+	char *luatest;
 	int verbose;
 	int randomize;
 	int multipart;
@@ -101,7 +115,8 @@ struct arg {
 	int msgonly;
 	char *headerf;
 	char *bodyf;
-	int dump;
+	int dumpArgs;
+	int dumpHttp;
 	char **headers;
 	char **body;
 };
@@ -202,8 +217,12 @@ int main ( int argc, char * argv[] ) {
 			arg.randomize = 1;
 		else if ( !strcmp( *argv, "-v" ) || !strcmp( *argv, "--verbose" ) )
 			arg.verbose = 1;
-		else if ( !strcmp( *argv, "-D" ) || !strcmp( *argv, "--dump" ) )
-			arg.dump = 1;
+		else if ( !strcmp( *argv, "-X" ) || !strcmp( *argv, "--dump-args" ) )
+			arg.dumpArgs = 1;
+		else if ( !strcmp( *argv, "-D" ) || !strcmp( *argv, "--dump-http" ) )
+			arg.dumpHttp = 1;
+		else if ( !strcmp( *argv, "-t" ) || !strcmp( *argv, "--test" ) )
+			arg.luatest = *( ++argv );
 		else if ( !strcmp( *argv, "-E" ) || !strcmp( *argv, "--headers" ) ) {
 			char * a = *( ++argv );
 			add_item( &arg.headers, a, unsigned char *, &arg.hlen );
@@ -225,7 +244,7 @@ int main ( int argc, char * argv[] ) {
 	}
 
 	//Dump the arguments if you need to
-	if ( arg.dump ) {
+	if ( arg.dumpArgs ) {
 		dump_args( &arg );
 	}
 
@@ -234,18 +253,6 @@ int main ( int argc, char * argv[] ) {
 		arg.method = ( arg.body ) ? "POST" : "GET";
 	else if ( !method_is_valid( arg.method ) ) {
 		fprintf( stderr, PP ": Wrong method requested: %s\n", arg.method );
-		return 1;
-	}
-
-	if ( !arg.path ) {
-		fprintf( stderr, PP ": Directory to application not specified.\n" );
-		return 1;
-	}
-
-	if ( !arg.uri )
-		arg.uri = "/";
-	else if ( *arg.uri != '/' ) {
-		fprintf( stderr, PP ": URI is unspecified (only specify what comes after the domain).\n" );
 		return 1;
 	}
 
@@ -268,6 +275,169 @@ int main ( int argc, char * argv[] ) {
 			return 1;
 		}
 	}
+
+	if ( arg.luatest ) {
+		lua_State *L = NULL;
+		char err[ 1024 ] = { 0 };
+		zTable *lt = NULL;
+		int count = 0;
+
+		if ( !( L = luaL_newstate() ) ) {
+			fprintf( stderr, PP ": Error opening Lua state\n" );
+			return 1;
+		}
+
+		if ( !lua_exec_file( L, arg.luatest, err, sizeof( err ) ) ) {
+			fprintf( stderr, PP ": Error running file '%s': %s\n", arg.luatest, err );
+			return 1;
+		}
+
+		count = lua_count( L, 1 );
+		if ( !( lt = lt_make( count * 2 ) ) ) {
+			fprintf( stderr, PP ": Error creating ztable!\n" );
+			return 1;
+		}
+
+		if ( !lua_to_ztable( L, 1, lt ) ) {
+			fprintf( stderr, PP ": Error converting Lua table to ztable!\n" );
+			return 1;
+		}
+
+		lt_lock( lt );
+		lua_close( L );
+
+	#if 0
+		for ( const char **term = terms; *term; term++ ) {
+
+		}
+	#else
+		int i = 0, run = 1;
+		if ( ( i = lt_geti( lt, "ctype" )	) > -1 )
+			arg.ctype = lt_text_at( lt, i );
+
+		if ( ( i = lt_geti( lt, "host" )	) > -1 )
+			arg.host = lt_text_at( lt, i );
+
+		if ( ( i = lt_geti( lt, "uri" )	) > -1 )
+			arg.uri = lt_text_at( lt, i );
+
+		if ( ( i = lt_geti( lt, "method" )	) > -1 )
+			arg.method = lt_text_at( lt, i );
+
+		if ( ( i = lt_geti( lt, "protocol" )	) > -1 )
+			arg.protocol = lt_text_at( lt, i );
+
+		//If the content-type is a serializable type, let's do something with that here
+		if ( arg.ctype && ( !strcmp( arg.ctype, CTYPE_JSON ) || !strcmp( arg.ctype, CTYPE_XML ) ) ) {
+			run = 0;
+			
+			//Extract the values first and convert them
+			if ( lt_geti( lt, "values" ) > -1 ) {
+		
+				int blen = 0, slen = 0;
+				char *str = NULL, err[ 1024 ] = {0};
+				ztable_t *vt = lt_copy_by_key( lt, "values" );
+				zhttpr_t *b = NULL;
+				lt_reset( vt );
+				
+				if ( !strcmp( arg.ctype, CTYPE_JSON ) )
+					str = zjson_encode( vt, err, sizeof( err ) ); 
+				else {
+					fprintf( stderr, PP ": Serialzation with %s is not enabled yet.\n", arg.ctype );
+					return 1;
+				}
+
+				//The encoding process failed here...
+				if ( !str ) {
+					fprintf( stderr, PP ": Serialization failed: %s\n", err );
+					return 1;
+				}
+
+				//Chop values (assumes that encoding looks like '{"values": {" 
+				memmove( str, &str[11], ( slen = strlen( str ) ) - 11 );
+				memset( &str[ slen - 13 ], 0, 13 ); 
+
+				//Add this one to the body
+				if ( !( b = malloc( sizeof( zhttpr_t ) ) ) || !memset( b, 0, sizeof( zhttpr_t ) ) ) {
+					fprintf( stderr, PP ": Could not allocate space for serialized body\n" );
+					return 1;
+				}
+
+				b->field = zhttp_dupstr( "body" );
+				b->value = (unsigned char *)str;
+				req.clen = b->size = strlen( str );
+				add_item( &req.body, b, zhttpr_t *, &blen ); 
+			}
+		}		
+
+		struct luavv_t {
+			const char *val;
+			char ***array;
+			int run; // Will not run if ctype is xml or json
+			int alen;
+		} vv[] = {
+			{ "headers", &arg.headers, 1 }
+		, { "values", &arg.body, run }
+		, { NULL }
+		};
+
+		for ( struct luavv_t *val = vv; val->val; val++ ) {
+			if ( ( i = lt_geti( lt, val->val ) ) > -1 ) {
+				ztable_t *tt = lt_copy_by_index( lt, i );
+				lt_reset( tt ), lt_next( tt );
+
+				//Both sides should be text (or text and integer, die if not for now)
+				for ( zKeyval *kv; ( kv = lt_next( tt ) ) ; ) {
+					char *a = NULL;
+					int alen = 2048;
+
+					if ( kv->key.type == ZTABLE_TRM ) {
+						break;	
+					}
+
+					if ( kv->key.type != ZTABLE_TXT ) {
+						fprintf( stderr, PP ": Key in %s table at %s was not a string.\n", val->val, arg.luatest );
+						return 1;
+					}
+	 
+					if ( kv->value.type != ZTABLE_TXT && kv->value.type != ZTABLE_INT ) {
+						fprintf( stderr, PP ": Value at key '%s.%s' at %s was not a string or number.\n", val->val, kv->key.v.vchar, arg.luatest );
+						return 1;
+					}
+
+					if ( !( a = malloc( alen ) ) || !memset( a, 0, alen ) ) {
+						fprintf( stderr, PP ": Failed to allocate space for record in %s table in file %s.\n", val->val, arg.luatest );
+						return 1;
+					}
+
+					if ( kv->value.type == ZTABLE_INT )	
+						snprintf( a, 2047, "%s=%d", kv->key.v.vchar, kv->value.v.vint );
+					else {
+						snprintf( a, 2047, "%s=%s", kv->key.v.vchar, kv->value.v.vchar );
+					} 
+
+					add_item( val->array, a, unsigned char *, &val->alen );
+				}
+				lt_free( tt );
+			}
+		}
+	#endif
+
+		lt_free( lt ), free( lt );
+	}
+
+	if ( !arg.path ) {
+		fprintf( stderr, PP ": Directory to application not specified.\n" );
+		return 1;
+	}
+
+	if ( !arg.uri )
+		arg.uri = "/";
+	else if ( *arg.uri != '/' ) {
+		fprintf( stderr, PP ": URI is unspecified (only specify what comes after the domain).\n" );
+		return 1;
+	}
+
 #else
 	if ( !arg.lib ) {
 		fprintf( stderr, PP ": No library specified.\n" );
@@ -297,7 +467,7 @@ int main ( int argc, char * argv[] ) {
 
 	//Populate the request structure.  Normally, one will never populate this from scratch
 	req.path = zhttp_dupstr( arg.uri );
-	req.ctype = zhttp_dupstr( "text/html" );
+	req.ctype = !arg.ctype ? zhttp_dupstr( "text/html" ) : zhttp_dupstr( arg.ctype );
 	req.host = !arg.host ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.host );
 	req.method = zhttp_dupstr( arg.method );
 	req.protocol = !arg.protocol ? zhttp_dupstr( "HTTP/1.1" ) : zhttp_dupstr( arg.protocol );
@@ -394,6 +564,12 @@ int main ( int argc, char * argv[] ) {
 	if ( !http_finalize_request( &req, err, sizeof( err ) ) ) {
 		fprintf( stderr, "%s\n", err );
 		return 1; 
+	}
+
+	//Stop and dump the request
+	if ( arg.dumpHttp ) {
+		print_httpbody( &req );
+		return 0;
 	}
 
 	//Mock the site config data (or populate from file)

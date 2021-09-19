@@ -109,7 +109,9 @@ static const char *http_status[] = {
 	[HTTP_504] = "Gateway Timeout"
 };
 
-const char text_html[] = "text/html";
+static const char text_html[] = "text/html";
+
+static const char idem[] = "POST,PUT,PATCH,DELETE";
 
 //Set http errors
 static int set_http_error( zhttp_t *entity, HTTP_Error code ) {

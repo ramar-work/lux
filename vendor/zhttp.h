@@ -272,6 +272,6 @@ unsigned char *zhttp_append_to_uint8t ( unsigned char **, int *, unsigned char *
  void print_httpbody_to_file ( zhttp_t *, const char * );
 #else
  #define print_httprecords(...)
- #define print_httpbody(...)
+ #define print_httpbody_to_file(...)
 #endif
 #endif

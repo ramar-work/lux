@@ -61,6 +61,8 @@
  #define LT_MAX_COLLISIONS 10
 #endif
 
+#define ztable_t zTable
+
 #define lt_counti(t, i) \
 	lt_count_at_index( t, i, 1 ) 
 

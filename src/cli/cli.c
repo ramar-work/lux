@@ -85,6 +85,8 @@ struct app defaults[] = {
 	{ "/misc/", H_DIR, NULL },
 	{ "/lib/", H_DIR, NULL },
 	{ "/private/", H_DIR, NULL },
+	{ "/private/setup/", H_DIR, NULL },
+	{ "/tests/", H_DIR, NULL },
 	{ "/sql/", H_DIR, NULL },
 	{ "/src/", H_DIR, NULL },
 	{ "/views/", H_DIR, NULL },
