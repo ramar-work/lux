@@ -240,8 +240,8 @@ int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 
 
 	
-//Copy all records from a zTable to a Lua table at any point in the stack.
-int ztable_to_lua ( lua_State *L, zTable *t ) {
+//Copy all records from a ztable_t to a Lua table at any point in the stack.
+int ztable_to_lua ( lua_State *L, ztable_t *t ) {
 	short ti[ 64 ] = { 0 }, *xi = ti; 
 
 	//Push a table and increase Lua's "save table" index
@@ -349,7 +349,7 @@ static char B[ 1024 ];
 #define TELL(fmt,a) 1
 
 //Convert Lua tables to regular tables
-int lua_to_ztable ( lua_State *L, int index, zTable *t ) {
+int lua_to_ztable ( lua_State *L, int index, ztable_t *t ) {
 
 	if ( !lua_checkstack( L, 3 ) ) {
 		fprintf( stderr, "STACK OUT OF SPACE!" );	

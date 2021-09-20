@@ -56,6 +56,7 @@ ctype_t ctypes_serializable[] = {
 #endif
 #ifdef INCLUDE_XML_SUPPORT
 , { "application/xml", CTYPE_XML }
+, { "text/xml", CTYPE_XML }
 #endif
 , { NULL }
 };
@@ -680,19 +681,24 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 	const char *ctype = NULL;
 	int clen = 0;
 	zhttp_t *p = NULL;
-
+	
+	if ( 0 ) { ; }
 #ifdef INCLUDE_JSON_SUPPORT
-	if ( t->ctype == CTYPE_JSON ) {
+	else if ( t->ctype == CTYPE_JSON ) {
 		content = zjson_encode( l->zmodel, l->err, 1024 );
 		clen = strlen( content );
 		ctype = t->ctypename;
 	}
-	else 
-#else
-	#error "Text table handler is not enabled yet"
-	if ( 1 )
 #endif
-	{
+#ifdef INCLUDE_XML_SUPPORT
+	else if ( t->ctype == CTYPE_XML ) {
+fprintf( stderr, "XML\n" );
+		content = xml_encode( l->zmodel, "model" );
+		clen = strlen( content );
+		ctype = t->ctypename;
+	}
+#endif
+	else {
 		//TODO: This should handle the other types... 
 		content = text_encode( l->zmodel );
 		clen = strlen( content );
@@ -967,20 +973,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 		//TODO: Check for an inherited content-type
 		//TODO: Then check for a globally defined default content-type
-
-		//First, check if there is a view specified 
-		snprintf( tkey, sizeof( tkey ) - 1, "%s.%s", key, "view" );
-		if ( lt_geti( ld.zroute, tkey ) == -1 ) {
-			if ( !return_as_serializable( &ld, &ctypes_serializable[ CTYPE_JSON ] ) ) {
-				char err[ LD_ERRBUF_LEN ] = { 0 };
-				memcpy( err, ld.err, strlen( ld.err ) );
-				free_ld( &ld );
-				return http_error( res, 500, "%s", err );
-			}
-			free_ld( &ld );
-			return 1;
-		} 
-
+fprintf( stderr, "evaluate ctypes...\n" );
 		//Then check for content-types
 		for ( const char **c = ctype_tags; *c; c++ ) {
 			int index = -1;
@@ -990,9 +983,10 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			if ( ( index = lt_geti( ld.zroute, tkey ) ) > -1 ) {
 				//Get Content-Type
 				char *ctype = lt_text_at( ld.zroute, index );
-				for ( ctype_t *cc = ctypes_serializable; cc->ctypename; cc++ ) {
+				for ( ctype_t *cc = ctypes_serializable; cc->ctypename != NULL; cc++ ) {
 					if ( !strcasecmp( ctype, cc->ctypename ) ) {
 						//Throw your own response in JSON?
+fprintf( stderr, "found ctype: %s\n", cc->ctypename );
 						if ( !return_as_serializable( &ld, cc ) ) {
 							char err[ LD_ERRBUF_LEN ] = { 0 };
 							memcpy( err, ld.err, strlen( ld.err ) );
@@ -1006,7 +1000,21 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 				}
 			}
 		}
+fprintf( stderr, "done w/ evaluate ctypes...\n" );
 
+		//Finally, check if there is a view specified 
+		memset( tkey, 0, sizeof( tkey ) );
+		snprintf( tkey, sizeof( tkey ) - 1, "%s.%s", key, "view" );
+		if ( lt_geti( ld.zroute, tkey ) == -1 ) {
+			if ( !return_as_serializable( &ld, &ctypes_serializable[ CTYPE_JSON ] ) ) {
+				char err[ LD_ERRBUF_LEN ] = { 0 };
+				memcpy( err, ld.err, strlen( ld.err ) );
+				free_ld( &ld );
+				return http_error( res, 500, "%s", err );
+			}
+			free_ld( &ld );
+			return 1;
+		} 
 		lua_pop( ld.state, 1 );
 	}
 

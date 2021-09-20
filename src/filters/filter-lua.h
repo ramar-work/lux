@@ -4,22 +4,19 @@
  * 
  * Summary 
  * -------
- * Header file for functions comprising the dirent filter for interpreting 
- * HTTP messages.
+ * Header file for functions comprising the Lua 
+ * filter for interpreting HTTP messages.
  *
  * Usage
  * -----
- * filter-dirent.c allows hypno to act as a directory server, in which the
- * server simply presents the user with a list of files for view or download. 
+ * filter-lua.c allows hypno to use Lua as a 
+ * server-side evaluation langauge.
  *
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
  * 
  * See LICENSE in the top-level directory for more information.
- *
- * CHANGELOG 
- * ---------
  * 
  * ------------------------------------------- */
 #include <lua.h>
@@ -42,6 +39,10 @@
 
 #ifdef INCLUDE_JSON_SUPPORT
  #include <zjson.h>
+#endif
+
+#ifdef INCLUDE_XML_SUPPORT
+ #include "../xml.h"
 #endif
 
 #ifndef FILTER_LUA_H
