@@ -42,3 +42,7 @@
 #define USEFILTER_LUA
 #define USEFILTER_STATIC
 #define USEFILTER_ECHO
+
+//Enable or disable content types
+#undef INCLUDE_XML_SUPPORT
+#define INCLUDE_JSON_SUPPORT

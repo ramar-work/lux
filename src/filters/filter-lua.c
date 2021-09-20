@@ -30,10 +30,34 @@ static const char rkey[] = "routes";
 
 static const char ctype_def[] = "text/html";
 
-static const char *ctype_serializable[] = {
-	"application/json"
-, "application/xml"
-, NULL
+typedef enum {
+	CTYPE_TEXTHTML
+,	CTYPE_PLAINTEXT
+#ifdef INCLUDE_JSON_SUPPORT
+, CTYPE_JSON
+#endif
+#ifdef INCLUDE_XML_SUPPORT
+, CTYPE_XML
+#endif
+} ctypen_t;
+
+
+typedef struct ctype_t { 
+	const char *ctypename; 
+	ctypen_t ctype; 
+} ctype_t;
+
+
+ctype_t ctypes_serializable[] = {
+	{ "text/html", CTYPE_TEXTHTML }
+,	{ "text/plain", CTYPE_PLAINTEXT }
+#ifdef INCLUDE_JSON_SUPPORT
+,	{ "application/json", CTYPE_JSON }
+#endif
+#ifdef INCLUDE_XML_SUPPORT
+, { "application/xml", CTYPE_XML }
+#endif
+, { NULL }
 };
 
 static const char *ctype_tags[] = {
@@ -43,53 +67,9 @@ static const char *ctype_tags[] = {
 , NULL
 };
 
-struct ab {
-	int msglen;
-	unsigned char *msg;	
-};
-
-
-static int ctype_is_serializable( const char *ctype ) {
-	for ( const char **c = ctype_serializable; *c; c++ ) {
-		if ( !strcmp( ctype, *c ) ) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
-
-static int make_c ( zKeyval *kv, int i, void *p ) {
-	struct ab *ab = (struct ab *)p;
-	if ( kv->key.type == ZTABLE_TXT )
-		;
-	else if ( kv->key.type == ZTABLE_INT ) {
-
-	}
-
-	if ( kv->value.type == ZTABLE_INT ) 
-		;
-	else if ( kv->value.type == ZTABLE_FLT ) 
-		;
-	else if ( kv->value.type == ZTABLE_TXT ) 
-		zhttp_append_to_uint8t( &ab->msg, &ab->msglen, (unsigned char *)kv->value.v.vchar, strlen( kv->value.v.vchar )); 
-	else if ( kv->value.type == ZTABLE_BLB ) {
-		zhttp_append_to_uint8t( &ab->msg, &ab->msglen, kv->value.v.vblob.blob, kv->value.v.vblob.size ); 
-	} 
-	return 1;	
-}
-
-
-//Create a message out of a zTable
-struct ab * ztable_to_msg ( zTable *t ) {
-	struct ab *ab = NULL;
-	lt_exec_complex( t, 1, t->count, &ab, make_c );
-	return ab;
-}
-
 
 //HTTP error
-int http_error( struct HTTPBody *res, int status, char *fmt, ... ) { 
+static int http_error( struct HTTPBody *res, int status, char *fmt, ... ) { 
 	va_list ap;
 	char err[ 2048 ];
 	memset( err, 0, sizeof( err ) );
@@ -150,7 +130,7 @@ int run_lua_buffer( lua_State *L, const char *buffer ) {
 
 
 //In lieu of a C-only way to make members read only, use this
-int make_read_only ( lua_State *L, const char *table ) {
+static int make_read_only ( lua_State *L, const char *table ) {
 	//Certain tables (and their children) need to be read-only
 	int err = 0;
 	const char fmt[] = "%s = make_read_only( %s )";
@@ -170,7 +150,7 @@ int make_read_only ( lua_State *L, const char *table ) {
 
 
 //Should return an error b/c there are some situations where this does not work.
-int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
+static int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
 	//Now load everything written elsewhere...
 	for ( ; set->namespace; set++ ) {
 //fprintf( stderr, "namespace: %s\n", set->namespace );
@@ -188,13 +168,6 @@ int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
 		return 0;
 	}
 	return 1;
-}
-
-
-
-//checking args is putting me in a weird zone... 
-int lua_getarg() {
-	return ZLUA_NO_ERROR;
 }
 
 
@@ -288,7 +261,7 @@ static int make_mvc_list ( zKeyval *kv, int i, void *p ) {
 
 
 //Free MVC list
-void free_mvc_list ( void ***list ) {
+static void free_mvc_list ( void ***list ) {
 	for ( void **l = *list; l && *l; l++ ) {
 		free( *l );
 	} 
@@ -308,7 +281,7 @@ static void free_route_list ( struct iroute_t **list ) {
 
 
 //Load Lua configuration
-int load_lua_config( struct luadata_t *l ) {
+static int load_lua_config( struct luadata_t *l ) {
 	char *db, *fqdn, cpath[ 2048 ] = { 0 };
 	DIR *dir = NULL;
 	struct dirent *d = NULL;
@@ -506,7 +479,7 @@ static const int send_static ( struct HTTPBody *res, const char *dir, const char
 
 
 //...
-void dump_records( struct HTTPRecord **r ) {
+static void dump_records( struct HTTPRecord **r ) {
 	int b = 0;
 	for ( struct HTTPRecord **a = r; a && *a; a++ ) {
 		fprintf( stderr, "%p: %s -> ", *a, (*a)->field ); 
@@ -524,7 +497,7 @@ static char * getpath( char *rpath, char *apath, int plen ) {
 
 
 //Initialize routes in Lua
-int init_lua_routes ( struct luadata_t *l ) {
+static int init_lua_routes ( struct luadata_t *l ) {
 	zWalker w = {0}, w2 = {0};
 	const char *active = NULL, *path = l->apath + 1, *resolved = l->rroute + 1;
 	char **routes = { NULL };
@@ -587,7 +560,7 @@ int init_lua_routes ( struct luadata_t *l ) {
 
 
 //Initialize HTTP in Lua
-int init_lua_http ( struct luadata_t *l ) {
+static int init_lua_http ( struct luadata_t *l ) {
 	//Loop through all things
 	const char *str[] = { "headers", "url", "body" };
 	struct HTTPRecord **ii[] = { l->req->headers, l->req->url, l->req->body };
@@ -651,13 +624,13 @@ int init_lua_http ( struct luadata_t *l ) {
 }
 
 
-int init_lua_shadowpath ( struct luadata_t *l ) {
+static int init_lua_shadowpath ( struct luadata_t *l ) {
 	lua_pushstring( l->state, l->root );
 	return 1;	
 }
 
 
-int init_lua_config ( struct luadata_t *l ) {
+static int init_lua_config ( struct luadata_t *l ) {
 	return ztable_to_lua( l->state, l->zconfig ); 
 }
 
@@ -665,7 +638,7 @@ int init_lua_config ( struct luadata_t *l ) {
 
 //Both of these functions return zTables, and this is heavy on memory and does a useless context switch
 //Doing it all in Lua makes more sense...
-struct lua_readonly_t {
+static struct lua_readonly_t {
 	const char *name;
 	int (*exec)( struct luadata_t * );
 	//int (*exec)( lua_State *, struct HTTPBody *, const char *, const char * );	
@@ -677,18 +650,8 @@ struct lua_readonly_t {
 , { NULL }
 };
 
-#if 0
-//consider this instead, but it will be extern...
-struct lua_lib_t {
-	...
-} lua_libs[] = {
-	{ "some_lib", libs }
-, { NULL }
-};
-#endif
 
-
-int free_ld ( struct luadata_t *l ) {
+static int free_ld ( struct luadata_t *l ) {
 	lua_close( l->state );
 
 	lt_free( l->zconfig );
@@ -707,15 +670,45 @@ int free_ld ( struct luadata_t *l ) {
 }
 
 
-static zhttp_t * return_as_serializable ( struct luadata_t *l ) {
-	char * content = zjson_encode( l->zmodel, l->err, 1024 );
-	l->res->clen = strlen( content );
+static char * text_encode ( ztable_t *t ) {
+	return "";
+}
+
+
+static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
+	char * content = NULL; 
+	const char *ctype = NULL;
+	int clen = 0;
+	zhttp_t *p = NULL;
+
+#ifdef INCLUDE_JSON_SUPPORT
+	if ( t->ctype == CTYPE_JSON ) {
+		content = zjson_encode( l->zmodel, l->err, 1024 );
+		clen = strlen( content );
+		ctype = t->ctypename;
+	}
+	else 
+#else
+	#error "Text table handler is not enabled yet"
+	if ( 1 )
+#endif
+	{
+		//TODO: This should handle the other types... 
+		content = text_encode( l->zmodel );
+		clen = strlen( content );
+		ctype = "text/plain";
+	}
+
+	l->res->clen = clen;
 	http_set_status( l->res, 200 ); 
-	http_set_ctype( l->res, "application/json" );
+	http_set_ctype( l->res, t->ctypename );
 	http_set_content( l->res, (unsigned char *)content, l->res->clen ); 
 
 	//Return the finished message if we got this far
-	return http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ); 
+	p = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN );
+	
+	free( content );
+	return p;
 }
 
 
@@ -723,7 +716,7 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l ) {
 //...
 static int return_as_response ( struct luadata_t *l ) {
 
-	zTable *rt = NULL;
+	ztable_t *rt = NULL;
 	int count = 0, status = 200, clen = 0;
 	char *ctype = "text/html";
 	unsigned char *content = NULL;
@@ -813,7 +806,7 @@ print_httpbody( l->res );
 const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 	//Define variables and error positions...
-	zTable zc = {0}, zm = {0};
+	ztable_t zc = {0}, zm = {0};
 	struct luadata_t ld = {0};
 	int clen = 0;
 	unsigned char *content = NULL;
@@ -859,11 +852,9 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	for ( struct iroute_t **lroutes = p.iroute_tlist; *lroutes; lroutes++ ) {
 		if ( route_resolve( ld.apath, (*lroutes)->route ) ) {
 			memcpy( (void *)ld.rroute, (*lroutes)->route, strlen( (*lroutes)->route ) );
-			zTable * croute = lt_copy_by_index( ld.zroutes, (*lroutes)->index );
+			ztable_t * croute = lt_copy_by_index( ld.zroutes, (*lroutes)->index );
 			lt_exec_complex( croute, 1, croute->count, &ld.pp, make_mvc_list );
 			ld.zroute = croute;
-			//lt_reset( ld.zroute );
-			//lt_free( croute ), free( croute );
 			notfound = 0;
 			break;
 		}
@@ -974,10 +965,13 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			return http_error( res, 500, "Error in model conversion." );
 		}
 
+		//TODO: Check for an inherited content-type
+		//TODO: Then check for a globally defined default content-type
+
 		//First, check if there is a view specified 
 		snprintf( tkey, sizeof( tkey ) - 1, "%s.%s", key, "view" );
 		if ( lt_geti( ld.zroute, tkey ) == -1 ) {
-			if ( !return_as_serializable( &ld ) ) {
+			if ( !return_as_serializable( &ld, &ctypes_serializable[ CTYPE_JSON ] ) ) {
 				char err[ LD_ERRBUF_LEN ] = { 0 };
 				memcpy( err, ld.err, strlen( ld.err ) );
 				free_ld( &ld );
@@ -989,18 +983,17 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 		//Then check for content-types
 		for ( const char **c = ctype_tags; *c; c++ ) {
-			char *ctype = NULL; 
 			int index = -1;
 			memset( tkey, 0, sizeof( tkey ) );
 			snprintf( tkey, sizeof( tkey ) - 1, "%s.%s", key, *c ); 
 
 			if ( ( index = lt_geti( ld.zroute, tkey ) ) > -1 ) {
 				//Get Content-Type
-				ctype = lt_text_at( ld.zroute, index );
-				for ( const char **cc = ctype_serializable; *cc; cc++ ) {
-					if ( !strcasecmp( ctype, *cc ) ) {
+				char *ctype = lt_text_at( ld.zroute, index );
+				for ( ctype_t *cc = ctypes_serializable; cc->ctypename; cc++ ) {
+					if ( !strcasecmp( ctype, cc->ctypename ) ) {
 						//Throw your own response in JSON?
-						if ( !return_as_serializable( &ld ) ) {
+						if ( !return_as_serializable( &ld, cc ) ) {
 							char err[ LD_ERRBUF_LEN ] = { 0 };
 							memcpy( err, ld.err, strlen( ld.err ) );
 							free_ld( &ld );
@@ -1069,24 +1062,11 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		}
 	}
 
-	//If key names are mispelled, this can cause the engine to completely skip rendering or interpreting a moidel
-	//Fail out in this case
+	//Fail out when neither model or view is specified
 	if ( !model && !view ) {
 		//free( content );
 		free_ld( &ld );
 		return http_error( res, 500, "Neither model nor view was specified for '/%s'.", ld.aroute );
-	}
-	else if ( !view ) {
-		//Throw your own response in JSON?
-		if ( !return_as_serializable( &ld ) ) {
-			char err[ LD_ERRBUF_LEN ] = { 0 };
-			memcpy( err, ld.err, strlen( ld.err ) );
-			free_ld( &ld );
-			return http_error( res, 500, "%s", err );
-		}
-
-		free_ld( &ld );
-		return 1;
 	}
 
 	//Set needed info for the response structure

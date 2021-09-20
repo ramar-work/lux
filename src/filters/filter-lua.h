@@ -29,7 +29,6 @@
 #include <ztable.h>
 #include <zrender.h>
 #include <zmime.h>
-#include <zjson.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <stdarg.h>
@@ -39,6 +38,11 @@
 #include "../server.h"
 #include "../lua.h"
 #include "../lua/lib.h"
+#include "../config.h"
+
+#ifdef INCLUDE_JSON_SUPPORT
+ #include <zjson.h>
+#endif
 
 #ifndef FILTER_LUA_H
 #define FILTER_LUA_H
@@ -76,15 +80,6 @@ struct mvc_t {
 struct luadata_t {
 	zhttp_t *req, *res;
 	lua_State *state;
-#if 0
-	const char *aroute;
-	const char *rroute;
-	const char *apath;
-	const char *db;
-	const char *fqdn;
-	const char *root;
-	const char *dctype;
-#else
 	const char aroute[ LD_LEN ];
 	const char rroute[ LD_LEN ];
 	const char apath[ LD_LEN ];
@@ -92,21 +87,15 @@ struct luadata_t {
 	const char fqdn[ LD_LEN ];
 	const char root[ LD_LEN ];
 	const char dctype[ LD_LEN ];
-#endif
-#if 1
 	int status; //can return a different status
-	//other zTables could go here...
 	ztable_t *zconfig;
 	ztable_t *zroutes;
 	ztable_t *zroute;
 	ztable_t *zmodel;
-	ztable_t *zhttp; //you might not need this anymore...
-#endif
+	ztable_t *zhttp; //TODO: you might not need this anymore...
 	struct mvc_t pp; 
 	char err[ LD_ERRBUF_LEN ];
 };
-
-int http_error( struct HTTPBody *, int, char *, ... );
 
 const int filter_lua
 ( int , struct HTTPBody *, struct HTTPBody *, struct cdata * );

@@ -18,23 +18,29 @@
  * ------------------------------------------- */
 #include "lib.h"
 #include "echo.h"
-#include "db.h"
 #include "lua.h"
-#include "filesystem.h"
-#include "http.h"
-#include "json.h"
 #include "rand.h"
 #include "hash.h"
 
+#include "http.h"
+#include "filesystem.h"
+#include "db.h"
+
+#ifdef INCLUDE_JSON_SUPPORT
+ #include "json.h"
+#endif
+
 struct lua_fset functions[] = {
 	{ "echo", echo_set }
-, { "db", db_set }
 , { "lua", lua_set }
-, { "fs", fs_set }
-, { "http", http_set }
-, { "json", json_set }
 , { "rand", rand_set }
 , { "hash", hash_set }
+, { "http", http_set }
+, { "fs", fs_set }
+, { "db", db_set }
+#ifdef INCLUDE_JSON_SUPPORT
+, { "json", json_set }
+#endif
 ,	{ NULL }
 };
 

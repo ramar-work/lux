@@ -18,6 +18,7 @@
  * ------------------------------------------- */
 #include <zhttp.h>
 #include "../server.h"
+#include "../config.h"
 
 const int 
 filter_redirect ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata *conn );

@@ -26,6 +26,7 @@
 #include "../util.h"
 #include "../configs.h"
 #include "../server.h"
+#include "../config.h"
 
 #ifndef FILTER_STATIC_H
 #define FILTER_STATIC_H

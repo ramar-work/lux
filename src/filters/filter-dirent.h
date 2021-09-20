@@ -29,6 +29,7 @@
 #include "../mime.h"
 #include "../util.h"
 #include "../server.h"
+#include "../config.h"
 
 #ifndef FILTER_DIR_H
 #define FILTER_DIR_H
