@@ -96,6 +96,7 @@ struct filter filters[16] = {
 , { NULL }
 };
 
+
 struct arg {
 	char *lib;
 	char *path;
@@ -119,6 +120,24 @@ struct arg {
 	int dumpHttp;
 	char **headers;
 	char **body;
+};
+
+
+struct test {
+	ztable_t *table;
+	char *ctype;
+	char *host;
+	char *uri;
+	char *method;
+	char *protocol;
+
+	struct expected {
+		int status;
+		int clength;
+		char *ctype;
+		char **headers;
+		unsigned char *payload;
+	} expected;
 };
 
 
@@ -174,6 +193,7 @@ int method_is_valid ( char *mstr ) {
 int main ( int argc, char * argv[] ) {
 	//Make this
 	struct arg arg = {0};
+	struct test test = {0};
 	int blen = 0;
 	void *app = NULL;
 	const int (*filter)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
@@ -182,6 +202,7 @@ int main ( int argc, char * argv[] ) {
 	struct cdata conn;
 	struct lconfig sconf;
 	int header_fd=1, body_fd=1;
+	ztable_t *lt = NULL;
 
 	if ( argc < 2 ) {
 		fprintf( stderr, PP ":\n%s\n", HELP );
@@ -279,7 +300,6 @@ int main ( int argc, char * argv[] ) {
 	if ( arg.luatest ) {
 		lua_State *L = NULL;
 		char err[ 1024 ] = { 0 };
-		zTable *lt = NULL;
 		int count = 0;
 
 		if ( !( L = luaL_newstate() ) ) {
@@ -293,17 +313,17 @@ int main ( int argc, char * argv[] ) {
 		}
 
 		count = lua_count( L, 1 );
-		if ( !( lt = lt_make( count * 2 ) ) ) {
+		if ( !( test.table = lt_make( count * 2 ) ) ) {
 			fprintf( stderr, PP ": Error creating ztable!\n" );
 			return 1;
 		}
 
-		if ( !lua_to_ztable( L, 1, lt ) ) {
+		if ( !lua_to_ztable( L, 1, test.table ) ) {
 			fprintf( stderr, PP ": Error converting Lua table to ztable!\n" );
 			return 1;
 		}
 
-		lt_lock( lt );
+		lt_lock( test.table );
 		lua_close( L );
 
 	#if 0
@@ -312,38 +332,38 @@ int main ( int argc, char * argv[] ) {
 		}
 	#else
 		int i = 0, run = 1;
-		if ( ( i = lt_geti( lt, "ctype" )	) > -1 )
-			arg.ctype = zhttp_dupstr( lt_text_at( lt, i ) );
+		if ( ( i = lt_geti( test.table, "ctype" )	) > -1 )
+			arg.ctype = test.ctype = zhttp_dupstr( lt_text_at( test.table, i ) );
 
-		if ( ( i = lt_geti( lt, "host" )	) > -1 )
-			arg.host = zhttp_dupstr( lt_text_at( lt, i ) );
+		if ( ( i = lt_geti( test.table, "host" )	) > -1 )
+			arg.host = test.host = zhttp_dupstr( lt_text_at( test.table, i ) );
 
-		if ( ( i = lt_geti( lt, "uri" )	) > -1 )
-			arg.uri = zhttp_dupstr( lt_text_at( lt, i ) );
+		if ( ( i = lt_geti( test.table, "uri" )	) > -1 )
+			arg.uri = test.uri = zhttp_dupstr( lt_text_at( test.table, i ) );
 
-		if ( ( i = lt_geti( lt, "method" )	) > -1 )
-			arg.method = zhttp_dupstr( lt_text_at( lt, i ) );
+		if ( ( i = lt_geti( test.table, "method" )	) > -1 )
+			arg.method = test.method = zhttp_dupstr( lt_text_at( test.table, i ) );
 
-		if ( ( i = lt_geti( lt, "protocol" )	) > -1 )
-			arg.protocol = zhttp_dupstr( lt_text_at( lt, i ) );
+		if ( ( i = lt_geti( test.table, "protocol" )	) > -1 )
+			arg.protocol = test.protocol = zhttp_dupstr( lt_text_at( test.table, i ) );
 
 		//If the content-type is a serializable type, let's do something with that here
-		if ( arg.ctype && ( !strcmp( arg.ctype, CTYPE_JSON ) || !strcmp( arg.ctype, CTYPE_XML ) ) ) {
+		if ( test.ctype && ( !strcmp( test.ctype, CTYPE_JSON ) || !strcmp( test.ctype, CTYPE_XML ) ) ) {
 			run = 0;
 			
 			//Extract the values first and convert them
-			if ( lt_geti( lt, "values" ) > -1 ) {
+			if ( lt_geti( test.table, "values" ) > -1 ) {
 		
 				int blen = 0, slen = 0;
 				char *str = NULL, err[ 1024 ] = {0};
-				ztable_t *vt = lt_copy_by_key( lt, "values" );
+				ztable_t *vt = lt_copy_by_key( test.table, "values" );
 				zhttpr_t *b = NULL;
 				lt_reset( vt );
 				
-				if ( !strcmp( arg.ctype, CTYPE_JSON ) )
+				if ( !strcmp( test.ctype, CTYPE_JSON ) )
 					str = zjson_encode( vt, err, sizeof( err ) ); 
 				else {
-					fprintf( stderr, PP ": Serialzation with %s is not enabled yet.\n", arg.ctype );
+					fprintf( stderr, PP ": Serialzation with %s is not enabled yet.\n", test.ctype );
 					return 1;
 				}
 
@@ -383,8 +403,8 @@ int main ( int argc, char * argv[] ) {
 		};
 
 		for ( struct luavv_t *val = vv; val->val; val++ ) {
-			if ( ( i = lt_geti( lt, val->val ) ) > -1 ) {
-				ztable_t *tt = lt_copy_by_index( lt, i );
+			if ( ( i = lt_geti( test.table, val->val ) ) > -1 ) {
+				ztable_t *tt = lt_copy_by_index( test.table, i );
 				lt_reset( tt ), lt_next( tt );
 
 				//Both sides should be text (or text and integer, die if not for now)
@@ -422,9 +442,41 @@ int main ( int argc, char * argv[] ) {
 				lt_free( tt );
 			}
 		}
-	#endif
 
-		lt_free( lt ), free( lt );
+
+		//Extract expects and status, etc
+		if ( ( i = lt_geti( test.table, "expects" ) ) > -1 ) {
+			ztable_t *t = lt_copy_by_index( test.table, i );
+
+			//Get the expected status if there is one
+			if ( ( i = lt_geti( t, "expects.status" ) ) > -1 ) {
+				test.expected.status = lt_int_at( t, i );
+			}
+		
+			//Get the expected content-type if there is one
+			if ( ( i = lt_geti( t, "expects.ctype" ) ) > -1 ) {
+				test.expected.ctype = lt_text_at( t, i );
+			}
+
+			//Get the expected content-length if there is one
+			if ( ( i = lt_geti( t, "expects.clen" ) ) > -1 ) {
+				test.expected.clength = lt_int_at( t, i );
+			}
+					
+			//Get the expected payload if there is one
+			if ( ( i = lt_geti( t, "expects.payload" ) ) > -1 ) {
+				if ( test.expected.clength )
+					test.expected.payload = lt_blob_at( t, i ).blob;
+				else {
+					test.expected.payload = (unsigned char *)lt_text_at( t, i );
+					test.expected.clength = strlen( lt_text_at( t, i ) );
+				}
+			}
+	
+			lt_free( t );
+		}
+		lt_free( test.table ), free( test.table );
+	#endif
 	}
 
 	if ( !arg.path ) {
@@ -470,10 +522,10 @@ int main ( int argc, char * argv[] ) {
 	req.path = zhttp_dupstr( arg.uri );
 		
 	//TODO: When coming from Lua file, all of this will result in a leak... 
-	req.ctype = !arg.ctype ? zhttp_dupstr( "text/html" ) : zhttp_dupstr( arg.ctype );
-	req.host = !arg.host ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.host );
+	req.ctype = !arg.ctype ? zhttp_dupstr( "text/html" ) : arg.ctype;
+	req.host = !arg.host ? zhttp_dupstr( "example.com" ) : arg.host;
 	req.method = zhttp_dupstr( arg.method );
-	req.protocol = !arg.protocol ? zhttp_dupstr( "HTTP/1.1" ) : zhttp_dupstr( arg.protocol );
+	req.protocol = !arg.protocol ? zhttp_dupstr( "HTTP/1.1" ) : arg.protocol;
 
 #if 0
 	req.alias = !arg.alias ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.alias );
@@ -614,13 +666,41 @@ int main ( int argc, char * argv[] ) {
 		}
 	}
 
-	if ( !filter( 0, &req, &res, &conn ) ) {
+	//
+	int status = filter( 0, &req, &res, &conn );
+
+#if 0
+	//A failure isn't technically a failure...  it could be a 400, and this could be exactly what's supposed to happen...
+	if ( !status ) {
 		fprintf( stderr, PP ": HTTP funct '%s' failed to execute\n", FSYMBOL );
+		//2 is the device I should write to...
 		write( 1, res.msg, res.mlen );
 		fflush( stdout );
 		http_free_request( &req );
 		http_free_response( &res );
 		return 1;
+	}
+#endif
+	
+	//The Lua test
+	if ( arg.luatest ) {
+		//If the table still exists, you need to run against the expects key		
+		if ( !test.table ) {
+			fprintf( stderr, PP ": Lua table was freed too soon\n" ); 
+			return 1;
+		}
+
+		//Print the site and URL
+		fprintf( stderr, "%20s:%s\nExpected %d; Got %d\n", 
+			arg.uri, arg.path, test.expected.status, res.status 
+		);
+
+		//Just show the status
+		if ( test.expected.status != res.status ) {
+			write( 2, res.msg, res.mlen );
+		}
+
+		return 0;	
 	}
 
 	//Show whatever message should have come out
@@ -644,14 +724,10 @@ int main ( int argc, char * argv[] ) {
 		fprintf( stderr, PP ": Failed to close application: %s\n", strerror( errno ) );
 		return 1;
 	}
-#endif
-
-	//Destroy res, req and anything else allocated
-	//print_httpbody( &req );
-	//print_httpbody( &res );
-
+#else
 	http_free_request( &req );
 	http_free_response( &res );
+#endif
 
 	//Close files
 	if ( header_fd > 2 ) {

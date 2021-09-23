@@ -21,14 +21,10 @@
 #include "lua.h"
 #include "rand.h"
 #include "hash.h"
-
 #include "http.h"
 #include "filesystem.h"
 #include "db.h"
-
-#ifdef INCLUDE_JSON_SUPPORT
- #include "json.h"
-#endif
+#include "json.h"
 
 struct lua_fset functions[] = {
 	{ "echo", echo_set }
@@ -38,9 +34,7 @@ struct lua_fset functions[] = {
 , { "http", http_set }
 , { "fs", fs_set }
 , { "db", db_set }
-#ifdef INCLUDE_JSON_SUPPORT
 , { "json", json_set }
-#endif
 ,	{ NULL }
 };
 

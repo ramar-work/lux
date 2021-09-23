@@ -35,15 +35,8 @@
 #include "../server.h"
 #include "../lua.h"
 #include "../lua/lib.h"
-#include "../config.h"
-
-#ifdef INCLUDE_JSON_SUPPORT
- #include <zjson.h>
-#endif
-
-#ifdef INCLUDE_XML_SUPPORT
- #include "../xml.h"
-#endif
+#include <zjson.h>
+#include "../xml.h"
 
 #ifndef FILTER_LUA_H
 #define FILTER_LUA_H

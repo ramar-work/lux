@@ -33,12 +33,8 @@ static const char ctype_def[] = "text/html";
 typedef enum {
 	CTYPE_TEXTHTML
 ,	CTYPE_PLAINTEXT
-#ifdef INCLUDE_JSON_SUPPORT
 , CTYPE_JSON
-#endif
-#ifdef INCLUDE_XML_SUPPORT
 , CTYPE_XML
-#endif
 } ctypen_t;
 
 
@@ -51,13 +47,9 @@ typedef struct ctype_t {
 ctype_t ctypes_serializable[] = {
 	{ "text/html", CTYPE_TEXTHTML }
 ,	{ "text/plain", CTYPE_PLAINTEXT }
-#ifdef INCLUDE_JSON_SUPPORT
 ,	{ "application/json", CTYPE_JSON }
-#endif
-#ifdef INCLUDE_XML_SUPPORT
 , { "application/xml", CTYPE_XML }
 , { "text/xml", CTYPE_XML }
-#endif
 , { NULL }
 };
 
@@ -164,10 +156,12 @@ static int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
 		lua_setglobal( L, set->namespace );
 	}
 
+#if 0
 	//And finally, add some functions that we'll need later (if this fails, meh)
 	if ( !run_lua_buffer( L, read_only_block ) ) {
 		return 0;
 	}
+#endif
 	return 1;
 }
 
@@ -332,7 +326,6 @@ static int load_lua_config( struct luadata_t *l ) {
 
 	//Create a directory string
 	snprintf( cpath, sizeof(cpath) - 1, "%s/%s", l->root, rkey );
-	fprintf( stderr, "%s\n", cpath );
 
 	//Do a list of the directory
 	if ( ( dir = opendir( cpath ) ) ) {
@@ -683,21 +676,16 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 	zhttp_t *p = NULL;
 	
 	if ( 0 ) { ; }
-#ifdef INCLUDE_JSON_SUPPORT
 	else if ( t->ctype == CTYPE_JSON ) {
 		content = zjson_encode( l->zmodel, l->err, 1024 );
 		clen = strlen( content );
 		ctype = t->ctypename;
 	}
-#endif
-#ifdef INCLUDE_XML_SUPPORT
 	else if ( t->ctype == CTYPE_XML ) {
-fprintf( stderr, "XML\n" );
 		content = xml_encode( l->zmodel, "model" );
 		clen = strlen( content );
 		ctype = t->ctypename;
 	}
-#endif
 	else {
 		//TODO: This should handle the other types... 
 		content = text_encode( l->zmodel );
@@ -886,6 +874,13 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		lua_setglobal( ld.state, t->name );
 	}
 
+#if 0
+FPRINTF( "%p", functions );
+for ( struct lua_fset *f = functions; f->namespace; f++ ) {
+	FPRINTF( "%s\n", f->namespace );	
+}
+#endif
+
 	//Load standard libraries
 	if ( !lua_loadlibs( ld.state, functions ) ) {
 		free_ld( &ld );
@@ -973,7 +968,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 		//TODO: Check for an inherited content-type
 		//TODO: Then check for a globally defined default content-type
-fprintf( stderr, "evaluate ctypes...\n" );
 		//Then check for content-types
 		for ( const char **c = ctype_tags; *c; c++ ) {
 			int index = -1;
@@ -986,7 +980,6 @@ fprintf( stderr, "evaluate ctypes...\n" );
 				for ( ctype_t *cc = ctypes_serializable; cc->ctypename != NULL; cc++ ) {
 					if ( !strcasecmp( ctype, cc->ctypename ) ) {
 						//Throw your own response in JSON?
-fprintf( stderr, "found ctype: %s\n", cc->ctypename );
 						if ( !return_as_serializable( &ld, cc ) ) {
 							char err[ LD_ERRBUF_LEN ] = { 0 };
 							memcpy( err, ld.err, strlen( ld.err ) );
@@ -1000,7 +993,6 @@ fprintf( stderr, "found ctype: %s\n", cc->ctypename );
 				}
 			}
 		}
-fprintf( stderr, "done w/ evaluate ctypes...\n" );
 
 		//Finally, check if there is a view specified 
 		memset( tkey, 0, sizeof( tkey ) );

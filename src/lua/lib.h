@@ -19,7 +19,6 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
-#include "../config.h"
 
 #ifndef LIB_H
 #define LIB_H
