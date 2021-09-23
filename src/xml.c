@@ -31,7 +31,7 @@ char * xml_encode ( ztable_t *t, const char *rootname ) {
 	//
 	const char *root = !rootname ? "root" : rootname;
 	snprintf( rootbuf, sizeof( rootbuf ) - 1, "<%s>\n", root );
-	append_to_uint8t( &content, &clen, (uint8_t *)rootbuf, strlen( rootbuf ) );
+	append_to_uint8t( &content, &clen, (unsigned char *)rootbuf, strlen( rootbuf ) );
 
 	//Loop through all values and copy
 	for ( zKeyval *kv ; ( kv = lt_next( t ) ); ) {
@@ -48,10 +48,10 @@ char * xml_encode ( ztable_t *t, const char *rootname ) {
 		else if ( k.type == ZTABLE_TRM ) {
 			tab--; 
 			for ( int i = 0; i < tab; i++ ) {
-				append_to_uint8t( &content, &clen, (uint8_t *)"\t", 1 );
+				append_to_uint8t( &content, &clen, (unsigned char *)"\t", 1 );
 			}
 			snprintf( kk, sizeof( kk ) - 1, "</%s>\n", *parent );
-			append_to_uint8t( &content, &clen, (uint8_t *)kk, strlen( kk ) );
+			append_to_uint8t( &content, &clen, (unsigned char *)kk, strlen( kk ) );
 			free( *parent );
 			parent--;
 			continue;
@@ -65,7 +65,7 @@ char * xml_encode ( ztable_t *t, const char *rootname ) {
 
 		//Add any tabs first
 		for ( int i = 0; i < tab; i++ ) {
-			append_to_uint8t( &content, &clen, (uint8_t *)"\t", 1 );
+			append_to_uint8t( &content, &clen, (unsigned char *)"\t", 1 );
 		}
 
 		//Set the parent
@@ -86,12 +86,12 @@ char * xml_encode ( ztable_t *t, const char *rootname ) {
 		}
 
 		//If we get here, append...
-		append_to_uint8t( &content, &clen, (uint8_t *)vbuf, vlen );
+		append_to_uint8t( &content, &clen, (unsigned char *)vbuf, vlen );
 	}
 
 	snprintf( rootbuf, sizeof( rootbuf ) - 1, "</%s>", root );
-	append_to_uint8t( &content, &clen, (uint8_t *)rootbuf, strlen( rootbuf ) );
-	append_to_uint8t( &content, &clen, (uint8_t *)"\0", 1 );
+	append_to_uint8t( &content, &clen, (unsigned char *)rootbuf, strlen( rootbuf ) );
+	append_to_uint8t( &content, &clen, (unsigned char *)"\0", 1 );
 	return (char *)content;
 }
 

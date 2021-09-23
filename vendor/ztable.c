@@ -775,6 +775,10 @@ void lt_unset ( zTable *t ) {
 
 //Get a key or value somewhere
 void lt_free ( zTable *t ) {	
+	if ( !t ) {
+		return;
+	}
+
 	//Free any text keys
 	for ( int ii=0; ii < t->count; ii++ ) {
 		zKeyval *k = t->head + ii;

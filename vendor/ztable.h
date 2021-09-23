@@ -76,7 +76,7 @@
 	lt_set( t, pos )
 
 #define lt_exec(t, a, b) \
-	lt_exec_complex( t, 0, t->index, a, b )
+	lt_exec_complex( t, 0, (t)->index, a, b )
 
 #define lt_dump(t) \
 	!( __ltHistoric.level = 0 ) && fprintf( stderr, "LEVEL IS %d\n", __ltHistoric.level ) && lt_exec( t, &__ltHistoric, __lt_dump )

@@ -74,19 +74,19 @@ struct mvc_t {
 struct luadata_t {
 	zhttp_t *req, *res;
 	lua_State *state;
+	//TODO: This might be able to be pointers again...
 	const char aroute[ LD_LEN ];
 	const char rroute[ LD_LEN ];
 	const char apath[ LD_LEN ];
 	const char db[ LD_LEN ];
 	const char fqdn[ LD_LEN ];
 	const char root[ LD_LEN ];
-	const char dctype[ LD_LEN ];
 	int status; //can return a different status
 	ztable_t *zconfig;
-	ztable_t *zroutes;
+//ztable_t *zroutes;
 	ztable_t *zroute;
 	ztable_t *zmodel;
-	ztable_t *zhttp; //TODO: you might not need this anymore...
+//ztable_t *zhttp; //TODO: you might not need this anymore...
 	struct mvc_t pp; 
 	char err[ LD_ERRBUF_LEN ];
 };

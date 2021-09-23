@@ -280,18 +280,16 @@ static int load_lua_config( struct luadata_t *l ) {
 	char *db, *fqdn, cpath[ 2048 ] = { 0 };
 	DIR *dir = NULL;
 	struct dirent *d = NULL;
+	struct stat sb = { 0 };
+	ztable_t *t = NULL;
+	int count = 0;
 
-	//If this fails, do something
-	if ( !lt_init( l->zconfig, NULL, 1024 ) ) {
-		snprintf( l->err, LD_ERRBUF_LEN, "Couldn't initalize configuration table." );
-		return 0;
-	}
-
-	//Create a better path
+	//Create a full path to the config file
 	snprintf( cpath, sizeof(cpath) - 1, "%s/%s", l->root, confname );
 
 	//Open the configuration file
 	if ( !lua_exec_file( l->state, cpath, l->err, LD_ERRBUF_LEN ) ) {
+		snprintf( l->err, LD_ERRBUF_LEN, "Execution of file failed." );
 		return 0;
 	}
 
@@ -301,60 +299,33 @@ static int load_lua_config( struct luadata_t *l ) {
 		return 0;
 	}
 
-	//Convert the Lua values to real values for extraction.
-	if ( !lua_to_ztable( l->state, 1, l->zconfig ) ) {
-		snprintf( l->err, LD_ERRBUF_LEN, "Failed to convert Lua to zTable" );
-		return 0;
-	}
-
-	//Get the index (IF we need it)
-	//int rindex = lt_geti( l->zconfig, rkey );
-	//TODO: Catch the failure
-	lt_lock( l->zconfig );
-
-	//Need to make a different table, that stays in Lua
-	if ( !( l->zroutes = lt_copy_by_key( l->zconfig, rkey ) ) ) {
-		snprintf( l->err, LD_ERRBUF_LEN, "'routes' key not present in config!" );
-		return 0;
-	}
-
-	//TODO: Catch the failure
-	lt_lock( l->zroutes );
-
-	//Pop the remaining Lua stuff
-	lua_pop( l->state, 1 );
-
-	//Create a directory string
+	//Check if there are any route files
 	snprintf( cpath, sizeof(cpath) - 1, "%s/%s", l->root, rkey );
 
-	//Do a list of the directory
-	if ( ( dir = opendir( cpath ) ) ) {
-		//Put the ztable on the stack
-		if ( !ztable_to_lua( l->state, l->zroutes ) ) {
-			snprintf( l->err, LD_ERRBUF_LEN, "Failed to move routing table into Lua userspace!" );
-			return 0;
-		}
-	
-		//The solution is decouple the string and the table
-		//and place the table back on the stack, (deleting the string)
-		//then merge SHOULD work...
-		//You may also be able to add a string and a table, after merging, then
-		//you should have a routes -> { aggregate of all route files + what is in the config } 
+	//Get a directory listing
+	if ( !( dir = opendir( cpath ) ) )
+		count = lua_count( l->state, 1 );
+	else {
+		//TODO: Check that there are actually files here...
+		//Find the routes table and put that on the stack
 		lua_pushnil( l->state );
-		lua_next( l->state, 1 );
-		lua_remove( l->state, 1 );
-		lua_remove( l->state, 1 );
+		for ( ; lua_next( l->state, 1 ); ) {
+			if ( lua_type( l->state, -2 ) == LUA_TSTRING && !strcmp( lua_tostring( l->state, -2 ), "routes" ) ) {
+				lua_remove( l->state, -2 );
+				break;
+			}
+			lua_pop( l->state, 1 );
+		}
 
 		//Load each route file and combine it with the route table
-		for ( int dlen; ( d = readdir( dir ) ) ; ) {
+		for ( int dlen, ii; ( d = readdir( dir ) ) ; ) {
 			if ( ( dlen = strlen( d->d_name )) <= 2 && ( d->d_name[1] == '.' || d->d_name[0] == '.' ) ) {
 				continue;
 			}
 
 			//Only deal with regular Lua files (eventually can support symbolic links)
-			if ( strlen( d->d_name ) > 4 && strstr( d->d_name, ".lua" ) && d->d_type == DT_REG ) { 
+			if ( dlen > 4 && strstr( d->d_name, ".lua" ) && d->d_type == DT_REG ) { 
 				snprintf( cpath, sizeof(cpath) - 1, "%s/%s/%s", l->root, "routes", d->d_name );
-				//fprintf( stderr, "dirname: %s\n", cpath );
 
 				//Open each file in the directory?
 				if ( !lua_exec_file( l->state, cpath, l->err, LD_ERRBUF_LEN ) ) {
@@ -362,50 +333,69 @@ static int load_lua_config( struct luadata_t *l ) {
 					return 1;
 				}
 
-				//If we made it this far, then merge it with the routes table...
-				lua_merge( l->state );
-				//lua_settable( l->state, 1 );
+				//The resultant value should ALWAYS be a table
+				if ( !lua_istable( l->state, ( ii = lua_gettop( l->state ) ) ) ) {
+					snprintf( l->err, LD_ERRBUF_LEN, "File at %s did not return a table.", cpath );
+					return 0;
+				}
+
+				//Loop through all the top-level keys
+				lua_pushnil( l->state );
+				for ( const char *vv; lua_next( l->state, ii ); ) {
+					if ( lua_type( l->state, -2 ) != LUA_TSTRING ) {
+						snprintf( l->err, LD_ERRBUF_LEN, "Key in table at %s was not a string.", cpath );
+						return 0;
+					}
+
+					if ( lua_type( l->state, -1 ) != LUA_TTABLE ) {
+						snprintf( l->err, LD_ERRBUF_LEN, "Value at %s in table at %s was not a string.", cpath, lua_tostring( l->state, -2 ) );
+						return 0;
+					}
+
+					//Push the key back for iteration's sake
+					vv = lua_tostring( l->state, -2 );
+					lua_settable( l->state, 2 );
+					lua_pushstring( l->state, vv );
+				}	
 			}
+
+			//Clean up the stack and free the original set of routes
+			lua_pop( l->state, 1 );
+
+			//Add key and set table
+			lua_pushstring( l->state, "routes" );
+			lua_insert( l->state, 2 );
+			lua_settable( l->state, 1 );
 		}
 
 		//Close the directory
+		lua_istack( l->state );
 		closedir( dir );
-
-		//Finally, combine all of these into one
-		lua_newtable( l->state );
-		lua_insert( l->state, 1 ); 
-		lua_pushstring( l->state, rkey );
-		lua_insert( l->state, 2 ); 
-		lua_settable( l->state, 1 ); 
-
-		//destroy the original zroutes
-		lt_free( l->zroutes ), free( l->zroutes ); 
-
-		//and add them back
-		if ( !( l->zroutes = lt_make( 1024 ) ) ) {
-			snprintf( l->err, LD_ERRBUF_LEN, "Allocation of routes ztable failed." );
-			return 0;
-		}
-
-		if ( !lua_to_ztable( l->state, 1, l->zroutes ) ) {
-			snprintf( l->err, LD_ERRBUF_LEN, "Routes to ztable conversion failed." );
-			return 0;
-		}
-
-		lt_lock( l->zroutes );
+		count = lua_count( l->state, 1 );
 	}
 
+	//Initialize a table of the right size
+	if ( !( t = lt_make( count * 2 ) ) || !lua_to_ztable( l->state, 1, t ) ) {
+		snprintf( l->err, LD_ERRBUF_LEN, "Conversion of config to ztable failed." );
+		return 0;
+	}
+
+	//Lock?
+	lt_lock( l->zconfig = t );
+
 	//Set other keys here
-	if ( ( db = lt_text( l->zconfig, "db" ) ) ) {
+	if ( ( db = lt_text( t, "db" ) ) ) {
 		memcpy( (void *)l->db, db, strlen( db ) ); 
 	}
 
-	if ( ( fqdn = lt_text( l->zconfig, "fqdn" ) ) ) {
+	if ( ( fqdn = lt_text( t, "fqdn" ) ) ) {
 		memcpy( (void *)l->fqdn, fqdn, strlen( fqdn ) ); 
 	}
 
+	lua_pop( l->state, 1 );
 	return 1;
 }
+
 
 
 
@@ -554,7 +544,7 @@ static int init_lua_routes ( struct luadata_t *l ) {
 
 
 //Initialize HTTP in Lua
-static int init_lua_http ( struct luadata_t *l ) {
+static int init_lua_request ( struct luadata_t *l ) {
 	//Loop through all things
 	const char *str[] = { "headers", "url", "body" };
 	struct HTTPRecord **ii[] = { l->req->headers, l->req->url, l->req->body };
@@ -629,18 +619,19 @@ static int init_lua_config ( struct luadata_t *l ) {
 }
 
 
-
-//Both of these functions return zTables, and this is heavy on memory and does a useless context switch
-//Doing it all in Lua makes more sense...
+//Data to initialize global elements
 static struct lua_readonly_t {
 	const char *name;
 	int (*exec)( struct luadata_t * );
 	//int (*exec)( lua_State *, struct HTTPBody *, const char *, const char * );	
 } lua_readonly[] = {
-	{ "request", init_lua_http }
+  { "config", init_lua_config }
+, { "request", init_lua_request }
 , { "route", init_lua_routes }
-, { "config", init_lua_config }
 , { "shadow", init_lua_shadowpath }
+#if 0
+, { "cache", init_lua_cache }
+#endif
 , { NULL }
 };
 
@@ -652,10 +643,12 @@ static int free_ld ( struct luadata_t *l ) {
 
 	lt_free( l->zroute ), free( l->zroute );
 
+#if 0
 	if ( l->zroutes ) {
 		lt_free( l->zroutes );
 		free( l->zroutes );
 	}
+#endif
 
 	lt_free( l->zmodel );
 
@@ -785,14 +778,42 @@ static int return_as_response ( struct luadata_t *l ) {
 
 	//Return finalized content
 	lt_free( rt ), free( rt );
-#if 1
 	return http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ) ? 1 : 0;
-#else
-	int s = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ) ? 1 : 0;
+}
 
-print_httpbody( l->res );
-	return s;
-#endif
+
+//Compare the path against the instance routes
+int find_matching_route ( struct luadata_t *l ) {
+	ztable_t *t = NULL;
+	struct route_t p =  { 0 };
+
+	if ( lt_geti( l->zconfig, "routes" ) > -1 ) { 
+		//Create a mini table
+		p.src = t = lt_copy_by_key( l->zconfig, "routes" );
+
+		//Loop through the routes...
+		lt_exec_complex( t, 1, t->count, &p, make_route_list );
+
+		//Loop through the routes
+		l->pp.depth = 1;
+		int notfound = 1;
+		for ( struct iroute_t **lroutes = p.iroute_tlist; *lroutes; lroutes++ ) {
+			if ( route_resolve( l->apath, (*lroutes)->route ) ) {
+				memcpy( (void *)l->rroute, (*lroutes)->route, strlen( (*lroutes)->route ) );
+				ztable_t * croute = lt_copy_by_index( t, (*lroutes)->index );
+				lt_exec_complex( croute, 1, croute->count, &l->pp, make_mvc_list );
+				l->zroute = croute;
+				notfound = 0;
+				break;
+			}
+		}
+
+		//Free the route list
+		free_route_list( p.iroute_tlist );
+		return !notfound;
+	}
+
+	return 0;
 }
 
 
@@ -807,8 +828,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 	//Initialize the data structure
 	memset( res, 0, sizeof( zhttp_t ) );
-	ld.req = req, ld.res = res;
-	ld.zconfig = &zc, ld.zmodel = &zm, ld.zroutes = NULL;
+	ld.req = req, ld.res = res, ld.zmodel = &zm; 
 	memcpy( (void *)ld.root, conn->hconfig->dir, strlen( conn->hconfig->dir ) );
 
 	//Then initialize the Lua state
@@ -825,6 +845,12 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "%s\n", ld.err );
 	}
 
+	//Then load the Hypno extensions 
+	if ( !lua_loadlibs( ld.state, functions ) ) {
+		free_ld( &ld );
+		return http_error( res, 500, "Failed to initialize Lua standard libs." ); 
+	}
+
 	//Need to delegate to static handler when request points to one of the static paths
 	if ( path_is_static( &ld ) ) {
 		free_ld( &ld );
@@ -837,6 +863,12 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "%s", "Failed to extract path." );
 	}
 
+#if 1
+	if ( !find_matching_route( &ld ) ) {
+		free_ld( &ld );
+		return http_error( res, 404, "Couldn't find path at %s\n", ld.apath );
+	}
+#else
 	struct route_t p = { .src = ld.zroutes };
 	lt_exec_complex( ld.zroutes, 1, ld.zroutes->count, &p, make_route_list );
 
@@ -863,6 +895,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 	//Destroy anything having to do with routes 
 	free_route_list( p.iroute_tlist );	
+#endif
 
 	//Loop through the structure and add read-only structures to Lua, 
 	//you could also add the libraries, but that is a different method
@@ -872,19 +905,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			return http_error( req, ld.status, ld.err );
 		}
 		lua_setglobal( ld.state, t->name );
-	}
-
-#if 0
-FPRINTF( "%p", functions );
-for ( struct lua_fset *f = functions; f->namespace; f++ ) {
-	FPRINTF( "%s\n", f->namespace );	
-}
-#endif
-
-	//Load standard libraries
-	if ( !lua_loadlibs( ld.state, functions ) ) {
-		free_ld( &ld );
-		return http_error( res, 500, "Failed to initialize Lua standard libs." ); 
 	}
 
 	//Set package path
