@@ -73,6 +73,7 @@
 	"-H, --headers-to <arg>   Output headers to file at <arg>\n" \
 	"-X, --dump-args          Dump the supplied arguments.\n" \
 	"-D, --dump-http          Dump the HTTP request that was created and stop.\n" \
+	"-O, --dump-response      Dump the HTTP response when using a test file.\n" \
 	"-v, --verbose            Be wordy.\n" \
 	"-h, --help               Show help and quit.\n"
 
@@ -118,6 +119,7 @@ struct arg {
 	char *bodyf;
 	int dumpArgs;
 	int dumpHttp;
+	int dumpResp;
 	char **headers;
 	char **body;
 };
@@ -242,6 +244,8 @@ int main ( int argc, char * argv[] ) {
 			arg.dumpArgs = 1;
 		else if ( !strcmp( *argv, "-D" ) || !strcmp( *argv, "--dump-http" ) )
 			arg.dumpHttp = 1;
+		else if ( !strcmp( *argv, "-O" ) || !strcmp( *argv, "--dump-response" ) )
+			arg.dumpResp = 1;
 		else if ( !strcmp( *argv, "-t" ) || !strcmp( *argv, "--test" ) )
 			arg.luatest = *( ++argv );
 		else if ( !strcmp( *argv, "-E" ) || !strcmp( *argv, "--headers" ) ) {
@@ -691,13 +695,20 @@ int main ( int argc, char * argv[] ) {
 		}
 
 		//Print the site and URL
-		fprintf( stderr, "%20s:%s\nExpected %d; Got %d\n", 
-			arg.uri, arg.path, test.expected.status, res.status 
-		);
+		fprintf( stdout, "%20s:%s\nExpected %d; Got %d\n", 
+			arg.uri, arg.path, test.expected.status, res.status );
+		fflush( stdout );
 
 		//Just show the status
 		if ( test.expected.status != res.status ) {
 			write( 2, res.msg, res.mlen );
+			fflush( stderr );
+		}
+
+		//Dump the response
+		if ( arg.dumpResp ) {
+			write( 1, res.msg, res.mlen );
+			fflush( stdout );
 		}
 
 		return 0;	
