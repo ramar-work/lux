@@ -146,7 +146,6 @@ static int make_read_only ( lua_State *L, const char *table ) {
 static int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
 	//Now load everything written elsewhere...
 	for ( ; set->namespace; set++ ) {
-//fprintf( stderr, "namespace: %s\n", set->namespace );
 		lua_newtable( L );
 		for ( struct luaL_Reg *f = set->functions; f->name; f++ ) {
 			lua_pushstring( L, f->name );
@@ -275,6 +274,21 @@ static void free_route_list ( struct iroute_t **list ) {
 
 
 
+//Return NULL if there are no files
+static int dir_has_files ( DIR *dir ) {
+	int fcount = 0;
+	struct dirent *d = NULL;
+	for ( ; ( d = readdir( dir ) ); ) {
+		if ( strstr( d->d_name, ".lua" ) ) {
+			//TODO: Will this need to happen b/c it's a different scope?
+			return 1; 
+		}
+	}
+	return 0;
+}
+
+
+
 //Load Lua configuration
 static int load_lua_config( struct luadata_t *l ) {
 	char *db, *fqdn, cpath[ 2048 ] = { 0 };
@@ -303,10 +317,10 @@ static int load_lua_config( struct luadata_t *l ) {
 	snprintf( cpath, sizeof(cpath) - 1, "%s/%s", l->root, rkey );
 
 	//Get a directory listing
-	if ( !( dir = opendir( cpath ) ) )
+	if ( !( dir = opendir( cpath ) ) || !dir_has_files( dir ) )
 		count = lua_count( l->state, 1 );
 	else {
-		//TODO: Check that there are actually files here...
+
 		//Find the routes table and put that on the stack
 		lua_pushnil( l->state );
 		for ( ; lua_next( l->state, 1 ); ) {
@@ -370,9 +384,11 @@ static int load_lua_config( struct luadata_t *l ) {
 
 		//Close the directory
 		lua_istack( l->state );
-		closedir( dir );
 		count = lua_count( l->state, 1 );
 	}
+
+	//Close the directory
+	closedir( dir );
 
 	//Initialize a table of the right size
 	if ( !( t = lt_make( count * 2 ) ) || !lua_to_ztable( l->state, 1, t ) ) {
@@ -383,7 +399,7 @@ static int load_lua_config( struct luadata_t *l ) {
 	//Lock?
 	lt_lock( l->zconfig = t );
 
-	//Set other keys here
+	//TODO: use pointers instead.  There is no reason to copy all of this...
 	if ( ( db = lt_text( t, "db" ) ) ) {
 		memcpy( (void *)l->db, db, strlen( db ) ); 
 	}
@@ -639,16 +655,9 @@ static struct lua_readonly_t {
 static int free_ld ( struct luadata_t *l ) {
 	lua_close( l->state );
 
-	lt_free( l->zconfig );
+	lt_free( l->zconfig ), free( l->zconfig );
 
 	lt_free( l->zroute ), free( l->zroute );
-
-#if 0
-	if ( l->zroutes ) {
-		lt_free( l->zroutes );
-		free( l->zroutes );
-	}
-#endif
 
 	lt_free( l->zmodel );
 
@@ -804,6 +813,7 @@ int find_matching_route ( struct luadata_t *l ) {
 				lt_exec_complex( croute, 1, croute->count, &l->pp, make_mvc_list );
 				l->zroute = croute;
 				notfound = 0;
+				lt_free( t ), free( t );
 				break;
 			}
 		}
@@ -828,7 +838,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 	//Initialize the data structure
 	memset( res, 0, sizeof( zhttp_t ) );
-	ld.req = req, ld.res = res, ld.zmodel = &zm; 
+	ld.req = req, ld.res = res;
 	memcpy( (void *)ld.root, conn->hconfig->dir, strlen( conn->hconfig->dir ) );
 
 	//Then initialize the Lua state
@@ -863,39 +873,10 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		return http_error( res, 500, "%s", "Failed to extract path." );
 	}
 
-#if 1
 	if ( !find_matching_route( &ld ) ) {
 		free_ld( &ld );
 		return http_error( res, 404, "Couldn't find path at %s\n", ld.apath );
 	}
-#else
-	struct route_t p = { .src = ld.zroutes };
-	lt_exec_complex( ld.zroutes, 1, ld.zroutes->count, &p, make_route_list );
-
-	//Loop through the routes
-	ld.pp.depth = 1;
-	int notfound = 1;
-	for ( struct iroute_t **lroutes = p.iroute_tlist; *lroutes; lroutes++ ) {
-		if ( route_resolve( ld.apath, (*lroutes)->route ) ) {
-			memcpy( (void *)ld.rroute, (*lroutes)->route, strlen( (*lroutes)->route ) );
-			ztable_t * croute = lt_copy_by_index( ld.zroutes, (*lroutes)->index );
-			lt_exec_complex( croute, 1, croute->count, &ld.pp, make_mvc_list );
-			ld.zroute = croute;
-			notfound = 0;
-			break;
-		}
-	}
-
-	//Die when unavailable...
-	if ( notfound ) {
-		free_route_list( p.iroute_tlist );	
-		free_ld( &ld );
-		return http_error( res, 404, "Couldn't find path at %s\n", ld.apath );
-	}
-
-	//Destroy anything having to do with routes 
-	free_route_list( p.iroute_tlist );	
-#endif
 
 	//Loop through the structure and add read-only structures to Lua, 
 	//you could also add the libraries, but that is a different method
@@ -967,18 +948,25 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		}
 	}
 
+#if 0
 	//In the case of no model, initialize one anyway
 	if ( !lt_init( ld.zmodel, NULL, 8193 ) ) {
 		free_ld( &ld );
 		return http_error( res, 500, "Could not allocate table for model." );
 	}
+#endif
 
 	//Could be either a table or string... so account for this
-	if ( lua_retglobal( ld.state, mkey, LUA_TTABLE ) ) {
+	if ( lua_gettop( ld.state ) && lua_retglobal( ld.state, mkey, LUA_TTABLE ) ) {
 
 		//Define these
 		char tkey[ 1024 ] = { 0 };
 		const char *key = lt_retkv( ld.zroute, 0 )->key.v.vchar;
+
+		//Do a count of a model (try one with a lot of entries, and no entries)
+		int count = lua_count( ld.state, 1 );
+FPRINTF( "Count is %d\n", count );
+return 0;
 
 		//Convert the model
 		if ( !lua_to_ztable( ld.state, 1, ld.zmodel ) ) {
@@ -1029,6 +1017,9 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		} 
 		lua_pop( ld.state, 1 );
 	}
+		free_ld( &ld );
+FPRINTF( "What happened?\n" );
+return 0;
 
 	//Stop if the user specifies a 'response' table that's not empty...
 	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
