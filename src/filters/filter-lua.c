@@ -275,16 +275,17 @@ static void free_route_list ( struct iroute_t **list ) {
 
 
 //Return NULL if there are no files
-static int dir_has_files ( DIR *dir ) {
+static struct dirent * dir_has_files ( DIR *dir ) {
 	int fcount = 0;
 	struct dirent *d = NULL;
-	for ( ; ( d = readdir( dir ) ); ) {
-		if ( strstr( d->d_name, ".lua" ) ) {
+	for ( int dlen ; ( d = readdir( dir ) ); ) {
+		if ( ( dlen = strlen( d->d_name ) > 4 ) && strstr( d->d_name, ".lua" ) ) {
 			//TODO: Will this need to happen b/c it's a different scope?
-			return 1; 
+			rewinddir( dir );
+			return d; 
 		}
 	}
-	return 0;
+	return d;
 }
 
 
@@ -317,10 +318,10 @@ static int load_lua_config( struct luadata_t *l ) {
 	snprintf( cpath, sizeof(cpath) - 1, "%s/%s", l->root, rkey );
 
 	//Get a directory listing
-	if ( !( dir = opendir( cpath ) ) || !dir_has_files( dir ) )
+	if ( !( dir = opendir( cpath ) ) || !dir_has_files( dir ) ) {
 		count = lua_count( l->state, 1 );
+	}
 	else {
-
 		//Find the routes table and put that on the stack
 		lua_pushnil( l->state );
 		for ( ; lua_next( l->state, 1 ); ) {
@@ -333,12 +334,9 @@ static int load_lua_config( struct luadata_t *l ) {
 
 		//Load each route file and combine it with the route table
 		for ( int dlen, ii; ( d = readdir( dir ) ) ; ) {
-			if ( ( dlen = strlen( d->d_name )) <= 2 && ( d->d_name[1] == '.' || d->d_name[0] == '.' ) ) {
-				continue;
-			}
-
 			//Only deal with regular Lua files (eventually can support symbolic links)
-			if ( dlen > 4 && strstr( d->d_name, ".lua" ) && d->d_type == DT_REG ) { 
+			FPRINTF( "Checking for valid route file at: %s/%s\n", cpath, d->d_name );
+			if ( ( dlen = strlen( d->d_name ) > 4 ) && strstr( d->d_name, ".lua" ) && d->d_type == DT_REG ) { 
 				snprintf( cpath, sizeof(cpath) - 1, "%s/%s/%s", l->root, "routes", d->d_name );
 
 				//Open each file in the directory?
@@ -370,25 +368,30 @@ static int load_lua_config( struct luadata_t *l ) {
 					vv = lua_tostring( l->state, -2 );
 					lua_settable( l->state, 2 );
 					lua_pushstring( l->state, vv );
-				}	
+				}
 			}
-
-			//Clean up the stack and free the original set of routes
-			lua_pop( l->state, 1 );
-
-			//Add key and set table
-			lua_pushstring( l->state, "routes" );
-			lua_insert( l->state, 2 );
-			lua_settable( l->state, 1 );
 		}
 
+		//Clean up the stack and free the original set of routes
+		lua_pop( l->state, 1 );
+
+		//Add key and set table
+		lua_pushstring( l->state, "routes" );
+		lua_insert( l->state, 2 );
+		lua_settable( l->state, 1 );
+
 		//Close the directory
-		lua_istack( l->state );
 		count = lua_count( l->state, 1 );
 	}
 
 	//Close the directory
 	closedir( dir );
+
+	//If there is a zero count for whatever reason, this needs to stop
+	if ( !count ) {
+		snprintf( l->err, LD_ERRBUF_LEN, "Configuration table has no values." );
+		return 0;
+	}
 
 	//Initialize a table of the right size
 	if ( !( t = lt_make( count * 2 ) ) || !lua_to_ztable( l->state, 1, t ) ) {
@@ -948,14 +951,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		}
 	}
 
-#if 0
-	//In the case of no model, initialize one anyway
-	if ( !lt_init( ld.zmodel, NULL, 8193 ) ) {
-		free_ld( &ld );
-		return http_error( res, 500, "Could not allocate table for model." );
-	}
-#endif
-
 	//Could be either a table or string... so account for this
 	if ( lua_gettop( ld.state ) && lua_retglobal( ld.state, mkey, LUA_TTABLE ) ) {
 
@@ -965,9 +960,13 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 		//Do a count of a model (try one with a lot of entries, and no entries)
 		int count = lua_count( ld.state, 1 );
-FPRINTF( "Count is %d\n", count );
-return 0;
 
+		//Initialize a table
+		if ( !( ld.zmodel = lt_make( count * 2 ) ) ) {
+			free_ld( &ld );
+			return http_error( res, 500, "Couldn't allocate table." );
+		}
+		
 		//Convert the model
 		if ( !lua_to_ztable( ld.state, 1, ld.zmodel ) ) {
 			free_ld( &ld );
@@ -1016,11 +1015,9 @@ return 0;
 			return 1;
 		} 
 		lua_pop( ld.state, 1 );
+		lt_lock( ld.zmodel ); //lt_kfdump( ld.zmodel, 2 );
 	}
-		free_ld( &ld );
-FPRINTF( "What happened?\n" );
-return 0;
-
+	
 	//Stop if the user specifies a 'response' table that's not empty...
 	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
 		FPRINTF( "Attempting alternate content return.\n" );
@@ -1034,7 +1031,6 @@ return 0;
 		return 1;
 	}
 
-	lt_lock( ld.zmodel ); //lt_kfdump( ld.zmodel, 2 );
 
 	//TODO: routes with no special keys need not be added
 	//Load all views

@@ -299,7 +299,6 @@ int ztable_to_lua ( lua_State *L, ztable_t *t ) {
 
 //Count the elements in a table.
 int lua_count ( lua_State *L, int i ) {
-	lua_pushnil( L );
 	int count = 0;
 
 	if ( !lua_istable( L, i ) ) {
@@ -308,6 +307,7 @@ int lua_count ( lua_State *L, int i ) {
 	}
 
 	//Descend, but keep in mind that we always have a count...
+	lua_pushnil( L );
 	for ( int v; lua_next( L, i ); ) {
 		if ( ( v = lua_type( L, -1 ) ) == LUA_TTABLE ) {
 			count += lua_count( L, i + 2 ); 
