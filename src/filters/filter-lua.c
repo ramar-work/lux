@@ -143,7 +143,7 @@ static int make_read_only ( lua_State *L, const char *table ) {
 
 
 //Should return an error b/c there are some situations where this does not work.
-static int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
+int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
 	//Now load everything written elsewhere...
 	for ( ; set->namespace; set++ ) {
 		lua_newtable( L );
@@ -662,7 +662,7 @@ static int free_ld ( struct luadata_t *l ) {
 
 	lt_free( l->zroute ), free( l->zroute );
 
-	lt_free( l->zmodel );
+	lt_free( l->zmodel ), free( l->zmodel );
 
 	free_mvc_list( (void ***)&(l->pp.imvc_tlist) );
 	return 1;
@@ -951,15 +951,25 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		}
 	}
 
-	//Could be either a table or string... so account for this
-	if ( lua_gettop( ld.state ) && lua_retglobal( ld.state, mkey, LUA_TTABLE ) ) {
 
+#if 0
+//lt_kfdump( ld.zmodel, 2 );
+FPRINTF( "GETTOP: %d\n", lua_gettop( ld.state ) );
+return http_error( res, 200, "noononon" );
+#endif
+
+	//Could be either a table or string... so account for this
+	if ( !lua_retglobal( ld.state, mkey, LUA_TTABLE ) )
+		ld.zmodel = lt_make( 31 );
+	else {
 		//Define these
-		char tkey[ 1024 ] = { 0 };
-		const char *key = lt_retkv( ld.zroute, 0 )->key.v.vchar;
+		char tkey[ 1024 ] = { 0 }, *key = lt_retkv( ld.zroute, 0 )->key.v.vchar;
+		int count = lua_count( ld.state, 1 );
 
 		//Do a count of a model (try one with a lot of entries, and no entries)
-		int count = lua_count( ld.state, 1 );
+		if ( count < 1 ) {
+			count = 16;
+		}
 
 		//Initialize a table
 		if ( !( ld.zmodel = lt_make( count * 2 ) ) ) {
