@@ -273,15 +273,53 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 		int type, keysize, valsize;
 		char *comma, *key, *val, vint[ 64 ];
 	};
-	struct ww *sr[ 1000 ] = { NULL }, br[ 1000 ];
-	memset( br, 0, sizeof( br ) );
-	struct ww **ptr = sr, *ff = br + 1, *rr = br, *tt = br;
+
+	int ptrd = 0;
+	struct ww *ff, *rr, *br = NULL;
+	unsigned int tcount = 0, size = 0, jl = 0, jp = 0;
+	char * json = NULL;
+	
+
+#if 1
+	if ( !t ) {
+		snprintf( err, errlen, "Table for JSON conversion not initialized" );
+		return NULL;
+	}
+
+	if ( !( tcount = lt_countall( t ) ) ) {
+		snprintf( err, errlen, "Could not get table count" );
+		return NULL;
+	}
+
+	//Always allocate tcount + 1, b/c we start processing ahead of time.
+	if ( ( size = ( tcount + 1 ) * sizeof( struct ww ) ) < 0 ) {
+		snprintf( err, errlen, "Could not allocate source JSON" );
+		return NULL;
+	}
+
+	if ( !( br = malloc( size ) ) || !memset( br, 0, size ) ) { 
+		snprintf( err, errlen, "Could not allocate source JSON" );
+		return NULL;
+	}
+
+	//Initialize the first element
+	br->type = ZTABLE_TBL, br->val = "{", br->valsize = 1, br->comma = " ";
+	ff = br + 1, rr = br;// tt = sr;
+
+	struct ww *sr[ 1024 ] = { NULL };
+	struct ww **ptr = sr;
+#else
+	struct ww *sr[ 1024 ] = { NULL }, br[ 1024 ] = { 0 };
+
+	//struct ww **ptr = sr, *ff = br + 1, *rr = br, *tt = br;
+	struct ww **ptr = sr, *ff = &br[ 1 ], *rr = br, *tt = br;
 	char * json = NULL;
 	int jl = 0, jp = 0;
 
 	//Initialize first data set, and mark initial table pointer 
 	br[0].type = ZTABLE_TBL, br[0].val = "{", br[0].valsize = 1, br[0].comma = " ";
 	*ptr = ff;
+#endif
 
 	//Initialize JSON string
 	if ( !( json = malloc( 16 ) ) || !memset( json, 0, 16 ) ) {
@@ -317,6 +355,7 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 			rr->comma = " ", ff->comma = ",", ff->type = ZTABLE_TRM; 
 			ff++, rr++;
 			ptr--;
+fprintf( stderr, "%d\n", --ptrd );
 			continue;	
 		}
 		else {
@@ -324,6 +363,7 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 			return NULL;	
 		}
 
+		//TODO: Add rules to replace " in blobs and text
 		if ( v.type == ZTABLE_NUL )
 			0;
 		else if ( v.type == ZTABLE_NON )
@@ -336,8 +376,9 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 			ff->val = v.v.vchar, ff->valsize = strlen( v.v.vchar ), ff->comma = ",";
 		else if ( v.type == ZTABLE_BLB )
 			ff->val = (char *)v.v.vblob.blob, ff->valsize = v.v.vblob.size, ff->comma = ",";
-		else if ( v.type == ZTABLE_TBL )
+		else if ( v.type == ZTABLE_TBL ) {
 			ff->val = "{", ff->valsize = 1, ++ptr, *ptr = ff;	
+		}
 		else { /* ZTABLE_TRM || ZTABLE_NON || ZTABLE_USR */
 			snprintf( err, errlen, "Got invalid value type: %s", lt_typename( v.type ) );
 			return NULL;
@@ -345,8 +386,11 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 		ff++, rr++;
 	}
 
+	//No longer null, b/c it exists...
+	ff->keysize = -1;
+
 	//TODO: There is a way to do this that DOES NOT need a second loop...
-	for ( struct ww *yy = tt; yy->type; yy++ ) {
+	for ( struct ww *yy = br; yy->keysize > -1; yy++ ) {
 		char kbuf[ 256 ] = {0}, vbuf[ 2048 ] = {0};
 		int lk = 0, lv = 0;
 

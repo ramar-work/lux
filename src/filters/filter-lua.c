@@ -1027,6 +1027,9 @@ return http_error( res, 200, "noononon" );
 		lua_pop( ld.state, 1 );
 		lt_lock( ld.zmodel ); //lt_kfdump( ld.zmodel, 2 );
 	}
+
+lt_kfdump( ld.zmodel, 1 );
+return http_error( res, 200, "OKOK" );
 	
 	//Stop if the user specifies a 'response' table that's not empty...
 	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
