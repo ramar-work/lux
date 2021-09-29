@@ -830,6 +830,15 @@ int find_matching_route ( struct luadata_t *l ) {
 }
 
 
+static add_config_to_model ( struct luadata_t *l ) {
+	//Get the config from the global state
+	lua_retglobal( ld.state, "config", LUA_TTABLE );
+	
+	//Add it to the current table
+	lua_istack( ld.state );
+}
+
+
 //The entry point for a Lua application
 const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
@@ -952,16 +961,19 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	}
 
 
-#if 0
-//lt_kfdump( ld.zmodel, 2 );
-FPRINTF( "GETTOP: %d\n", lua_gettop( ld.state ) );
-return http_error( res, 200, "noononon" );
-#endif
+	//This should always happen
+	if ( lua_retglobal( ld.state, "config", LUA_TTABLE ) ) {
+		lua_getglobal( ld.state, mkey );
+		( lua_isnil( ld.state, -1 ) ) ? lua_pop( ld.state, 1 ) : 0;
+		lua_merge( ld.state );
+		lua_setglobal( ld.state, mkey );
+	}
+
 
 	//Could be either a table or string... so account for this
-	if ( !lua_retglobal( ld.state, mkey, LUA_TTABLE ) )
-		ld.zmodel = lt_make( 31 );
-	else {
+	if ( lua_retglobal( ld.state, mkey, LUA_TTABLE ) ) {
+		//ld.zmodel = lt_make( 31 );
+	//else {
 		//Define these
 		char tkey[ 1024 ] = { 0 }, *key = lt_retkv( ld.zroute, 0 )->key.v.vchar;
 		int count = lua_count( ld.state, 1 );
@@ -1028,9 +1040,6 @@ return http_error( res, 200, "noononon" );
 		lt_lock( ld.zmodel ); //lt_kfdump( ld.zmodel, 2 );
 	}
 
-lt_kfdump( ld.zmodel, 1 );
-return http_error( res, 200, "OKOK" );
-	
 	//Stop if the user specifies a 'response' table that's not empty...
 	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
 		FPRINTF( "Attempting alternate content return.\n" );

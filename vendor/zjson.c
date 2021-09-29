@@ -272,15 +272,10 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 		struct ww *ptr;
 		int type, keysize, valsize;
 		char *comma, *key, *val, vint[ 64 ];
-	};
-
-	int ptrd = 0;
-	struct ww *ff, *rr, *br = NULL;
+	} **ptr, *ff, *rr, *br = NULL, *sr[ 1024 ] = { NULL };
 	unsigned int tcount = 0, size = 0, jl = 0, jp = 0;
 	char * json = NULL;
 	
-
-#if 1
 	if ( !t ) {
 		snprintf( err, errlen, "Table for JSON conversion not initialized" );
 		return NULL;
@@ -304,26 +299,14 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 
 	//Initialize the first element
 	br->type = ZTABLE_TBL, br->val = "{", br->valsize = 1, br->comma = " ";
-	ff = br + 1, rr = br;// tt = sr;
 
-	struct ww *sr[ 1024 ] = { NULL };
-	struct ww **ptr = sr;
-#else
-	struct ww *sr[ 1024 ] = { NULL }, br[ 1024 ] = { 0 };
-
-	//struct ww **ptr = sr, *ff = br + 1, *rr = br, *tt = br;
-	struct ww **ptr = sr, *ff = &br[ 1 ], *rr = br, *tt = br;
-	char * json = NULL;
-	int jl = 0, jp = 0;
-
-	//Initialize first data set, and mark initial table pointer 
-	br[0].type = ZTABLE_TBL, br[0].val = "{", br[0].valsize = 1, br[0].comma = " ";
-	*ptr = ff;
-#endif
+	//Then initialize our other pointers
+	ff = br + 1, rr = br, ptr = sr;
 
 	//Initialize JSON string
 	if ( !( json = malloc( 16 ) ) || !memset( json, 0, 16 ) ) {
 		snprintf( err, errlen, "Could not allocate source JSON" );
+		free( br );
 		return NULL;
 	}
 
@@ -355,11 +338,11 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 			rr->comma = " ", ff->comma = ",", ff->type = ZTABLE_TRM; 
 			ff++, rr++;
 			ptr--;
-fprintf( stderr, "%d\n", --ptrd );
 			continue;	
 		}
 		else {
 			snprintf( err, errlen, "Got invalid key type: %s", lt_typename( k.type ) );
+			free( br ), free( json );
 			return NULL;	
 		}
 
@@ -381,6 +364,7 @@ fprintf( stderr, "%d\n", --ptrd );
 		}
 		else { /* ZTABLE_TRM || ZTABLE_NON || ZTABLE_USR */
 			snprintf( err, errlen, "Got invalid value type: %s", lt_typename( v.type ) );
+			free( br ), free( json );
 			return NULL;
 		}
 		ff++, rr++;
@@ -427,6 +411,7 @@ fprintf( stderr, "%d\n", --ptrd );
 		jl += ( lk + lv );
 		if ( !( json = realloc( json, jl ) ) ) {
 			snprintf( err, errlen, "Could not re-allocate source JSON" );
+			free( br ), free( json );
 			return NULL;
 		}
 
@@ -438,10 +423,12 @@ fprintf( stderr, "%d\n", --ptrd );
 	//This is kind of ugly
 	if ( !( json = realloc ( json, jp + 3 ) ) ) {
 		snprintf( err, errlen, "Could not re-allocate source JSON" );
+		free( br ), free( json );
 		return NULL;
 	}
 
 	json[ jp - 1 ] = ' ', json[ jp ] = '}', json[ jp + 1 ] = '\0';
+	free( br );
 	return json;
 }
 
