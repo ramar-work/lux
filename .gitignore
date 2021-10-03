@@ -4,6 +4,7 @@ TASKS
 TODO
 src.vim
 configure.scan
+config.status
 *.log
 *.o
 *.a
@@ -19,7 +20,7 @@ example/
 include/
 lib/
 src/tim
-tests/
+tests/*
 tmp/
 vendor/*tar.gz
 vendor/*zip
