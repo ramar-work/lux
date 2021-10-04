@@ -102,4 +102,5 @@ struct luaL_Reg hash_set[] = {
 ,{ "sha256", generate_sha256 }
 ,{ "sha384", generate_sha384 }
 ,{ "sha512", generate_sha512 }
+,{ NULL }
 };
