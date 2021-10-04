@@ -830,15 +830,6 @@ int find_matching_route ( struct luadata_t *l ) {
 }
 
 
-static add_config_to_model ( struct luadata_t *l ) {
-	//Get the config from the global state
-	lua_retglobal( ld.state, "config", LUA_TTABLE );
-	
-	//Add it to the current table
-	lua_istack( ld.state );
-}
-
-
 //The entry point for a Lua application
 const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
