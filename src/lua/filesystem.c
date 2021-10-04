@@ -24,8 +24,7 @@
  * ------------------------------------------- */
 #include "filesystem.h"
 
-static char *sw_path( lua_State *L, const char *path ) {
-	char *spath = NULL;
+static char *sw_path( lua_State *L, const char *path, char *spath, int splen ) {
 	int len = 0;
 
 	//Get the shadow path if there is one
@@ -35,21 +34,21 @@ static char *sw_path( lua_State *L, const char *path ) {
 		return NULL;
 	}
 
+
 	//Translate to the right path
-	if ( !( spath = malloc( 2048 ) ) || !memset( spath, 0, 2048 ) ) {
+	if ( /*!( spath = malloc( 2048 ) ) || */ !memset( spath, 0, splen ) ) {
 		return NULL;
 	}
 
-	len = snprintf( spath, 2047, "%s", lua_tostring( L, -1 ) );
+	len = snprintf( spath, splen - 1, "%s", lua_tostring( L, -1 ) );
 	lua_pop( L, 1 );
 
 	//Stop if the buffer is too large (this is bigger than PATH_MAX)
-	if ( ( 2047 - len ) <= strlen( path ) ) {
-		free( spath );
+	if ( ( splen - len ) <= strlen( path ) ) {
 		return NULL;
 	}
 
-	snprintf( &spath[ len ], 2047 - len, "/%s", path );
+	snprintf( &spath[ len ], splen - len, "/%s", path );
 	return spath;
 }
 
@@ -77,22 +76,23 @@ static zTable * get_config_limits( lua_State *L ) {
 
 int fs_pwd ( lua_State *L ) {
 	char *fspath = NULL, fp[ PATH_MAX ] = {0}, rp[ PATH_MAX ] = {0};
+	char pathbuf[ PATH_MAX ];
 	struct stat sb;
 
 	//Check for a string argument
 	luaL_checktype( L, 1, LUA_TSTRING );
 
 	//Seems like this should never happen
-	if ( !( fspath = ( char * )sw_path( L, "." ) ) ) {
+	if ( !sw_path( L, ".", pathbuf, sizeof( pathbuf ) ) ) {
 		return luaL_error( L, "Could not find shadow directory" );
 	}
 
 #if 1
-	if ( !realpath( fspath, rp ) ) {
+	if ( !realpath( pathbuf, rp ) ) {
 		return luaL_error( L, "realpath() failed: %s", strerror( errno ) );
 	}
 	lua_pushstring( L, rp );	
-	free( fspath );
+	//free( fspath );
 	return 1;
 #else
 	//Stat
@@ -114,17 +114,19 @@ int fs_read ( lua_State *L ) {
 	struct stat sb;
 	int fd, rlimit = 0;
 	char *fspath, err[ 1024 ] = { 0 }; 
+	char pathbuf[ PATH_MAX ];
 	const char *funct = "fs.read", *filename = lua_tostring( L, 1 );
 	unsigned char *rb = NULL;
 
 	//Seems like this should never happen
-	if ( !( fspath = ( char * )sw_path( L, filename ) ) ) {
+	if ( !sw_path( L, filename, pathbuf, sizeof(pathbuf) ) ) {
 		return luaL_error( L, "Could not find shadow directory" );
 	}
 
 	//Do a stat and compare against a decent size
-	if ( stat( fspath, &sb ) == -1 ) {
-		return luaL_error( L, "Error opening '%s': %s.", fspath, strerror( errno ) );
+	if ( stat( pathbuf, &sb ) == -1 ) {
+		//free( fspath );
+		return luaL_error( L, "Error opening '%s': %s.", pathbuf, strerror( errno ) );
 	}
 
 	//Pop and get limits, etc
@@ -144,31 +146,32 @@ int fs_read ( lua_State *L ) {
 
 	//Read a file if the sizes are right
 	if ( sb.st_size > rlimit ) {
+		//free( fspath );
 		return luaL_error( L, "Could not find shadow directory" );
 	}
 
-	if ( ( fd = open( fspath, O_RDONLY ) ) == -1 ) {
-		free( fspath );
+	if ( ( fd = open( pathbuf, O_RDONLY ) ) == -1 ) {
+		//free( fspath );
 		return luaL_error( L, "%s: %s", funct, strerror( errno ) );
 	}
 
 	if ( !( rb = malloc( sb.st_size + 1 ) ) || !memset( rb, 0, sb.st_size + 1 ) ) {
-		free( fspath );
+		//free( fspath );
 		return luaL_error( L, "%s: %s", funct, strerror( errno ) );
 	}
 
 	if ( read( fd, rb, sb.st_size ) == -1 ) {
-		free( rb ), free( fspath );
+		free( rb );// free( fspath );
 		return luaL_error( L, "%s: %s", funct, strerror( errno ) );
 	}
 
 	if ( close( fd ) == -1 ) {
-		free( rb ), free( fspath );
+		free( rb ); //free( fspath );
 		return luaL_error( L, "%s: %s", funct, strerror( errno ) );
 	}
 
 	//Add a table and just return info
-	free( fspath );
+	//free( fspath );
 	lua_newtable( L );
 	lua_pushstring( L, "results" );
 	lua_newtable( L );
@@ -202,11 +205,12 @@ int fs_write ( lua_State *L ) {
 	//
 	char *fspath = NULL;
 	const char *src = lua_tostring( L, 1 ); 
+	char pathbuf[ PATH_MAX ];
 	const unsigned char *data;
 	unsigned long size = 0;
 	int fd, mode = 0644;
 
-	if ( !( fspath = sw_path( L, src ) ) ) {
+	if ( !sw_path( L, src, pathbuf, sizeof(pathbuf) ) ) {
 		return luaL_error( L, "Could not get new shadow path" );
 	}
 
@@ -220,15 +224,18 @@ int fs_write ( lua_State *L ) {
 	}
 
 	lua_pop( L, lua_gettop( L ) );
-	if ( ( fd = open( fspath, O_RDWR | O_CREAT | O_TRUNC, mode ) ) == -1 ) {
+	if ( ( fd = open( pathbuf, O_RDWR | O_CREAT | O_TRUNC, mode ) ) == -1 ) {
+		//free( fspath );
 		return luaL_error( L, "Could not create new file" );
 	}
 
 	if ( write( fd, data, size ) == -1 ) {
+		//free( fspath );
 		return luaL_error( L, "Could not write data to file" );
 	}
 
 	if ( close( fd ) == -1 ) {
+		//free( fspath );
 		return luaL_error( L, "Could not close file" );
 	}
 
@@ -238,9 +245,9 @@ int fs_write ( lua_State *L ) {
 	lua_pushstring( L, "true" );
 	lua_settable( L, 1 );
 	lua_pushstring( L, "message" );
-	lua_pushfstring( L, "Wrote %d bytes to file %s", size, fspath );
+	lua_pushfstring( L, "Wrote %d bytes to file %s", size, pathbuf );
 	lua_settable( L, 1 );
-	free( fspath );
+	//free( fspath );
 	return 1;
 }
 
@@ -248,18 +255,22 @@ int fs_write ( lua_State *L ) {
 
 int fs_stat ( lua_State *L ) {
 	struct stat sb;
-	char *fspath = NULL;
+	char *fspath = NULL; 
+	const char *opath = NULL;
+	char pathbuf[ PATH_MAX ];
 	luaL_checktype( L, 1, LUA_TSTRING );
 	//What's on the stack?
 	//lua_istack( L ); getchar ();
 
+	opath = lua_tostring( L, 1 );
+
 	//Seems like this should never happen
-	if ( !( fspath = ( char * )sw_path( L, lua_tostring( L, 1 ) ) ) ) {
+	if ( !sw_path( L, opath, pathbuf, sizeof(pathbuf) ) ) {
 		return luaL_error( L, "Could not find shadow directory" );
 	}
 
-	if ( stat( fspath, &sb ) == -1 ) {
-		return luaL_error( L, "Error opening '%s': %s.", fspath, strerror( errno ) );
+	if ( stat( pathbuf, &sb ) == -1 ) {
+		return luaL_error( L, "Error opening '%s': %s.", pathbuf, strerror( errno ) );
 	}
 
 	//Add a table and just return info
@@ -301,17 +312,23 @@ int fs_stat ( lua_State *L ) {
 int fs_list ( lua_State *L ) {
 	DIR *dir;
 	struct dirent *dd;
-	luaL_checktype( L, 1, LUA_TSTRING );
-	const char *dirname = NULL; 
-	lua_pop( L, 1 );
+	char pathbuf[ PATH_MAX ];
+	const char *opath = NULL;
 
-	if ( !( dirname = ( char * )sw_path( L, lua_tostring( L, 1 ) ) ) ) {
+	luaL_checktype( L, 1, LUA_TSTRING );
+
+	opath = lua_tostring( L, 1 );
+
+	if ( !sw_path( L, opath, pathbuf, sizeof(pathbuf) ) ) {
 		return luaL_error( L, "Could not find shadow directory" );
 	}
 
+	//Pop the string argument
+	lua_pop( L, 1 );
+
 	//Try to open the directory
-	if ( !( dir = opendir( dirname ) ) ) {
-		return luaL_error( L, "Could not open directory: %s: %s", dirname, strerror( errno ) );
+	if ( !( dir = opendir( pathbuf ) ) ) {
+		return luaL_error( L, "Could not open directory: %s: %s", pathbuf, strerror( errno ) );
 	}
 
 	//Loop through all the entries and add them to table
