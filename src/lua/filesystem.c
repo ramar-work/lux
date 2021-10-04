@@ -336,19 +336,24 @@ int fs_list ( lua_State *L ) {
 	lua_pushstring( L, "results" );
 	lua_newtable( L );
 
+	int i = 0;
 	for ( char *typename = NULL; ( dd = readdir( dir ) ); ) {
 		//Omit . & ..
 		if ( strlen( dd->d_name ) <= 2 && *dd->d_name == '.' ) {
 			continue;
 		}
 
+		//Add a table
+		lua_pushnumber( L, ++p );
+		lua_newtable( L );
+
 		lua_pushstring( L, "inode" );
 		lua_pushnumber( L, dd->d_ino );
-		lua_settable( L, 3 );
+		lua_settable( L, 5 );
 		
 		lua_pushstring( L, "name" );
 		lua_pushstring( L, dd->d_name );
-		lua_settable( L, 3 );
+		lua_settable( L, 5 );
 
 		//TODO: Some systems don't have support for d_type
 		if ( dd->d_type == DT_BLK )
@@ -371,6 +376,7 @@ int fs_list ( lua_State *L ) {
 
 		lua_pushstring( L, "type" );
 		lua_pushstring( L, typename );
+		lua_settable( L, 5 );
 		lua_settable( L, 3 );
 	}
 
