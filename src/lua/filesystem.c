@@ -344,7 +344,7 @@ int fs_list ( lua_State *L ) {
 		}
 
 		//Add a table
-		lua_pushnumber( L, ++p );
+		lua_pushnumber( L, ++i );
 		lua_newtable( L );
 
 		lua_pushstring( L, "inode" );

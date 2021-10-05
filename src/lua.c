@@ -380,6 +380,10 @@ int lua_to_ztable ( lua_State *L, int index, ztable_t *t ) {
 		}
 		else if ( vt  == LUA_TSTRING ) {
 		#if 1
+
+			//unsigned char *a = lua_tostring( L, -1 );
+//FPRINTF( "%d", *
+
 			TELL( " (%s)\n", lua_tostring( L, -1 ) ) && lt_addtextvalue( t, (char *)lua_tostring( L, -1 ));
 			lt_finalize( t );
 		#else
@@ -404,16 +408,16 @@ int lua_to_ztable ( lua_State *L, int index, ztable_t *t ) {
 			lt_finalize( t );
 		}
 	#if 0
+		else if ( vt == LUA_TUSERDATA | vt == LUA_TLIGHTUSERDATA ) {
+			lua_addudvalue( t, lua_touserdata( L, -1 ) );
+			lt_finalize( t ); 
+		}
 		else if ( vt == LUA_TFUNCTION ) {
 			//Somehow we have to inject scope...
 			//Then we need to execute
 			lua_pcall( L, 1, 1 );
 			//We can execute immediately, or wait until the environment is on
 			//(or just use a file)  
-		}
-		else if ( vt == LUA_TUSERDATA | vt == LUA_TLIGHTUSERDATA ) {
-			lua_addudvalue( t, lua_touserdata( L, -1 ) );
-			lt_finalize( t ); 
 		}
 		else if ( vt == LUA_TNONE | vt == LUA_TNIL ) {
 

@@ -173,8 +173,48 @@ int lua_dump_var ( lua_State *L ) {
 	return 1;
 }
 
+
+
+int lua_return_unsigned ( lua_State *L ) {
+	//Take a number and string argument and return it as a userdata
+	luaL_checkstring( L, 1 );
+	luaL_checknumber( L, 2 );
+
+	unsigned char * farg = NULL;
+	size_t flen = 0;
+
+	//TODO: If flen is bigger than a 32 bit SIGNED integer, die
+	flen = lua_tonumber( L, 2 );
+
+	//Allocate + 4 at the beginning of whatever it is...
+	unsigned char * m = malloc( flen + 8 );
+	
+	//Save each into their slots
+	//256 256 256 256
+	//m[0] = SPECIAL_CHARACTER
+	//m[1] = flen & 0xff
+	//m[2] = flen & 0xff
+	//m[3] = flen & 0xff
+	//m[4] = flen & 0xff
+#if 0
+	farg = (unsigned char *)lua_tolstring( L, 1, &flen );
+	//memcpy( m + 5, farg, flen );
+#else
+	//memcpy( m + 5, lua_tolstring( L, 1, &flen ), flen );
+#endif
+
+	//lua_pop( L, 2 );
+	//lua_pushlstring( L, m, flen );
+	//free( m );  //Should be a copy, so free the original...
+	return 1;
+}
+
+
+
+
 struct luaL_Reg lua_set[] = {
 	{ "dump", lua_dump_var }
+,	{ "unsigned", lua_return_unsigned }
 ,	{ NULL }
 };
 

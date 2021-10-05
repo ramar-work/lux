@@ -774,12 +774,33 @@ static int return_as_response ( struct luadata_t *l ) {
 	//Get the content
 	int content_i = 0;
 	if ( ( content_i = lt_geti( rt, "content" ) ) > -1 ) {
-		if ( clen_i > -1 )
-			content = lt_blob_at( rt, content_i ).blob;
-		else {
-			content = (unsigned char *)lt_text_at( rt, content_i );
+		content = (unsigned char *)lt_text_at( rt, content_i );
+		if ( clen_i == -1 ) {
 			clen = strlen( (char *)content );
-		} 
+		}
+	}
+
+
+	//In this case, set clen with the file
+	int file_i = 0;
+	if ( ( file_i = lt_geti( rt, "file" ) ) > -1 ) {
+		const char * fname = lt_text_at( rt, file_i );
+		char fbuf[ PATH_MAX ];
+		int len = 0;
+		memset( fbuf, 0, PATH_MAX );
+
+		//Do I need a shadow?
+		snprintf( fbuf, sizeof( fbuf ) - 1, "%s/%s", l->root, fname );
+
+		//
+		if ( !( content = read_file( fbuf, &len, l->err, sizeof( l->err ) ) ) )  {
+			snprintf( l->err, LD_ERRBUF_LEN, lt_strerror( rt ) );
+			return 0;
+		}
+
+		ctype = (char *)zmime_get_by_filename( fbuf )->mimetype;
+		clen = len;
+		FPRINTF( "FIN MESSAGE %s/%s -> %s", l->root, fname, ctype );
 	}
 
 	//Set structures
@@ -789,8 +810,10 @@ static int return_as_response ( struct luadata_t *l ) {
 	http_copy_content( l->res, content, clen ); 
 
 	//Return finalized content
+	zhttp_t *rr = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ); 
 	lt_free( rt ), free( rt );
-	return http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ) ? 1 : 0;
+	free( content );
+	return 1;
 }
 
 
@@ -1038,6 +1061,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			free_ld( &ld );
 			return http_error( res, 500, ld.err );
 		}
+		FPRINTF( "Did content return complete?\n" );
 		lua_pop( ld.state, 1 );
 		free_ld( &ld );
 		FPRINTF( "We got to a successful point.\n" );

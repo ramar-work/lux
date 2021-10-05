@@ -37,6 +37,7 @@
 #include "../lua/lib.h"
 #include <zjson.h>
 #include "../xml.h"
+#include "../mime.h"
 
 #ifndef FILTER_LUA_H
 #define FILTER_LUA_H
