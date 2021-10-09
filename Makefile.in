@@ -21,7 +21,6 @@ SRVUSER = ramar
 SRVGROUP = ramar
 IFLAGS = -Ivendor -Ivendor/lua-5.4.3/src -I/usr/include/lua5.3
 LDFLAGS = -ldl -lpthread -lm
-#-L/usr/lib/x86_64-linux-gnu -
 DEBUGFLAGS = -DDEBUG_H
 CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security $(IFLAGS)
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
@@ -60,7 +59,6 @@ SRC = \
 	@srcdir@/src/filters/filter-dirent.c \
 	@srcdir@/src/filters/filter-redirect.c \
 	@srcdir@/src/filters/filter-lua.c
-
 OBJ = ${SRC:.c=.o}
 TARGET = main
 TESTS = luabind router util
@@ -68,13 +66,11 @@ UNAME = $(shell uname)
 DOMAIN = localhost 
 
 # main - Compiles all code needed to get hypno running
-main: $(OBJ)
+main: vendor/liblua.a vendor/libssl.a vendor/libcrypto.a $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a 
-
-#	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ)
 
 # debug - Builds code with debugging flags on
 debug: debug-clang
@@ -164,9 +160,16 @@ test:
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	for t in $(TESTS); do $(CC) $(LDFLAGS) $(CFLAGS) -o bin/$$t src/test/$${t}-test.c $(OBJ); done
 
-# deps - Build some of the larger dependencies first (they take a minute)
-deps:
-	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
+# vendor/libssl.a - Build OpenSSL
+vendor/libssl.a vendor/libcrypto.a &:
+	-@cd vendor/ && tar xzf openssl-1.1.1l.tar.gz && cd openssl-1.1.1l && ./config && make && mv libssl.a libcrypto.a ../
+
+# vendor/liblua.a - Build Lua 5.4.3
+vendor/liblua.a: 
+	-@cd vendor/ && tar xzf lua-5.4.3.tar.gz && cd lua-5.4.3 && make && mv src/liblua.a ../
+
+#	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
+#	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
 
 # clean - Get rid of object files and tests 
 clean:
