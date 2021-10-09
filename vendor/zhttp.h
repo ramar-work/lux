@@ -34,10 +34,16 @@
  * 12-02-20 - 
  * 
  * ------------------------------------------- */
-#include <stdlib.h>
-#include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <zwalker.h>
+
+#ifndef _WIN32
+ #include <unistd.h>
+#else
+ #include <io.h>
+ #define write(FD,C,CLEN) _write(FD, C, CLEN)
+#endif
 
 #ifdef DEBUG_H
  #include <stdio.h>

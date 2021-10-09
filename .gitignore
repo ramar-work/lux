@@ -30,3 +30,6 @@ vendor/lib*
 vendor/lua*
 vendor/*
 where_are_we.lua
+
+# ...
+#configure

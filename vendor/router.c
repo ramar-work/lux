@@ -1,7 +1,5 @@
 #include "router.h"
-#include <strings.h>
 
-#include <unistd.h>
 
 #define router_add_item(LIST, ELEMENT, SIZE, LEN) \
 	add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
@@ -141,7 +139,7 @@ static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 			memset( &pp, 0, sizeof(zWalker) );
 			while ( memwalk( &pp, block, (unsigned char *)mb, r.size - 1, strlen(mb) ) ) {
 				char *b, buf[ 1024 ] = {0};
-				int size = ( index( "},=", pp.chr ) || index( "}", *pp.ptr ) ) ? pp.size - 1 : pp.size;
+				int size = ( strchr( "},=", pp.chr ) || strchr( "}", *pp.ptr ) ) ? pp.size - 1 : pp.size;
 				memcpy( buf, &block[ pp.pos ], size );
 				b = router_strdup(buf);
 				router_add_item( &e->string, b, char *, &e->len );

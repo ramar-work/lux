@@ -81,7 +81,7 @@ debug: debug-clang
 	@printf '' > /dev/null
 
 clang: CC = clang
-clang: CFLAGS = $(CLANGFLAGS)
+clang: CFLAGS = $(CLANGFLAGS) -g $(DEBUGFLAGS)
 clang: main
 	@printf '' > /dev/null
 
@@ -141,7 +141,7 @@ examples:
 		--start --port $(PORT) --config $(srcdir)/example/config.lua --user $$USER
 
 
-vendor/sqlite3.o: CFLAGS+=-Wno-misleading-indentation
+vendor/sqlite3.o: CFLAGS+=-Wno-misleading-indentation -Wno-deprecated-declarations
 vendor/sqlite3.o:
 	$(CC) $(CFLAGS) -c -o vendor/sqlite3.o vendor/sqlite3.c
 

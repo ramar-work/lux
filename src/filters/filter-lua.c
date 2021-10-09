@@ -800,7 +800,6 @@ static int return_as_response ( struct luadata_t *l ) {
 
 		ctype = (char *)zmime_get_by_filename( fbuf )->mimetype;
 		clen = len;
-		FPRINTF( "FIN MESSAGE %s/%s -> %s", l->root, fname, ctype );
 	}
 
 	//Set structures

@@ -236,7 +236,7 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 	}
 
 	//This is the web root 
-	config->wwwroot = strdup( loader_get_char_value( t, "wwwroot" ) ); 
+	config->wwwroot = dupstr( loader_get_char_value( t, "wwwroot" ) ); 
 
 	//This is the global root default
 	//config->root_default = strdup( loader_get_char_value( t, "root_default" ) ); 

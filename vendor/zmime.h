@@ -35,7 +35,6 @@
  * ------------------------------------------- */
 #include <inttypes.h>
 #include <string.h>
-#include <strings.h>
 
 #ifndef ZMIME_H
 #define ZMIME_H

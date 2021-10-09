@@ -50,6 +50,9 @@
 #define zr_add_item(LIST,ELEMENT,SIZE,LEN) \
  add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 
+#define zr_dupstr(V) \
+	(char *)zr_dupblk( (unsigned char *)V, strlen(V) + 1 )
+
 enum {
 	RW = 0,
 	SX = 32,
@@ -119,7 +122,6 @@ unsigned char * zrender_interpret( zRender *, unsigned char **, int * );
 unsigned char * zrender_render( zRender *, const unsigned char *, int, int * );
 
 void zrender_free( zRender *);
-
 
 #ifdef DEBUG_H
  #define XMAP_DUMP_LEN 20 

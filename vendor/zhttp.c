@@ -558,8 +558,7 @@ static int parse_http_header ( zhttp_t *entity, char *err, int errlen ) {
 
 	//Get host requested (not always going to be there)
 	entity->host = zhttp_msg_get_value( "Host: ", "\r", entity->msg, entity->hlen );	
-	if ( entity->host && ( port = index( entity->host, ':' ) ) ) {
-		//TODO: Switch over to this ASAP!!!!!!!
+	if ( entity->host && ( port = strchr( entity->host, ':' ) ) ) {
 	#if 1
 		//Remove colon
 		entity->port = atoi( port + 1 );
@@ -648,7 +647,7 @@ zhttp_t * http_parse_request ( zhttp_t *entity, char *err, int errlen ) {
 	}
 
 	//ZHTTP_PRINTF( "Dump http body." );
-	print_httpbody_to_file( entity, "/tmp/zhttp-01" );
+	//print_httpbody_to_file( entity, "/tmp/zhttp-01" );
 	return entity;
 } 
 
@@ -962,7 +961,6 @@ void http_free_body ( zhttp_t *entity ) {
 int http_set_error ( zhttp_t *entity, int status, char *message ) {
 	char err[ 2048 ];
 	memset( err, 0, sizeof( err ) );
-	ZHTTP_PRINTF( stderr, "status: %d, mlen: %ld, msg: '%s'\n", status, strlen(message), message );
 
 	http_set_status( entity, status );
 	http_set_ctype( entity, text_html );
@@ -1009,6 +1007,7 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 		fb = stdout, fd = 1;
 	else if ( strcmp( path, "/dev/stderr" ) )
 		fb = stderr, fd = 2;
+#ifndef _WIN32
 	else {
 		if ( ( fd = open( path, O_RDWR | O_CREAT | O_TRUNC, 0655 ) ) == -1 ) {
 			fprintf( stderr, "[%s:%d] %s\n", __func__, __LINE__, strerror( errno ) );
@@ -1020,6 +1019,12 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 			return;
 		}
 	}
+#else
+	else {
+		//TODO: Handle Windows properly
+		fb = stdout, fd = 1;
+	}
+#endif
 
 	ZHTTP_PRINTF( fb, "r->mlen: '%d'\n", r->mlen );
 	ZHTTP_PRINTF( fb, "r->clen: '%d'\n", r->clen );
@@ -1055,10 +1060,12 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 		}
 	}
 
+#ifndef _WIN32
 	if ( fd > 2 ) {
 		fclose( fb );
 		close( fd );
 	}
+#endif
 }
 
 #endif

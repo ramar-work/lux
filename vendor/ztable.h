@@ -35,7 +35,6 @@
  * THE SOFTWARE.
  *
  * ---------------------------------------------------------------- */
-
 #ifndef _WIN32
  #define _POSIX_C_SOURCE 200809L
 #endif 
@@ -43,7 +42,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+
+#ifndef _WIN32
+ #include <unistd.h>
+#else
+ #include <io.h>
+ #define write(FD,C,CLEN) _write(FD, C, CLEN)
+#endif
 
 #ifndef ZTABLE_H
 #define ZTABLE_H
@@ -51,7 +56,6 @@
 #ifndef LT_DEVICE
  #define LT_DEVICE 2
 #endif
-
 
 #define ZTABLE_ERRV_LENGTH 127 
 
@@ -77,21 +81,6 @@
 
 #define lt_exec(t, a, b) \
 	lt_exec_complex( t, 0, (t)->index, a, b )
-
-#define lt_dump(t) \
-	!( __ltHistoric.level = 0 ) && fprintf( stderr, "LEVEL IS %d\n", __ltHistoric.level ) && lt_exec( t, &__ltHistoric, __lt_dump )
-
-#define lt_fdump(t, i) \
-	!( __ltHistoric.level = 0 ) && ( __ltHistoric.fd = i ) && lt_exec( t, &__ltHistoric, __lt_dump ) && fflush( stdout )
-
-#define lt_kfdump(t, i) \
-	!( __ltComplex.level = 0 ) && ( __ltComplex.fd = i ) && lt_exec( t, &__ltComplex, __lt_dump ) && fflush( stdout )
-
-#define lt_kdump(t) \
-	!( __ltComplex.level = 0 ) && lt_exec( t, &__ltComplex, __lt_dump )
-
-#define lt_sdump(t) \
-	lt_exec( t, &__ltSimple, __lt_dump )
 
 #define lt_blob_at( t, i ) \
 	lt_ret( t, ZTABLE_BLB, i )->vblob
@@ -306,6 +295,29 @@
 
 #define lt_copy_by_index(t, start) \
 	lt_deep_copy (t, start, t->count )
+
+#ifndef DEBUG_H
+ #define lt_dump(t)
+ #define lt_fdump(t, i)
+ #define lt_kfdump(t, i)
+ #define lt_kdump(t)
+ #define lt_sdump(t)
+#else
+ #define lt_dump(t) \
+	!( __ltHistoric.level = 0 ) && fprintf( stderr, "LEVEL IS %d\n", __ltHistoric.level ) && lt_exec( t, &__ltHistoric, __lt_dump )
+
+ #define lt_fdump(t, i) \
+	!( __ltHistoric.level = 0 ) && ( __ltHistoric.fd = i ) && lt_exec( t, &__ltHistoric, __lt_dump ) && fflush( stdout )
+
+ #define lt_kfdump(t, i) \
+	!( __ltComplex.level = 0 ) && ( __ltComplex.fd = i ) && lt_exec( t, &__ltComplex, __lt_dump ) && fflush( stdout )
+
+ #define lt_kdump(t) \
+	!( __ltComplex.level = 0 ) && lt_exec( t, &__ltComplex, __lt_dump )
+
+ #define lt_sdump(t) \
+	lt_exec( t, &__ltSimple, __lt_dump )
+#endif
 
 enum {
 	ZTABLE_ERR_NONE = 0,

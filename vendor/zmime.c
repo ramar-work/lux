@@ -156,8 +156,10 @@ const struct mime_t *zmime_get_default() {
 
 
 char * zmime_get_extension ( const char *filename ) {
-	char *f = NULL;
-	return ( ( f = rindex( filename, '.' ) ) ) ? ++f : NULL; 
+	int len;
+	char *f = (char *)&filename[ strlen( filename ) ];
+	for ( len = strlen( filename ); len && *f != '.'; len--, f-- ) ;
+	return ( len ) ? f++ : f;
 }
 
 

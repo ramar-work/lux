@@ -66,6 +66,16 @@
  * ------------------------------------------------------- */
 #include "zrender.h"
 
+//Duplicate a block 
+static unsigned char * zr_dupblk( const unsigned char *v, int vlen ) {
+	unsigned char * vv = malloc( vlen );
+	memset( vv, 0, vlen );
+	memcpy( vv, v, vlen );
+	return vv;
+}
+
+
+
 //Write full path to a node
 static char * lookup_xmap ( struct xmap *xp, char *xb, int xblen ) {
 	struct xdesc *tp = xp->parent;	
@@ -211,7 +221,7 @@ static void extract_value ( zRender *rz, int hash, struct xmap *xp ) {
 	else if ( lt->value.type == ZTABLE_INT ) {
 		char intptr[32] = {0}; 
 		xp->len = snprintf( intptr, sizeof( intptr ), "%d", lt->value.v.vint ); 
-		xp->ptr = (unsigned char *)strdup( intptr );
+		xp->ptr = (unsigned char *)zr_dupstr( intptr );
 		xp->free = 1;
 	}
 	else {
@@ -220,6 +230,7 @@ static void extract_value ( zRender *rz, int hash, struct xmap *xp ) {
 		xp->free = 0; 
 	}
 }
+
 
 
 //Set specific error strings
@@ -249,8 +260,8 @@ void zrender_set_fetchdata( zRender *rz, void *t ) {
 
 //...
 void zrender_set_boundaries ( zRender *rz, const char *s, const char *end ) {
-	( s ) ? rz->zStart = strdup( s ) : 0;
-	( end ) ? rz->zEnd = strdup( end ) : 0;
+	( s ) ? rz->zStart = zr_dupstr( s ) : 0;
+	( end ) ? rz->zEnd = zr_dupstr( end ) : 0;
 }
 
 

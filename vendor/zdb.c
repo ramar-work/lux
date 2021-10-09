@@ -40,14 +40,6 @@
  * ------------------------------------------- */
 #include "zdb.h"
 
-#ifdef ZDB_ENABLE_SQLITE
- #include <sqlite3.h>
-#endif
-
-#ifdef ZDB_ENABLE_MYSQL
- #include <mysql/mysql.h>
-#endif
-
 #define AT_EOS(a) ( (a)->len == -1 && *(a)->field == eos )
 
 enum zdb_error {

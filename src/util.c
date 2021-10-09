@@ -281,3 +281,20 @@ unsigned char *trim (unsigned char *msg, char *trim, int len, int *nlen) {
 }
 
 
+
+//Duplicate a block 
+unsigned char * dupblk( const unsigned char *v, int vlen ) {
+	unsigned char * vv = malloc( vlen );
+	memset( vv, 0, vlen );
+	memcpy( vv, v, vlen );
+	return vv;
+}
+
+
+
+#ifdef _WIN32
+char * strerror ( int errno ) {
+return NULL;
+}
+
+#endif

@@ -38,7 +38,6 @@
  * ---------
  * 
  * ------------------------------------------- */
-#include <strings.h>
 #include <zwalker.h>
 
 #ifndef ZDATABASE_H
@@ -56,12 +55,20 @@
 
 #undef ZDB_ENABLE_MYSQL
 
-#define zdbv_add_item(LIST,ELEMENT,SIZE,LEN) \
-	zdb_add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
-
 #ifdef ZDB_ENABLE_EXTENSIONS
  #include <ztable.h>
 #endif 
+
+#ifdef ZDB_ENABLE_SQLITE
+ #include <sqlite3.h>
+#endif
+
+#ifdef ZDB_ENABLE_MYSQL
+ #include <mysql/mysql.h>
+#endif
+
+#define zdbv_add_item(LIST,ELEMENT,SIZE,LEN) \
+	zdb_add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 
 typedef enum {
 	ZDB_NONE

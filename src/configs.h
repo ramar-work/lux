@@ -22,6 +22,14 @@
 #include <ztable.h>
 #include "lua.h"
 #include "loader.h"
+#include "util.h"
+
+#ifndef _WIN32
+#else
+ #define PATH_MAX 2048
+ #define realpath(A, B) _fullpath( B, A, PATH_MAX )
+// #define strerror(A) strerror( A )
+#endif
 
 #ifndef LCONFIG_H
 #define LCONFIG_H
