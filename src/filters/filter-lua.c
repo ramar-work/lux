@@ -45,7 +45,7 @@ typedef struct ctype_t {
 
 
 ctype_t ctypes_serializable[] = {
-	{ "text/html", CTYPE_TEXTHTML }
+	{ ctype_def, CTYPE_TEXTHTML }
 ,	{ "text/plain", CTYPE_PLAINTEXT }
 ,	{ "application/json", CTYPE_JSON }
 , { "application/xml", CTYPE_XML }
@@ -717,7 +717,7 @@ static int return_as_response ( struct luadata_t *l ) {
 
 	ztable_t *rt = NULL;
 	int count = 0, status = 200, clen = 0;
-	char *ctype = "text/html";
+	char ctype[ 128 ] = { 0 }; //'t','e','x','t','/','h','t','m','l','\0', 0 };
 	unsigned char *content = NULL;
 
 #if 1
@@ -759,10 +759,8 @@ static int return_as_response ( struct luadata_t *l ) {
 	
 	//Get the content-type (if there is one)
 	int ctype_i = 0;
-	if ( ( ctype_i = lt_geti( rt, "ctype" ) ) > -1 )
-		ctype = zhttp_dupstr( lt_text_at( rt, ctype_i ) ); 
-	else {
-		ctype = zhttp_dupstr( ctype );
+	if ( ( ctype_i = lt_geti( rt, "ctype" ) ) > -1 ) {
+		snprintf( ctype, sizeof( ctype ) - 1, "%s", lt_text_at( rt, ctype_i ) ); 
 	}
 
 	//Get the content-length (if there is one)
@@ -779,7 +777,6 @@ static int return_as_response ( struct luadata_t *l ) {
 			clen = strlen( (char *)content );
 		}
 	}
-
 
 	//In this case, set clen with the file
 	int file_i = 0;
@@ -798,20 +795,25 @@ static int return_as_response ( struct luadata_t *l ) {
 			return 0;
 		}
 
-		ctype = (char *)zmime_get_by_filename( fbuf )->mimetype;
+		snprintf( ctype, sizeof( ctype ) - 1, "%s", zmime_get_by_filename( fbuf )->mimetype );
 		clen = len;
+	}
+
+	//Set content type to default if it was not set anywhere else
+	if ( *ctype == 0 ) {
+		snprintf( ctype, sizeof( ctype ) - 1, "%s", ctype_def );
 	}
 
 	//Set structures
 	l->res->clen = clen;
 	http_set_status( l->res, status ); 
 	http_set_ctype( l->res, ctype );
-	http_copy_content( l->res, content, clen ); 
+	http_set_content( l->res, content, clen ); 
 
 	//Return finalized content
 	zhttp_t *rr = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ); 
 	lt_free( rt ), free( rt );
-	free( content );
+	//free( content );
 	return 1;
 }
 
@@ -973,15 +975,16 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		}
 	}
 
-
+#if 1
 	//This should always happen
 	if ( lua_retglobal( ld.state, "config", LUA_TTABLE ) ) {
 		lua_getglobal( ld.state, mkey );
 		( lua_isnil( ld.state, -1 ) ) ? lua_pop( ld.state, 1 ) : 0;
+lua_istack( ld.state );
 		lua_merge( ld.state );
 		lua_setglobal( ld.state, mkey );
 	}
-
+#endif
 
 	//Could be either a table or string... so account for this
 	if ( lua_retglobal( ld.state, mkey, LUA_TTABLE ) ) {
@@ -1115,7 +1118,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//Set needed info for the response structure
 	res->clen = clen;
 	http_set_status( res, 200 ); 
-	http_set_ctype( res, "text/html" );
+	http_set_ctype( res, ctype_def );
 	http_set_content( res, content, clen ); 
 
 	//Return the finished message if we got this far

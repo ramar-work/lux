@@ -275,6 +275,16 @@ void zdbv_loop ( zdbv_t ** list ) {
 
 
 
+//Free bound value structure
+void zdbv_free ( zdbv_t **zdbv ) {
+	for ( zdbv_t **l = zdbv; l && *l; l++ ) {
+		free( (void *)(*l)->field ), free( (*l)->value ), free( *l );
+	}
+	free( zdbv );
+} 
+
+
+
 //Only use these on generated lists
 void zdb_free ( zdb_t * zdb ) {
 	//Destroy results

@@ -26,12 +26,6 @@ static const char *engines[] = {
 };
 
 
-void zdbv_free ( zdbv_t **zdbv ) {
-	for ( zdbv_t **l = zdbv; l && *l; l++ ) {
-		free( (void *)(*l)->field ), free( (*l)->value ), free( *l );
-	}
-} 
-
 
 //Accepts three arguments { db, [query,file], bind_args }
 int db_exec ( lua_State *L ) {
@@ -133,14 +127,14 @@ int db_exec ( lua_State *L ) {
 
 	//Finally, handle bind args if there are any
 	if ( ( pos = lt_geti( t, "bindargs" ) ) > -1 ) {
-		fprintf( stderr, "Got bind args...\n" );
 		int zlen = 0;
-		zTable *tt = lt_copy_by_index( t, pos );
+		ztable_t *tt = lt_copy_by_index( t, pos );
 		zKeyval *kv = NULL;
+
 		//TODO: This is way more complicated than it should be...
 		lt_lock( tt );
 		lt_reset( tt );
-		lt_next(tt);
+		lt_next( tt );
 
 		//Loop through everything
 		for ( zdbv_t *tv = NULL; ( kv = lt_next( tt ) ) && kv->key.type != ZTABLE_TRM; ) {
@@ -168,8 +162,9 @@ int db_exec ( lua_State *L ) {
 				fprintf( stderr, "you are a table...\n" );	
 			}
 
-			if ( kv->value.type == ZTABLE_TXT )
-				tv->value = zhttp_dupstr( kv->value.v.vchar ), tv->len = strlen( kv->value.v.vchar );		
+			if ( kv->value.type == ZTABLE_TXT ) {
+				tv->value = zhttp_dupstr( kv->value.v.vchar ), tv->len = strlen( kv->value.v.vchar );
+			}
 			else if ( kv->value.type == ZTABLE_INT ) {
 				char buf[ 64 ] = { 0 };
 				int len = snprintf( buf, 63, "%d", kv->value.v.vint );
@@ -183,6 +178,8 @@ int db_exec ( lua_State *L ) {
 			}
 			add_item( &zdbbind, tv, zdbv_t *, &zlen );
 		}
+
+		lt_free( tt ), free( tt );
 	}
 
 	//Open or connect to database, run the query and close the connection 
@@ -205,9 +202,6 @@ int db_exec ( lua_State *L ) {
 		( len ) ? free( (void *)query ) : 0;
 		return luaL_error( L, "conversion error: %s", zdb.err );
 	}
-
-//lt_kfdump( results, 2 );
-//getchar();
 
 	//It's infinitely easier to write this first...
 	if ( !ztable_to_lua( L, results ) ) {

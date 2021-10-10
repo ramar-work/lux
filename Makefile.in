@@ -66,7 +66,10 @@ UNAME = $(shell uname)
 DOMAIN = localhost 
 
 # main - Compiles all code needed to get hypno running
-main: vendor/liblua.a vendor/libssl.a vendor/libcrypto.a $(OBJ)
+main: vendor/liblua.a
+main: vendor/libssl.a
+main: vendor/libcrypto.a
+main: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
@@ -78,17 +81,26 @@ debug: debug-clang
 
 clang: CC = clang
 clang: CFLAGS = $(CLANGFLAGS) -g $(DEBUGFLAGS)
+clang: vendor/liblua.a
+clang: vendor/libssl.a
+clang: vendor/libcrypto.a
 clang: main
 	@printf '' > /dev/null
 
 debug-clang: CC = clang
 debug-clang: CFLAGS = $(CLANGFLAGS)
 debug-clang: CFLAGS += -g -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
+debug-clang: vendor/liblua.a
+debug-clang: vendor/libssl.a
+debug-clang: vendor/libcrypto.a
 debug-clang: main
 	@printf '' > /dev/null
 
 debug-gcc: CC = gcc
 debug-gcc: CFLAGS += -g -O0 $(DEBUGFLAGS)
+debug-gcc: vendor/liblua.a
+debug-gcc: vendor/libssl.a
+debug-gcc: vendor/libcrypto.a
 debug-gcc: main
 	@printf '' > /dev/null
 
