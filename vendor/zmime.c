@@ -155,11 +155,15 @@ const struct mime_t *zmime_get_default() {
 }
 
 
+const char * zmime_get_mimetype( const struct mime_t *t ) {
+	return ( t ) ? t->mimetype : (*mime).mimetype;
+}
+
 char * zmime_get_extension ( const char *filename ) {
 	int len;
 	char *f = (char *)&filename[ strlen( filename ) ];
 	for ( len = strlen( filename ); len && *f != '.'; len--, f-- ) ;
-	return ( len ) ? f++ : f;
+	return ( len ) ? ++f : f;
 }
 
 

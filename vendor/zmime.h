@@ -43,6 +43,7 @@ struct mime_t {
 	const char *mimetype; 
 };
 
+const char * zmime_get_mimetype( const struct mime_t * );
 const struct mime_t * zmime_get_by_extension ( const char * );
 const struct mime_t * zmime_get_by_mime ( const char * );
 const struct mime_t * zmime_get_default ();

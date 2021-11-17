@@ -275,6 +275,7 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 	} **ptr, *ff, *rr, *br = NULL, *sr[ 1024 ] = { NULL };
 	unsigned int tcount = 0, size = 0, jl = 0, jp = 0;
 	char * json = NULL;
+	const char emptystring[] = "''";
 	
 	if ( !t ) {
 		snprintf( err, errlen, "Table for JSON conversion not initialized" );
@@ -355,8 +356,15 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 			ff->valsize = snprintf( ff->vint, 64, "%d", v.v.vint ), ff->val = ff->vint, ff->comma = ",";
 		else if ( v.type == ZTABLE_FLT )
 			ff->valsize = snprintf( ff->vint, 64, "%f", v.v.vfloat ), ff->val = ff->vint, ff->comma = ",";
-		else if ( v.type == ZTABLE_TXT )
-			ff->val = v.v.vchar, ff->valsize = strlen( v.v.vchar ), ff->comma = ",";
+		else if ( v.type == ZTABLE_TXT ) {
+			if ( v.v.vchar ) 	
+				ff->val = v.v.vchar, ff->valsize = strlen( v.v.vchar );
+			else {
+				ff->val = (char *)emptystring; 
+				ff->valsize = 2; 
+			}
+			ff->comma = ",";
+		}
 		else if ( v.type == ZTABLE_BLB )
 			ff->val = (char *)v.v.vblob.blob, ff->valsize = v.v.vblob.size, ff->comma = ",";
 		else if ( v.type == ZTABLE_TBL ) {

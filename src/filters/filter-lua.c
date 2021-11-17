@@ -304,7 +304,7 @@ static int load_lua_config( struct luadata_t *l ) {
 
 	//Open the configuration file
 	if ( !lua_exec_file( l->state, cpath, l->err, LD_ERRBUF_LEN ) ) {
-		snprintf( l->err, LD_ERRBUF_LEN, "Execution of file failed." );
+		//snprintf( l->err, LD_ERRBUF_LEN, "Execution of %s/%s failed.", l->root, "config.lua" );
 		return 0;
 	}
 
@@ -313,6 +313,10 @@ static int load_lua_config( struct luadata_t *l ) {
 		snprintf( l->err, LD_ERRBUF_LEN, "Configuration is not a Lua table." );
 		return 0;
 	}
+
+	//Set shadow path
+	lua_pushstring( l->state, l->root );
+	lua_setglobal( l->state, "shadow" );
 
 	//Check if there are any route files
 	snprintf( cpath, sizeof(cpath) - 1, "%s/%s", l->root, rkey );
@@ -342,7 +346,8 @@ static int load_lua_config( struct luadata_t *l ) {
 				//Open each file in the directory?
 				if ( !lua_exec_file( l->state, cpath, l->err, LD_ERRBUF_LEN ) ) {
 					//snprintf( stderr, "Lua error: %s\n", l->err );
-					return 1;
+					//snprintf( l->err, LD_ERRBUF_LEN, "Failed to run file at %s did not return a table.", cpath );
+					return 0;
 				}
 
 				//The resultant value should ALWAYS be a table
@@ -647,8 +652,8 @@ static struct lua_readonly_t {
   { "config", init_lua_config }
 , { "request", init_lua_request }
 , { "route", init_lua_routes }
-, { "shadow", init_lua_shadowpath }
 #if 0
+, { "shadow", init_lua_shadowpath }
 , { "cache", init_lua_cache }
 #endif
 , { NULL }
@@ -795,7 +800,8 @@ static int return_as_response ( struct luadata_t *l ) {
 			return 0;
 		}
 
-		snprintf( ctype, sizeof( ctype ) - 1, "%s", zmime_get_by_filename( fbuf )->mimetype );
+		//const struct mime_t *mime = zmime_get_by_filename( fbuf );
+		snprintf( ctype, sizeof( ctype ) - 1, "%s", zmime_get_mimetype( zmime_get_by_filename( fbuf ) ) );
 		clen = len;
 	}
 
@@ -813,7 +819,9 @@ static int return_as_response ( struct luadata_t *l ) {
 	//Return finalized content
 	zhttp_t *rr = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ); 
 	lt_free( rt ), free( rt );
-	//free( content );
+	if ( file_i > -1 ) {
+		free( content );
+	}
 	return 1;
 }
 
@@ -876,16 +884,16 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//Load the standard libraries first
 	luaL_openlibs( ld.state );
 
-	//Then start loading our configuration
-	if ( !load_lua_config( &ld ) ) {
-		free_ld( &ld );
-		return http_error( res, 500, "%s\n", ld.err );
-	}
-
 	//Then load the Hypno extensions 
 	if ( !lua_loadlibs( ld.state, functions ) ) {
 		free_ld( &ld );
 		return http_error( res, 500, "Failed to initialize Lua standard libs." ); 
+	}
+
+	//Then start loading our configuration
+	if ( !load_lua_config( &ld ) ) {
+		free_ld( &ld );
+		return http_error( res, 500, "%s\n", ld.err );
 	}
 
 	//Need to delegate to static handler when request points to one of the static paths
