@@ -76,15 +76,6 @@ static int process_credentials ( struct gnutls_abstr *g, struct sconfig *conf ) 
 			//Make a filename
 			char cert[2048] = {0}, key[2048] = {0}, ca[2048] = {0};
 		#if 0
-			char *w[] = { cert, key, ca, NULL };
-			for ( char **ww = w; *ww; ww++ ) {
-				struct stat sb = {0};
-				snprintf( *ww, 2047, "%s/%s/%s", conf->wwwroot, (*h)->dir, (*h)->cert_file );
-				if ( stat( *ww, &sb ) == -1 ) {
-					FPRINTF( "STAT ERR: %s\n", strerror( errno ) );
-					return 0;	
-				}
-			}
 		#else
 			snprintf( cert, sizeof(cert), "%s/%s/%s", conf->wwwroot, (*h)->dir, (*h)->cert_file );
 			snprintf( key, sizeof(key), "%s/%s/%s", conf->wwwroot, (*h)->dir, (*h)->key_file );
@@ -94,11 +85,18 @@ static int process_credentials ( struct gnutls_abstr *g, struct sconfig *conf ) 
 			FPRINTF( "cert: %s\n", cert );
 			FPRINTF( "key: %s\n", key );
 			char *w[] = { cert, key, /*ca, */NULL };
+			//char *w[] = { cert, key, ca, NULL };
 			for ( char **ww = w; *ww; ww++ ) {
 				struct stat sb = {0};
+				//Check that the file exists and is a regular file
 				if ( stat( *ww, &sb ) == -1 ) {
 					FPRINTF( "STAT ERR: %s\n", strerror( errno ) );
 					return 0;	
+				}
+				
+				if ( !S_ISREG( sb.st_mode ) ) {
+					FPRINTF( "Cert part is not a regular file: %s\n", *ww );
+					return 0;
 				}
 			}
 		#endif
@@ -110,13 +108,14 @@ static int process_credentials ( struct gnutls_abstr *g, struct sconfig *conf ) 
 				FPRINTF( "Could not set trust for '%s': %s\n", (*h)->name, gnutls_strerror( cp ) );
 				return 0;
 			}
+			FPRINTF( "Certificates processed: %d\n", cp );
 #endif
 
-			FPRINTF( "Certificates processed: %d\n", cp );
 			if ( ( status = gnutls_certificate_set_x509_key_file( g->x509_cred, cert, key, GNUTLS_X509_FMT_PEM ) ) < 0 ) {
 				FPRINTF( "Could not set certificate for '%s': %s\n", (*h)->name, gnutls_strerror( status ) );
 				return 0;
 			}
+			FPRINTF( "TLS connection data for host '%s' successfully initialized\n", (*h)->name );
 		}
 	}	
 	return 1;
@@ -183,11 +182,11 @@ pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *conn 
 	//Set a few more details for our current session.	
 	gnutls_certificate_server_set_request( g->session, GNUTLS_CERT_IGNORE ); 
 	gnutls_handshake_set_timeout( g->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT ); 
-  gnutls_transport_set_int( g->session, fd );
+	gnutls_transport_set_int( g->session, fd );
 
 	//Try to get the server name here?
 	//Do the actual handshake with an open file descriptor
-#if 0
+#if 1
 	while ( ( ret = gnutls_handshake( g->session ) ) == GNUTLS_E_AGAIN || ret == GNUTLS_E_INTERRUPTED );
 #else
 	do {
@@ -223,6 +222,7 @@ pre_gnutls ( int fd, struct HTTPBody *a, struct HTTPBody *b, struct cdata *conn 
 		destroy_gnutls( g );
 		FPRINTF( "GnuTLS handshake failed: %s\n", gnutls_strerror( ret ) );
 		//This isn't a fatal error... but what do I return?
+conn->count = -2;
 		return 0;	
 	}
 
@@ -305,13 +305,14 @@ read_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *co
 		else {
 			rq->mlen += rd;
 			struct HTTPBody *tmp = http_parse_request( rq, err, sizeof(err) ); 
-
+#if 0
 			//Check that the hostname matches the SNI name
 			if ( strcmp( tmp->host, g->sniname ) ) {
 				conn->count = -3;
 				snprintf( err, sizeof( err ), "Requested cert host '%s' does not match hostname '%s'.", tmp->host, g->sniname ); 
 				return http_set_error( rs, 500, err );
 			}
+#endif
 	
 			//TODO: Is this handling everything?
 			if ( tmp->error == ZHTTP_NONE ) { 

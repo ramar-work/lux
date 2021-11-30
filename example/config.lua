@@ -59,40 +59,14 @@ return {
 			filter = "lua"
 		},
 
-		-- A Lua directory...
-		["carolinascholar.local"] = { 
-			dir = "carolinascholar.com",
-			filter = "lua"
-		},
-	
-		-- SSL capable hosts look like this
-		["selfsigned.local"] = { 
-			dir = "ssl",
-			root_default = "/index.html",
-			--ca_bundle = "misc/ssl/self-signed/self-signed.ca-bundle",
-			cert_file = "misc/ssl/self-signed/self-signed.crt",
-			key_file = "misc/ssl/self-signed/self-signed.pem",
-			filter = "static"
-		},
-
-		-- SSL capable hosts look like this
-		["selfsignedtwo.local"] = { 
-			dir = "ssl",
-			root_default = "/index2.html",
-			--ca_bundle = "misc/ssl/self-signed/self-signed-2.ca-bundle",
-			cert_file = "misc/ssl/self-signed-2/self-signed-2.crt",
-			key_file = "misc/ssl/self-signed-2/self-signed-2.pem",
-			filter = "static"
-		},
-
-		-- SSL capable hosts look like this
+		-- ...
 		["supergreatwok.xyz"] = { 
-			dir = "ssl",
-			root_default = "/index.html",
-			ca_bundle = "misc/ssl/supergreatwok.xyz/supergreatwok_xyz.ca-bundle",
-			cert_file = "misc/ssl/supergreatwok.xyz/supergreatwok_xyz.crt",
-			key_file = "misc/ssl/supergreatwok.xyz/supergreatwok_xyz.pem",
-			filter = "static"
+			dir = "tls",
+			-- root_default = "/index.html",
+			ca_bundle = "misc/tls/supergreatwok.xyz/supergreatwok_xyz.ca-bundle",
+			cert_file = "misc/tls/supergreatwok.xyz/supergreatwok_xyz.crt",
+			key_file = "misc/tls/supergreatwok.xyz/supergreatwok_xyz.pem",
+			filter = "lua"
 		},
 	}
 }
