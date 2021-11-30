@@ -59,7 +59,17 @@ return {
 			filter = "lua"
 		},
 
-		-- ...
+		-- self-signed certificate will match with ironheadrecordings.local
+		["ironheadrecordings.local"] = { 
+			dir = "tls",
+			-- root_default = "/index.html",
+			ca_bundle = "misc/tls/ironheadrecordings.local/ironhead_self_signed.ca-bundle",
+			cert_file = "misc/tls/ironheadrecordings.local/ironhead_self_signed.crt",
+			key_file = "misc/tls/ironheadrecordings.local/ironhead_self_signed.key",
+			filter = "lua"
+		},
+
+		-- supergreatwok.xyz
 		["supergreatwok.xyz"] = { 
 			dir = "tls",
 			-- root_default = "/index.html",
