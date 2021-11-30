@@ -4,6 +4,7 @@ TASKS
 TODO
 src.vim
 configure.scan
+configure
 config.status
 *.log
 *.o
@@ -16,7 +17,9 @@ artwork/
 bin/
 build/
 docs/
-example/
+example/c/app.so
+example/tls/misc/tls/supergreatwok.xyz
+example/carolinascholar.com
 include/
 lib/
 src/tim

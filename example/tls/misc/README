@@ -1,0 +1,5 @@
+The SSL folder contains two sets of certs.
+
+One (supergreatwok.xyz) is for a server capable of intercepting real-world network traffic via the domain name: supergreatwok.xyz
+
+The other (self-signed) is for a server capable of servicing requests via a self-signed certificate. 

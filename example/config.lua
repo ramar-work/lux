@@ -63,9 +63,9 @@ return {
 		["ironheadrecordings.local"] = { 
 			dir = "tls",
 			-- root_default = "/index.html",
-			ca_bundle = "misc/tls/ironheadrecordings.local/ironhead_self_signed.ca-bundle",
-			cert_file = "misc/tls/ironheadrecordings.local/ironhead_self_signed.crt",
-			key_file = "misc/tls/ironheadrecordings.local/ironhead_self_signed.key",
+			ca_bundle = "misc/tls/self-signed/ironhead_self_signed.ca-bundle",
+			cert_file = "misc/tls/self-signed/ironhead_self_signed.crt",
+			key_file = "misc/tls/self-signed/ironhead_self_signed.key",
 			filter = "lua"
 		},
 
