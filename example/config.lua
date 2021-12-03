@@ -28,39 +28,47 @@ return {
 		},
 		
 		-- Redirect does nothing of real importance
-		["redirect.hypno"] = { 
+		["redirect.hypno.local"] = { 
 			-- Where to redirect?
 			filter = "redirect"
 		},
 
 		-- See the dirent filter in action 
-		["dir.hypno"] = { 
+		["dir.hypno.local"] = { 
 			dir = "dir",
 			root_default = "/index.html",
 			filter = "dirent"
 		},
 
 		-- See the echo filter in action
-		["echo.hypno"] = { 
+		["echo.hypno.local"] = { 
 			root_default = "/index.html", -- Technically, no root is needed
 			filter = "echo"
 		},
 
 		-- See the static filter in action
-		["html.hypno"] = { 
+		["html.hypno.local"] = { 
 			dir = "html",
 			root_default = "/index.html",
 			filter = "static"
 		},
 	
+		-- See the static filter in action
+		["file.hypno.local"] = { 
+			dir = "file",
+			root_default = "/index.html",
+			filter = "static"
+		},
+
 		-- A Lua directory...
-		["lua.hypno"] = { 
+		["lua.hypno.local"] = { 
 			dir = "lua",
 			filter = "lua"
 		},
 
 		-- self-signed certificate will match with ironheadrecordings.local
-		["ironheadrecordings.local"] = { 
+		-- ["ironheadrecordings.local"] = { 
+		["tls.hypno.local"] = { 
 			dir = "tls",
 			-- root_default = "/index.html",
 			ca_bundle = "misc/tls/self-signed/ironhead_self_signed.ca-bundle",
