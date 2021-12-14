@@ -51,6 +51,9 @@
 #include "../filters/filter-redirect.h"
 #include "../filters/filter-lua.h"
 
+//Include pthreads here...
+#include <pthread.h>
+
 #define eprintf(...) \
 	fprintf( stderr, "%s: ", NAME "-server" ) && \
 	fprintf( stderr, __VA_ARGS__ ) && \
@@ -144,6 +147,21 @@ struct filter filters[16] = {
 , { NULL }
 };
 
+struct thread_info {
+	pthread_t id;
+	int num;
+};
+
+struct thread_arg {
+	int fd, num;
+	pthread_t id;
+	struct senderrecvr *ctx; 
+	struct cdata *conn;
+};
+
+struct thread_info tiarray[ 1024 ] = {
+	{ 0, 0 }
+};
 
 int cmd_kill ( struct values *, char *, int );
 
@@ -319,6 +337,61 @@ void see_runas_user ( struct values *v ) {
 #endif
 
 
+
+
+// This can be refactored to do something else...
+void * run_srv_cycle( void *t ) {
+	int *status = malloc( sizeof( int ) );
+	struct thread_arg *ta = (struct thread_arg *)t;
+FPRINTF( "I'm being called in a thread and here is my data: %p\n"
+				 "(fd = %d), (ctx = %p), (conn = %p)\n", ta, ta->fd, ta->ctx, ta->conn );
+
+	ta->conn = malloc( sizeof( struct cdata ) );
+	memset( ta->conn, 0, sizeof( struct cdata ) ); 
+	ta->conn->ctx = ta->ctx;
+	ta->conn->flags = O_NONBLOCK;
+#if 1
+	//TODO: This needs to use the child socket (fd), not su.
+	//That whole structure should have been closed already...	
+	#if 0
+	//Get IP here and save it for logging purposes
+	if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
+		FPRINTF( "Error in getting IP address of connecting client.\n" );
+	}
+
+	//Close the socket
+	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
+		FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
+		return 0;
+	}
+	#endif
+
+	for ( ;; ) {
+		//additionally, this one should block
+		if ( !srv_response( ta->fd, ta->conn ) ) {
+			//TODO: What exactly causes this?
+			FPRINTF( "Error in TCP socket handling.\n" );
+		}
+
+		if ( CONN_CLOSE || ta->conn->count < 0 || ta->conn->count > 5 ) {
+			FPRINTF( "Closing connection marked by descriptor %d to peer.\n", ta->fd );
+			if ( close( ta->fd ) == -1 ) {
+				FPRINTF( "Error when closing child socket.\n" );
+				//TODO: You need to handle this and retry closing to regain resources
+			}
+			FPRINTF( "Connection is done. count is %d\n", ta->conn->count );
+			free( ta->conn );
+			*status = 1;
+			return status;	
+		}
+	}
+	FPRINTF( "Child process is exiting.\n" );
+#endif
+	*status = 1;
+	return status;
+}
+
+
 //Loop should be extracted out
 int cmd_server ( struct values *v, char *err, int errlen ) {
 	//Define
@@ -381,50 +454,30 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			return 0;
 		}
 	}
-#if 0
-	//Change process owner (may have to be done with either fork or something else)
-	else {
-		//Create another process with user and group 
-		pid_t spid; 
-		if ( ( spid = fork() ) == -1 ) {
-			FPRINTF( "Failed to start new process for server: %s\n", strerror(errno) );
-			return 0;
-		}
-		else if ( cpid == 0 ) {
-			//Change the owner and group of the opened socket?
-			return 0;
-		}
-		else {
-			//Record the PID somewhere
-			int len, fd = 0;
-			char buf[64] = { 0 };
-			//char pidfile[2048] = { 0 }; 
-			char *pidfile = "/var/run/hypno.pid";
-
-			if ( ( fd = open( pidfile, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR ) ) == -1 ) {
-				eprintf( "Failed to access PID file: %s.", strerror(errno));
-				return 0;
-			}
-
-			len = snprintf( buf, 63, "%d", spid );
-
-			//Write the pid down
-			if ( write( fd, buf, len ) == -1 ) {
-				eprintf( "Failed to log PID: %s.", strerror(errno));
-				return 0;
-			}
-		
-			//The parent exited successfully.
-			if ( close(fd) == -1 ) { 
-				eprintf( "Could not close parent socket: %s", strerror(errno));
-				return 0;
-			}
-		}
-	}
-#endif
 	
 	//TODO: Using threads may make this easier... https://www.geeksforgeeks.org/zombie-processes-prevention/
 	signal( SIGCHLD, SIG_IGN );
+
+	
+	//Allocate memory.  We can TECHNICALLY set limits here?
+	int nthreads = 1024;
+	int ccount = 0;
+	
+	//Use threads instead to serve
+	pthread_attr_t attr;
+	ssize_t stack_size;
+	
+	//Initialize thread attribute thing
+	if ( pthread_attr_init( &attr ) != 0 ) {
+		FPRINTF( "Failed to initialize thread attributes: %s\n", strerror(errno) );
+		return 0;	
+	}
+
+	//Set a minimum stack size (1kb?)
+	if ( pthread_attr_setstacksize( &attr, 4000000 ) != 0 ) {
+		FPRINTF( "Failed to set new stack size: %s\n", strerror(errno) );
+		return 0;	
+	}
 
 	//This can have one global variable
 	for ( CONN_CONTINUE ) {
@@ -438,6 +491,30 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			continue;
 		}
 
+#if 1
+	
+		//The thread "stackwatcherthing" will probably be allocated ahead of time
+		//And there is only ONE context, so that can be prepopulated	
+		//Create a new thread
+		void *res = NULL;	
+		struct thread_arg *tk = malloc( sizeof( struct thread_arg ) );
+#if 1
+		memset( tk, 0, sizeof( struct thread_arg ) );
+		tk->fd = fd;
+		tk->ctx = ctx;
+		//tk->conn = malloc( sizeof( struct cdata ) );
+#endif
+		pthread_create( &tk->id, &attr, run_srv_cycle, tk );
+FPRINTF( "Started new thread id: %ld\n", tk->id );
+		ccount++;
+
+		//Have NO idea how to join and get the status of each of these...
+#if 0	
+		pthread_join( ta.id, res );
+FPRINTF( "Possible no return yet: %d\n", *(int *)res );
+		free( res );
+#endif
+#else
 		//Fork and serve a request 
 		//fork() should not be the only choice
 		if ( ( cpid = fork() ) == -1 ) {
@@ -446,6 +523,11 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			break;	
 		}
 		else if ( cpid == 0 ) {
+
+#if 1
+			struct thread_arg ta = { fd, ctx };
+			run_srv_cycle( &ta );
+#else
 			struct cdata connection = {0};	
 			connection.flags = O_NONBLOCK;
 			connection.ctx = ctx;
@@ -481,6 +563,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 				}
 			}
 			FPRINTF( "Child process is exiting.\n" );
+#endif
 		#if 1	
 			break;
 		#else
@@ -500,6 +583,8 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			#endif
 			FPRINTF( "Waiting for new connection.\n" );
 		}
+#endif
+		FPRINTF( "Closing and waiting for next connection.\n" );
 	}
 
 	//Close the socket
