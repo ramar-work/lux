@@ -26,6 +26,8 @@
 #include "../socket.h"
 #include "../server.h"
 
+#include "../config.h"
+
 #ifndef CTXHTTP_H
 #define CTXHTTP_H
 void create_notls ( void **p ); 

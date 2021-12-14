@@ -75,7 +75,7 @@ read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *con
 	FPRINTF( "Read started...\n" );
 
 	//Define
-	int mult = 1, size = 1024; 
+	int mult = 1, size = CTX_READ_SIZE; 
 	char err[ 2048 ] = {0};
 
 	//Get the time at the start

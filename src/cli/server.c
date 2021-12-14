@@ -380,7 +380,7 @@ FPRINTF( "I'm being called in a thread and here is my data: %p\n"
 				//TODO: You need to handle this and retry closing to regain resources
 			}
 			FPRINTF( "Connection is done. count is %d\n", ta->conn->count );
-			free( ta->conn );
+			//free( ta->conn );
 			*status = 1;
 			return status;	
 		}
@@ -507,6 +507,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		pthread_create( &tk->id, &attr, run_srv_cycle, tk );
 FPRINTF( "Started new thread id: %ld\n", tk->id );
 		ccount++;
+		pthread_detach( tk->id );
 
 		//Have NO idea how to join and get the status of each of these...
 #if 0	

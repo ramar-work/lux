@@ -239,7 +239,7 @@ read_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *co
 
 	//Define
 	struct gnutls_abstr *g = (struct gnutls_abstr *)conn->ctx->data;
-	int mult = 1, size = 2048;
+	int mult = 1, size = CTX_READ_SIZE;
 	char err[ 2048 ] = {0};
 
 	//Get the time at the start

@@ -28,6 +28,8 @@
 #include "../server.h"
 #include "../util.h"
 
+#include "../config.h"
+
 #ifdef INCLUDE_GNUTLS 
 #include <gnutls/gnutls.h>
 #endif
