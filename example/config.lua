@@ -66,6 +66,16 @@ return {
 			filter = "lua"
 		},
 
+		-- Big file tests
+		["ironheadrecordings.local"] = { 
+			dir = "file",
+			root_default = "/index.html",
+			ca_bundle = "misc/self-signed/ironhead_self_signed.ca-bundle",
+			cert_file = "misc/self-signed/ironhead_self_signed.crt",
+			key_file = "misc/self-signed/ironhead_self_signed.key",
+			filter = "static"
+		},
+
 		-- self-signed certificate will match with ironheadrecordings.local
 		-- ["ironheadrecordings.local"] = { 
 		["tls.hypno.local"] = { 

@@ -168,5 +168,6 @@ const int filter_static ( int dd, struct HTTPBody *rq, struct HTTPBody *rs, stru
 		return http_set_error( rs, 500, err );
 	}
 
+	free( content );
 	return 1;
 }

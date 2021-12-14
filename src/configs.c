@@ -105,7 +105,6 @@ static struct lconfig ** build_hosts ( zTable *t ) {
 void free_hosts ( struct lconfig ** hlist ) {
 	struct lconfig **hosts = hlist;
 	while ( hosts && (*hosts) ) {
-		FPRINTF( "Freeing host %s\n", (*hosts)->name );
 		free( (*hosts)->alias );
 		free( (*hosts)->dir );
 		free( (*hosts)->filter );
@@ -113,7 +112,10 @@ void free_hosts ( struct lconfig ** hlist ) {
 		free( (*hosts)->ca_bundle );
 		free( (*hosts)->cert_file );
 		free( (*hosts)->key_file );
+
+
 		free( (*hosts) );
+
 		hosts++;
 	}
 	free( hlist );
@@ -265,6 +267,7 @@ void free_server_config( struct sconfig *config ) {
 	}
 
 	if ( config->hosts ) {
+		FPRINTF( "Freeing the hosts....!!!!!!!!!!!!!!!!\n" );
 		free_hosts( config->hosts );	
 	}
 

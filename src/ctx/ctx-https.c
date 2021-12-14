@@ -367,6 +367,7 @@ write_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *c
 
 		if ( sent == 0 ) {
 			FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", rs->mlen );
+			FPRINTF( "total bytes remaining %d...\n", total );
 			break;	
 		}
 		else if ( sent > -1 ) {

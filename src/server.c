@@ -75,6 +75,8 @@ static int srv_check_dir ( struct cdata *conn, char *err, int errlen ) {
 	}
 
 	//TODO: Fix me
+	free( conn->hconfig->dir );
+	conn->hconfig->dir = NULL;
 	conn->hconfig->dir = strdup( adir );
 	return 1;
 }

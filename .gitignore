@@ -18,6 +18,7 @@ bin/
 build/
 docs/
 example/c/app.so
+example/file
 example/tls/misc/tls/supergreatwok.xyz
 example/carolinascholar.com
 include/
