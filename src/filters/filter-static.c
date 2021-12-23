@@ -135,6 +135,8 @@ const int filter_static ( int dd, struct HTTPBody *rq, struct HTTPBody *rs, stru
 		return http_set_error( rs, 500, err );
 	}
 
+	//If the size is small enough, read into memory and serve.  Otherwise, serve file differently...
+
 	//Allocate a buffer
 	if ( !( content = malloc( sb.st_size ) ) || !memset( content, 0, sb.st_size ) ) {
 		const char fmt[] = "Could not allocate space for file: %s\n";
@@ -161,14 +163,13 @@ const int filter_static ( int dd, struct HTTPBody *rq, struct HTTPBody *rs, stru
 	//Just set content messages...
 	http_set_status( rs, 200 );
 	http_set_ctype( rs, mimetype->mimetype );
-	//http_set_content( rs, content, size ); 
-	http_copy_content( rs, content, size ); 
+	http_copy_content( rs, content, size ); //http_set_content( rs, content, size ); 
 
 	if ( !http_finalize_response( rs, err, sizeof( err ) ) ) {
 		free( content );
 		return http_set_error( rs, 500, err );
 	}
 
-	//free( content );
+	free( content );
 	return 1;
 }

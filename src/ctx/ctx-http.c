@@ -64,7 +64,6 @@ static void dumpconn( struct cdata *conn, const char *fname ) {
 
 
 const int pre_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
-dumpconn( conn, __func__ );
 	return 1;
 }
 

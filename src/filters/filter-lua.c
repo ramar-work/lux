@@ -874,6 +874,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//Initialize the data structure
 	memset( res, 0, sizeof( zhttp_t ) );
 	ld.req = req, ld.res = res;
+FPRINTF( "dir: %s\n", conn->hconfig->dir );
 	memcpy( (void *)ld.root, conn->hconfig->dir, strlen( conn->hconfig->dir ) );
 
 	//Then initialize the Lua state
@@ -988,7 +989,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	if ( lua_retglobal( ld.state, "config", LUA_TTABLE ) ) {
 		lua_getglobal( ld.state, mkey );
 		( lua_isnil( ld.state, -1 ) ) ? lua_pop( ld.state, 1 ) : 0;
-lua_istack( ld.state );
 		lua_merge( ld.state );
 		lua_setglobal( ld.state, mkey );
 	}

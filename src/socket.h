@@ -49,7 +49,8 @@ struct sockAbstr {
 	int reuse;
 	int family;
 	int *port;
-	struct sockaddr_in *sin;	
+	struct sockaddr_in *sin;
+	struct sockaddr_in sin2;
 	struct sockaddr addrinfo; 
 	socklen_t addrlen;
 	char iip[ 16 ];	

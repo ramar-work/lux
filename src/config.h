@@ -32,19 +32,23 @@
 #define POLL_INTERVAL 100000000
 
 //
-#define CTX_READ_SIZE 1024
+#define CTX_READ_SIZE 4096 
 #define CTX_WRITE_SIZE 1024
+
+#define MAX_THREADS 1024 
+
+//Forks or threads
+#if 0
+#undef HBLOCK_H
+#undef HFORK_H
+#undef HTHREAD_H
+#endif
 
 #if 0
 //Activate / deactivate database engines
 #define NOMYSQL_H
 #define NOPGSQL_H
 #define NOSQLITE_H
-
-//Forks or threads
-#define FORK_H
-//#define HFORK_H
-//#define HTHREAD_H
 
 //Enable or disable certain filters
 #define USEFILTER_C

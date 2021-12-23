@@ -50,7 +50,7 @@ static int srv_check_dir ( struct cdata *conn, char *err, int errlen ) {
 
 	//Check that log dir is accessible and writeable (or exists) - send 500 if not 
 	struct stat sb;
-	char *adir, dir[ 2048 ] = { 0 };
+	char *adir = NULL, dir[ 2048 ] = { 0 };
 
 	if ( !( adir = conn->hconfig->dir ) ) {
 		snprintf( err, errlen, "Directory for host '%s' does not exist.", conn->hconfig->name );
@@ -65,7 +65,10 @@ static int srv_check_dir ( struct cdata *conn, char *err, int errlen ) {
 			snprintf( err, errlen, fmt, conn->hconfig->name, strerror(errno) );
 			return 0;
 		}
-		adir = dir;
+
+		//If we get this far, replace the original directory with this new one
+		free( conn->hconfig->dir );
+		conn->hconfig->dir = adir = strdup( dir );
 	}
 
 	if ( access( adir, W_OK ) == -1 ) {
@@ -74,10 +77,6 @@ static int srv_check_dir ( struct cdata *conn, char *err, int errlen ) {
 		return 0;
 	}
 
-	//TODO: Fix me
-	free( conn->hconfig->dir );
-	conn->hconfig->dir = NULL;
-	conn->hconfig->dir = strdup( adir );
 	return 1;
 }
 
@@ -146,6 +145,7 @@ static const int srv_proc( int fd, struct HTTPBody *req, struct HTTPBody *res, s
 
 //Generate a message in common log format: ip - - [date] "method path protocol" status clen
 static const int srv_log( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn) {
+#if 0
 	const char fmt[] = "%s %s %s [%s] \"%s %s %s\" %d %d";
 	const char datefmt[] = "%d/%b/%Y:%H:%M:%S %z";
 	char log[2048] = {0};
@@ -163,6 +163,7 @@ static const int srv_log( int fd, struct HTTPBody *rq, struct HTTPBody *rs, stru
 	snprintf( log, sizeof(log), fmt, 
 		conn->ipv4, "-", "-", date, rq->method, rq->path, prot, rs->status, rs->clen );
 	FPRINTF( "%s\n", log );
+#endif
 	return 1;
 }
 
@@ -192,7 +193,7 @@ int srv_response ( int fd, struct cdata *conn ) {
 	char err[2048] = {0};
 	int status = 0;
 
-	const int (*rc[])( int, struct HTTPBody *, struct HTTPBody *, struct cdata *) = {
+	const int (*rc[])( int, zhttp_t *, zhttp_t *, struct cdata *) = {
 		srv_start
 	, conn->ctx->pre
 	, conn->ctx->read

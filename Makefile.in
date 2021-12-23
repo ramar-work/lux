@@ -22,9 +22,10 @@ SRVGROUP = ramar
 IFLAGS = -Ivendor -Ivendor/lua-5.4.3/src -I/usr/include/lua5.3
 LDFLAGS = -ldl -lpthread -lm -lgnutls
 DEBUGFLAGS = -DDEBUG_H
-CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -DINCLUDE_GNUTLS $(IFLAGS)
+MODEL = HTHREAD_H
+CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -DINCLUDE_GNUTLS -D$(MODEL) $(IFLAGS) 
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
-	-Wno-format-truncation -Wno-return-local-addr -DINCLUDE_GNUTLS -O2 $(IFLAGS)
+	-Wno-format-truncation -Wno-return-local-addr -DINCLUDE_GNUTLS -D$(MODEL) -O2 $(IFLAGS)
 CFLAGS = $(GCCFLAGS)
 CC = gcc
 SRC = \
@@ -105,6 +106,9 @@ debug-gcc: vendor/libcrypto.a
 debug-gcc: main
 	@printf '' > /dev/null
 
+debug-fork: main
+	@printf '' > /dev/null
+
 
 # install - Installs targets to $PREFIX/{bin,share} and /var/lib
 install:
@@ -172,6 +176,12 @@ test: CFLAGS += -g -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUG
 test:
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	for t in $(TESTS); do $(CC) $(LDFLAGS) $(CFLAGS) -o bin/$$t src/test/$${t}-test.c $(OBJ); done
+
+
+# test-invoke - Run a test invocation
+test-invoke:
+	echo sudo ASAN_OPTIONS=$$ASAN_OPTIONS bin/hypno-server --start --port 80 --config ../www/config.lua -x
+	sudo ASAN_OPTIONS=$$ASAN_OPTIONS bin/hypno-server --start --port 80 --config ../www/config.lua -x
 
 # vendor/libssl.a - Build OpenSSL
 vendor/libssl.a vendor/libcrypto.a &:

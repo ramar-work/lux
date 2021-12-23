@@ -202,18 +202,14 @@ struct sockAbstr * set_nonblock_on_socket ( struct sockAbstr *sa, char *err, int
 
 struct sockAbstr * open_listening_socket ( struct sockAbstr *sa, char *err, int errlen ) {
 	int status;
-	struct sockaddr_in t;
-	struct sockaddr_in *si = NULL; 
+	struct sockaddr_in *si = &sa->sin2; 
 
-	//An alternate way to do this is memcpy of a static structure to alloc	
-	//si->sin_family = sa->iptype; 
-	//si->sin_port = htons( *sa->port );
-	//(&si->sin_addr)->s_addr = htonl( INADDR_ANY ); // Can't this fail?
-
+#if 0
 	if ( !( si = malloc( sizeof( struct sockaddr_in ) ) ) ) {
 		snprintf( err, errlen, "Couldn't allocate space for socket: %s\n", strerror( errno ) );
 		return NULL;	
 	}
+#endif
 
 	si->sin_family = sa->iptype; 
 	si->sin_port = htons( *sa->port );
@@ -250,12 +246,10 @@ struct sockAbstr * open_listening_socket ( struct sockAbstr *sa, char *err, int 
 struct sockAbstr * close_listening_socket ( struct sockAbstr *sa, char *err, int errlen ) {
 	if ( close( sa->fd ) == -1 ) {
 		snprintf( err, errlen, "Could not close socket file %d: %s\n", sa->fd, strerror(errno) ); 
-		free( sa->sin );
 		sa->sin = NULL;
 		return NULL;
 	}
 
-	free( sa->sin );
 	sa->sin = NULL;
 	return sa;
 }

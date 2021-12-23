@@ -51,6 +51,9 @@
 #include "../filters/filter-redirect.h"
 #include "../filters/filter-lua.h"
 
+//Config
+#include "../config.h"
+
 //Include pthreads here...
 #include <pthread.h>
 
@@ -92,7 +95,10 @@
 	"-h, --help               Show the help menu.\n"
 
 #ifdef LEAKTEST_H
- #define CONN_CONTINUE int i=0; i<1; i++
+ #ifndef LEAKLIMIT
+	#define LEAKLIMIT 64
+ #endif
+ #define CONN_CONTINUE int i=0; i<LEAKLIMIT; i++
  #define CONN_CLOSE 1
 #else
  #define CONN_CONTINUE ;;
@@ -116,14 +122,24 @@ struct values {
 	int fork;
 	int dump;
 	int uid, gid;
-	char *user;
-	char *group;
-	char *config;
-	char *libdir;
-	char *pidfile;
+	char user[ 128 ];
+	char group[ 128 ];
+	char config[ PATH_MAX ];
+	char libdir[ PATH_MAX ];
+	char pidfile[ PATH_MAX ];
 #ifdef DEBUG_H
 	int pfork;
 #endif
+} values = {
+	.port = 80
+,	.pid = 80 
+,	.ssl = 0 
+,	.start = 0 
+,	.kill = 0 
+,	.fork = 0 
+,	.dump = 0 
+,	.uid = -1 
+,	.gid = -1 
 };
 
 
@@ -156,7 +172,8 @@ struct thread_arg {
 	int fd, num;
 	pthread_t id;
 	struct senderrecvr *ctx; 
-	struct cdata *conn;
+	//struct cdata *conn;
+	struct cdata conn;
 };
 
 struct thread_info tiarray[ 1024 ] = {
@@ -197,7 +214,7 @@ struct senderrecvr sr[] = {
 #if 1
 	{ read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost  }
 #endif
-#if 1
+#if 0
 , { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls }
 #endif
 ,	{ NULL }
@@ -337,58 +354,58 @@ void see_runas_user ( struct values *v ) {
 #endif
 
 
-
-
 // This can be refactored to do something else...
 void * run_srv_cycle( void *t ) {
-	int *status = malloc( sizeof( int ) );
 	struct thread_arg *ta = (struct thread_arg *)t;
-FPRINTF( "I'm being called in a thread and here is my data: %p\n"
-				 "(fd = %d), (ctx = %p), (conn = %p)\n", ta, ta->fd, ta->ctx, ta->conn );
+	FPRINTF( "I'm being called in a thread and here is my data: %p\n"
+			 "(fd = %d), (ctx = %p)\n", ta, ta->fd, ta->ctx );
 
-	ta->conn = malloc( sizeof( struct cdata ) );
-	memset( ta->conn, 0, sizeof( struct cdata ) ); 
-	ta->conn->ctx = ta->ctx;
-	ta->conn->flags = O_NONBLOCK;
-#if 1
+	ta->conn.ctx = ta->ctx;
+	ta->conn.flags = O_NONBLOCK;
+
 	//TODO: This needs to use the child socket (fd), not su.
 	//That whole structure should have been closed already...	
-	#if 0
 	//Get IP here and save it for logging purposes
+	#if 0
 	if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
 		FPRINTF( "Error in getting IP address of connecting client.\n" );
-	}
-
-	//Close the socket
-	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
-		FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
-		return 0;
 	}
 	#endif
 
 	for ( ;; ) {
 		//additionally, this one should block
-		if ( !srv_response( ta->fd, ta->conn ) ) {
+		if ( !srv_response( ta->fd, &ta->conn ) ) {
 			//TODO: What exactly causes this?
 			FPRINTF( "Error in TCP socket handling.\n" );
 		}
 
-		if ( CONN_CLOSE || ta->conn->count < 0 || ta->conn->count > 5 ) {
+		if ( CONN_CLOSE || ta->conn.count < 0 || ta->conn.count > 5 ) {
 			FPRINTF( "Closing connection marked by descriptor %d to peer.\n", ta->fd );
 			if ( close( ta->fd ) == -1 ) {
 				FPRINTF( "Error when closing child socket.\n" );
 				//TODO: You need to handle this and retry closing to regain resources
 			}
-			FPRINTF( "Connection is done. count is %d\n", ta->conn->count );
-			//free( ta->conn );
-			*status = 1;
-			return status;	
+			FPRINTF( "Connection is done. count is %d\n", ta->conn.count );
+			FPRINTF( "returning NULL.\n" );
+			return 0;
 		}
 	}
-	FPRINTF( "Child process is exiting.\n" );
+#if 0
+	const char resp[] = 
+		"HTTP/1.1 200 OK\r\n"
+		"Host: example.org\r\n"
+		"Content-Length: 12\r\n"
+		"Content-Type: text/html\r\n\r\n"
+		"All is well.";
+	
+	int b = 0;	
+	if ( ( b = write( ta->fd, resp, sizeof( resp ) ) ) < sizeof( resp ) ) {
+		write( ta->fd, &resp[ b ], sizeof( resp ) - b );
+	}
+	close( ta->fd );
 #endif
-	*status = 1;
-	return status;
+	FPRINTF( "Child process is exiting.\n" );
+	return 0;
 }
 
 
@@ -397,9 +414,11 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	//Define
 	struct sockAbstr su = {0};
 	struct senderrecvr *ctx = NULL;
+	//struct sockaddr_in t = {0};
 
 	//Initialize
 	populate_tcp_socket( &su, &v->port );
+
 	ctx = &sr[ v->ssl ];	
 	ctx->init( &ctx->data );
 	ctx->filters = filters;
@@ -419,12 +438,11 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;
 	}
 
-#if 1
+#if 0
 	//Drop privileges
 	if ( !revoke_priv( v, err, errlen ) ) {
 		return 0;
 	}
-#endif
 
 	//Write a PID file
 	if ( !v->fork ) { 
@@ -454,18 +472,19 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			return 0;
 		}
 	}
+#endif
 	
 	//TODO: Using threads may make this easier... https://www.geeksforgeeks.org/zombie-processes-prevention/
 	signal( SIGCHLD, SIG_IGN );
 
-	
-	//Allocate memory.  We can TECHNICALLY set limits here?
-	int nthreads = 1024;
-	int ccount = 0;
-	
+#ifdef HTHREAD_H
 	//Use threads instead to serve
+	int count = 0;
+	int nthreads = MAX_THREADS * 4;
 	pthread_attr_t attr;
 	ssize_t stack_size;
+	struct thread_arg ta_set[ nthreads ];
+	memset( ta_set, 0, sizeof( struct thread_arg ) * nthreads );
 	
 	//Initialize thread attribute thing
 	if ( pthread_attr_init( &attr ) != 0 ) {
@@ -479,43 +498,72 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;	
 	}
 
+#if 0
+	//Automatically detach everything?
+	if ( pthread_attr_setdetachstate( &attr, PTHREAD_CREATE_DETACHED ) != 0 ) {
+		FPRINTF( "Failed to set detach state: %s\n", strerror(errno) );
+		return 0;	
+	}
+#endif
+
+#endif
+
 	//This can have one global variable
 	for ( CONN_CONTINUE ) {
 		//Client address and length?
 		int fd = 0, status;	
-		pid_t cpid; 
-
+		pid_t cpid;
+		
 		//Accept a connection.
 		if ( !accept_listening_socket( &su, &fd, err, errlen ) ) {
 			FPRINTF( "socket %d could not be marked as non-blocking\n", fd );
 			continue;
 		}
 
-#if 1
-	
-		//The thread "stackwatcherthing" will probably be allocated ahead of time
-		//And there is only ONE context, so that can be prepopulated	
-		//Create a new thread
-		void *res = NULL;	
-		struct thread_arg *tk = malloc( sizeof( struct thread_arg ) );
-#if 1
+	#ifdef HBLOCK_H 
+		//Should just run once and die...
+		struct thread_arg th;
+		th.fd = fd;
+		th.ctx = ctx;
+		run_srv_cycle( &th ); 
+		break;
+	#endif
+
+	#ifdef HTHREAD_H
+		struct thread_arg *tk = &ta_set[ count ];
 		memset( tk, 0, sizeof( struct thread_arg ) );
 		tk->fd = fd;
 		tk->ctx = ctx;
-		//tk->conn = malloc( sizeof( struct cdata ) );
-#endif
-		pthread_create( &tk->id, &attr, run_srv_cycle, tk );
-FPRINTF( "Started new thread id: %ld\n", tk->id );
-		ccount++;
-		pthread_detach( tk->id );
+		count++;
+		FPRINTF( "count is: %d\n", count );
 
-		//Have NO idea how to join and get the status of each of these...
-#if 0	
-		pthread_join( ta.id, res );
-FPRINTF( "Possible no return yet: %d\n", *(int *)res );
-		free( res );
-#endif
-#else
+		if ( pthread_create( &tk->id, NULL, run_srv_cycle, tk ) != 0 ) {
+			FPRINTF( "Pthread create unsuccessful.\n" );
+			continue;
+		}
+
+		#if 1
+		if ( pthread_detach( tk->id ) != 0 ) {
+			FPRINTF( "Pthread detach unsuccessful.\n" );
+			continue;
+		}
+		#else
+		if ( count >= 32 ) {
+			for ( count = 0; count >= 32; count++ ) {
+				int s = pthread_join( ta_set[ count ].id, NULL ); 
+				FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
+				if ( s != 0 ) {
+					FPRINTF( "Pthread join at pos %d failed...\n", count );
+					continue;
+				}
+			}
+			count = 0;
+		}
+		#endif
+		
+	#endif
+
+	#ifdef HFORK_H
 		//Fork and serve a request 
 		//fork() should not be the only choice
 		if ( ( cpid = fork() ) == -1 ) {
@@ -524,11 +572,6 @@ FPRINTF( "Possible no return yet: %d\n", *(int *)res );
 			break;	
 		}
 		else if ( cpid == 0 ) {
-
-#if 1
-			struct thread_arg ta = { fd, ctx };
-			run_srv_cycle( &ta );
-#else
 			struct cdata connection = {0};	
 			connection.flags = O_NONBLOCK;
 			connection.ctx = ctx;
@@ -564,12 +607,7 @@ FPRINTF( "Possible no return yet: %d\n", *(int *)res );
 				}
 			}
 			FPRINTF( "Child process is exiting.\n" );
-#endif
-		#if 1	
 			break;
-		#else
-			_exit( 0 );
-		#endif
 		}
 		else { 
 			//TODO: Additional logging ought to happen here.
@@ -584,7 +622,7 @@ FPRINTF( "Possible no return yet: %d\n", *(int *)res );
 			#endif
 			FPRINTF( "Waiting for new connection.\n" );
 		}
-#endif
+	#endif
 		FPRINTF( "Closing and waiting for next connection.\n" );
 	}
 
@@ -663,12 +701,24 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 	fprintf( stderr, "Port:                %d\n", v->port );
 	fprintf( stderr, "Using SSL?:          %s\n", v->ssl ? "T" : "F" );
 	fprintf( stderr, "Daemonized:          %s\n", v->fork ? "T" : "F" );
-	fprintf( stderr, "Request Model:       %s\n", "Fork" );
 	fprintf( stderr, "User:                %s (%d)\n", v->user, v->uid );
 	fprintf( stderr, "Group:               %s (%d)\n", v->group, v->gid );
 	fprintf( stderr, "Config:              %s\n", v->config );
 	fprintf( stderr, "PID file:            %s\n", v->pidfile );
 	fprintf( stderr, "Library Directory:   %s\n", v->libdir );
+#ifdef HFORK_H
+	fprintf( stderr, "Running in fork mode.\n" );
+#endif
+#ifdef HTHREAD_H
+	fprintf( stderr, "Running in threaded mode.\n" );
+#endif
+#ifdef HBLOCK_H
+	fprintf( stderr, "Running in blocking mode (NOTE: Performance will suffer, only use this for testing).\n" );
+#endif
+#ifdef LEAKTEST_H
+ 	fprintf( stderr, "Leak testing is enabled, server will stop after %d requests.\n",
+		LEAKLIMIT ); 
+#endif
 
 	fprintf( stderr, "Filters enabled:\n" );
 	for ( struct filter *f = filters; f->name; f++ ) {
@@ -694,9 +744,20 @@ void print_options ( struct values *v ) {
 
 
 int main (int argc, char *argv[]) {
-	struct values values = { .gid = -1, .uid = -1 };
 	char err[ 2048 ] = { 0 };
 	int *port = NULL; 
+	struct values v = { 0 };
+	
+	//Set default v 
+	v.port = 80;
+	v.pid = 80;
+	v.ssl = 0 ;
+	v.start = 0; 
+	v.kill = 0 ;
+	v.fork = 0 ;
+	v.dump = 0 ;
+	v.uid = -1 ;
+	v.gid = -1 ;
 
 	if ( argc < 2 ) {
 		fprintf( stderr, HELP );
@@ -705,24 +766,24 @@ int main (int argc, char *argv[]) {
 	
 	while ( *argv ) {
 		if ( !strcmp( *argv, "-s" ) || !strcmp( *argv, "--start" ) ) 
-			values.start = 1;
+			v.start = 1;
 		else if ( !strcmp( *argv, "-k" ) || !strcmp( *argv, "--kill" ) ) 
-			values.kill = 1;
+			v.kill = 1;
 		else if ( !strcmp( *argv, "-x" ) || !strcmp( *argv, "--dump" ) ) 
-			values.dump = 1;
+			v.dump = 1;
 	#if 0
 		else if ( !strcmp( *argv, "-d" ) || !strcmp( *argv, "--daemonize" ) ) 
-			values.fork = 1;
+			v.fork = 1;
 	#endif
 		else if ( !strcmp( *argv, "--use-ssl" ) ) 
-			values.ssl = 1;
+			v.ssl = 1;
 		else if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--libs" ) ) {
 			argv++;
 			if ( !*argv ) {
 				eprintf( "Expected argument for --libs!" );
 				return 0;
 			}
-			values.libdir = *argv;
+			snprintf( v.libdir, sizeof( v.libdir ) - 1, "%s", *argv );	
 		}
 		else if ( !strcmp( *argv, "-c" ) || !strcmp( *argv, "--config" ) ) {
 			argv++;
@@ -730,7 +791,7 @@ int main (int argc, char *argv[]) {
 				eprintf( "Expected argument for --config!" );
 				return 0;
 			}
-			values.config = *argv;
+			snprintf( v.config, sizeof( v.config ) - 1, "%s", *argv );	
 		}
 		else if ( !strcmp( *argv, "--pidfile" ) ) {
 			argv++;
@@ -738,7 +799,7 @@ int main (int argc, char *argv[]) {
 				eprintf( "Expected argument for --port!" );
 				return 0;
 			}
-			values.pidfile = *argv;
+			snprintf( v.pidfile, sizeof( v.pidfile ) - 1, "%s", *argv );	
 		}
 		else if ( !strcmp( *argv, "-p" ) || !strcmp( *argv, "--port" ) ) {
 			argv++;
@@ -747,7 +808,7 @@ int main (int argc, char *argv[]) {
 				return 0;
 			}
 			//TODO: This should be safeatoi 
-			values.port = atoi( *argv );
+			v.port = atoi( *argv );
 		}
 		else if ( !strcmp( *argv, "-g" ) || !strcmp( *argv, "--group" ) ) {
 			argv++;
@@ -755,7 +816,7 @@ int main (int argc, char *argv[]) {
 				eprintf( "Expected argument for --group!" );
 				return 0;
 			} 
-			values.group = strdup( *argv );
+			snprintf( v.group, sizeof( v.group ) - 1, "%s", *argv );	
 		}
 		else if ( !strcmp( *argv, "-u" ) || !strcmp( *argv, "--user" ) ) {
 			argv++;
@@ -763,7 +824,7 @@ int main (int argc, char *argv[]) {
 				eprintf( "Expected argument for --user!" );
 				return 0;
 			} 
-			values.user = strdup( *argv );
+			snprintf( v.user, sizeof( v.user ) - 1, "%s", *argv );	
 		}
 		argv++;
 	}
@@ -772,71 +833,65 @@ int main (int argc, char *argv[]) {
 	signal( SIGINT, sigkill );
 
 	//Set all of the socket stuff
-	if ( !values.port ) {
-		values.port = defport;
+	if ( !v.port ) {
+		v.port = defport;
 	}
 
 	//Set a default user and group
-	if ( !values.user ) {
-		values.user = getpwuid( getuid() )->pw_name;
-		values.uid = getuid();
+	if ( ! *v.user ) {
+		snprintf( v.user, sizeof( v.user ) - 1, "%s", getpwuid( getuid() )->pw_name );
+		v.uid = getuid();
 	}
 
-	if ( !values.group ) {
-		//values.group = getpwuid( getuid() )->pw_gid ;
-		values.gid = getgid();
-		values.group = getpwuid( values.gid )->pw_name ;
+	if ( ! *v.group ) {
+		//v.group = getpwuid( getuid() )->pw_gid ;
+		v.gid = getgid();
+		snprintf( v.group, sizeof( v.group ) - 1, "%s", getpwuid( getuid() )->pw_name );
 	}
 
 	//Open the libraries (in addition to stuff)
-	if ( !values.libdir ) {
-		values.libdir = LIBDIR;
+	if ( ! *v.libdir ) {
+		snprintf( v.libdir, sizeof( v.libdir ), "%s", LIBDIR );
 	}
 
 #if 0
 	//Load shared libraries
-	if ( !cmd_libs( &values, err, sizeof( err ) ) ) {
+	if ( !cmd_libs( &v, err, sizeof( err ) ) ) {
 		eprintf( "%s", err );
 		return 1;
 	}
 #endif
 
 	//Dump the configuration if necessary
-	if ( values.dump ) {
-		cmd_dump( &values, err, sizeof( err ) );		
+	if ( v.dump ) {
+		cmd_dump( &v, err, sizeof( err ) );		
 	}
 
 	//Start a server
-	if ( values.start ) {
-	#if 0
-		if ( values.fork ) {
-			//start a fork...
-		}
-	#endif
+	if ( v.start ) {
 		//Set pid file
-		if ( !values.pidfile ) {
+		if ( ! *v.pidfile ) {
 			struct timespec t;
 			clock_gettime( CLOCK_REALTIME, &t );
 			unsigned long time = t.tv_nsec % 3333;
-			snprintf( pidbuf, sizeof( pidbuf ) - 1, "%s/%s-%ld", PIDDIR, NAME, time );
-			values.pidfile = pidbuf;
+			snprintf( v.pidfile, sizeof( v.pidfile ) - 1, "%s/%s-%ld", PIDDIR, NAME, time );
 		}
 
 		//Pull in a configuration
-		if ( !values.config ) {
+		if ( ! *v.config ) {
 			eprintf( "No configuration specified." );
 			return 1;
 		}
 
-		if ( !cmd_server( &values, err, sizeof(err) ) ) {
+		if ( !cmd_server( &v, err, sizeof(err) ) ) {
 			eprintf( "%s", err );
 			return 1;
 		}
 	}
 
-	if ( values.kill ) {
+	if ( v.kill ) {
 		//eprintf ( "%s\n", "--kill not yet implemented." );
-		if ( !cmd_kill( &values, err, sizeof( err ) ) ) {
+		if ( !cmd_kill( &v, err, sizeof( err ) ) ) {
 			eprintf( "%s", err );
 			return 1;
 		}
