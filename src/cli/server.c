@@ -98,10 +98,8 @@
  #ifndef LEAKLIMIT
 	#define LEAKLIMIT 64
  #endif
- #define CONN_CONTINUE int i=0; i<LEAKLIMIT; i++
  #define CONN_CLOSE 1
 #else
- #define CONN_CONTINUE ;;
  #define CONN_CLOSE 0 
 #endif
 
@@ -357,20 +355,8 @@ void see_runas_user ( struct values *v ) {
 // This can be refactored to do something else...
 void * run_srv_cycle( void *t ) {
 	struct thread_arg *ta = (struct thread_arg *)t;
-	FPRINTF( "I'm being called in a thread and here is my data: %p\n"
-			 "(fd = %d), (ctx = %p)\n", ta, ta->fd, ta->ctx );
-
 	ta->conn.ctx = ta->ctx;
 	ta->conn.flags = O_NONBLOCK;
-
-	//TODO: This needs to use the child socket (fd), not su.
-	//That whole structure should have been closed already...	
-	//Get IP here and save it for logging purposes
-	#if 0
-	if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
-		FPRINTF( "Error in getting IP address of connecting client.\n" );
-	}
-	#endif
 
 	for ( ;; ) {
 		//additionally, this one should block
@@ -390,20 +376,7 @@ void * run_srv_cycle( void *t ) {
 			return 0;
 		}
 	}
-#if 0
-	const char resp[] = 
-		"HTTP/1.1 200 OK\r\n"
-		"Host: example.org\r\n"
-		"Content-Length: 12\r\n"
-		"Content-Type: text/html\r\n\r\n"
-		"All is well.";
-	
-	int b = 0;	
-	if ( ( b = write( ta->fd, resp, sizeof( resp ) ) ) < sizeof( resp ) ) {
-		write( ta->fd, &resp[ b ], sizeof( resp ) - b );
-	}
-	close( ta->fd );
-#endif
+
 	FPRINTF( "Child process is exiting.\n" );
 	return 0;
 }
@@ -411,14 +384,12 @@ void * run_srv_cycle( void *t ) {
 
 //Loop should be extracted out
 int cmd_server ( struct values *v, char *err, int errlen ) {
-	//Define
-	struct sockAbstr su = {0};
+	//Define some variables for use throughout this function
+	FILE * logfd;
+	char * logfile = "log";
+
+	//Initialize server context
 	struct senderrecvr *ctx = NULL;
-	//struct sockaddr_in t = {0};
-
-	//Initialize
-	populate_tcp_socket( &su, &v->port );
-
 	ctx = &sr[ v->ssl ];	
 	ctx->init( &ctx->data );
 	ctx->filters = filters;
@@ -430,13 +401,56 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;
 	}
 
-	//Open a socket		
-	if ( !open_listening_socket( &su, err, errlen ) ) {
-		//eprintf( "socket open error: %s", err );
+	//Open a log file here
+	if ( !( logfd = fopen( logfile, "w+" ) ) ) {
+		eprintf( "Couldn't open log file at: %s...\n", logfile );
+		return 0;
+	}
+
+	//Setup and open a TCP socket
+#if 0
+	struct sockAbstr su = {0};
+	if ( !populate_tcp_socket( &su, &v->port ) || !open_listening_socket( &su, err, errlen ) ) {
+		eprintf( "socket open error: %s", err );
 		char throwaway[ 1024 ] = {0};
 		close_listening_socket( &su, throwaway, sizeof(throwaway) );
 		return 0;
 	}
+#else
+	struct sockaddr_in sa, *si = &sa;
+	short unsigned int port = 80, *pport = &port;
+	int listen_fd;
+	int status;
+	int backlog = 4096;
+	//struct sockaddr_in *si = &sa->sin2; 
+	si->sin_family = PF_INET; 
+	si->sin_port = htons( port );
+	(&si->sin_addr)->s_addr = htonl( INADDR_ANY ); // Can't this fail?
+
+	if (( listen_fd = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1 ) {
+		snprintf( err, errlen, "Couldn't open socket! Error: %s\n", strerror( errno ) );
+		fprintf( logfd, err );
+		return 0;
+	}
+
+	if ( fcntl( listen_fd, F_SETFD, O_NONBLOCK ) == -1 ) {
+		snprintf( err, errlen, "fcntl error: %s\n", strerror(errno) ); 
+		fprintf( logfd, err );
+		return 0;
+	}
+
+	if ( bind( listen_fd, (struct sockaddr *)si, sizeof(struct sockaddr_in)) == -1 ) {
+		snprintf( err, errlen, "Couldn't bind socket to address! Error: %s\n", strerror( errno ) );
+		fprintf( logfd, err );
+		return 0;
+	}
+
+	if ( listen( listen_fd, backlog) == -1 ) {
+		snprintf( err, errlen, "Couldn't listen for connections! Error: %s\n", strerror( errno ) );
+		fprintf( logfd, err );
+		return 0;
+	}
+#endif
 
 #if 0
 	//Drop privileges
@@ -477,7 +491,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	//TODO: Using threads may make this easier... https://www.geeksforgeeks.org/zombie-processes-prevention/
 	signal( SIGCHLD, SIG_IGN );
 
-#ifdef HTHREAD_H
 	//Use threads instead to serve
 	int count = 0;
 	int nthreads = MAX_THREADS * 4;
@@ -498,56 +511,73 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;	
 	}
 
-#if 0
-	//Automatically detach everything?
-	if ( pthread_attr_setdetachstate( &attr, PTHREAD_CREATE_DETACHED ) != 0 ) {
-		FPRINTF( "Failed to set detach state: %s\n", strerror(errno) );
-		return 0;	
-	}
+#ifdef LEAKTEST_H	
+	for ( int fd, count = 0, i = 0; i<LEAKLIMIT; i++ ) { 
+#else
+	for ( int fd, count = -1; ; ) {
 #endif
-
-#endif
-
-	//This can have one global variable
-	for ( CONN_CONTINUE ) {
 		//Client address and length?
-		int fd = 0, status;	
-		pid_t cpid;
-		
+		struct sockaddr addrinfo;
+		socklen_t addrlen;
+		struct thread_arg *tk = &ta_set[ ++count ];
+		memset( tk, 0, sizeof( struct thread_arg ) );
+	
+	#if 0	
 		//Accept a connection.
 		if ( !accept_listening_socket( &su, &fd, err, errlen ) ) {
 			FPRINTF( "socket %d could not be marked as non-blocking\n", fd );
 			continue;
 		}
-
-	#ifdef HBLOCK_H 
-		//Should just run once and die...
-		struct thread_arg th;
-		th.fd = fd;
-		th.ctx = ctx;
-		run_srv_cycle( &th ); 
-		break;
+	#else
+		if ( ( fd = accept( listen_fd, &addrinfo, &addrlen ) ) == -1 ) {
+			//TODO: Need to check if the socket was non-blocking or not...
+			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
+				//This should just try to read again
+				snprintf( err, errlen, "Try accept again: %s\n", strerror( errno ) );
+				continue;	
+			}
+			else if ( errno == EMFILE || errno == ENFILE ) { 
+				//These both refer to open file limits
+				snprintf( err, errlen, "Too many open files, try closing some requests.\n" );
+				//fprintf( stderr, "%s\n", err );
+				fprintf( logfd, "%s\n", err );
+				return 0;
+			}
+			else if ( errno == EINTR ) { 
+				//In this situation we'll handle signals
+				snprintf( err, errlen, "Signal received: %s\n", strerror( errno ) );
+				fprintf( logfd, "%s", err );
+				return 0;
+			}
+			else {
+				//All other codes really should just stop. 
+				snprintf( err, errlen, "accept() failed: %s\n", strerror( errno ) );
+				fprintf( logfd, "%s", err );
+				return 0;
+			}
+		}
 	#endif
 
-	#ifdef HTHREAD_H
-		struct thread_arg *tk = &ta_set[ count ];
-		memset( tk, 0, sizeof( struct thread_arg ) );
+		//Right after accept, get the IP information
+		//char *ip = inet_ntoa( a->sin->sin_addr );
+
+		//Set up both context and file descriptor
 		tk->fd = fd;
 		tk->ctx = ctx;
-		count++;
-		FPRINTF( "count is: %d\n", count );
 
+		//Start a new thread
 		if ( pthread_create( &tk->id, NULL, run_srv_cycle, tk ) != 0 ) {
 			FPRINTF( "Pthread create unsuccessful.\n" );
 			continue;
 		}
 
-		#if 1
+	#if 0
+		//This SHOULD work, but doesn't because there is no way to track whether or not it finished
 		if ( pthread_detach( tk->id ) != 0 ) {
 			FPRINTF( "Pthread detach unsuccessful.\n" );
 			continue;
 		}
-		#else
+	#else
 		if ( count >= 32 ) {
 			for ( count = 0; count >= 32; count++ ) {
 				int s = pthread_join( ta_set[ count ].id, NULL ); 
@@ -559,78 +589,22 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			}
 			count = 0;
 		}
-		#endif
-		
-	#endif
-
-	#ifdef HFORK_H
-		//Fork and serve a request 
-		//fork() should not be the only choice
-		if ( ( cpid = fork() ) == -1 ) {
-			//TODO: There is most likely a reason this didn't work.
-			FPRINTF( "Failed to setup new child connection. %s\n", strerror(errno) );
-			break;	
-		}
-		else if ( cpid == 0 ) {
-			struct cdata connection = {0};	
-			connection.flags = O_NONBLOCK;
-			connection.ctx = ctx;
-		
-			//TODO: This needs to use the child socket (fd), not su.
-			//That whole structure should have been closed already...	
-			#if 0
-			//Get IP here and save it for logging purposes
-			if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
-				FPRINTF( "Error in getting IP address of connecting client.\n" );
-			}
-
-			//Close the socket
-			if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
-				FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
-				return 0;
-			}
-			#endif
-
-			for ( ;; ) {
-				//additionally, this one should block
-				if ( !srv_response( fd, &connection ) ) {
-					FPRINTF( "Error in TCP socket handling.\n" );
-				}
-
-				if ( CONN_CLOSE || connection.count < 0 || connection.count > 5 ) {
-					FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
-					if ( close( fd ) == -1 ) {
-						FPRINTF( "Error when closing child socket.\n" );
-					}
-					FPRINTF( "Connection is done. count is %d\n", connection.count );
-					break;
-				}
-			}
-			FPRINTF( "Child process is exiting.\n" );
-			break;
-		}
-		else { 
-			//TODO: Additional logging ought to happen here.
-			//Close the file descriptor here?
-			if ( close( fd ) == -1 ) {
-				FPRINTF( "Parent couldn't close socket.\n" );
-			}
-			#if 0
-			if ( !get_iip_of_socket( &su ) || !( connection.ipv4 = su.iip ) ) {
-				FPRINTF( "Error in getting IP address of connecting client.\n" );
-			}
-			#endif
-			FPRINTF( "Waiting for new connection.\n" );
-		}
 	#endif
 		FPRINTF( "Closing and waiting for next connection.\n" );
 	}
 
+#if 0
 	//Close the socket
 	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
 		FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
 		return 0;
 	}
+#else
+	if ( close( listen_fd ) == -1 ) {
+		FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
+		return 0;
+	}
+#endif
 
 	return 1;
 }

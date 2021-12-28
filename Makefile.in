@@ -23,6 +23,7 @@ IFLAGS = -Ivendor -Ivendor/lua-5.4.3/src -I/usr/include/lua5.3
 LDFLAGS = -ldl -lpthread -lm -lgnutls
 DEBUGFLAGS = -DDEBUG_H
 MODEL = HTHREAD_H
+ASAN_OPTIONS = log_path=asan.log
 CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -DINCLUDE_GNUTLS -D$(MODEL) $(IFLAGS) 
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
 	-Wno-format-truncation -Wno-return-local-addr -DINCLUDE_GNUTLS -D$(MODEL) -O2 $(IFLAGS)

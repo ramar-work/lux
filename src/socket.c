@@ -169,10 +169,10 @@ struct sockAbstr * populate_socket ( struct sockAbstr *sa, int protocol, int soc
 }
 
 
-int get_iip_of_socket( struct sockAbstr *a ) {
+int get_iip_of_socket( struct sockAbstr *sa ) {
 	//struct sockaddr_in *cin = (struct sockaddr_in *)&a->addrinfo;
-	char *ip = inet_ntoa( a->sin->sin_addr );
-	memcpy( a->iip, ip, strlen( ip ) );
+	char *ip = inet_ntoa( sa->sin->sin_addr );
+	memcpy( sa->iip, ip, strlen( ip ) );
 	return 1;
 }
 
