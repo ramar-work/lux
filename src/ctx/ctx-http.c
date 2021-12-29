@@ -157,7 +157,7 @@ const int write_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct
 
 	//Start writing data to socket
 	for ( ;; ) {
-		sent = send( fd, ptr, total, MSG_DONTWAIT );
+		sent = send( fd, ptr, total, MSG_DONTWAIT | MSG_NOSIGNAL );
 		FPRINTF( "Bytes sent: %d\n", sent );
 
 		if ( sent == 0 ) {

@@ -40,7 +40,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include <pwd.h>
+#include <pthread.h>
 #include "../socket.h"
 #include "../server.h"
 #include "../ctx/ctx-http.h"
@@ -50,31 +52,32 @@
 #include "../filters/filter-dirent.h"
 #include "../filters/filter-redirect.h"
 #include "../filters/filter-lua.h"
-
-//Config
 #include "../config.h"
 
-//Include pthreads here...
-#include <pthread.h>
-
-#define eprintf(...) \
-	fprintf( stderr, "%s: ", NAME "-server" ) && \
-	fprintf( stderr, __VA_ARGS__ ) && \
-	fprintf( stderr, "\n" )
+#ifndef PIDDIR
+ #define PIDDIR "/var/run/"
+#endif
 
 #define NAME "hypno"
 
-#define LIBDIR "/var/lib/hypno"
+#define LIBDIR "/var/lib/" NAME
 
-#define PIDFILE "/var/run/hypno.pid"
-
-#if 0
-#define PIDDIR "/var/run"
-#else
-#define PIDDIR "/tmp"
-#endif
+#define PIDFILE PIDDIR NAME ".pid"
 
 #define HELP \
+	"-s, --start              Start the server\n" \
+	"-k, --kill               Kill a running server\n" \
+	"-c, --config <arg>       Use this Lua file for configuration\n" \
+	"-p, --port <arg>         Start using a different port \n" \
+	"    --pidfile <arg>      Define a PID file\n" \
+	"-u, --user <arg>         Choose an alternate user to run as\n" \
+	"-g, --group <arg>        Choose an alternate group to run as\n" \
+	"-x, --dump               Dump configuration at startup\n" \
+	"-l, --logfile <arg>      Define an alternate log file location\n" \
+	"-a, --accessfile <arg>   Define an alternate access file location\n" \
+	"-h, --help               Show the help menu.\n"
+
+#if 0
 	"-d, --dir <arg>          Define where to create a new application.\n"\
 	"-n, --domain-name <arg>  Define a specific domain for the app.\n"\
 	"    --title <arg>        Define a <title> for the app.\n"\
@@ -82,17 +85,15 @@
 	"                         specify multiple paths).\n"\
 	"-b, --database <arg>     Define a specific database connection.\n"\
 	"-x, --dump-args          Dump passed arguments.\n" \
-	"-s, --start              Start the server\n" \
-	"-c, --config <arg>       Use this Lua file for configuration\n" \
-	"-p, --port <arg>         Start using a different port \n" \
-	"-u, --user <arg>         Choose an alternate user to start as\n" \
-	"-x, --dump               Dump configuration at startup\n" \
-	"-k, --kill               Kill a running server\n" \
-	"-l, --libs <arg>         Point to libraries at <arg>\n" \
 	"    --no-fork            Do not fork\n" \
 	"    --use-ssl            Use SSL\n" \
-	"    --debug              set debug rules\n" \
-	"-h, --help               Show the help menu.\n"
+	"    --debug              set debug rules\n"
+#endif
+
+#define eprintf(...) \
+	fprintf( stderr, "%s: ", NAME "-server" ) && \
+	fprintf( stderr, __VA_ARGS__ ) && \
+	fprintf( stderr, "\n" )
 
 #ifdef LEAKTEST_H
  #ifndef LEAKLIMIT
@@ -105,11 +106,17 @@
 
 const int defport = 2000;
 
+char * logfile = "/var/log/hypno-error.log";
+
+char * accessfile = "/var/log/hypno-access.log";
+
 const char libn[] = "libname";
 
 const char appn[] = "filter";
 
 char pidbuf[128] = {0};
+
+FILE * logfd = NULL, * accessfd = NULL;
 
 struct values {
 	int port;
@@ -123,6 +130,8 @@ struct values {
 	char user[ 128 ];
 	char group[ 128 ];
 	char config[ PATH_MAX ];
+	char logfile[ PATH_MAX ];
+	char accessfile[ PATH_MAX ];
 	char libdir[ PATH_MAX ];
 	char pidfile[ PATH_MAX ];
 #ifdef DEBUG_H
@@ -161,26 +170,18 @@ struct filter filters[16] = {
 , { NULL }
 };
 
-struct thread_info {
-	pthread_t id;
-	int num;
-};
-
 struct thread_arg {
 	int fd, num;
 	pthread_t id;
 	struct senderrecvr *ctx; 
-	//struct cdata *conn;
 	struct cdata conn;
-};
-
-struct thread_info tiarray[ 1024 ] = {
-	{ 0, 0 }
 };
 
 int cmd_kill ( struct values *, char *, int );
 
 int procpid = 0;
+
+int fdset[ 10 ] = { -1 };
 
 //In lieu of an actual ctx object, we do this to mock pre & post which don't exist
 const int fkctpre( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c ) {
@@ -192,9 +193,43 @@ const int fkctpost( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c) {
 }
 
 void sigkill( int signum ) {
-	fprintf( stderr, "Killing the server..." );
+	fprintf( stderr, "Received SIGKILL - Killing the server...\n" );
 	char err[ 2048 ] = {0};
-	cmd_kill( NULL, err, sizeof( err ) );
+
+	//Kill any open sockets
+	for ( int i = 0; i < sizeof( fdset ) / sizeof( int ); i++ )	{
+		if ( fdset[ i ] == -1 ) {
+			break;
+		}
+
+		if ( close( fdset[ i ] ) == -1 ) {
+			fprintf( stderr, "Failed to close fd..." );
+			//Join (and kill) all the open threads (could take a while)
+			#if 0
+			for ( count = 0; count >= 64; count++ ) {
+				int s = pthread_join( ta_set[ count ].id, NULL ); 
+				FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
+				if ( s != 0 ) {
+					FPRINTF( "Pthread join at pos %d failed...\n", count );
+					continue;
+				}
+			}
+			#endif
+		}
+	}
+
+	//Kill the accessfd and log fd
+	if ( accessfd ) {
+		fclose( accessfd ); 
+		accessfd = NULL;
+	}
+
+	if ( logfd ) {
+		fclose( logfd );
+		logfd = NULL;
+	}
+
+	//cmd_kill( NULL, err, sizeof( err ) );
 }
 
 
@@ -204,7 +239,6 @@ static int findex() {
 	for ( struct filter *f = filters; f->name; f++, fi++ ); 
 	return fi;	
 }
-
 
 
 //Define a list of "context types"
@@ -378,15 +412,13 @@ void * run_srv_cycle( void *t ) {
 	}
 
 	FPRINTF( "Child process is exiting.\n" );
+	free( ta );
 	return 0;
 }
 
 
 //Loop should be extracted out
 int cmd_server ( struct values *v, char *err, int errlen ) {
-	//Define some variables for use throughout this function
-	FILE * logfd;
-	char * logfile = "log";
 
 	//Initialize server context
 	struct senderrecvr *ctx = NULL;
@@ -402,13 +434,20 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	}
 
 	//Open a log file here
-	if ( !( logfd = fopen( logfile, "w+" ) ) ) {
-		eprintf( "Couldn't open log file at: %s...\n", logfile );
+	if ( !( logfd = fopen( v->logfile, "a" ) ) ) {
+		eprintf( "Couldn't open error log file at: %s...\n", logfile );
+		return 0;
+	}
+
+	//Open an access file too 
+	if ( !( accessfd = fopen( v->accessfile, "a" ) ) ) {
+		eprintf( "Couldn't open access log file at: %s...\n", accessfile );
 		return 0;
 	}
 
 	//Setup and open a TCP socket
 #if 0
+	pthread_attr_t attr;
 	struct sockAbstr su = {0};
 	if ( !populate_tcp_socket( &su, &v->port ) || !open_listening_socket( &su, err, errlen ) ) {
 		eprintf( "socket open error: %s", err );
@@ -417,15 +456,17 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;
 	}
 #else
+	pthread_attr_t attr;
 	struct sockaddr_in sa, *si = &sa;
-	short unsigned int port = 80, *pport = &port;
-	int listen_fd;
-	int status;
-	int backlog = 4096;
-	//struct sockaddr_in *si = &sa->sin2; 
+	short unsigned int port = v->port, *pport = &port;
+	int listen_fd = 0;
+	int backlog = BACKLOG;
+	int on = 1;
+	int nthreads = MAX_THREADS;
+	
 	si->sin_family = PF_INET; 
-	si->sin_port = htons( port );
-	(&si->sin_addr)->s_addr = htonl( INADDR_ANY ); // Can't this fail?
+	si->sin_port = htons( *pport );
+	(&si->sin_addr)->s_addr = htonl( INADDR_ANY );
 
 	if (( listen_fd = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1 ) {
 		snprintf( err, errlen, "Couldn't open socket! Error: %s\n", strerror( errno ) );
@@ -433,7 +474,33 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;
 	}
 
+	fdset[ 0 ] = listen_fd;
+
+	if ( setsockopt( listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on) ) == -1 ) {
+		snprintf( err, errlen, "Couldn't set socket to reusable! Error: %s\n", strerror( errno ) );
+		fprintf( logfd, err );
+		return 0;
+	}
+
+	#if 0
+	//This may only be valid via BSD
+	if ( setsockopt( listen_fd, SOL_SOCKET, SO_NOSIGPIPE, (char *)&on, sizeof(on) ) == -1 ) {
+		snprintf( err, errlen, "Couldn't set socket sigpipe behavior! Error: %s\n", strerror( errno ) );
+		fprintf( logfd, err );
+		return 0;
+	}
+	#endif
+
+	/*
 	if ( fcntl( listen_fd, F_SETFD, O_NONBLOCK ) == -1 ) {
+		snprintf( err, errlen, "fcntl error: %s\n", strerror(errno) ); 
+		fprintf( logfd, err );
+		return 0;
+	}
+	*/
+
+	//One of these two should set non blocking functionality
+	if ( ioctl( listen_fd, FIONBIO, (char *)&on ) == -1 ) {
 		snprintf( err, errlen, "fcntl error: %s\n", strerror(errno) ); 
 		fprintf( logfd, err );
 		return 0;
@@ -450,6 +517,8 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		fprintf( logfd, err );
 		return 0;
 	}
+
+	FPRINTF( "listener: %d with backlog %d\n", listen_fd, backlog );
 #endif
 
 #if 0
@@ -489,16 +558,27 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 #endif
 	
 	//TODO: Using threads may make this easier... https://www.geeksforgeeks.org/zombie-processes-prevention/
-	signal( SIGCHLD, SIG_IGN );
+	if ( signal( SIGCHLD, SIG_IGN ) == SIG_ERR ) {
+		snprintf( err, errlen, "Failed to set SIGCHLD\n" );
+		fprintf( logfd, err );
+		return 0;
+	}
 
-	//Use threads instead to serve
-	int count = 0;
-	int nthreads = MAX_THREADS * 4;
-	pthread_attr_t attr;
-	ssize_t stack_size;
-	struct thread_arg ta_set[ nthreads ];
-	memset( ta_set, 0, sizeof( struct thread_arg ) * nthreads );
-	
+	//Needed for lots of send() activity
+	if ( signal( SIGPIPE, SIG_IGN ) == SIG_ERR ) {
+		snprintf( err, errlen, "Failed to set SIGPIPE\n" );
+		fprintf( logfd, err );
+		return 0;
+	}
+
+	#if 0
+	if ( signal( SIGSEGV, SIG_IGN ) == SIG_ERR ) {
+		snprintf( err, errlen, "Failed to set SIGCHLD\n" );
+		fprintf( logfd, err );
+		return 0;
+	}
+	#endif
+
 	//Initialize thread attribute thing
 	if ( pthread_attr_init( &attr ) != 0 ) {
 		FPRINTF( "Failed to initialize thread attributes: %s\n", strerror(errno) );
@@ -506,7 +586,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	}
 
 	//Set a minimum stack size (1kb?)
-	if ( pthread_attr_setstacksize( &attr, 4000000 ) != 0 ) {
+	if ( pthread_attr_setstacksize( &attr, STACK_SIZE ) != 0 ) {
 		FPRINTF( "Failed to set new stack size: %s\n", strerror(errno) );
 		return 0;	
 	}
@@ -514,22 +594,23 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 #ifdef LEAKTEST_H	
 	for ( int fd, count = 0, i = 0; i<LEAKLIMIT; i++ ) { 
 #else
-	for ( int fd, count = -1; ; ) {
+	for ( int fd = 0, count = 0; ; ) {
 #endif
 		//Client address and length?
-		struct sockaddr addrinfo;
-		socklen_t addrlen;
-		struct thread_arg *tk = &ta_set[ ++count ];
+		char ip[ 128 ] = { 0 };
+		struct sockaddr_storage addrinfo = { 0 };
+		socklen_t addrlen = sizeof( addrinfo );
+		struct thread_arg *tk = malloc( sizeof( struct thread_arg ) );
 		memset( tk, 0, sizeof( struct thread_arg ) );
 	
-	#if 0	
+	#if 0
 		//Accept a connection.
 		if ( !accept_listening_socket( &su, &fd, err, errlen ) ) {
 			FPRINTF( "socket %d could not be marked as non-blocking\n", fd );
 			continue;
 		}
 	#else
-		if ( ( fd = accept( listen_fd, &addrinfo, &addrlen ) ) == -1 ) {
+		if ( ( fd = accept( listen_fd, (struct sockaddr *)&addrinfo, &addrlen ) ) == -1 ) {
 			//TODO: Need to check if the socket was non-blocking or not...
 			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				//This should just try to read again
@@ -556,14 +637,21 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 				return 0;
 			}
 		}
-	#endif
 
-		//Right after accept, get the IP information
-		//char *ip = inet_ntoa( a->sin->sin_addr );
+		//Log an access message including the IP in either ipv6 or v4
+		if ( addrinfo.ss_family == AF_INET )
+			inet_ntop( AF_INET, &((struct sockaddr_in *)&addrinfo)->sin_addr, ip, sizeof( ip ) ); 
+		else {
+			inet_ntop( AF_INET6, &((struct sockaddr_in6 *)&addrinfo)->sin6_addr, ip, sizeof( ip ) ); 
+		}
+		fprintf( stderr, "IP addr is: %s\n", ip );
+		fprintf( accessfd, "IP addr is: %s\n", ip );
+	#endif
 
 		//Set up both context and file descriptor
 		tk->fd = fd;
 		tk->ctx = ctx;
+		//count++;
 
 		//Start a new thread
 		if ( pthread_create( &tk->id, NULL, run_srv_cycle, tk ) != 0 ) {
@@ -571,15 +659,15 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			continue;
 		}
 
-	#if 0
+	#if 1
 		//This SHOULD work, but doesn't because there is no way to track whether or not it finished
 		if ( pthread_detach( tk->id ) != 0 ) {
 			FPRINTF( "Pthread detach unsuccessful.\n" );
 			continue;
 		}
 	#else
-		if ( count >= 32 ) {
-			for ( count = 0; count >= 32; count++ ) {
+		if ( count >= CLIENT_MAX_SIMULTANEOUS ) {
+			for ( count = 0; count >= CLIENT_MAX_SIMULTANEOUS; count++ ) {
 				int s = pthread_join( ta_set[ count ].id, NULL ); 
 				FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
 				if ( s != 0 ) {
@@ -591,6 +679,17 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		}
 	#endif
 		FPRINTF( "Closing and waiting for next connection.\n" );
+	}
+
+	//Close both log files
+	if ( accessfd ) {
+		fclose( accessfd ); 
+		accessfd = NULL;
+	}
+
+	if ( logfd ) {
+		fclose( logfd );
+		logfd = NULL;
 	}
 
 #if 0
@@ -733,6 +832,10 @@ int main (int argc, char *argv[]) {
 	v.uid = -1 ;
 	v.gid = -1 ;
 
+	//
+	snprintf( v.logfile, sizeof( v.logfile ), "%s", ERROR_LOGFILE );
+	snprintf( v.accessfile, sizeof( v.accessfile ), "%s", ACCESS_LOGFILE );
+
 	if ( argc < 2 ) {
 		fprintf( stderr, HELP );
 		return 1;	
@@ -751,6 +854,7 @@ int main (int argc, char *argv[]) {
 	#endif
 		else if ( !strcmp( *argv, "--use-ssl" ) ) 
 			v.ssl = 1;
+	#if 0
 		else if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--libs" ) ) {
 			argv++;
 			if ( !*argv ) {
@@ -759,6 +863,7 @@ int main (int argc, char *argv[]) {
 			}
 			snprintf( v.libdir, sizeof( v.libdir ) - 1, "%s", *argv );	
 		}
+	#endif
 		else if ( !strcmp( *argv, "-c" ) || !strcmp( *argv, "--config" ) ) {
 			argv++;
 			if ( !*argv ) {
@@ -799,6 +904,24 @@ int main (int argc, char *argv[]) {
 				return 0;
 			} 
 			snprintf( v.user, sizeof( v.user ) - 1, "%s", *argv );	
+		}
+		else if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--logfile" ) ) {
+			argv++;
+			if ( !*argv ) {
+				eprintf( "Expected argument for --logfile!" );
+				return 0;
+			}
+			memset( v.logfile, 0, sizeof( v.logfile ) );
+			snprintf( v.logfile, sizeof( v.logfile) - 1, "%s", *argv );	
+		}
+		else if ( !strcmp( *argv, "-a" ) || !strcmp( *argv, "--accessfile" ) ) {
+			argv++;
+			if ( !*argv ) {
+				eprintf( "Expected argument for --accessfile!" );
+				return 0;
+			}
+			memset( v.accessfile, 0, sizeof( v.accessfile ) );
+			snprintf( v.accessfile, sizeof( v.accessfile) - 1, "%s", *argv );	
 		}
 		argv++;
 	}

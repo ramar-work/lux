@@ -5,8 +5,9 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=__PREFIX__/bin/hypno-server --start --port 80 --user __SRVUSER__ --group __SRVGROUP__ --config /var/www/config.lua
+ExecStart=__PREFIX__/bin/hypno-server --start --port 80 --user __SRVUSER__ --group __SRVGROUP__ --config /home/ramar/www/config.lua
 Restart=on-failure
+RestartSec=20s
 
 [Install]
 WantedBy=multi-user.target

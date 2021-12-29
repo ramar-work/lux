@@ -23,6 +23,10 @@
 //(perhaps we could further customize this, see LOAD_TOO_HIGH_STATUS )
 #define CLIENT_REQUEST_TIMEOUT 5
 
+//How many clients until the main thread cleans up
+#define CLIENT_MAX_SIMULTANEOUS 64
+
+//Default status for too many connections
 #define LOAD_TOO_HIGH_STATUS 503
 
 //Where are the default htdocs?
@@ -31,11 +35,32 @@
 //How often should a process poll for new data?
 #define POLL_INTERVAL 100000000
 
-//
+//Default read buffer size
 #define CTX_READ_SIZE 4096 
+
+//Default write buffer size
 #define CTX_WRITE_SIZE 1024
 
+//Default stack size of each new thread 
+#define STACK_SIZE 1000000 
+
+//Default thread limit
 #define MAX_THREADS 1024 
+
+//Default listener backlog
+#define BACKLOG 4096
+
+//Enable XML support
+#define INCLUDE_XML_SUPPORT
+
+//Enable JSON support
+#define INCLUDE_JSON_SUPPORT
+
+//Default error log file location
+#define ERROR_LOGFILE "/var/log/hypno-error.log"
+
+//Default access log file location
+#define ACCESS_LOGFILE "/var/log/hypno-access.log"
 
 //Forks or threads
 #if 0
@@ -57,6 +82,3 @@
 #define USEFILTER_ECHO
 #endif
 
-//Enable or disable content types
-#define INCLUDE_XML_SUPPORT
-#define INCLUDE_JSON_SUPPORT
