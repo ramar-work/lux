@@ -23,11 +23,12 @@
 #include "ctx-http.h"
 
 //Define an interval for polling 
-static const struct timespec __interval__ = { 0, 100000000 };
+static const struct timespec __interval__ = { 0, POLL_INTERVAL };
 
 
 //No-op
 void create_notls ( void **p ) { ; }
+
 
 static void dumpconn( struct cdata *conn, const char *fname ) {
 	if ( conn ) {	
@@ -82,8 +83,9 @@ read_notls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *con
 	clock_gettime( CLOCK_REALTIME, &timer );	
 
 	//Allocate space for the first call
-	if ( !( rq->msg = malloc( size ) ) )
+	if ( !( rq->msg = malloc( size ) ) ) {
 		return http_set_error( rs, 500, "Could not allocate initial read buffer." ); 
+	}
 
 	//Read first
 	for ( ;; ) {

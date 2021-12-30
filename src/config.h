@@ -17,7 +17,6 @@
  * ---------
  * - 
  * ------------------------------------------- */
-
 //How long should each client be allowed to persist?
 //When the timeout is reached, send a 503 back to the client
 //(perhaps we could further customize this, see LOAD_TOO_HIGH_STATUS )
@@ -33,7 +32,7 @@
 #define HTDOCS_DIR /var/www
 
 //How often should a process poll for new data?
-#define POLL_INTERVAL 100000000
+#define POLL_INTERVAL 1000000
 
 //Default read buffer size
 #define CTX_READ_SIZE 4096 
@@ -42,7 +41,7 @@
 #define CTX_WRITE_SIZE 1024
 
 //Default stack size of each new thread 
-#define STACK_SIZE 1000000 
+#define STACK_SIZE 100000
 
 //Default thread limit
 #define MAX_THREADS 1024 

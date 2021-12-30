@@ -44,7 +44,7 @@ static char *sw_path( lua_State *L, const char *path, char *spath, int splen ) {
 	lua_pop( L, 1 );
 
 	//ADD THIS
-fprintf( stderr, "FILESYSTEM.C [%s:%d] sp: %s, p: %s\n", __FILE__, __LINE__, spath, path );
+	fprintf( stderr, "FILESYSTEM.C [%s:%d] sp: %s, p: %s\n", __FILE__, __LINE__, spath, path );
 
 	//Stop if the buffer is too large (this is bigger than PATH_MAX)
 	if ( ( splen - len ) <= strlen( path ) ) {

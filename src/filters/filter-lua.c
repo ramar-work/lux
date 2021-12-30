@@ -18,6 +18,8 @@
  * ------------------------------------------- */
 #include "filter-lua.h"
 
+#define DYLIB ".so"
+
 static const char rname[] = "route";
 
 static const char def[] = "default";
@@ -29,6 +31,10 @@ static const char mkey[] = "model";
 static const char rkey[] = "routes";
 
 static const char ctype_def[] = "text/html";
+
+static const char extfmt[] = "%s;%s/?;%s/?.lua";
+
+static const char libcfmt[] = "%s;%s/lib/?" DYLIB;
 
 typedef enum {
 	CTYPE_TEXTHTML
@@ -868,13 +874,12 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//Define variables and error positions...
 	ztable_t zc = {0}, zm = {0};
 	struct luadata_t ld = {0};
-	int clen = 0;
+	int clen = 0, ccount = 0, tcount = 0, model = 0, view = 0;
 	unsigned char *content = NULL;
 
 	//Initialize the data structure
 	memset( res, 0, sizeof( zhttp_t ) );
 	ld.req = req, ld.res = res;
-FPRINTF( "dir: %s\n", conn->hconfig->dir );
 	memcpy( (void *)ld.root, conn->hconfig->dir, strlen( conn->hconfig->dir ) );
 
 	//Then initialize the Lua state
@@ -926,11 +931,24 @@ FPRINTF( "dir: %s\n", conn->hconfig->dir );
 
 	//Set package path
 	if ( lua_retglobal( ld.state, "package", LUA_TTABLE ) ) {
+	#if 0
+		struct kv { const char *n, *fmt; } kv[] = { { "path", extfmt }, { "cpath", libcfmt },	{ NULL } };
+		for ( struct kv *k = kv; k->n ; k++ ) {
+			char ppath[ PATH_MAX ] = { 0 };
+			char *op = (char *)lua_tostring( ld.state, lua_getv( ld.state, k->n, 1, LUA_TSTRING ) );
+			snprintf( ppath, sizeof( ppath ) - 1, k->fmt, op, ld.root, ld.root );
+			lua_pushstring( ld.state, k->n );
+			lua_pushstring( ld.state, ppath );
+			lua_settable( ld.state, 1 );
+		}	
+		lua_setglobal( ld.state, "package" );
+	#else
 		//Get the path of whatever we're talking about
-		int i = lua_getv( ld.state, "path", 1, LUA_TSTRING );
-		char ppath[ PATH_MAX ], *op = (char *)lua_tostring( ld.state, i );
-		memset( ppath, 0, sizeof( ppath ) ); 
-		snprintf( ppath, sizeof( ppath ) - 1, "%s;%s/?;%s/?.lua", op, ld.root, ld.root );
+		char *op, ppath[ PATH_MAX / 2 ] = { 0 }, cpath[ PATH_MAX / 2 ] = {0};
+		op = (char *)lua_tostring( ld.state, lua_getv( ld.state, "path", 1, LUA_TSTRING ) );
+		snprintf( ppath, sizeof( ppath ) - 1, extfmt, op, ld.root, ld.root );
+		op = (char *)lua_tostring( ld.state, lua_getv( ld.state, "cpath", 1, LUA_TSTRING ) );
+		snprintf( cpath, sizeof( cpath ) - 1, libcfmt, op, ld.root );
 
 		//Reset the package path here...
 		lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
@@ -939,11 +957,14 @@ FPRINTF( "dir: %s\n", conn->hconfig->dir );
 		lua_pushstring( ld.state, "path" );
 		lua_pushstring( ld.state, ppath );
 		lua_settable( ld.state, 1 );
+		lua_pushstring( ld.state, "cpath" );
+		lua_pushstring( ld.state, cpath );
+		lua_settable( ld.state, 1 );
 		lua_setglobal( ld.state, "package" );
+	#endif
 	}
 
 	//Execute each model
-	int ccount = 0, tcount = 0, model = 0;
 	for ( struct imvc_t **m = ld.pp.imvc_tlist; m && *m; m++ ) {
 		//Define
 		char err[2048] = {0}, msymname[1024] = {0}, mpath[2048] = {0};
@@ -996,8 +1017,6 @@ FPRINTF( "dir: %s\n", conn->hconfig->dir );
 
 	//Could be either a table or string... so account for this
 	if ( lua_retglobal( ld.state, mkey, LUA_TTABLE ) ) {
-		//ld.zmodel = lt_make( 31 );
-	//else {
 		//Define these
 		char tkey[ 1024 ] = { 0 }, *key = lt_retkv( ld.zroute, 0 )->key.v.vchar;
 		int count = lua_count( ld.state, 1 );
@@ -1061,7 +1080,7 @@ FPRINTF( "dir: %s\n", conn->hconfig->dir );
 			return 1;
 		} 
 		lua_pop( ld.state, 1 );
-		lt_lock( ld.zmodel ); //lt_kfdump( ld.zmodel, 2 );
+		lt_lock( ld.zmodel );
 	}
 
 	//Stop if the user specifies a 'response' table that's not empty...
@@ -1081,7 +1100,6 @@ FPRINTF( "dir: %s\n", conn->hconfig->dir );
 
 	//TODO: routes with no special keys need not be added
 	//Load all views
-	int view = 0;
 	for ( struct imvc_t **v = ld.pp.imvc_tlist; v && *v; v++ ) {
 		if ( *(*v)->file == 'v' ) {
 			int len = 0, renlen = 0;

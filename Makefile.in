@@ -46,6 +46,7 @@ SRC = \
 	@srcdir@/src/server.c \
 	@srcdir@/src/loader.c \
 	@srcdir@/src/xml.c \
+	@srcdir@/src/log.c \
 	@srcdir@/src/ctx/ctx-http.c \
 	@srcdir@/src/ctx/ctx-https.c \
 	@srcdir@/src/lua/lib.c \

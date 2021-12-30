@@ -43,7 +43,8 @@
 #include <sys/ioctl.h>
 #include <pwd.h>
 #include <pthread.h>
-#include "../socket.h"
+#include "../config.h"
+#include "../log.h"
 #include "../server.h"
 #include "../ctx/ctx-http.h"
 #include "../ctx/ctx-https.h"
@@ -52,7 +53,6 @@
 #include "../filters/filter-dirent.h"
 #include "../filters/filter-redirect.h"
 #include "../filters/filter-lua.h"
-#include "../config.h"
 
 #ifndef PIDDIR
  #define PIDDIR "/var/run/"
@@ -118,6 +118,13 @@ char pidbuf[128] = {0};
 
 FILE * logfd = NULL, * accessfd = NULL;
 
+struct senderrecvr *ctx = NULL;
+
+struct fdset {
+	int fd;
+	pthread_t id;
+} fds[ MAX_THREADS ] = { { -1, -1 } };
+
 struct values {
 	int port;
 	pid_t pid;
@@ -170,11 +177,10 @@ struct filter filters[16] = {
 , { NULL }
 };
 
-struct thread_arg {
-	int fd, num;
-	pthread_t id;
-	struct senderrecvr *ctx; 
-	struct cdata conn;
+
+struct log loggers[] = {
+	{ f_open, f_close, f_write, f_handler }
+,	{ sqlite3_log_open, sqlite3_log_close, sqlite3_log_write, sqlite3_handler }
 };
 
 int cmd_kill ( struct values *, char *, int );
@@ -388,31 +394,37 @@ void see_runas_user ( struct values *v ) {
 
 // This can be refactored to do something else...
 void * run_srv_cycle( void *t ) {
+	#if 1
+	int fd = *(int *)t;
+	struct cdata conn = { .ctx = ctx, .flags = O_NONBLOCK };
+	
+	#else
 	struct thread_arg *ta = (struct thread_arg *)t;
 	ta->conn.ctx = ta->ctx;
 	ta->conn.flags = O_NONBLOCK;
+	#endif
 
 	for ( ;; ) {
 		//additionally, this one should block
-		if ( !srv_response( ta->fd, &ta->conn ) ) {
+		if ( !srv_response( fd, &conn ) ) {
 			//TODO: What exactly causes this?
 			FPRINTF( "Error in TCP socket handling.\n" );
 		}
 
-		if ( CONN_CLOSE || ta->conn.count < 0 || ta->conn.count > 5 ) {
-			FPRINTF( "Closing connection marked by descriptor %d to peer.\n", ta->fd );
-			if ( close( ta->fd ) == -1 ) {
+		if ( CONN_CLOSE || conn.count < 0 || conn.count > 5 ) {
+			FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
+			if ( close( fd ) == -1 ) {
 				FPRINTF( "Error when closing child socket.\n" );
 				//TODO: You need to handle this and retry closing to regain resources
 			}
-			FPRINTF( "Connection is done. count is %d\n", ta->conn.count );
+			FPRINTF( "Connection is done. count is %d\n", conn.count );
 			FPRINTF( "returning NULL.\n" );
 			return 0;
 		}
 	}
 
 	FPRINTF( "Child process is exiting.\n" );
-	free( ta );
+	//free( ta );
 	return 0;
 }
 
@@ -421,18 +433,32 @@ void * run_srv_cycle( void *t ) {
 int cmd_server ( struct values *v, char *err, int errlen ) {
 
 	//Initialize server context
-	struct senderrecvr *ctx = NULL;
-	ctx = &sr[ v->ssl ];	
+	//struct senderrecvr *ctx = NULL;
+	ctx = &sr[ 0 ]; // v->ssl	
 	ctx->init( &ctx->data );
 	ctx->filters = filters;
 	ctx->config = v->config;
 
 	//Die if config is null or file not there 
 	if ( !ctx->config ) {
-		eprintf( "No config specified...\n" );
+		snprintf( err, errlen, "No config specified...\n" );
 		return 0;
 	}
 
+	//Init logging and access structures too
+	struct log *al = &loggers[ 0 ], *el = &loggers[ 0 ];
+	
+	if ( !el->open( v->logfile, &el->data ) ) {
+		snprintf( err, errlen, "Could not open error log handle at %s - %s\n", v->logfile, el->handler() );
+		return 0;
+	}
+
+	if ( !al->open( v->accessfile, &al->data ) ) {
+		snprintf( err, errlen, "Could not open access log handle at %s - %s\n", v->accessfile, al->handler() );
+		return 0;
+	}
+
+return 0;
 	//Open a log file here
 	if ( !( logfd = fopen( v->logfile, "a" ) ) ) {
 		eprintf( "Couldn't open error log file at: %s...\n", logfile );
@@ -446,35 +472,22 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	}
 
 	//Setup and open a TCP socket
-#if 0
-	pthread_attr_t attr;
-	struct sockAbstr su = {0};
-	if ( !populate_tcp_socket( &su, &v->port ) || !open_listening_socket( &su, err, errlen ) ) {
-		eprintf( "socket open error: %s", err );
-		char throwaway[ 1024 ] = {0};
-		close_listening_socket( &su, throwaway, sizeof(throwaway) );
-		return 0;
-	}
-#else
-	pthread_attr_t attr;
 	struct sockaddr_in sa, *si = &sa;
 	short unsigned int port = v->port, *pport = &port;
 	int listen_fd = 0;
 	int backlog = BACKLOG;
 	int on = 1;
-	int nthreads = MAX_THREADS;
+	pthread_attr_t attr;
 	
 	si->sin_family = PF_INET; 
 	si->sin_port = htons( *pport );
 	(&si->sin_addr)->s_addr = htonl( INADDR_ANY );
 
-	if (( listen_fd = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1 ) {
+	if (( fdset[0] = listen_fd = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1 ) {
 		snprintf( err, errlen, "Couldn't open socket! Error: %s\n", strerror( errno ) );
 		fprintf( logfd, err );
 		return 0;
 	}
-
-	fdset[ 0 ] = listen_fd;
 
 	if ( setsockopt( listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on) ) == -1 ) {
 		snprintf( err, errlen, "Couldn't set socket to reusable! Error: %s\n", strerror( errno ) );
@@ -512,14 +525,11 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;
 	}
 
-	if ( listen( listen_fd, backlog) == -1 ) {
+	if ( listen( listen_fd, BACKLOG) == -1 ) {
 		snprintf( err, errlen, "Couldn't listen for connections! Error: %s\n", strerror( errno ) );
 		fprintf( logfd, err );
 		return 0;
 	}
-
-	FPRINTF( "listener: %d with backlog %d\n", listen_fd, backlog );
-#endif
 
 #if 0
 	//Drop privileges
@@ -598,19 +608,12 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 #endif
 		//Client address and length?
 		char ip[ 128 ] = { 0 };
+		struct fdset *f = &fds[ count ];
 		struct sockaddr_storage addrinfo = { 0 };
 		socklen_t addrlen = sizeof( addrinfo );
-		struct thread_arg *tk = malloc( sizeof( struct thread_arg ) );
-		memset( tk, 0, sizeof( struct thread_arg ) );
-	
-	#if 0
-		//Accept a connection.
-		if ( !accept_listening_socket( &su, &fd, err, errlen ) ) {
-			FPRINTF( "socket %d could not be marked as non-blocking\n", fd );
-			continue;
-		}
-	#else
-		if ( ( fd = accept( listen_fd, (struct sockaddr *)&addrinfo, &addrlen ) ) == -1 ) {
+
+		//Accept a new connection	
+		if ( ( f->fd = accept( listen_fd, (struct sockaddr *)&addrinfo, &addrlen ) ) == -1 ) {
 			//TODO: Need to check if the socket was non-blocking or not...
 			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				//This should just try to read again
@@ -644,29 +647,25 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		else {
 			inet_ntop( AF_INET6, &((struct sockaddr_in6 *)&addrinfo)->sin6_addr, ip, sizeof( ip ) ); 
 		}
+
 		fprintf( stderr, "IP addr is: %s\n", ip );
 		fprintf( accessfd, "IP addr is: %s\n", ip );
-	#endif
-
-		//Set up both context and file descriptor
-		tk->fd = fd;
-		tk->ctx = ctx;
-		//count++;
 
 		//Start a new thread
-		if ( pthread_create( &tk->id, NULL, run_srv_cycle, tk ) != 0 ) {
+		if ( pthread_create( &f->id, NULL, run_srv_cycle, &f->fd ) != 0 ) {
 			FPRINTF( "Pthread create unsuccessful.\n" );
 			continue;
 		}
 
 	#if 1
 		//This SHOULD work, but doesn't because there is no way to track whether or not it finished
-		if ( pthread_detach( tk->id ) != 0 ) {
+		count++;
+		if ( pthread_detach( f->id ) != 0 ) {
 			FPRINTF( "Pthread detach unsuccessful.\n" );
 			continue;
 		}
 	#else
-		if ( count >= CLIENT_MAX_SIMULTANEOUS ) {
+		if ( ++count >= CLIENT_MAX_SIMULTANEOUS ) {
 			for ( count = 0; count >= CLIENT_MAX_SIMULTANEOUS; count++ ) {
 				int s = pthread_join( ta_set[ count ].id, NULL ); 
 				FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
@@ -681,7 +680,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		FPRINTF( "Closing and waiting for next connection.\n" );
 	}
 
-	//Close both log files
 	if ( accessfd ) {
 		fclose( accessfd ); 
 		accessfd = NULL;
@@ -692,18 +690,10 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		logfd = NULL;
 	}
 
-#if 0
-	//Close the socket
-	if ( !close_listening_socket( &su, err, sizeof(err) ) ) {
-		FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
-		return 0;
-	}
-#else
 	if ( close( listen_fd ) == -1 ) {
 		FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
 		return 0;
 	}
-#endif
 
 	return 1;
 }
