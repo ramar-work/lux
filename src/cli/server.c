@@ -445,6 +445,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;
 	}
 
+#if 0
 	//Init logging and access structures too
 	struct log *al = &loggers[ 0 ], *el = &loggers[ 0 ];
 	
@@ -457,8 +458,8 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		snprintf( err, errlen, "Could not open access log handle at %s - %s\n", v->accessfile, al->handler() );
 		return 0;
 	}
+#endif
 
-return 0;
 	//Open a log file here
 	if ( !( logfd = fopen( v->logfile, "a" ) ) ) {
 		eprintf( "Couldn't open error log file at: %s...\n", logfile );

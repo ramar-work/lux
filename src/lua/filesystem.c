@@ -255,6 +255,28 @@ int fs_write ( lua_State *L ) {
 }
 
 
+int fs_exists ( lua_State *L ) {
+	struct stat sb;
+	int status = 0;
+	char *fspath = NULL; 
+	const char *opath = NULL;
+	char pathbuf[ PATH_MAX ] = {0};
+	luaL_checktype( L, 1, LUA_TSTRING );
+
+	//Get the path requested
+	opath = lua_tostring( L, 1 );
+	lua_pop( L, 1 );
+
+	//Seems like this should never happen
+	if ( !sw_path( L, opath, pathbuf, sizeof(pathbuf) ) ) {
+		return luaL_error( L, "Could not find shadow directory" );
+	}
+
+	//Check if the file exists
+	lua_pushboolean( L, ( access( pathbuf, F_OK ) > -1 ) ); 
+	return 1;
+}
+
 
 int fs_stat ( lua_State *L ) {
 	struct stat sb;
@@ -407,6 +429,7 @@ struct luaL_Reg fs_set[] = {
  	{ "read", fs_read }
 ,	{ "write", fs_write }
 ,	{ "stat", fs_stat }
+,	{ "exists", fs_exists }
 ,	{ "pwd", fs_pwd }
 ,	{ "list", fs_list }
 #if 0
