@@ -1038,6 +1038,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			return http_error( res, 500, "Error in model conversion." );
 		}
 
+#if 0
 		//TODO: Check for an inherited content-type
 		//TODO: Then check for a globally defined default content-type
 		//Then check for content-types
@@ -1081,7 +1082,11 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		} 
 		lua_pop( ld.state, 1 );
 		lt_lock( ld.zmodel );
+#endif
 	}
+
+lua_dumpstack( ld.state ); 
+exit(1); 
 
 	//Stop if the user specifies a 'response' table that's not empty...
 	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {

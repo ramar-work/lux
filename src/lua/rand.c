@@ -1,5 +1,9 @@
 #include "rand.h"
 
+static char alpha[] = 
+	"abcdefghijklmnopqrstuvwxyz"
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+;
 
 static char ascii[] = 
 	"abcdefghijklmnopqrstuvwxyz"
@@ -38,11 +42,25 @@ static unsigned char * generate ( unsigned char *str, unsigned int len, unsigned
 }
 
 
+int rand_alpha ( lua_State *L ) {
+	luaL_checknumber( L, 1 );
+	unsigned char *buf = NULL;
+	int bfsize = lua_tonumber( L, 1 );
+	if ( !( buf = generate( (unsigned char *)alpha, sizeof( alpha ) / sizeof( char ), bfsize + 1 ) )  ) {
+		return luaL_error( L, "rand.alpha failed." );
+	}
+
+	lua_pushstring( L, ( char * )buf );
+	free( buf );
+	return 1;
+}
+
+
 int rand_str ( lua_State *L ) {
 	luaL_checknumber( L, 1 );
 	unsigned char *buf = NULL;
 	int bfsize = lua_tonumber( L, 1 );
-	if ( !( buf = generate( (unsigned char *)ascii, sizeof( ascii ) / sizeof( char ), bfsize - 1 ) )  ) {
+	if ( !( buf = generate( (unsigned char *)ascii, sizeof( ascii ) / sizeof( char ), bfsize + 1 ) )  ) {
 		return luaL_error( L, "rand.str failed." );
 	}
 
@@ -61,7 +79,7 @@ int rand_seq ( lua_State *L ) {
 	memset( seq, 0, 256 );
 	for ( int i = 0; i < 256; i++ ) seq[ i ];
 
-	if ( !( buf = generate( (unsigned char *)seq, sizeof( seq ) / sizeof( char ), bfsize - 1 ) )  ) {
+	if ( !( buf = generate( (unsigned char *)seq, sizeof( seq ) / sizeof( char ), bfsize + 1 ) )  ) {
 		return luaL_error( L, "rand.str failed." );
 	}
 
@@ -76,7 +94,7 @@ int rand_nums ( lua_State *L ) {
 	luaL_checknumber( L, 1 );
 	int bfsize = lua_tonumber( L, 1 );
 	unsigned char *buf = NULL;
-	if ( !( buf = generate( (unsigned char *)numerics, sizeof( numerics ) / sizeof( char ), bfsize - 1 ) )  ) {
+	if ( !( buf = generate( (unsigned char *)numerics, sizeof( numerics ) / sizeof( char ), bfsize + 1 ) )  ) {
 		return luaL_error( L, "rand.nums failed." );
 	}
 	lua_pushstring( L, ( char * )buf );
@@ -89,6 +107,6 @@ struct luaL_Reg rand_set[] = {
  	{ "nums", rand_nums }
 ,	{ "str", rand_str }
 ,	{ "seq", rand_seq }
-//,	{ "number", fs_write }
+,	{ "alpha", rand_alpha }
 ,	{ NULL }
 };

@@ -7,14 +7,15 @@
 ## Hypno on most machines. 
 ##
 ## @author
-## Copyright 2021 Tubular Modular Inc. dba Collins Design
+## Copyright 2022 Ironhead, Inc.
 ## --------------------------------------------------------- ##
 NAME = @PACKAGE_NAME@
 VERSION = @PACKAGE_VERSION@ 
 PREFIX = @prefix@
+LOGDIR = /var/log
 EXEC_PREFIX = @exec_prefix@
 BINDIR = @bindir@
-WEBDIR = /var/www
+WWWROOT = /var/www
 srcdir = @srcdir@
 VPATH = @srcdir@
 SRVUSER = ramar
@@ -132,7 +133,7 @@ cygwin-install:
 
 # systemd-install - Installs systemd on Linux systems
 systemd-install:
-	sed '{ s#__PREFIX__#$(PREFIX)#; s#__SRVUSER__#$(SRVUSER)#; s#__SRVGROUP__#$(SRVGROUP)# }' \
+	sed '{ s#__PREFIX__#$(PREFIX)#; s#__SRVUSER__#$(SRVUSER)#; s#__SRVGROUP__#$(SRVGROUP)#; s#__LOGDIR__#$(LOGDIR)#g; s#__WWWROOT__#$(WWWROOT)# }' \
 		$(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service > /etc/systemd/system/hypno.service
 
 
