@@ -680,8 +680,10 @@ static int free_ld ( struct luadata_t *l ) {
 }
 
 
-static char * text_encode ( ztable_t *t ) {
-	return "";
+char * text_encode ( ztable_t *t ) {
+	char *c = malloc( 1 );
+	*c = '\0';
+	return c;
 }
 
 
@@ -716,7 +718,8 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 
 	//Return the finished message if we got this far
 	p = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN );
-	
+
+fprintf( stderr, "%s:%d -> %p\n", __FILE__, __LINE__, content );	
 	free( content );
 	return p;
 }
@@ -800,9 +803,9 @@ static int return_as_response ( struct luadata_t *l ) {
 		//Do I need a shadow?
 		snprintf( fbuf, sizeof( fbuf ) - 1, "%s/%s", l->root, fname );
 
-		//
-		if ( !( content = read_file( fbuf, &len, l->err, sizeof( l->err ) ) ) )  {
-			snprintf( l->err, LD_ERRBUF_LEN, lt_strerror( rt ) );
+		//Problem reading the file
+		if ( !( content = read_file( fbuf, &len, l->err, LD_ERRBUF_LEN ) ) )  {
+			lt_free( rt ), free( rt );
 			return 0;
 		}
 
@@ -814,6 +817,14 @@ static int return_as_response ( struct luadata_t *l ) {
 	//Set content type to default if it was not set anywhere else
 	if ( *ctype == 0 ) {
 		snprintf( ctype, sizeof( ctype ) - 1, "%s", ctype_def );
+	}
+
+	//Likewise, if all we have is status, and no file or content then
+	//you need to error with a 500
+	if ( status_i > -1 && file_i == -1 && content_i == -1 ) {
+		lt_free( rt ), free( rt );
+		snprintf( l->err, LD_ERRBUF_LEN, "Status specified with no content." );
+		return 0;
 	}
 
 	//Set structures
@@ -1005,11 +1016,26 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		}
 	}
 
+	//Stop if the user specifies a 'response' table that's not empty...
+	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
+		FPRINTF( "Attempting alternate content return.\n" );
+		if ( !return_as_response( &ld ) ) {
+			free_ld( &ld );
+			return http_error( res, 500, ld.err );
+		}
+		FPRINTF( "Did content return complete?\n" );
+		lua_pop( ld.state, 1 );
+		free_ld( &ld );
+		FPRINTF( "We got to a successful point.\n" );
+		return 1;
+	}
+
 #if 1
 	//This should always happen
 	if ( lua_retglobal( ld.state, "config", LUA_TTABLE ) ) {
 		lua_getglobal( ld.state, mkey );
 		( lua_isnil( ld.state, -1 ) ) ? lua_pop( ld.state, 1 ) : 0;
+FPRINTF( "Config is in top-level table , I think I figured out why...\n" );
 		lua_merge( ld.state );
 		lua_setglobal( ld.state, mkey );
 	}
@@ -1038,7 +1064,6 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			return http_error( res, 500, "Error in model conversion." );
 		}
 
-#if 0
 		//TODO: Check for an inherited content-type
 		//TODO: Then check for a globally defined default content-type
 		//Then check for content-types
@@ -1082,26 +1107,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		} 
 		lua_pop( ld.state, 1 );
 		lt_lock( ld.zmodel );
-#endif
 	}
-
-lua_dumpstack( ld.state ); 
-exit(1); 
-
-	//Stop if the user specifies a 'response' table that's not empty...
-	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
-		FPRINTF( "Attempting alternate content return.\n" );
-		if ( !return_as_response( &ld ) ) {
-			free_ld( &ld );
-			return http_error( res, 500, ld.err );
-		}
-		FPRINTF( "Did content return complete?\n" );
-		lua_pop( ld.state, 1 );
-		free_ld( &ld );
-		FPRINTF( "We got to a successful point.\n" );
-		return 1;
-	}
-
 
 	//TODO: routes with no special keys need not be added
 	//Load all views
