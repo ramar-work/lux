@@ -180,6 +180,7 @@ static const char *errors[] = {
 , [ZHTTP_UNSPECIFIED_CONTENT_TYPE] = "No content type specified"
 , [ZHTTP_UNSPECIFIED_CONTENT_LENGTH] = "No content length specified"
 , [ZHTTP_UNSPECIFIED_MULTIPART_BOUNDARY] = "No boundary speciifed for content type multipart/form-data"
+, [ZHTTP_INVALID_PORT] = "Invalid port specified"
 ,	[ZHTTP_MALFORMED_HEADERS] = "Headers are either malformed or not present."
 , [ZHTTP_MALFORMED_FIRSTLINE] = "Got malformed HTTP message"
 , [ZHTTP_MALFORMED_FORMDATA] = "Got malformed data from submitted form"
@@ -853,11 +854,11 @@ int http_frame_content ( zhttp_t *en, unsigned char *p, int plen ) {
 				return 0;
 			}
 			if ( !strcmp( zhttp_multipart, en->ctype ) )
-				en->formtype = ZHTTP_FORM_MULTIPART;
+				en->formtype = ZHTTP_MULTIPART;
 			else if ( !strcmp( zhttp_x_www_form, en->ctype ) )
-				en->formtype = ZHTTP_FORM_URLENCODED;
+				en->formtype = ZHTTP_URL_ENCODED;
 			else {
-				en->formtype = ZHTTP_FORM_FREE;
+				en->formtype = ZHTTP_OTHER;
 			}	
 		}
 
@@ -935,19 +936,7 @@ char * http_get_protocol ( zhttp_t *en, unsigned char **p, int *plen ) {
 }
 
 
-int http_get_port ( zhttp_t *en, unsigned char *p, int plen ) {
-	//Get host requested (not always going to be there)
-	if ( ( en->host = zhttp_msg_get_value( "Host: ", "\r", p, plen ) ) ) {
-		char *port = NULL; 
-		if ( ( port = strchr( en->host, ':' ) ) ) {
-			//Remove colon
-			en->port = atoi( port + 1 ); //TODO: zhttp_satoi( port + 1, en->port ); 
-			memset( port, 0, strlen( port ) ); 
-		}
-	}
 
-	return 0;
-}
 
 int http_get_content_length ( zhttp_t *en, zhttpr_t **list ) {
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
@@ -955,8 +944,7 @@ int http_get_content_length ( zhttp_t *en, zhttpr_t **list ) {
 			char clenbuf[64];
 			int clen;
 
-			memset( clenbuf, 0, sizeof( clenbuf ) ); 
-			memcpy( clenbuf, (*slist)->value, (*slist)->size );
+			memset( clenbuf, 0, sizeof( clenbuf ) ), memcpy( clenbuf, (*slist)->value, (*slist)->size );
 
 			if ( zhttp_satoi( clenbuf, &clen ) )
 				return en->clen = clen;
@@ -969,11 +957,20 @@ int http_get_content_length ( zhttp_t *en, zhttpr_t **list ) {
 	return -1; 
 }
 
+
 char * http_get_content_type ( zhttp_t *en, zhttpr_t **list ) {
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
 		if ( strcmp( (*slist)->field, "Content-Type" ) == 0 ) {
-			for ( unsigned char *v = (*slist)->value; *v != '\r' || ( *v = '\0' ); v++ );
-			return en->ctype = (char *)(*slist)->value; 
+			for ( unsigned char *v = (*slist)->value; ( *v != '\r' && *v != ';' ) || ( *v = '\0' ); v++ );
+			en->ctype = (char *)(*slist)->value; 
+			if ( strcmp( en->ctype, zhttp_multipart ) == 0 )
+				en->formtype = ZHTTP_MULTIPART;
+			else if ( strcmp( en->ctype, zhttp_multipart ) == 0 )
+				en->formtype = ZHTTP_URL_ENCODED;
+			else {
+				en->formtype = ZHTTP_OTHER;
+			}
+			return en->ctype;
 		}
 	}
 
@@ -981,16 +978,45 @@ char * http_get_content_type ( zhttp_t *en, zhttpr_t **list ) {
 	return en->ctype = (char *)default_content_type;
 }
 
-char * http_get_boundary ( zhttp_t *en, zhttpr_t **list ) {
 
-			char *b = NULL;
-			//This is a pretty ugly way to do this; but until I move over to all static allocations, this will have to do.
-			if ( ( b = zhttp_msg_get_value( "boundary=", "\r", en->msg, en->hlen ) ) ) {
-				memcpy( en->boundary, b, strlen( b ) );
-				free( b );
-			}
+char * http_get_boundary ( zhttp_t *en, zhttpr_t **list ) {
+	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
+		if ( strcmp( (*slist)->field, "Content-Type" ) == 0 ) {
+			int s = (*slist)->size;
+			for ( unsigned char *v = (*slist)->value; ( *v != '\r' && s > 1 ) || ( *v = '\0' ); v++, s-- );
+			char *c = memstr( (*slist)->value, "boundary=", (*slist)->size );
+			return en->boundary = c += sizeof( "boundary=" );
+		}
+	}
 	return NULL;
 }
+
+
+char * http_get_host ( zhttp_t *en, zhttpr_t **list ) {
+	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
+		if ( strcmp( (*slist)->field, "Host" ) == 0 ) {
+			for ( unsigned char *v = (*slist)->value; *v != '\r' || ( *v = '\0' ); v++ );
+			return en->host = (char *)(*slist)->value;
+		}
+	}
+	return NULL;
+}
+
+
+int http_get_port ( zhttp_t *en, zhttpr_t **list ) {
+	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
+		if ( strcmp( (*slist)->field, "Host" ) == 0 ) {
+			int port = 0, s = (*slist)->size;
+			char pb[64];
+			unsigned char *v = (*slist)->value;
+			for ( ; ( s > 1 && *v != '\r' && *v != ':' ) || ( *v = '\0' ); v++, s-- );
+			v++, memset( pb, 0, sizeof( pb ) ), memcpy( pb, v, s );
+			return en->port = ( !zhttp_satoi( pb, &port ) || port < 1 || port > 65535 ) ? 0 : port;
+		}
+	}
+	return 80;
+}
+
 
 zhttpr_t ** http_get_query_strings ( zhttp_t *en, char *p, int plen ) {
 	zhttpr_t **list = NULL;
@@ -1082,96 +1108,39 @@ zhttp_t * http_parse_header ( zhttp_t *en ) {
 	int plen = en->hlen;
 	en->headers = en->body = en->url = NULL;
 
-	//Die if hlen is not specified
-	if ( plen < 1 ) {
+	if ( plen < 1 )
 		return fatal_error( en, ZHTTP_HEADER_LENGTH_UNSET );
-	}
-#if 0
 
-	if ( !http_parse_preamble( en, en->preamble, ZHTTP_PREAMBLE_SIZE ) ) {
-		return NULL;
-	}
-
-	if ( !http_parse_port( en, en->preamble, ZHTTP_PREAMBLE_SIZE ) ) {
-		return NULL;
-	}
-
-	if ( !http_frame_content( en, en->preamble, ZHTTP_PREAMBLE_SIZE ) ) {
-		return NULL;
-	}
-
-	if ( !http_process_query_string( en ) ) {
-		return NULL;
-	}
-
-	if ( !http_process_header_keyvalues( en, en->preamble, ZHTTP_PREAMBLE_SIZE ) ) {
-		return NULL;
-	}
-#else
-	//This is the only place where it kind of falls apart, but breaking it down
-	//into stupid simple pieces is helpful...
-	#if 0
-	if ( !http_parse_preamble( en ) ) {
-		return NULL;
-	}
-	#else
-	if ( !http_get_method( en, &p, &plen ) ) {
+	if ( !http_get_method( en, &p, &plen ) )
 		return fatal_error( en, ZHTTP_UNSUPPORTED_METHOD );
-	}
 
-fprintf( stderr, "Got method: '%s'\n", en->method );
-
-	if ( !http_get_path( en, &p, &plen ) ) {
+	if ( !http_get_path( en, &p, &plen ) )
 		return fatal_error( en, ZHTTP_BAD_PATH );
-	}
-fprintf( stderr, "Got path: '%s'\n", en->path );
 
-	if ( !http_get_protocol( en, &p, &plen ) ) {
-		//TODO: You could mark error here, but that's not clear...
-		//You'd have to differentiate between, "couldn't find" and "invalid"
+	//TODO: Handle blank vs invalid?
+	if ( !http_get_protocol( en, &p, &plen ) )
 		return fatal_error( en, ZHTTP_UNSUPPORTED_PROTOCOL );
-	}
-fprintf( stderr, "Got protocol: '%s'\n", en->protocol );
 
-	if ( !( en->headers = http_get_header_keyvalues( en, &p, &plen ) ) ) {
+	if ( !( en->headers = http_get_header_keyvalues( en, &p, &plen ) ) )
 		return fatal_error( en, ZHTTP_MALFORMED_HEADERS );
-	}
 
-fprintf( stderr, "Got headers: %s\n", en->headers ? "yes" : "no" );
-	#endif
-
-	#if 0
-	if ( !http_frame_content( en ) ) {
-		return NULL;
-	}
-	#else
-	if ( en->expectsURL && !http_get_query_strings( en, en->path, strlen( en->path ) ) ) {
+	if ( en->expectsURL && !http_get_query_strings( en, en->path, strlen( en->path ) ) )
 		return fatal_error( en, ZHTTP_INCOMPLETE_QUERYSTRING );
-	}
-fprintf( stderr, "Got query strings: %s\n", en->url ? "yes" : "no" );
 
-	if ( en->idempotent && !http_get_content_length( en, en->headers ) ) {
+	if ( !http_get_host( en, en->headers ) )
+		0;//Depending on how the thing runs, this field may or may not be necessary
+
+	if ( !http_get_port( en, en->headers ) )
+		return fatal_error( en, ZHTTP_INVALID_PORT );
+
+	if ( en->idempotent && !http_get_content_length( en, en->headers ) )
 		return fatal_error( en, ZHTTP_UNSPECIFIED_CONTENT_LENGTH );
-	}
-fprintf( stderr, "Got content-length: %d\n", en->clen );
 
-	if ( en->idempotent && !http_get_content_type( en, en->headers ) ) {
+	if ( en->idempotent && !http_get_content_type( en, en->headers ) )
 		return fatal_error( en, ZHTTP_UNSPECIFIED_CONTENT_TYPE );
-	}
-fprintf( stderr, "Got content-type: %s\n", en->ctype );
 
-	if ( !( en->port = http_get_port( en, p, plen ) ) ) {
-		0;//We'll never fail here if only because we can intuit which port we want
-	}
-
-	#if 0
-	if ( en->formtype == ZHTTP_MULTIPART && !( en->boundary = http_get_boundary( en, p, plen ) ) ) {
+	if ( en->formtype == ZHTTP_MULTIPART && !http_get_boundary( en, en->headers ) )
 		return fatal_error( en, ZHTTP_UNSPECIFIED_MULTIPART_BOUNDARY );
-	}
-	#endif
-	#endif
-
-#endif
 
 	return en;	
 }
@@ -1305,13 +1274,13 @@ zhttp_t * http_parse_content ( zhttp_t *en ) {
 	unsigned char *p = en->msg + en->hlen + 4;
 
 	//This should not run if method is not something that expects a body
-	if ( en->formtype == ZHTTP_FORM_NONE )
+	if ( en->formtype == ZHTTP_NO_CONTENT )
 		return en;
-	else if ( en->formtype == ZHTTP_FORM_URLENCODED && !http_parse_standard_form( en, p ) )
+	else if ( en->formtype == ZHTTP_URL_ENCODED && !http_parse_standard_form( en, p ) )
 		return fatal_error( en, ZHTTP_MALFORMED_FORMDATA );		
-	else if ( en->formtype == ZHTTP_FORM_MULTIPART && !http_parse_multipart_form( en, p ) )
+	else if ( en->formtype == ZHTTP_MULTIPART && !http_parse_multipart_form( en, p ) )
 		return fatal_error( en, ZHTTP_MALFORMED_FORMDATA );
-	else if ( en->formtype == ZHTTP_FORM_FREE && !http_parse_freeform_body( en, p ) ) {
+	else if ( en->formtype == ZHTTP_OTHER && !http_parse_freeform_body( en, p ) ) {
 		return fatal_error( en, ZHTTP_MALFORMED_FORMDATA );
 	}
 

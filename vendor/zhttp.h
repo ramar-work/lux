@@ -200,14 +200,6 @@ typedef enum {
 
 
 typedef enum {
-	ZHTTP_FORM_NONE = 0
-, ZHTTP_FORM_URLENCODED
-, ZHTTP_FORM_MULTIPART
-,	ZHTTP_FORM_FREE
-} HTTP_ContentType;
-
-
-typedef enum {
 	ZHTTP_NONE = 0
 ,	ZHTTP_HEADER_LENGTH_UNSET
 ,	ZHTTP_AWAITING_HEADER
@@ -221,6 +213,7 @@ typedef enum {
 , ZHTTP_UNSPECIFIED_CONTENT_TYPE
 , ZHTTP_UNSPECIFIED_CONTENT_LENGTH
 , ZHTTP_UNSPECIFIED_MULTIPART_BOUNDARY
+, ZHTTP_INVALID_PORT
 ,	ZHTTP_MALFORMED_HEADERS
 , ZHTTP_MALFORMED_FIRSTLINE
 , ZHTTP_MALFORMED_FORMDATA
@@ -229,7 +222,8 @@ typedef enum {
 
 
 typedef enum {
- 	ZHTTP_URL_ENCODED = 0
+ 	ZHTTP_NO_CONTENT = 0
+,	ZHTTP_URL_ENCODED
 , ZHTTP_MULTIPART
 , ZHTTP_OTHER
 } HttpContentType;
@@ -265,7 +259,7 @@ typedef struct HTTPBody {
 	char *host;
 	char *method;
 	char *protocol;
-	char boundary[ 128 ];
+	char *boundary;
 	char lengths[ 4 ];
 	unsigned char preamble[ ZHTTP_PREAMBLE_SIZE ];
  	unsigned char *msg;
@@ -278,7 +272,7 @@ typedef struct HTTPBody {
 	int expects;
 #else
 	char idempotent;
-	HTTP_ContentType formtype;
+	HttpContentType formtype;
 	short expectsURL;
 #endif
 	short error; 
