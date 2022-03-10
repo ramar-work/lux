@@ -1093,6 +1093,23 @@ zhttpr_t ** http_get_header_keyvalues ( zhttp_t *en, unsigned char **p, int *ple
 }
 
 
+//Set the chunked "bit" if this is that kind of message...
+int http_check_for_chunked_encoding ( zhttp_t *en, zhttpr_t **list ) {
+	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
+		if ( strcmp( (*slist)->field, "Transfer-Encoding" ) == 0 ) {
+			return en->chunked = 1;
+		}
+	}
+	return 1;
+}
+
+
+#if 0
+int http_get_cookie ( zhttp_t *en, zhttpr_t **list ) {
+	return 0;
+}
+#endif
+
 //Just parse the headers
 zhttp_t * http_parse_header ( zhttp_t *en ) {
 #if 0
@@ -1125,6 +1142,9 @@ zhttp_t * http_parse_header ( zhttp_t *en ) {
 
 	if ( en->expectsURL && !http_get_query_strings( en, en->path, strlen( en->path ) ) )
 		return fatal_error( en, ZHTTP_INCOMPLETE_QUERYSTRING );
+
+	if ( !http_check_for_chunked_encoding( en, en->headers ) )
+		0; //return fatal_error( en, ZHTTP_INVALID_PORT );
 
 	if ( !http_get_host( en, en->headers ) && en->port == -1 )
 		return fatal_error( en, ZHTTP_INVALID_PORT );
@@ -1619,12 +1639,14 @@ static void http_free_records( zhttpr_t **records ) {
 
 //...
 void http_free_body ( zhttp_t *en ) {
+#if 0
 	//Free all of the header info
 	en->path ? free( en->path ) : 0;
 	en->ctype ? free( en->ctype ) : 0;
 	en->host ? free( en->host ) : 0;
 	en->method ? free( en->method ) : 0;
 	en->protocol ? free( en->protocol ) : 0;
+#endif
 
 	http_free_records( en->headers );
 	http_free_records( en->url );

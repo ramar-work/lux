@@ -272,15 +272,23 @@ typedef struct HTTPBody {
 	int expects;
 #else
 	char idempotent;
+	char chunked;
+	char compressed; //Would be better to mark a specific type... 
 	HttpContentType formtype;
 	short expectsURL;
 #endif
 	short error; 
 	short efatal;
 	const char *errmsg;
+#if 1
 	zhttpr_t **headers;
 	zhttpr_t **url;
 	zhttpr_t **body;
+#else
+	zhttpr_t headers[ ZHTTP_HEADER_COUNT ];
+	zhttpr_t url[ ZHTTP_QUERY_STRING_COUNT ];
+	zhttpr_t body[ ZHTTP_FORM_VALUE_COUNT ];
+#endif
 } zhttp_t;
 
 unsigned char *httpvtrim (unsigned char *, int , int *) ;

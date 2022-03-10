@@ -44,6 +44,11 @@
  #define CTX_READ_SIZE 4096 
 #endif
 
+//Default file receive size (8MB)
+#ifndef CTX_READ_MAX
+ #define CTX_READ_MAX 8388608
+#endif
+
 //Default write buffer size
 #define CTX_WRITE_SIZE 1024
 

@@ -152,7 +152,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 		return 1;
 	}
 
-#if 1
+#if 0
 	fprintf( stderr, "%d ?= %d\n", rq->mlen, rq->hlen + 4 + rq->clen );
 	conn->count = -3;
 	return http_set_error( rs, 200, "OK" ); 
@@ -168,10 +168,19 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 		return 1;
 	}
 
+	//Check here if the thing is too big
+	if ( rq->clen > CTX_READ_MAX ) {
+		conn->count = -3;
+		char errmsg[ 1024 ] = {0};
+		snprintf( errmsg, sizeof( errmsg ), "%s", 
+			"Content-Length (%d) exceeds read max (%d).", rq->clen, CTX_READ_MAX );
+		return http_set_error( rs, 500, (char *)errmsg ); 
+	} 	
+
 	//Unsure if we still need this...
 	#if 1
 	if ( 1 )
-		nsize = rq->hlen + BHSIZE + rq->clen;	
+		nsize = rq->clen;	
 	#else
 	if ( !rq->chunked )
 		nsize = rq->mlen + rq->clen + 4;	
