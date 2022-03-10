@@ -45,16 +45,32 @@
  #define write(FD,C,CLEN) _write(FD, C, CLEN)
 #endif
 
+#ifndef ZHTTP_PREAMBLE_SIZE 
+ #define ZHTTP_PREAMBLE_SIZE 2048
+#endif
+
 #ifdef DEBUG_H
  #include <stdio.h>
  #include <errno.h>
  #include <fcntl.h>
+
  #define ZHTTP_PRINTF(fb, ...) \
 	fprintf( fb, __VA_ARGS__ )
+
  #define ZHTTP_WRITE(fd,a,b) \
 	write( 2, a, b )
+
  #define print_httpbody(a) \
 	print_httpbody_to_file(a, "/dev/stderr")
+
+ #define print_headers(a) \
+	print_httprecords( (a)->headers )
+
+ #define print_url(a) \
+	print_httprecords( (a)->url )
+
+ #define print_content(a) \
+	print_httprecords( (a)->body )
 #else
  #define ZHTTP_PRINTF(fb, ...)
  #define ZHTTP_WRITE(fd,...)
@@ -73,6 +89,9 @@
 
 #define http_free_response( entity ) \
 	http_free_body( entity )
+
+#define http_set_status(ENTITY,VAL) \
+	http_set_int( &(ENTITY)->status, VAL )
 
 #define http_set_status(ENTITY,VAL) \
 	http_set_int( &(ENTITY)->status, VAL )
@@ -181,16 +200,25 @@ typedef enum {
 
 
 typedef enum {
+	ZHTTP_FORM_NONE = 0
+, ZHTTP_FORM_URLENCODED
+, ZHTTP_FORM_MULTIPART
+,	ZHTTP_FORM_FREE
+} HTTP_ContentType;
+
+
+typedef enum {
 	ZHTTP_NONE = 0
+,	ZHTTP_AWAITING_HEADER
 ,	ZHTTP_INCOMPLETE_METHOD
-, ZHTTP_INCOMPLETE_PATH
+, ZHTTP_BAD_PATH
 , ZHTTP_INCOMPLETE_PROTOCOL
 , ZHTTP_INCOMPLETE_HEADER
 , ZHTTP_INCOMPLETE_QUERYSTRING
 , ZHTTP_UNSUPPORTED_METHOD
 , ZHTTP_UNSUPPORTED_PROTOCOL
 , ZHTTP_MALFORMED_FIRSTLINE
-, ZHTTP_INCOMPLETE_FIRSTLINE
+, ZHTTP_MALFORMED_FORMDATA
 , ZHTTP_OUT_OF_MEMORY
 } HTTP_Error;
 
@@ -233,18 +261,21 @@ typedef struct HTTPBody {
 	char *protocol;
 	char boundary[ 128 ];
 	char lengths[ 4 ];
+	unsigned char preamble[ ZHTTP_PREAMBLE_SIZE ];
  	unsigned char *msg;
 	int clen;  //content length
 	int mlen;  //message length (length of the entire received message)
 	int	hlen;  //header length
 	int status; //what was this?
 	int port; //what was this?
+	char idempotent;
+	char formtype;
+	short error; 
+	short efatal;
+	const char *errmsg;
 	zhttpr_t **headers;
 	zhttpr_t **url;
 	zhttpr_t **body;
-	int error;
-	char errmsg[ 1024 ];
-	//int rstatus;  //HEADER_PARSED, URL_PARSED, ...
 } zhttp_t;
 
 unsigned char *httpvtrim (unsigned char *, int , int *) ;
@@ -272,6 +303,14 @@ int http_set_error ( zhttp_t *entity, int status, char *message );
 unsigned char * zhttp_dupblk( const unsigned char *v, int vlen ) ;
 
 unsigned char *zhttp_append_to_uint8t ( unsigned char **, int *, unsigned char *, int );
+
+zhttp_t * http_parse_header( zhttp_t * );
+
+zhttp_t * http_parse_content( zhttp_t * );
+
+int http_header_received ( unsigned char *, int );
+
+int http_header_xreceived ( zhttp_t * );
 
 #ifdef DEBUG_H
  void print_httprecords ( zhttpr_t ** );

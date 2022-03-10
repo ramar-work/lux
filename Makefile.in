@@ -25,7 +25,7 @@ LDFLAGS = -ldl -lpthread -lm -lgnutls
 DEBUGFLAGS = -DDEBUG_H
 MODEL = HTHREAD_H
 ASAN_OPTIONS = log_path=asan.log
-CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -DINCLUDE_GNUTLS -D$(MODEL) $(IFLAGS) 
+CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -DINCLUDE_GNUTLS -D$(MODEL) $(IFLAGS)
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
 	-Wno-format-truncation -Wno-return-local-addr -DINCLUDE_GNUTLS -D$(MODEL) -O2 $(IFLAGS)
 CFLAGS = $(GCCFLAGS)
@@ -79,6 +79,7 @@ main: $(OBJ)
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a 
+	$(CC) $(LDFLAGS) -llzma -lbz2 -lz $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a $(srcdir)/vendor/libarchive.a
 
 # debug - Builds code with debugging flags on
 debug: debug-clang
@@ -119,6 +120,8 @@ install:
 	-test -d $(PREFIX)/share/$(NAME)/ || mkdir -p $(PREFIX)/share/$(NAME)/
 	test -d $(PREFIX)/share/$(NAME)/
 	cp $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
+	-test -d /etc/$(NAME) || mkdir -p /etc/$(NAME)/
+	cp $(srcdir)/share/etc.hypno.hypno.lua /etc/$(NAME)/hypno.lua
 	-mkdir -p $(WEBDIR)/ && chown $(SRVUSER):$(SRVGROUP) $(WEBDIR)/
 	-test -d /var/lib/$(NAME)/ || mkdir /var/lib/$(NAME)/
 	test -d /var/lib/$(NAME)/

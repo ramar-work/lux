@@ -35,7 +35,14 @@
 #define POLL_INTERVAL 1000000
 
 //Default read buffer size
-#define CTX_READ_SIZE 4096 
+#ifndef ZHTTP_PREAMBLE_SIZE
+ #define ZHTTP_PREAMBLE_SIZE 2048
+#endif
+
+//Default read buffer size
+#ifndef CTX_READ_SIZE
+ #define CTX_READ_SIZE 4096 
+#endif
 
 //Default write buffer size
 #define CTX_WRITE_SIZE 1024

@@ -24,54 +24,51 @@
  * ------------------------------------------- */
 #include "filter-echo.h"
 
-//
 
-const int
-filter_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
+
+
+
+const int filter_echo ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 
 	//Allocate a big buffer and do work
 	char err[ 2048 ] = { 0 };
+	const char urlfmt[] = "<h2>URL</h2>\n%s<br>\n";
 	uint8_t *buf = NULL;
-	struct n { const char *name; struct HTTPRecord **records; } **ttt = 
+	int bl = 0, progress = 0;
+	struct n { const char *name; zhttpr_t **records; } **ttt = 
 	(struct n *[]){
 		&(struct n){ "Headers", rq->headers },
 		&(struct n){ "GET", rq->url },
 		&(struct n){ "POST", rq->body },
 		NULL
 	};
-	int buflen = 0; 
-	int progress = 0;
 
-	const char urlfmt[] = "<h2>URL</h2>\n%s<br>\n";
 	//Sanity checks
-	if ( !rq->path || !( buflen = (strlen(urlfmt) - 1) + strlen(rq->path) ) ) {
+	if ( !rq->path || !( bl = ( sizeof(urlfmt) - 1 ) + strlen( rq->path ) ) )
 		return http_set_error( rs, 500, "Path cannot be zero..." );
-	}
 
 	//Reallocate a buffer
-	if ( !( buf = realloc( buf, buflen ) ) || !memset( buf, 0, buflen ) ) {
+	if ( !( buf = realloc( buf, bl ) ) || !memset( buf, 0, bl ) )
 		return http_set_error( rs, 500, strerror( errno ) );
-	}
 
-	if ( ( buflen = snprintf( (char *)buf, buflen, urlfmt, rq->path )) == -1 ) {
+	if ( ( bl = snprintf( (char *)buf, bl, urlfmt, rq->path )) == -1 )
 		return http_set_error( rs, 500, "Failed to zero memory..." );
-	}
 
 	//Switch to whiles, b/c it's just easier to follow...
 	while ( ttt && *ttt ) {
-		struct HTTPRecord **r = (*ttt)->records; 
+		zhttpr_t **r = (*ttt)->records; 
 		char *endstr = r ? "\n" : "\n-<br>\n";
 
-		append_to_uint8t( &buf, &buflen, (uint8_t *)"<h2>", 4 );
-		append_to_uint8t( &buf, &buflen, (uint8_t *)(*ttt)->name, strlen( (*ttt)->name ) );
-		append_to_uint8t( &buf, &buflen, (uint8_t *)"</h2>", 5 );
-		append_to_uint8t( &buf, &buflen, (uint8_t *)endstr, strlen( endstr ) );
+		append_to_uint8t( &buf, &bl, (uint8_t *)"<h2>", 4 );
+		append_to_uint8t( &buf, &bl, (uint8_t *)(*ttt)->name, strlen( (*ttt)->name ) );
+		append_to_uint8t( &buf, &bl, (uint8_t *)"</h2>", 5 );
+		append_to_uint8t( &buf, &bl, (uint8_t *)endstr, strlen( endstr ) );
 
 		while ( r && *r ) {
-			append_to_uint8t( &buf, &buflen, (uint8_t *)(*r)->field, strlen( (*r)->field ) ); 
-			append_to_uint8t( &buf, &buflen, (uint8_t *)" => ", 4 );
-			append_to_uint8t( &buf, &buflen, (uint8_t *)(*r)->value, (*r)->size ); 
-			append_to_uint8t( &buf, &buflen, (uint8_t *)"<br>\n", 5 ); 
+			append_to_uint8t( &buf, &bl, (uint8_t *)(*r)->field, strlen( (*r)->field ) ); 
+			append_to_uint8t( &buf, &bl, (uint8_t *)" => ", 4 );
+			append_to_uint8t( &buf, &bl, (uint8_t *)(*r)->value, (*r)->size ); 
+			append_to_uint8t( &buf, &bl, (uint8_t *)"<br>\n", 5 ); 
 			r++;	
 		}
 		ttt++;
@@ -80,7 +77,7 @@ filter_echo ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *co
 	//Package a message
 	http_set_status( rs, 200 );
 	http_set_ctype( rs, "text/html" );
-	http_set_content( rs, buf, buflen );
+	http_set_content( rs, buf, bl );
 
 	if ( !http_finalize_response( rs, err, sizeof(err) ) ) {
 		free( buf );

@@ -582,6 +582,8 @@ static int init_lua_request ( struct luadata_t *l ) {
 	//Add one table for all structures
 	lua_newtable( l->state );
 
+print_httpbody( l->req );
+
 	//Add general request info
 	lua_pushstring( l->state, "contenttype" );
 	lua_pushstring( l->state, l->req->ctype );
