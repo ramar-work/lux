@@ -376,6 +376,7 @@ static zhttpr_t * init_record() {
 
 
 
+#if 0
 
 //Parse out the URL (or path requested) of an HTTP request 
 static int parse_url( zhttp_t *en, char *err, int errlen ) {
@@ -698,20 +699,6 @@ static int parse_http_header ( zhttp_t *en, char *err, int errlen ) {
 }
 
 
-
-//Return if the header is fully received
-int http_header_received ( unsigned char *p, int size ) {
-	return memblkat( p, "\r\n\r\n", size, 4  ); 
-	//return memcmp( p, "\r\n\r\n", size ) == 0;	
-}
-
-
-
-int http_header_xreceived ( zhttp_t *en ) {
-	return ( ( en->hlen = memblkat( en->msg, "\r\n\r\n", en->mlen, 4  ) ) > -1 );  
-}
-
-
 //
 int http_parse_preamble( zhttp_t *en, unsigned char *p, int plen ) {
 	zWalker z;
@@ -874,7 +861,18 @@ int http_frame_content ( zhttp_t *en, unsigned char *p, int plen ) {
 
 	return 1;
 }
+#endif
 
+//Return if the header is fully received
+int http_header_received ( unsigned char *p, int size ) {
+	return memblkat( p, "\r\n\r\n", size, 4  ); 
+	//return memcmp( p, "\r\n\r\n", size ) == 0;	
+}
+
+
+int http_header_xreceived ( zhttp_t *en ) {
+	return ( ( en->hlen = memblkat( en->msg, "\r\n\r\n", en->mlen, 4  ) ) > -1 );  
+}
 
 
 char * http_get_method ( zhttp_t *en, unsigned char **p, int *plen ) {
@@ -985,7 +983,7 @@ char * http_get_boundary ( zhttp_t *en, zhttpr_t **list ) {
 			int s = (*slist)->size;
 			for ( unsigned char *v = (*slist)->value; ( *v != '\r' && s > 1 ) || ( *v = '\0' ); v++, s-- );
 			char *c = memstr( (*slist)->value, "boundary=", (*slist)->size );
-			return en->boundary = c += sizeof( "boundary=" );
+			return en->boundary = c += strlen( "boundary=" );
 		}
 	}
 	return NULL;
@@ -995,37 +993,38 @@ char * http_get_boundary ( zhttp_t *en, zhttpr_t **list ) {
 char * http_get_host ( zhttp_t *en, zhttpr_t **list ) {
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
 		if ( strcmp( (*slist)->field, "Host" ) == 0 ) {
-			for ( unsigned char *v = (*slist)->value; *v != '\r' || ( *v = '\0' ); v++ );
-			return en->host = (char *)(*slist)->value;
+			int s = (*slist)->size;
+			unsigned char *v = (*slist)->value; 
+			for ( ; *v != '\r' && *v != ':' ; v++, s-- ) ;
+			if ( *v == '\r' ) {
+				*v = '\0', v++;
+				return en->host = (char *)(*slist)->value;
+			}
+			else {
+				int port = 0;
+				char pb[ 64 ];
+				*v = '\0', v++, s--;
+				memset( pb, 0, sizeof( pb ) ), memcpy( pb, v, s );
+				if ( !zhttp_satoi( pb, &port ) || port < 1 || port > 65535 ) {
+					en->port = -1;
+					return NULL;
+				}
+				en->port = port, en->host = (char *)(*slist)->value;
+				return en->host; 
+			}
 		}
 	}
 	return NULL;
 }
 
 
-int http_get_port ( zhttp_t *en, zhttpr_t **list ) {
-	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
-		if ( strcmp( (*slist)->field, "Host" ) == 0 ) {
-			int port = 0, s = (*slist)->size;
-			char pb[64];
-			unsigned char *v = (*slist)->value;
-			for ( ; ( s > 1 && *v != '\r' && *v != ':' ) || ( *v = '\0' ); v++, s-- );
-			v++, memset( pb, 0, sizeof( pb ) ), memcpy( pb, v, s );
-			return en->port = ( !zhttp_satoi( pb, &port ) || port < 1 || port > 65535 ) ? 0 : port;
-		}
-	}
-	return 80;
-}
-
 
 zhttpr_t ** http_get_query_strings ( zhttp_t *en, char *p, int plen ) {
 	zhttpr_t **list = NULL;
 
 	//Process the query string if there is one...
-	if ( strlen( en->path ) == 1 || !memchr( en->path, '?', strlen( en->path ) ) ) {
-		//zhttpr_t *t, throwaway = { .value = NULL, .size = 1 }; 
+	if ( strlen( en->path ) == 1 || !memchr( en->path, '?', strlen( en->path ) ) )
 		return en->url = NULL;
-	}
 	else {
 		zhttpr_t *b = NULL; 
 		zWalker z = {0};
@@ -1127,10 +1126,7 @@ zhttp_t * http_parse_header ( zhttp_t *en ) {
 	if ( en->expectsURL && !http_get_query_strings( en, en->path, strlen( en->path ) ) )
 		return fatal_error( en, ZHTTP_INCOMPLETE_QUERYSTRING );
 
-	if ( !http_get_host( en, en->headers ) )
-		0;//Depending on how the thing runs, this field may or may not be necessary
-
-	if ( !http_get_port( en, en->headers ) )
+	if ( !http_get_host( en, en->headers ) && en->port == -1 )
 		return fatal_error( en, ZHTTP_INVALID_PORT );
 
 	if ( en->idempotent && !http_get_content_length( en, en->headers ) )
@@ -1178,35 +1174,43 @@ int http_parse_standard_form ( zhttp_t *en, unsigned char *p ) {
 			}
 		}
 	}
+
+fprintf( stderr, "standard done form\n" );
+getchar();
 	return 1;
 }
 
 
 
 //Parse multipart/form-data
-int http_parse_multipart_form ( zhttp_t *en, unsigned char *p ) {
-	char bd[ 128 ];
-	memset( &bd, 0, sizeof( bd ) );
-	snprintf( bd, 64, "--%s", en->boundary );
-	const int bdlen = strlen( bd );
-	int len = 0, len1 = en->clen, pp = 0;
+zhttpr_t ** http_parse_multipart_form ( zhttp_t *en, unsigned char *p ) {
+	//Prepare the boundary
+	int blen, len = 0, len1 = en->clen;
+	char boundary[ 128 ];
+	zhttpr_t **list = NULL;
 
-	while ( ( pp = memblkat( p, bd, len1, bdlen ) ) > -1 ) {
+	//Do any initialization
+	memset( &boundary, 0, sizeof( boundary ) );
+	snprintf( boundary, 64, "--%s", en->boundary );
+	blen = strlen( boundary );
+
+	for ( int pp = 0; ( pp = memblkat( p, boundary, len1, blen ) ) > -1; ) {
 		int len2 = pp, inner = 0, count = 0;
 		unsigned char *i = p;
 	#if 0 
-		fprintf( stderr, "START POINT======== len: %d \n", len2 ); write( 2, i, len2 );  getchar();
+		fprintf( stderr, "START POINT======== len: %d \n", len2 ); 
+		write( 2, i, len2 );  getchar();
 	#endif
 		if ( len2 > 0 ) {	
 			zhttpr_t *b = init_record();
 			b->type = ZHTTP_MULTIPART;
-			i += bdlen + 1, len2 -= bdlen - 1;
-			//char *name, *filename, *ctype;
+			i += blen + 1, len2 -= blen - 1;
 
 			//Boundary was found, so we need to move up again
 			while ( ( inner = memblkat( i, "\r\n", len2, 2 ) ) > -1 ) {
 			#if 0
-				write( 2, i, inner ); fprintf( stderr, "count: %d, inner: %d\n", count, inner ); getchar();
+				write( 2, i, inner ); 
+				fprintf( stderr, "count: %d, inner: %d\n", count, inner ); getchar();
 			#endif
 				if ( inner == 1 ) 
 					; //skip me
@@ -1224,19 +1228,13 @@ int http_parse_multipart_form ( zhttp_t *en, unsigned char *p ) {
 				}
 				++inner, len2 -= inner, i += inner, count++;
 			}
-		#if 0
-			fprintf( stderr, "NAME:\n" );
-			fprintf( stderr, "%s\n", b->field );
-			fprintf( stderr, "VALUE: %p, %d\n", b->value, b->size );
-			write( 2, b->value, b->size );
-			getchar();
-		#endif
-			zhttp_add_item( &en->body, b, zhttpr_t *, &len );
+			zhttp_add_item( &list, b, zhttpr_t *, &len );
 			b = NULL;
 		}
 		++pp, len1 -= pp, p += pp;	
 	}
-	return 1;
+
+	return en->body = list;
 }
 
 
@@ -1271,7 +1269,7 @@ int http_parse_chunked_encoding_part ( zhttp_t *en, unsigned char *p ) {
 //Handle different types of content
 zhttp_t * http_parse_content ( zhttp_t *en ) {
 	
-	unsigned char *p = en->msg + en->hlen + 4;
+	unsigned char *p = en->msg;
 
 	//This should not run if method is not something that expects a body
 	if ( en->formtype == ZHTTP_NO_CONTENT )
@@ -1288,12 +1286,24 @@ zhttp_t * http_parse_content ( zhttp_t *en ) {
 }
 
 
+
 //Parse an HTTP request
 zhttp_t * http_parse_request ( zhttp_t *en, char *err, int errlen ) {
 
 	//Set error to none
 	en->error = ZHTTP_NONE;
 
+#if 1
+	if ( !http_parse_header( en ) ) {
+		return en;
+	}
+
+
+	if ( !http_parse_header( en ) ) {
+		return en;
+	}
+
+#else
 	//Parse the header
 	if ( !parse_http_header( en, err, errlen ) ) {
 		return en;
@@ -1313,7 +1323,7 @@ zhttp_t * http_parse_request ( zhttp_t *en, char *err, int errlen ) {
 	if ( !parse_body( en, err, errlen ) ) {
 		return en;
 	}
-
+#endif
 	//ZHTTP_PRINTF( "Dump http body." );
 	//print_httpbody_to_file( en, "/tmp/zhttp-01" );
 	return en;
