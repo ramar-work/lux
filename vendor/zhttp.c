@@ -51,7 +51,7 @@
 static const char zhttp_multipart[] =
 	"multipart/form-data";
 
-static const char zhttp_x_www_form[] =
+static const char zhttp_url_encoded[] =
 	"application/x-www-form-urlencoded"; 
 
 static const char zhttp_idempotent_methods[] =
@@ -87,6 +87,25 @@ static const char *zhttp_supported_protocols2[] = {
 , "HTTP/1"
 , "HTTP/0.9"
 , NULL
+};
+
+static const char base[] = { 
+	['0'] = 0
+,	['1'] = 1
+,	['2'] = 2
+,	['3'] = 3
+,	['4'] = 4
+,	['5'] = 5
+,	['6'] = 6
+,	['7'] = 7
+,	['8'] = 8
+,	['9'] = 9
+,	['a'] = 10 
+,	['b'] = 11
+,	['c'] = 12 
+,	['d'] = 13
+,	['e'] = 14
+,	['f'] = 15
 };
 
 static const char default_content_type[] = 
@@ -240,6 +259,29 @@ char *zhttp_rand_chars ( int len ) {
 		a[ i ] = chars[ rand() % sizeof(chars) ];
 	}
 	return a;	
+}
+
+
+
+//Return a single char based on code... 
+char zhttp_url_decode ( unsigned char *p, int len ) {
+	//const char reserved[] = ";/?:@=&";
+	if ( *p != '%' ) {
+		return 0;
+	}
+
+	char k = 0;
+	for ( unsigned char *x = p; len; len--, x++ ) {
+		if ( len == 2 )
+			k += base[ (int)*x ] * 16;
+		else if ( len == 1 )
+			k += base[ (int)*x ];
+		else if ( len == 3 && *x == '%' )  {
+			continue;
+		}
+	}
+	
+	return (char)k;
 }
 
 
@@ -963,7 +1005,7 @@ char * http_get_content_type ( zhttp_t *en, zhttpr_t **list ) {
 			en->ctype = (char *)(*slist)->value; 
 			if ( strcmp( en->ctype, zhttp_multipart ) == 0 )
 				en->formtype = ZHTTP_MULTIPART;
-			else if ( strcmp( en->ctype, zhttp_multipart ) == 0 )
+			else if ( strcmp( en->ctype, zhttp_url_encoded ) == 0 )
 				en->formtype = ZHTTP_URL_ENCODED;
 			else {
 				en->formtype = ZHTTP_OTHER;
@@ -1183,20 +1225,43 @@ int http_parse_standard_form ( zhttp_t *en, unsigned char *p ) {
 		//TODO: Should be checking that allocation was successful
 		if ( z.chr == '=' )
 			b = init_record(), b->field = zhttp_copystr( m, z.size - 1 );
+	#if 0
+		else if ( z.chr == '+' )
+			*m = ' ';
+		//Percent encoding will drop
+		else if ( z.chr == '%' ) {
+
+		}
+	#endif
 		else { 
 			if ( !b )
 				break;
-			else {	
-				b->value = m;
-				b->size = z.size - (( z.chr == '&' ) ? 1 : 2);
+			else {
+				//You'll have blank spaces, but this is probably ok...
+				unsigned char *c = m;
+				int osize, a, d; 
+				osize = a = d = z.size - (( z.chr == '&' ) ? 1 : 2);
+
+				//Die when a hits 0, because we're done...
+				for ( unsigned char *n = m; a; d--, c++ ) {
+					if ( *n == '+' )
+						*n = ' ' ;
+					else if ( *n == '%' && d > 3 ) {
+						*c = *n = zhttp_url_decode( n, 3 ), n += 3, a -= 3;
+						continue;
+					}
+					*c = *n, n++, a--;
+				}
+		
+				//Wipe any excess buffer after translation
+				( d ) ? memset( c, 0, d ) : 0;
+				b->value = m, b->size = osize - d;
 				zhttp_add_item( &en->body, b, zhttpr_t *, &len );
 				b = NULL;
 			}
 		}
 	}
 
-fprintf( stderr, "standard done form\n" );
-getchar();
 	return 1;
 }
 
@@ -1284,6 +1349,21 @@ int http_parse_chunked_encoding_part ( zhttp_t *en, unsigned char *p ) {
 	return 1;
 }
 
+
+const char * print_formtype ( int x ) {
+	const char *w[] = { "multipart", "url_enc", "other", "none" };
+  switch ( x ) {
+    case ZHTTP_MULTIPART:
+      return w[0];
+    case ZHTTP_URL_ENCODED:
+      return w[1];
+    case ZHTTP_OTHER:
+      return w[2];
+    default:
+      return w[3];
+  }
+  return NULL;
+}
 
 
 //Handle different types of content

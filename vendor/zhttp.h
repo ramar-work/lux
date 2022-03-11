@@ -325,6 +325,7 @@ int http_header_received ( unsigned char *, int );
 
 int http_header_xreceived ( zhttp_t * );
 
+ const char * print_formtype ( int ) ;
 #ifdef DEBUG_H
  void print_httprecords ( zhttpr_t ** );
  void print_httpbody_to_file ( zhttp_t *, const char * );
