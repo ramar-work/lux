@@ -220,6 +220,13 @@ typedef enum {
 , ZHTTP_OUT_OF_MEMORY
 } HTTP_Error;
 
+typedef enum {
+ 	ZHTTP_MESSAGE_STATIC = 0
+,	ZHTTP_MESSAGE_MALLOC
+, ZHTTP_MESSAGE_SENDFILE
+, ZHTTP_MESSAGE_OTHER
+} HttpMessageAllocationType;
+
 
 typedef enum {
  	ZHTTP_NO_CONTENT = 0
@@ -262,7 +269,12 @@ typedef struct HTTPBody {
 	char *boundary;
 	char lengths[ 4 ];
 	unsigned char preamble[ ZHTTP_PREAMBLE_SIZE ];
+#if 0
+	union { int fd; unsigned char *msg; } msg;
+#else
+	int fd; 
  	unsigned char *msg;
+#endif
 	int clen;  //content length
 	int mlen;  //message length (length of the entire received message)
 	int	hlen;  //header length
@@ -273,6 +285,7 @@ typedef struct HTTPBody {
 #else
 	char idempotent;
 	char chunked;
+	HttpMessageAllocationType atype;
 	char compressed; //Would be better to mark a specific type... 
 	HttpContentType formtype;
 	short expectsURL;
@@ -317,9 +330,10 @@ unsigned char * zhttp_dupblk( const unsigned char *v, int vlen ) ;
 
 unsigned char *zhttp_append_to_uint8t ( unsigned char **, int *, unsigned char *, int );
 
-zhttp_t * http_parse_header( zhttp_t * );
+//zhttp_t * http_parse_header( zhttp_t * );
+zhttp_t * http_parse_header ( zhttp_t *, int );
 
-zhttp_t * http_parse_content( zhttp_t * );
+zhttp_t * http_parse_content( zhttp_t *, unsigned char *, int );
 
 int http_header_received ( unsigned char *, int );
 

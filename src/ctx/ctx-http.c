@@ -21,9 +21,10 @@
  * 
  * ------------------------------------------- */
 #include "ctx-http.h"
+#include <sys/sendfile.h>
 
-#define BHSIZE \
-	sizeof( "\r\n\r\n" )	
+//Size of \r\n\r\n
+#define BHSIZE 4	
 
 #if CTX_READ_SIZE < 4096
 	#error "Context read size is too small."
@@ -82,6 +83,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 
 	//Get the time at the start
 	int total = 0, nsize, mult = 1, size = CTX_READ_SIZE; 
+	int hlen = 0, mlen = 0;
 	struct timespec timer = {0};
 	unsigned char *x = NULL, *xp = NULL;
 	clock_gettime( CLOCK_REALTIME, &timer );	
@@ -126,7 +128,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 			FPRINTF( "Received %d additional header bytes on fd %d\n", rd, fd ); 
 			bsize -= rd, total += rd, x += rd;
 			recvd = http_header_received( rq->preamble, total );
-			rq->hlen = recvd, rq->mlen = total;
+			hlen = recvd; //rq->mlen = total;
 		#if 0
 			//rq->hlen = total - 4;
 			FPRINTF( 
@@ -139,15 +141,22 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	}
 
 	//This should probably be a while loop
-	if ( !http_parse_header( rq ) ) {
+	if ( !http_parse_header( rq, hlen ) ) {
 		conn->count = -3;
 		return http_set_error( rs, 500, (char *)rq->errmsg ); 
 	}
 
 	//If the message is not idempotent, stop and return.
 	//print_httpbody( rq );
-	//write( 2, rq->msg, rq->mlen );
+
+#if 0
+	//Dump a message
+	fprintf( stderr, "MESSAGE SO FAR:\n" );
+	write( 2, rq->preamble, total );
+#endif
+
 	if ( !rq->idempotent ) {
+		//rq->atype = ZHTTP_MESSAGE_STATIC;
 		FPRINTF( "Read complete.\n" );
 		return 1;
 	}
@@ -159,8 +168,9 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 #endif
 
 	//Check to see if we've fully received the message
-	if ( rq->mlen == ( rq->hlen + rq->clen + 4 ) ) {
-		if ( !http_parse_content( rq ) ) {
+	if ( total == ( hlen + BHSIZE + rq->clen ) ) {
+		rq->msg = rq->preamble + ( hlen + BHSIZE );
+		if ( !http_parse_content( rq, rq->msg, rq->clen ) ) {
 			conn->count = -3;
 			return http_set_error( rs, 500, (char *)rq->errmsg ); 
 		}
@@ -172,7 +182,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	if ( rq->clen > CTX_READ_MAX ) {
 		conn->count = -3;
 		char errmsg[ 1024 ] = {0};
-		snprintf( errmsg, sizeof( errmsg ), "%s", 
+		snprintf( errmsg, sizeof( errmsg ),
 			"Content-Length (%d) exceeds read max (%d).", rq->clen, CTX_READ_MAX );
 		return http_set_error( rs, 500, (char *)errmsg ); 
 	} 	
@@ -194,17 +204,26 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	#endif
 
 	//Allocate space for the content of the message (may wish to initialize the memory)
-	if ( !( rq->msg = realloc( rq->msg, nsize ) ) ) {
+	rq->atype = ZHTTP_MESSAGE_MALLOC;
+	if ( !( xp = rq->msg = malloc( nsize ) ) || !memset( xp, 0, nsize ) ) {
 		conn->count = -3;
 		return http_set_error( rs, 500, strerror( errno ) );
 	}
 
-	//Mark the start of our new block
-	xp = rq->msg, xp += rq->mlen;
+	//Take any excess in the preamble and move that into xp
+	int crecvd = total - ( hlen + BHSIZE );
+	if ( crecvd > 0 ) {
+		unsigned char *hp = rq->preamble + ( hlen + BHSIZE );
+		memmove( xp, hp, crecvd );
+		memset( hp, 0, crecvd );
+		xp += crecvd; 
+	} 
 
 	//Get the rest of the message
-	for ( int rd, bsize = size, crecvd = rq->mlen - rq->hlen + BHSIZE; crecvd < rq->clen; ) {
+	//FPRINTF( "crecvd: %d, clen: %d\n", crecvd, rq->clen );
+	for ( int rd, bsize = size; crecvd < rq->clen; ) {
 		FPRINTF( "Attempting read of %d bytes in ptr %p\n", bsize, xp );
+		//FPRINTF( "crevd: %d, clen: %d\n", crecvd, rq->clen );
 		if ( ( rd = recv( fd, xp, bsize, MSG_DONTWAIT ) ) == 0 ) {
 			conn->count = -2; //most likely resources are unavailable
 			return 0;		
@@ -231,27 +250,24 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 		else {
 			//Process a successfully read buffer
 			FPRINTF( "Received %d additional bytes on fd %d\n", rd, fd ); 
-			xp += rd, rq->mlen += rd, crecvd += rd;
+			xp += rd, total += rd, crecvd += rd;
 			if ( ( rq->clen - crecvd ) < size ) {
 				bsize = rq->clen - crecvd;
 			}
 
 			//Set timer to keep track of long running requests
-			FPRINTF( "Total so far: %d\n", rq->mlen );
+			FPRINTF( "Total so far: %d\n", total );
 			clock_gettime( CLOCK_REALTIME, &timer );	
 		}
 	}
 
 	//Finally, process the body (chunked may still need something fancy)
-	if ( !http_parse_content( rq ) ) {
+	if ( !http_parse_content( rq, rq->msg, rq->clen ) ) {
 		conn->count = -3;
 		return http_set_error( rs, 500, (char *)rq->errmsg ); 
 	}
 
-	write( 2, rq->msg, rq->mlen );
-	//print_httpbody( rq );
-	FPRINTF( "Read complete.\n" );
-	return http_set_error( rs, 200, "OK" );
+	FPRINTF( "Read complete (read %d out of %d bytes for content)\n", crecvd, rq->clen );
 	return 1;
 }
 
@@ -264,7 +280,90 @@ const int write_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 
 	//Get the time at the start
 	struct timespec timer = {0};
-	clock_gettime( CLOCK_REALTIME, &timer );	
+	clock_gettime( CLOCK_REALTIME, &timer );
+
+	#if 1
+	if ( rs->atype == ZHTTP_MESSAGE_SENDFILE ) {
+		//Send the header first
+		//for ( ;; ) {
+			//
+		int hlen = total;	
+		for ( ; total; ) {
+			sent = send( fd, ptr, total, MSG_DONTWAIT | MSG_NOSIGNAL );
+			if ( sent == 0 ) {
+				FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", rs->mlen );
+				break;	
+			}
+			else if ( sent > -1 ) {
+				pos += sent, total -= sent, ptr += sent;	
+				FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
+				if ( total == 0 ) {
+					FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", rs->mlen );
+					break;
+				}
+			}
+			else {
+				if ( !total ) {
+					FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
+					return 1;
+				}
+				
+				if ( errno != EAGAIN || errno != EWOULDBLOCK ) {
+					FPRINTF( "Got socket write error: %s\n", strerror( errno ) );
+					conn->count = -2;
+					return 0;	
+				}
+
+				struct timespec n = {0};
+				clock_gettime( CLOCK_REALTIME, &n );
+				
+				if ( ( n.tv_sec - timer.tv_sec ) > 5 ) {
+					conn->count = -3;
+					return http_set_error( rs, 408, "Timeout reached." );
+				}
+
+				FPRINTF("Trying again to send header to socket. (%d).\n", sent );
+				nanosleep( &__interval__, NULL );
+			}
+			FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
+		}
+		FPRINTF( "Header Write complete (sent %d out of %d bytes)\n", pos, hlen );
+		//}
+
+		//Then send the file
+		for ( total = rs->clen; total; ) {
+			sent = sendfile( fd, rs->fd, NULL, CTX_WRITE_SIZE );
+			FPRINTF( "Bytes sent from open file %d: %d\n", fd, sent );
+			if ( sent == 0 ) 
+				break;
+			else if ( sent > -1 )
+				total -= sent, pos += sent;
+			else {
+				if ( errno != EAGAIN || errno != EWOULDBLOCK ) {
+					FPRINTF( "Got socket write error: %s\n", strerror( errno ) );
+					conn->count = -2;
+					return 0;	
+				}
+
+				struct timespec n = {0};
+				clock_gettime( CLOCK_REALTIME, &n );
+				
+				if ( ( n.tv_sec - timer.tv_sec ) > 5 ) {
+					conn->count = -3;
+					return http_set_error( rs, 408, "Timeout reached." );
+				}
+
+				FPRINTF("Trying again to send file to socket. (%d).\n", sent );
+				nanosleep( &__interval__, NULL );
+			}
+			FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
+		}
+		FPRINTF( "Write complete (sent %d out of %d bytes)\n", pos, rs->clen );
+	}
+	else {
+
+	}
+	#endif
 
 	//Start writing data to socket
 	for ( ;; ) {
@@ -283,7 +382,6 @@ const int write_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 				break;
 			}
 		}
-#if 1
 		else {
 			if ( !total ) {
 				FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
@@ -304,29 +402,11 @@ const int write_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 				return http_set_error( rs, 408, "Timeout reached." );
 			}
 
-			FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
 			nanosleep( &__interval__, NULL );
 		}
-#else 
-		else if ( sent == -1 && ( errno == EAGAIN || errno == EWOULDBLOCK ) ) {
-			FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
-		}
-		else {
-			//TODO: Can't close a most-likely closed socket.  What do you do?
-			if ( sent == -1 && ( errno == EAGAIN || errno == EWOULDBLOCK ) )
-				FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
-			else {
-				//EBADF|ECONNREFUSED|EFAULT|EINTR|EINVAL|ENOMEM|ENOTCONN|ENOTSOCK
-				FPRINTF( "Got socket write error: %s\n", strerror( errno ) );
-				conn->count = -2;
-				return 0;	
-			}
-		}
-#endif
-		try++;
 		FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
 	}
 
-	FPRINTF( "Write complete.\n" );
+	FPRINTF( "Write complete (sent %d out of %d bytes)\n", pos, rq->mlen );
 	return 1;
 }

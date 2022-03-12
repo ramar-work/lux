@@ -49,8 +49,11 @@
  #define CTX_READ_MAX 8388608
 #endif
 
-//Default write buffer size
-#define CTX_WRITE_SIZE 1024
+//Default write sink size (1MB)
+#ifndef CTX_WRITE_SIZE
+ //#define CTX_WRITE_SIZE 1048576
+ #define CTX_WRITE_SIZE 8192 
+#endif
 
 //Default stack size of each new thread 
 #define STACK_SIZE 100000

@@ -454,20 +454,28 @@ static int path_is_static ( struct luadata_t *l ) {
 
 
 //Send a static file
-static const int send_static ( struct HTTPBody *res, const char *dir, const char *uri ) {
+static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) {
 	//Read_file and return that...
 	struct stat sb;
-	int dlen = 0;
+	int fd = 0;
 	char err[ 2048 ] = { 0 }, spath[ 2048 ] = { 0 };
 	unsigned char *data;
 	const struct mime_t *mime;
 	memset( spath, 0, sizeof( spath ) );
 	snprintf( spath, sizeof( spath ) - 1, "%s/%s", dir, ++uri );
 
-	//check if the path is there at all (read-file can't do this)
-	if ( stat( spath, &sb ) == -1 ) {
-		return http_error( res, 404, "static read failed: %s", err );
-	}
+	//Check if the path is there at all (read-file can't do this)
+	if ( stat( spath, &sb ) == -1 )
+		return http_error( res, 404, "File '%s' not found", spath );
+
+	//Get its mimetype
+	if ( !( mime = zmime_get_by_filename( spath ) ) )
+		mime = zmime_get_default();
+#if 0
+	//write max should be checked.
+	//...
+	int dlen = 0;
+
 	//read_file and send back
 	if ( !( data = read_file( spath, &dlen, err, sizeof( err ) ) ) ) {
 		return http_error( res, 500, "static read failed: %s", err );
@@ -488,6 +496,29 @@ static const int send_static ( struct HTTPBody *res, const char *dir, const char
 	}
 
 	free( data );
+#else
+	//Open the file
+	if ( ( fd = open( spath, O_RDONLY ) ) == -1 ) 
+		return http_error( res, 404, strerror( errno ) );
+
+	//Prepare the message
+#if 1 
+	res->atype = ZHTTP_MESSAGE_SENDFILE;
+	res->clen = sb.st_size;
+	res->fd = fd;
+	res->status = 200;
+#else
+	http_set_fd( res, 200 ); 
+	http_set_content_length( res, sb.st_size ); 
+	http_set_message_type( res, ZHTTP_MESSAGE_SENDFILE ); 
+	http_set_status( res, 200 ); 
+#endif
+	http_set_ctype( res, mime->mimetype );
+
+	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
+		return http_error( res, 500, err );
+	}
+#endif
 	return 1;	
 }
 
@@ -582,8 +613,6 @@ static int init_lua_request ( struct luadata_t *l ) {
 	//Add one table for all structures
 	lua_newtable( l->state );
 
-print_httpbody( l->req );
-
 	//Add general request info
 	lua_pushstring( l->state, "contenttype" );
 	lua_pushstring( l->state, l->req->ctype );
@@ -609,7 +638,6 @@ print_httpbody( l->req );
 	lua_pushstring( l->state, "host" );
 	lua_pushstring( l->state, l->req->host );
 	lua_settable( l->state, 1 );
-	
 
 	//Add simple keys for headers and URL
 	for ( int pos=3, i = 0; i < 3; i++ ) {

@@ -908,13 +908,13 @@ int http_frame_content ( zhttp_t *en, unsigned char *p, int plen ) {
 //Return if the header is fully received
 int http_header_received ( unsigned char *p, int size ) {
 	return memblkat( p, "\r\n\r\n", size, 4  ); 
-	//return memcmp( p, "\r\n\r\n", size ) == 0;	
 }
 
-
+#if 0
 int http_header_xreceived ( zhttp_t *en ) {
 	return ( ( en->hlen = memblkat( en->msg, "\r\n\r\n", en->mlen, 4  ) ) > -1 );  
 }
+#endif
 
 
 char * http_get_method ( zhttp_t *en, unsigned char **p, int *plen ) {
@@ -1153,7 +1153,7 @@ int http_get_cookie ( zhttp_t *en, zhttpr_t **list ) {
 #endif
 
 //Just parse the headers
-zhttp_t * http_parse_header ( zhttp_t *en ) {
+zhttp_t * http_parse_header ( zhttp_t *en, int plen ) {
 #if 0
 	//Check if the full headers were received	
 	if ( !en->hlen && !http_header_received( en ) ) {
@@ -1163,7 +1163,7 @@ zhttp_t * http_parse_header ( zhttp_t *en ) {
 
 	//Define & initialize everything else here...
 	unsigned char *p = en->preamble;
-	int plen = en->hlen;
+	//int plen = en->hlen;
 	en->headers = en->body = en->url = NULL;
 
 	if ( plen < 1 )
@@ -1367,10 +1367,12 @@ const char * print_formtype ( int x ) {
 
 
 //Handle different types of content
-zhttp_t * http_parse_content ( zhttp_t *en ) {
+zhttp_t * http_parse_content( zhttp_t *en, unsigned char *p, int plen ) {
 	
-	unsigned char *p = en->msg;
-
+	//Block any blank entries	
+	if ( !en || !p || plen < 1 )
+		return NULL;
+	
 	//This should not run if method is not something that expects a body
 	if ( en->formtype == ZHTTP_NO_CONTENT )
 		return en;
@@ -1394,14 +1396,25 @@ zhttp_t * http_parse_request ( zhttp_t *en, char *err, int errlen ) {
 	en->error = ZHTTP_NONE;
 
 #if 1
-	if ( !http_parse_header( en ) ) {
-		return en;
+	#if 0
+	int len = 0;
+	//Need to know how big message is, but you'll need this
+	if ( ( len = http_header_received( NULL, 0 ) ) > -1 ) {
+		return NULL;
 	}
 
-
-	if ( !http_parse_header( en ) ) {
-		return en;
+	//Use an independent reference to the message
+	//http_parse_header( en, hp, plen );
+	if ( !http_parse_header( en, len ) ) {
+		return NULL;
 	}
+
+	//Same here
+	//http_parse_content( en, cp, plen );
+	if ( !http_parse_content( en ) ) {
+		return NULL;
+	}
+	#endif
 
 #else
 	//Parse the header
@@ -1430,6 +1443,7 @@ zhttp_t * http_parse_request ( zhttp_t *en, char *err, int errlen ) {
 } 
 
 
+#if 0
 //Parse an HTTP response
 zhttp_t * http_parse_response ( zhttp_t *en, char *err, int errlen ) {
 	//Prepare the rest of the request
@@ -1441,13 +1455,13 @@ zhttp_t * http_parse_response ( zhttp_t *en, char *err, int errlen ) {
 	en->host = zhttp_msg_get_value( "Host: ", "\r", en->msg, hdLen );
 	return NULL;
 } 
+#endif
 
 
 
 //Finalize an HTTP request (really just returns a unsigned char, but this can handle it)
 zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 	unsigned char *msg = NULL, *hmsg = NULL;
-	//enum rtype { ZHTTP_APPWWW, ZHTTP_MULTIPART, ZHTTP_OTHER } rtype = ZHTTP_OTHER;
 	HttpContentType rtype = ZHTTP_OTHER;
 
 	char clen[ 32 ] = {0};
@@ -1473,9 +1487,9 @@ zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 			return NULL;
 		}
 
-		if ( !strcmp( en->ctype, "application/x-www-form-urlencoded" ) ) 
+		if ( !strcmp( en->ctype, zhttp_url_encoded ) ) 
 			rtype = ZHTTP_URL_ENCODED;	
-		else if ( !strcmp( en->ctype, "multipart/form-data" ) ) {
+		else if ( !strcmp( en->ctype, zhttp_multipart ) ) {
 			rtype = ZHTTP_MULTIPART;	
 			char *b = zhttp_rand_chars( 32 );
 			memcpy( en->boundary, b, strlen( b ) );
@@ -1592,7 +1606,7 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 	char http_header_buf[ 2048 ] = { 0 };
 	char http_header_fmt[] = "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n";
 
-	if ( !en->headers && !en->body ) {
+	if ( !en->headers && !en->body && !en->fd ) {
 		snprintf( err, errlen, "%s", "No headers or body specified with response." );
 		return NULL;
 	}
@@ -1613,9 +1627,10 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 	}
 
 	//This assumes (perhaps wrongly) that ctype is already set.
-	en->clen = (*en->body)->size;
+	en->clen = !en->clen ? (*en->body)->size : en->clen;
+	//en->clen = (*en->body)->size;
 	http_header_len = snprintf( http_header_buf, sizeof(http_header_buf) - 1, http_header_fmt,
-		en->status, http_get_status_text( en->status ), en->ctype, (*en->body)->size );
+		en->status, http_get_status_text( en->status ), en->ctype, en->clen ); //((*en->body)->size );
 
 	if ( !zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)http_header_buf, http_header_len ) ) {
 		snprintf( err, errlen, "%s", "Failed to add default HTTP headers to response." );
@@ -1631,18 +1646,19 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 		zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)"\r\n", 2 ); 
 		headers++;
 	}
-
+#if 0
 	if ( !msg ) {
 		snprintf( err, errlen, "Failed to append all headers" );
 		return NULL;
 	}
+#endif
 
 	if ( !zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)"\r\n", 2 ) ) {
 		snprintf( err, errlen, "%s", "Could not add header terminator to message." );
 		return NULL;
 	}
 
-	if ( !zhttp_append_to_uint8t( &msg, &msglen, (*en->body)->value, (*en->body)->size ) ) {
+	if ( !en->fd && !zhttp_append_to_uint8t( &msg, &msglen, (*en->body)->value, (*en->body)->size ) ) {
 		snprintf( err, errlen, "%s", "Could not add content to message." );
 		return NULL;
 	}
@@ -1733,9 +1749,12 @@ void http_free_body ( zhttp_t *en ) {
 	http_free_records( en->body );
 
 	//Free big message buffer
-	if ( en->msg ) {
+	if ( en->atype == ZHTTP_MESSAGE_MALLOC )
 		free( en->msg );
-	}	
+	else if ( en->atype == ZHTTP_MESSAGE_SENDFILE ) {
+		// TODO: Switching to a union for all of this...
+		( en->fd > 2 ) ? close( en->fd ) : 0;
+	}
 }
 
 
@@ -1818,6 +1837,21 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 	ZHTTP_PRINTF( fb, "r->protocol: '%s'\n", r->protocol );
 	ZHTTP_PRINTF( fb, "r->host: '%s'\n", r->host );
 	ZHTTP_PRINTF( fb, "r->boundary: '%s'\n", r->boundary );
+
+	switch ( r->atype ) {
+		case ZHTTP_MESSAGE_STATIC:
+			ZHTTP_PRINTF( fb, "Message allocation type: '%s'\n", "static" );
+			break;	
+		case ZHTTP_MESSAGE_MALLOC:
+			ZHTTP_PRINTF( fb, "Message allocation type: '%s'\n", "mallocd" );
+			break;	
+		case ZHTTP_MESSAGE_SENDFILE:
+			ZHTTP_PRINTF( fb, "Message allocation type: '%s'\n", "sendfile" );
+			break;	
+		case ZHTTP_MESSAGE_OTHER:
+			ZHTTP_PRINTF( fb, "Message allocation type: '%s'\n", "other" );
+			break;	
+	}
 
 	//Print out headers and more
 	const char *names[] = { "r->headers", "r->url", "r->body" };

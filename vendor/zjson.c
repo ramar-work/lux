@@ -166,38 +166,51 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 		return NULL;
 	}
 
-	//...
+	//Walk through everything
 	for ( int i = 0; memwalk( &w, (unsigned char *)str, (unsigned char *)tokens, len, strlen( tokens ) ); ) {
-		char *b, buf[ ZJSON_MAX_LENGTH ] = { 0 };
+		char *srcbuf, *copybuf, statbuf[ ZJSON_MAX_STATIC_LENGTH ] = { 0 };
 		int blen = 0;
 
 		if ( w.chr == '"' && !( d->inText = !d->inText ) ) { 
 			//Rewind until we find the beginning '"'
 			unsigned char *val = w.src;
-			int size = w.size - 1;
+			int size = w.size - 1, mallocd = 0;
 			for ( ; *val != '"'; --val, ++size ) ;
-			b = ( char * )zjson_trim( val, "\" \t\n\r", size, &blen );
+			srcbuf = ( char * )zjson_trim( val, "\" \t\n\r", size, &blen );
 
-			if ( ++blen < ZJSON_MAX_LENGTH ) 
-				memcpy( buf, b, blen );	
+			if ( ++blen < ZJSON_MAX_STATIC_LENGTH )
+				memcpy( statbuf, srcbuf, blen ), copybuf = statbuf; 
 			else {
+			#if 0
 				snprintf( err, errlen, "%s", "zjson max length is too large." );
 				return NULL;
+			#else
+				if ( !( copybuf = malloc( blen + 1 ) ) ) {
+					snprintf( err, errlen, "%s", "zjson out of memory." );
+					return NULL;
+				} 
+				memset( copybuf, 0, blen + 1 );
+				memcpy( copybuf, srcbuf, blen );
+				mallocd = 1;
+			#endif
 			}
 	
 			if ( !d->isObject ) {
-				lt_addintkey( t, d->index ), lt_addtextvalue( t, buf ), lt_finalize( t );
+				lt_addintkey( t, d->index ), lt_addtextvalue( t, copybuf ), lt_finalize( t );
 				d->inText = 0, d->isVal = 0;
 			}
 			else {
 				if ( !d->isVal ) {
-					ZJSON_PRINTF( "Adding text key: %s\n", buf );
-					lt_addtextkey( t, buf ), d->inText = 0; //, d->isVal = 1;
+					ZJSON_PRINTF( "Adding text key: %s\n", copybuf );
+					lt_addtextkey( t, copybuf ), d->inText = 0; //, d->isVal = 1;
 				}
 				else {
-					ZJSON_PRINTF( "Adding text value: %s\n", buf );
-					lt_addtextvalue( t, buf ), lt_finalize( t );
+					//ZJSON_PRINTF( "blen: %d\n", blen );
+					//ZJSON_PRINTF( "ptr: %p\n", copybuf );
+					ZJSON_PRINTF( "Adding text value: %s\n", copybuf );
+					lt_addtextvalue( t, copybuf ), lt_finalize( t );
 					d->isVal = 0, d->inText = 0;
+					( mallocd ) ? free( copybuf ) : 0;
 				}		 
 			}
 			continue;
@@ -236,20 +249,20 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 			}
 			else if ( w.chr == ',' || w.chr == ':' ) {
 				( w.chr == ',' && !d->isObject ) ? d->index++ : 0; 
-				b = ( char * )zjson_trim( w.src, "\",: \t\n\r", w.size - 1, &blen );
+				srcbuf = ( char * )zjson_trim( w.src, "\",: \t\n\r", w.size - 1, &blen );
 				if ( blen ) {
-					memcpy( buf, b, blen + 1 );	
+					memcpy( statbuf, srcbuf, blen + 1 );	
 					if ( w.chr == ':' ) {
-						ZJSON_PRINTF( "Adding text key: %s\n", buf );
-						lt_addtextkey( t, buf );
+						ZJSON_PRINTF( "Adding text key: %s\n", statbuf );
+						lt_addtextkey( t, statbuf );
 					}
 					else {
-						ZJSON_PRINTF( "Adding text value: %s\n", buf );
-						lt_addtextvalue( t, buf );
+						ZJSON_PRINTF( "Adding text value: %s\n", statbuf );
+						lt_addtextvalue( t, statbuf );
 						lt_finalize( t );
 					}
 				}
-				else if ( blen >= ZJSON_MAX_LENGTH ) {
+				else if ( blen >= ZJSON_MAX_STATIC_LENGTH ) {
 					snprintf( err, errlen, "%s", "Key is too large." );
 					//lt_free( t ), free( t );
 					return NULL;
@@ -265,7 +278,7 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 
 
 
-//...
+//Allow deep copying or not...
 char * zjson_encode ( zTable *t, char *err, int errlen ) {
 	//Define more
 	struct ww {
@@ -276,7 +289,7 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 	unsigned int tcount = 0, size = 0, jl = 0, jp = 0;
 	char * json = NULL;
 	const char emptystring[] = "''";
-	
+
 	if ( !t ) {
 		snprintf( err, errlen, "Table for JSON conversion not initialized" );
 		return NULL;
@@ -293,6 +306,7 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 		return NULL;
 	}
 
+	//?
 	if ( !( br = malloc( size ) ) || !memset( br, 0, size ) ) { 
 		snprintf( err, errlen, "Could not allocate source JSON" );
 		return NULL;

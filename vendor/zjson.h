@@ -11,8 +11,8 @@
  #define ZJSON_MAX_DEPTH 100
 #endif
  
-#ifndef ZJSON_MAX_LENGTH
- #define ZJSON_MAX_LENGTH 2048
+#ifndef ZJSON_MAX_STATIC_LENGTH
+ #define ZJSON_MAX_STATIC_LENGTH 2048
 #endif
 
 zTable * zjson_decode ( const char *, int, char *, int );

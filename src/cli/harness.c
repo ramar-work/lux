@@ -523,13 +523,13 @@ int main ( int argc, char * argv[] ) {
 #endif
 
 	//Populate the request structure.  Normally, one will never populate this from scratch
-	req.path = zhttp_dupstr( arg.uri );
+	req.path = arg.uri;
 		
 	//TODO: When coming from Lua file, all of this will result in a leak... 
-	req.ctype = !arg.ctype ? zhttp_dupstr( "text/html" ) : arg.ctype;
-	req.host = !arg.host ? zhttp_dupstr( "example.com" ) : arg.host;
-	req.method = zhttp_dupstr( arg.method );
-	req.protocol = !arg.protocol ? zhttp_dupstr( "HTTP/1.1" ) : arg.protocol;
+	req.ctype = !arg.ctype ? "text/html" : arg.ctype;
+	req.host = !arg.host ? "example.com" : arg.host;
+	req.method = arg.method;
+	req.protocol = !arg.protocol ? "HTTP/1.1" : arg.protocol;
 
 #if 0
 	req.alias = !arg.alias ? zhttp_dupstr( "example.com" ) : zhttp_dupstr( arg.alias );
@@ -585,7 +585,7 @@ int main ( int argc, char * argv[] ) {
 			if ( req.ctype ) {
 				free( req.ctype );
 			}
-			req.ctype = zhttp_dupstr( "multipart/form-data" );
+			req.ctype = "multipart/form-data";
 		}
 
 		//Save all bodies 
