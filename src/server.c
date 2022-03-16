@@ -189,9 +189,12 @@ static int srv_end( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn
 //Generate a response
 int srv_response ( int fd, struct cdata *conn ) {
 
-	struct HTTPBody rq = {0}, rs = {0};
+	zhttp_t rq = {0}, rs = {0};
 	char err[2048] = {0};
 	int status = 0;
+
+	rq.type = ZHTTP_IS_CLIENT;
+	rs.type = ZHTTP_IS_SERVER;
 
 	const int (*rc[])( int, zhttp_t *, zhttp_t *, struct cdata *) = {
 		srv_start

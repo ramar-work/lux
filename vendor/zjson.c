@@ -19,6 +19,9 @@
  * ------------------------------------------- */
 #include "zjson.h"
 
+#define ZJSON_MAX_KEY_LENGTH 256
+
+#define ZJSON_MAX_VALUE_LENGTH 256
 
 #ifndef DEBUG_H
  #define ZJSON_PRINTF(...)
@@ -188,7 +191,7 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 				if ( !( copybuf = malloc( blen + 1 ) ) ) {
 					snprintf( err, errlen, "%s", "zjson out of memory." );
 					return NULL;
-				} 
+				}
 				memset( copybuf, 0, blen + 1 );
 				memcpy( copybuf, srcbuf, blen );
 				mallocd = 1;
@@ -201,13 +204,13 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 			}
 			else {
 				if ( !d->isVal ) {
-					ZJSON_PRINTF( "Adding text key: %s\n", copybuf );
+					//ZJSON_PRINTF( "Adding text key: %s\n", copybuf );
 					lt_addtextkey( t, copybuf ), d->inText = 0; //, d->isVal = 1;
 				}
 				else {
 					//ZJSON_PRINTF( "blen: %d\n", blen );
 					//ZJSON_PRINTF( "ptr: %p\n", copybuf );
-					ZJSON_PRINTF( "Adding text value: %s\n", copybuf );
+					//ZJSON_PRINTF( "Adding text value: %s\n", copybuf );
 					lt_addtextvalue( t, copybuf ), lt_finalize( t );
 					d->isVal = 0, d->inText = 0;
 					( mallocd ) ? free( copybuf ) : 0;
@@ -221,7 +224,7 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 				//++i;
 				if ( ++i > 1 ) {
 					if ( !d->isObject ) {
-						ZJSON_PRINTF( "Adding int key: %d\n", d->index );
+						//ZJSON_PRINTF( "Adding int key: %d\n", d->index );
 						lt_addintkey( t, d->index );
 					}
 					++d, d->isObject = 1, lt_descend( t );
@@ -250,22 +253,22 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 			else if ( w.chr == ',' || w.chr == ':' ) {
 				( w.chr == ',' && !d->isObject ) ? d->index++ : 0; 
 				srcbuf = ( char * )zjson_trim( w.src, "\",: \t\n\r", w.size - 1, &blen );
-				if ( blen ) {
-					memcpy( statbuf, srcbuf, blen + 1 );	
-					if ( w.chr == ':' ) {
-						ZJSON_PRINTF( "Adding text key: %s\n", statbuf );
-						lt_addtextkey( t, statbuf );
-					}
-					else {
-						ZJSON_PRINTF( "Adding text value: %s\n", statbuf );
-						lt_addtextvalue( t, statbuf );
-						lt_finalize( t );
-					}
-				}
-				else if ( blen >= ZJSON_MAX_STATIC_LENGTH ) {
+				if ( blen >= ZJSON_MAX_STATIC_LENGTH ) {
 					snprintf( err, errlen, "%s", "Key is too large." );
 					//lt_free( t ), free( t );
 					return NULL;
+				}
+				else if ( blen ) {
+					memcpy( statbuf, srcbuf, blen + 1 );	
+					if ( w.chr == ':' ) {
+						//ZJSON_PRINTF( "Adding text key: %s\n", statbuf );
+						lt_addtextkey( t, statbuf );
+					}
+					else {
+						//ZJSON_PRINTF( "Adding text value: %s\n", statbuf );
+						lt_addtextvalue( t, statbuf );
+						lt_finalize( t );
+					}
 				}
 				d->isVal = ( w.chr == ':' );
 			}
@@ -273,7 +276,7 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 	}
 
 	lt_lock( t );
-lt_kdump( t );
+//lt_kdump( t );
 	return t;
 }
 
@@ -332,7 +335,7 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 	//Loop through all values and copy
 	for ( zKeyval *kv ; ( kv = lt_next( t ) ); ) {
 		zhValue k = kv->key, v = kv->value;
-		char kbuf[ 256 ] = { 0 }, vbuf[ 2048 ] = { 0 };
+		char kbuf[ 256 ] = { 0 }, vbuf[ 2048 ] = { 0 }, *vv = NULL;
 		int lk = 0, lv = 0;
 		ff->comma = " ", ff->type = v.type;
 
@@ -398,11 +401,18 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 
 	//TODO: There is a way to do this that DOES NOT need a second loop...
 	for ( struct ww *yy = br; yy->keysize > -1; yy++ ) {
-		char kbuf[ 256 ] = {0}, vbuf[ 2048 ] = {0};
+		char kbuf[ ZJSON_MAX_STATIC_LENGTH ] = {0}, vbuf[ 2048 ] = {0}, *v = vbuf, vmallocd = 0;
 		int lk = 0, lv = 0;
 
 		if ( yy->keysize ) {
 			char *k = kbuf;
+			// Stop on keys that are just too big...
+			if ( yy->keysize >= ZJSON_MAX_STATIC_LENGTH ) {
+				snprintf( err, errlen, "Key too large" );
+				free( br ), free( json );
+				return NULL;
+			}
+
 			if ( yy->type != ZTABLE_TRM ) {
 				memcpy( k, "\"", 1 ), k++, lk++;
 				memcpy( k, yy->key, yy->keysize ), k += yy->keysize, lk += yy->keysize;
@@ -411,22 +421,34 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 		}
 
 		if ( yy->valsize ) {
-			char *v = vbuf;
+			char *p = v; 
+
+			// Values can be quite long when encoding
+			if ( yy->valsize > ZJSON_MAX_STATIC_LENGTH ) {
+				if ( !( p = v = malloc( yy->valsize + 3 ) ) ) {
+					snprintf( err, errlen, "Could not claim memory for JSON value." );
+					free( br ), free( json );
+					return NULL;
+				}
+				vmallocd = 1;
+			}
+
+			memset( p, 0, yy->valsize );
 			if ( yy->type == ZTABLE_TBL )
-				memcpy( v, yy->val, yy->valsize ), v += yy->valsize, lv += yy->valsize;
+				memcpy( p, yy->val, yy->valsize ), p += yy->valsize, lv += yy->valsize;
 			else if ( yy->type == ZTABLE_INT || yy->type == ZTABLE_FLT ) {
-				memcpy( v, yy->vint, yy->valsize ), v += yy->valsize, lv += yy->valsize;
-				memcpy( v, yy->comma, 1 ), v += 1, lv += 1;
+				memcpy( p, yy->vint, yy->valsize ), p += yy->valsize, lv += yy->valsize;
+				memcpy( p, yy->comma, 1 ), p += 1, lv += 1;
 			}
 			else if ( yy->type == ZTABLE_TRM ) {
-				memcpy( v, yy->val, yy->valsize ), v += yy->valsize, lv += yy->valsize;
-				memcpy( v, yy->comma, 1 ), v += 1, lv += 1;
+				memcpy( p, yy->val, yy->valsize ), p += yy->valsize, lv += yy->valsize;
+				memcpy( p, yy->comma, 1 ), p += 1, lv += 1;
 			}
 			else {
-				memcpy( v, "\"", 1 ), v++, lv++;
-				memcpy( v, yy->val, yy->valsize ), v += yy->valsize, lv += yy->valsize;
-				memcpy( v, "\"", 1 ), v += 1, lv += 1;
-				memcpy( v, yy->comma, 1 ), v += 1, lv += 1;
+				memcpy( p, "\"", 1 ), p++, lv++;
+				memcpy( p, yy->val, yy->valsize ), p += yy->valsize, lv += yy->valsize;
+				memcpy( p, "\"", 1 ), p += 1, lv += 1;
+				memcpy( p, yy->comma, 1 ), p += 1, lv += 1;
 			}
 		}
 
@@ -440,7 +462,8 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 
 		//Copy stuff (don't try to initialize)
 		memcpy( &json[ jp ], kbuf, lk ), jp += lk;
-		memcpy( &json[ jp ], vbuf, lv ), jp += lv;
+		memcpy( &json[ jp ], v, lv ), jp += lv;
+		( vmallocd ) ? free( v ) : 0;
 	}
 
 	//This is kind of ugly

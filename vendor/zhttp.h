@@ -227,6 +227,10 @@ typedef enum {
 , ZHTTP_MESSAGE_OTHER
 } HttpMessageAllocationType;
 
+typedef enum {
+	ZHTTP_IS_CLIENT = 0
+, ZHTTP_IS_SERVER
+} HttpServiceType;
 
 typedef enum {
  	ZHTTP_NO_CONTENT = 0
@@ -290,6 +294,7 @@ typedef struct HTTPBody {
 	HttpContentType formtype;
 	short expectsURL;
 #endif
+	HttpServiceType type; 
 	short error; 
 	short efatal;
 	const char *errmsg;

@@ -1735,14 +1735,13 @@ static void http_free_records( zhttpr_t **records ) {
 
 //...
 void http_free_body ( zhttp_t *en ) {
-#if 0
-	//Free all of the header info
-	en->path ? free( en->path ) : 0;
-	en->ctype ? free( en->ctype ) : 0;
-	en->host ? free( en->host ) : 0;
-	en->method ? free( en->method ) : 0;
-	en->protocol ? free( en->protocol ) : 0;
-#endif
+	if ( en->type == ZHTTP_IS_SERVER ) {
+		en->path ? free( en->path ) : 0;
+		en->ctype ? free( en->ctype ) : 0;
+		en->host ? free( en->host ) : 0;
+		en->method ? free( en->method ) : 0;
+		en->protocol ? free( en->protocol ) : 0;
+	}
 
 	http_free_records( en->headers );
 	http_free_records( en->url );

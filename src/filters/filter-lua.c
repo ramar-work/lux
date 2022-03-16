@@ -931,6 +931,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//Initialize the data structure
 	memset( res, 0, sizeof( zhttp_t ) );
 	ld.req = req, ld.res = res;
+	ld.res->atype = ZHTTP_MESSAGE_MALLOC;
 	memcpy( (void *)ld.root, conn->hconfig->dir, strlen( conn->hconfig->dir ) );
 
 	//Then initialize the Lua state
@@ -1080,35 +1081,19 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		lua_copy( ld.state, 1, 4 );
 		lua_remove( ld.state, 1 ); 
 		lua_settable( ld.state, 1 );
-//lua_dumpstack( ld.state ), getchar();
 
-	#if 0
-		//2. Copy table, delete the first and push string
-		if ( lua_retglobal( ld.state, modelkey, LUA_TTABLE ) )
-			lua_merge( ld.state );
-	#else
+		//...
 		lua_getglobal( ld.state, modelkey );
-//lua_dumpstack( ld.state ), getchar();
 	#if 0
 		lua_isnil( ld.state, -1 ) ? lua_pop( ld.state, 1 ) : 0;
 	#else
-		if ( lua_isnil( ld.state, -1 ) )
-			lua_pop( ld.state, 1 );
-		else {
-			lua_merge( ld.state );
-		}
+		lua_isnil( ld.state, -1 ) ? lua_pop( ld.state, 1 ) : lua_merge( ld.state );
 	#endif
-	#endif
-//lua_dumpstack( ld.state ), getchar();
 
 		//Add it back to the model after successful merge
-		//lua_dumpstack( ld.state );	
 		lua_setglobal( ld.state, modelkey );
 		FPRINTF( "Config done.\n" );
 	}
-
-	//FPRINTF( "Why didn't model run here?...\n" );
-	//lua_dumpstack( ld.state );	
 
 	//Could be either a table or string... so account for this
 	if ( lua_retglobal( ld.state, modelkey, LUA_TTABLE ) ) {
