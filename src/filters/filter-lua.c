@@ -1080,11 +1080,26 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		lua_copy( ld.state, 1, 4 );
 		lua_remove( ld.state, 1 ); 
 		lua_settable( ld.state, 1 );
+//lua_dumpstack( ld.state ), getchar();
 
+	#if 0
 		//2. Copy table, delete the first and push string
-		if ( lua_retglobal( ld.state, modelkey, LUA_TTABLE ) ) {
+		if ( lua_retglobal( ld.state, modelkey, LUA_TTABLE ) )
+			lua_merge( ld.state );
+	#else
+		lua_getglobal( ld.state, modelkey );
+//lua_dumpstack( ld.state ), getchar();
+	#if 0
+		lua_isnil( ld.state, -1 ) ? lua_pop( ld.state, 1 ) : 0;
+	#else
+		if ( lua_isnil( ld.state, -1 ) )
+			lua_pop( ld.state, 1 );
+		else {
 			lua_merge( ld.state );
 		}
+	#endif
+	#endif
+//lua_dumpstack( ld.state ), getchar();
 
 		//Add it back to the model after successful merge
 		//lua_dumpstack( ld.state );	
@@ -1092,8 +1107,12 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		FPRINTF( "Config done.\n" );
 	}
 
+	//FPRINTF( "Why didn't model run here?...\n" );
+	//lua_dumpstack( ld.state );	
+
 	//Could be either a table or string... so account for this
 	if ( lua_retglobal( ld.state, modelkey, LUA_TTABLE ) ) {
+		FPRINTF( "Adding model...\n" );
 		const char **c = ctype_tags;
 		char tkey[ 1024 ] = { 0 }, *key = lt_retkv( ld.zroute, 0 )->key.v.vchar;
 		int count = lua_count( ld.state, 1 ), ksize = sizeof( tkey );
@@ -1146,6 +1165,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		}
 		lua_pop( ld.state, 1 );
 		lt_lock( ld.zmodel );
+		FPRINTF( "Done with model...\n" );
 	}
 
 	//TODO: routes with no special keys need not be added
