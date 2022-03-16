@@ -273,6 +273,7 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 	}
 
 	lt_lock( t );
+lt_kdump( t );
 	return t;
 }
 

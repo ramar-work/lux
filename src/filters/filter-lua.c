@@ -26,7 +26,9 @@ static const char def[] = "default";
 
 static const char confname[] = "config.lua";
 
-static const char mkey[] = "model";
+static const char configkey[] = "config";
+
+static const char modelkey[] = "model";
 
 static const char rkey[] = "routes";
 
@@ -909,6 +911,14 @@ int find_matching_route ( struct luadata_t *l ) {
 }
 
 
+int has_views( struct imvc_t **list ) {
+	for ( struct imvc_t **l = list; l && *l; l++ ) {
+		if ( *(*l)->file == 'v' ) return 1;
+	}
+	return 0;
+}
+
+
 //The entry point for a Lua application
 const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
@@ -1034,13 +1044,13 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 			//Merge previous models
 			if ( tcount > 1 ) {
-				lua_getglobal( ld.state, mkey );
+				lua_getglobal( ld.state, modelkey );
 				( lua_isnil( ld.state, -1 ) ) ? lua_pop( ld.state, 1 ) : 0;
 				lua_merge( ld.state );	
-				lua_setglobal( ld.state, mkey );
+				lua_setglobal( ld.state, modelkey );
 			} 
 			else if ( ccount ) {
-				lua_setglobal( ld.state, mkey );
+				lua_setglobal( ld.state, modelkey );
 			}
 			model = 1;
 		}
@@ -1053,37 +1063,43 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			free_ld( &ld );
 			return http_error( res, 500, ld.err );
 		}
-		FPRINTF( "Did content return complete?\n" );
 		lua_pop( ld.state, 1 );
 		free_ld( &ld );
-		FPRINTF( "We got to a successful point.\n" );
+		FPRINTF( "Content return completed?\n" );
 		return 1;
 	}
 
-#if 1
-	//This should always happen
-	if ( lua_retglobal( ld.state, "config", LUA_TTABLE ) ) {
-		lua_getglobal( ld.state, mkey );
-		( lua_isnil( ld.state, -1 ) ) ? lua_pop( ld.state, 1 ) : 0;
-FPRINTF( "Config is in top-level table , I think I figured out why...\n" );
-		lua_merge( ld.state );
-		lua_setglobal( ld.state, mkey );
-	}
-#endif
+	//Can we simply check if config exists in _G?
+	if ( has_views( ld.pp.imvc_tlist ) && lua_retglobal( ld.state, configkey, LUA_TTABLE ) ) {
+		FPRINTF( "Adding config...\n" );
+		
+		//Make a config key and do some stuff...
+		lua_newtable( ld.state );
+		lua_pushstring( ld.state, configkey );
+		lua_pushnil( ld.state );
+		lua_copy( ld.state, 1, 4 );
+		lua_remove( ld.state, 1 ); 
+		lua_settable( ld.state, 1 );
 
-	//Could be either a table or string... so account for this
-	if ( lua_retglobal( ld.state, mkey, LUA_TTABLE ) ) {
-		//Define these
-		char tkey[ 1024 ] = { 0 }, *key = lt_retkv( ld.zroute, 0 )->key.v.vchar;
-		int count = lua_count( ld.state, 1 );
-
-		//Do a count of a model (try one with a lot of entries, and no entries)
-		if ( count < 1 ) {
-			count = 16;
+		//2. Copy table, delete the first and push string
+		if ( lua_retglobal( ld.state, modelkey, LUA_TTABLE ) ) {
+			lua_merge( ld.state );
 		}
 
+		//Add it back to the model after successful merge
+		//lua_dumpstack( ld.state );	
+		lua_setglobal( ld.state, modelkey );
+		FPRINTF( "Config done.\n" );
+	}
+
+	//Could be either a table or string... so account for this
+	if ( lua_retglobal( ld.state, modelkey, LUA_TTABLE ) ) {
+		const char **c = ctype_tags;
+		char tkey[ 1024 ] = { 0 }, *key = lt_retkv( ld.zroute, 0 )->key.v.vchar;
+		int count = lua_count( ld.state, 1 ), ksize = sizeof( tkey );
+
 		//Initialize a table
-		if ( !( ld.zmodel = lt_make( count * 2 ) ) ) {
+		if ( !( ld.zmodel = lt_make( ( count = ( count < 1 ) ? 16 : count ) * 2 ) ) ) {
 			free_ld( &ld );
 			return http_error( res, 500, "Couldn't allocate table." );
 		}
@@ -1094,14 +1110,9 @@ FPRINTF( "Config is in top-level table , I think I figured out why...\n" );
 			return http_error( res, 500, "Error in model conversion." );
 		}
 
-		//TODO: Check for an inherited content-type
-		//TODO: Then check for a globally defined default content-type
-		//Then check for content-types
-		for ( const char **c = ctype_tags; *c; c++ ) {
-			int index = -1;
-			memset( tkey, 0, sizeof( tkey ) );
-			snprintf( tkey, sizeof( tkey ) - 1, "%s.%s", key, *c ); 
-
+		//TODO: Check for an inherited content-type then a default content-type
+		for ( int index = -1; *c; c++ ) {
+			memset( tkey, 0, ksize ), snprintf( tkey, ksize - 1, "%s.%s", key, *c );
 			if ( ( index = lt_geti( ld.zroute, tkey ) ) > -1 ) {
 				//Get Content-Type
 				char *ctype = lt_text_at( ld.zroute, index );
@@ -1114,7 +1125,6 @@ FPRINTF( "Config is in top-level table , I think I figured out why...\n" );
 							free_ld( &ld );
 							return http_error( res, 500, "%s", err );
 						}
-
 						free_ld( &ld );
 						return 1;
 					}
@@ -1123,8 +1133,7 @@ FPRINTF( "Config is in top-level table , I think I figured out why...\n" );
 		}
 
 		//Finally, check if there is a view specified 
-		memset( tkey, 0, sizeof( tkey ) );
-		snprintf( tkey, sizeof( tkey ) - 1, "%s.%s", key, "view" );
+		memset( tkey, 0, ksize ), snprintf( tkey, ksize - 1, "%s.%s", key, "view" );
 		if ( lt_geti( ld.zroute, tkey ) == -1 ) {
 			if ( !return_as_serializable( &ld, &ctypes_serializable[ CTYPE_JSON ] ) ) {
 				char err[ LD_ERRBUF_LEN ] = { 0 };
@@ -1134,7 +1143,7 @@ FPRINTF( "Config is in top-level table , I think I figured out why...\n" );
 			}
 			free_ld( &ld );
 			return 1;
-		} 
+		}
 		lua_pop( ld.state, 1 );
 		lt_lock( ld.zmodel );
 	}
@@ -1202,7 +1211,7 @@ FPRINTF( "Config is in top-level table , I think I figured out why...\n" );
 
 
 #ifdef RUN_MAIN
-int main (int argc, char *argv[]) {
+int main ( int argc, char *argv[] ) {
 	struct HTTPBody req = {0}, res = {0};
 	char err[ 2048 ] = { 0 };
 

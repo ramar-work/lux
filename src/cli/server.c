@@ -64,6 +64,8 @@
 
 #define PIDFILE PIDDIR NAME ".pid"
 
+#define REAPING_THREADS
+
 #define HELP \
 	"-s, --start              Start the server\n" \
 	"-k, --kill               Kill a running server\n" \
@@ -120,10 +122,16 @@ FILE * logfd = NULL, * accessfd = NULL;
 
 struct senderrecvr *ctx = NULL;
 
-struct fdset {
+struct threadinfo_t {
 	int fd;
+	char running;	
 	pthread_t id;
-} fds[ MAX_THREADS ] = { { -1, -1 } };
+	char ipaddr[ 128 ]; // Might be a little heavy..
+#if 0
+	struct timespec start;
+	struct timespec end;
+#endif	
+} fds[ MAX_THREADS ] = { { -1, 0, -1, { 0 } } };
 
 struct values {
 	int port;
@@ -202,37 +210,44 @@ void sigkill( int signum ) {
 	fprintf( stderr, "Received SIGKILL - Killing the server...\n" );
 	char err[ 2048 ] = {0};
 
-	//Kill any open sockets
+#if 0
+	//TODO: Join (and kill) all the open threads (could take a while)
+	for ( ; ; ) {
+		//
+	}
+#endif
+
+	//Kill any open sockets.  This is the only time we'll see this type of looping
 	for ( int i = 0; i < sizeof( fdset ) / sizeof( int ); i++ )	{
-		if ( fdset[ i ] == -1 ) {
+		if ( fdset[ i ] < 3 ) {
 			break;
 		}
-
-		if ( close( fdset[ i ] ) == -1 ) {
-			fprintf( stderr, "Failed to close fd..." );
-			//Join (and kill) all the open threads (could take a while)
-			#if 0
-			for ( count = 0; count >= 64; count++ ) {
-				int s = pthread_join( ta_set[ count ].id, NULL ); 
-				FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
-				if ( s != 0 ) {
-					FPRINTF( "Pthread join at pos %d failed...\n", count );
-					continue;
-				}
+		#if 0
+		for ( count = 0; count >= 64; count++ ) {
+			int s = pthread_join( ta_set[ count ].id, NULL ); 
+			FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
+			if ( s != 0 ) {
+				FPRINTF( "Pthread join at pos %d failed...\n", count );
+				continue;
 			}
-			#endif
+		}
+		#endif
+
+		//Should be reaping all of the open threads...
+		if ( close( fdset[ i ] ) == -1 ) {
+			fprintf( logfd, "Failed to close fd '%d': %s", fdset[ i ], strerror( errno ) );
 		}
 	}
 
-	//Kill the accessfd and log fd
+	//TODO: Add in write detection versus just closing arbitrarily
 	if ( accessfd ) {
 		fclose( accessfd ); 
-		accessfd = NULL;
+		accessfd = stderr;
 	}
 
 	if ( logfd ) {
 		fclose( logfd );
-		logfd = NULL;
+		logfd = stderr;
 	}
 
 	//cmd_kill( NULL, err, sizeof( err ) );
@@ -394,21 +409,21 @@ void see_runas_user ( struct values *v ) {
 
 // This can be refactored to do something else...
 void * run_srv_cycle( void *t ) {
-	#if 1
-	int fd = *(int *)t;
 	struct cdata conn = { .ctx = ctx, .flags = O_NONBLOCK };
-	
-	#else
-	struct thread_arg *ta = (struct thread_arg *)t;
-	ta->conn.ctx = ta->ctx;
-	ta->conn.flags = O_NONBLOCK;
-	#endif
+#ifndef REAPING_THREADS
+	int fd = *(int *)t;
+#else
+	struct threadinfo_t *tt = (struct threadinfo_t *)t; 
+	int fd = tt->fd;
+	tt->running = 1;
+#endif
 
 	for ( ;; ) {
 		//additionally, this one should block
 		if ( !srv_response( fd, &conn ) ) {
 			//TODO: What exactly causes this?
 			FPRINTF( "Error in TCP socket handling.\n" );
+			//I don't what this means...
 		}
 
 		if ( CONN_CLOSE || conn.count < 0 || conn.count > 5 ) {
@@ -419,12 +434,13 @@ void * run_srv_cycle( void *t ) {
 			}
 			FPRINTF( "Connection is done. count is %d\n", conn.count );
 			FPRINTF( "returning NULL.\n" );
+			tt->running = 0;
 			return 0;
 		}
 	}
 
 	FPRINTF( "Child process is exiting.\n" );
-	//free( ta );
+	tt->running = 0;
 	return 0;
 }
 
@@ -602,14 +618,14 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;	
 	}
 
-#ifdef LEAKTEST_H	
-	for ( int fd, count = 0, i = 0; i<LEAKLIMIT; i++ ) { 
+#ifdef LEAKTEST_H
+	for ( int fd, count = 0, i = 0; i < LEAKLIMIT; i++ ) { 
 #else
 	for ( int fd = 0, count = 0; ; ) {
 #endif
 		//Client address and length?
 		char ip[ 128 ] = { 0 };
-		struct fdset *f = &fds[ count ];
+		struct threadinfo_t *f = &fds[ count ];
 		struct sockaddr_storage addrinfo = { 0 };
 		socklen_t addrlen = sizeof( addrinfo );
 
@@ -649,16 +665,24 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 			inet_ntop( AF_INET6, &((struct sockaddr_in6 *)&addrinfo)->sin6_addr, ip, sizeof( ip ) ); 
 		}
 
+		//Populate any other thread data
+	#ifndef REAPING_THREADS 
 		fprintf( stderr, "IP addr is: %s\n", ip );
 		fprintf( accessfd, "IP addr is: %s\n", ip );
+	#else
+		memcpy( f->ipaddr, ip, sizeof( ip ) );
+		fprintf( stderr, "IP addr is: %s\n", ip );
+		fprintf( accessfd, "IP addr is: %s\n", ip );
+	#endif
 
 		//Start a new thread
-		if ( pthread_create( &f->id, NULL, run_srv_cycle, &f->fd ) != 0 ) {
+		if ( pthread_create( &f->id, NULL, run_srv_cycle, f ) != 0 ) {
 			FPRINTF( "Pthread create unsuccessful.\n" );
 			continue;
 		}
 
-	#if 1
+		FPRINTF( "Starting new thread.\n" );
+	#ifndef REAPING_THREADS 
 		//This SHOULD work, but doesn't because there is no way to track whether or not it finished
 		count++;
 		if ( pthread_detach( f->id ) != 0 ) {
@@ -668,17 +692,19 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	#else
 		if ( ++count >= CLIENT_MAX_SIMULTANEOUS ) {
 			for ( count = 0; count >= CLIENT_MAX_SIMULTANEOUS; count++ ) {
-				int s = pthread_join( ta_set[ count ].id, NULL ); 
-				FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
-				if ( s != 0 ) {
-					FPRINTF( "Pthread join at pos %d failed...\n", count );
-					continue;
+				if ( fds[ count ].running ) {
+					int s = pthread_join( fds[ count ].id, NULL ); 
+					FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
+					if ( s != 0 ) {
+						FPRINTF( "Pthread join at pos %d failed...\n", count );
+						continue;
+					}
 				}
 			}
 			count = 0;
 		}
 	#endif
-		FPRINTF( "Closing and waiting for next connection.\n" );
+		FPRINTF( "Waiting for next connection.\n" );
 	}
 
 	if ( accessfd ) {
