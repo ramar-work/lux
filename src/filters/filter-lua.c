@@ -473,7 +473,7 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 	//Get its mimetype
 	if ( !( mime = zmime_get_by_filename( spath ) ) )
 		mime = zmime_get_default();
-#if 0
+#if 1
 	//write max should be checked.
 	//...
 	int dlen = 0;
