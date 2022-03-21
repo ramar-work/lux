@@ -32,9 +32,9 @@
 #define CTXHTTP_H
 void create_notls ( void **p ); 
 
-const int pre_notls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
+const int pre_notls ( int, zhttp_t *, zhttp_t *, struct cdata *);
 
-const int read_notls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
+const int read_notls ( int, zhttp_t *, zhttp_t *, struct cdata *);
 
-const int write_notls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
+const int write_notls ( int, zhttp_t *, zhttp_t *, struct cdata *);
 #endif

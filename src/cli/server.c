@@ -48,6 +48,7 @@
 #include "../server.h"
 #include "../ctx/ctx-http.h"
 #include "../ctx/ctx-https.h"
+#include "../ctx/ctx-dns.h"
 #include "../filters/filter-static.h"
 #include "../filters/filter-echo.h"
 #include "../filters/filter-dirent.h"
@@ -166,7 +167,7 @@ struct values {
 
 
 //Define a list of filters
-struct filter filters[16] = { 
+struct filter http_filters[16] = { 
 	{ "static", filter_static }
 ,	{ "echo", filter_echo }
 ,	{ "dirent", filter_dirent }
@@ -253,22 +254,33 @@ void sigkill( int signum ) {
 	//cmd_kill( NULL, err, sizeof( err ) );
 }
 
-
+#if 0
 //Return fi
 static int findex() {
 	int fi = 0;
-	for ( struct filter *f = filters; f->name; f++, fi++ ); 
+	for ( struct filter *f = http_filters; f->name; f++, fi++ ); 
 	return fi;	
 }
+#endif
 
+struct filter dns_filters[] = {
+	{ "dns", NULL }
+, { NULL }
+};
 
 //Define a list of "context types"
 struct senderrecvr sr[] = {
 #if 1
-	{ read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost  }
+	{ read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost, http_filters  }
 #endif
 #if 0
 , { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls }
+#endif
+#if 0
+, { read_dns, write_dns, create_dns, NULL, pre_dns, post_dns }
+#endif
+#if 0
+, { read_rtmp, write_rtmp, create_rtmp, NULL, pre_rtmp, post_rtmp }
 #endif
 ,	{ NULL }
 };
@@ -452,8 +464,8 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	//struct senderrecvr *ctx = NULL;
 	ctx = &sr[ 0 ]; // v->ssl	
 	ctx->init( &ctx->data );
-	ctx->filters = filters;
 	ctx->config = v->config;
+	//ctx->filters = http_filters;
 
 	//Die if config is null or file not there 
 	if ( !ctx->config ) {
@@ -734,7 +746,7 @@ int cmd_libs( struct values *v, char *err, int errlen ) {
 	int findex = 0;
 
 	//Find the last index
-	for ( struct filter *f = filters; f->name; f++, findex++ );
+	for ( struct filter *f = http_filters; f->name; f++, findex++ );
 
 	//Open directory
 	if ( !( dir = opendir( v->libdir ) ) ) {
@@ -745,7 +757,7 @@ int cmd_libs( struct values *v, char *err, int errlen ) {
 	//List whatever directory
 	for ( ; ( d = readdir( dir ) );  ) { 
 		void *lib = NULL;
-		struct filter *f = &filters[ findex ];
+		struct filter *f = &http_filters[ findex ];
 		char fpath[2048] = {0};
 
 		//Skip '.' & '..', and stop if you can't open it...
@@ -811,7 +823,7 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 #endif
 
 	fprintf( stderr, "Filters enabled:\n" );
-	for ( struct filter *f = filters; f->name; f++ ) {
+	for ( struct filter *f = http_filters; f->name; f++ ) {
 		fprintf( stderr, "[ %-16s ] %p\n", f->name, f->filter ); 
 	}
 	return 1;

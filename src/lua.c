@@ -249,7 +249,7 @@ int ztable_to_lua ( lua_State *L, ztable_t *t ) {
 	*ti = 1;
 
 	//Reset table's index
-	lt_reset( t );
+	lt_dump( t );
 
 	//Loop through all values and copy
 	for ( zKeyval *kv ; ( kv = lt_next( t ) ); ) {
@@ -285,7 +285,12 @@ int ztable_to_lua ( lua_State *L, ztable_t *t ) {
 			lua_newtable( L );
 			*( ++xi ) = lua_gettop( L );
 		}
+		else if ( v.type == ZTABLE_NON ) {
+			return 1;
+		}
 		else /* ZTABLE_TRM || ZTABLE_NON */ {
+			fprintf( stderr, "Got value of type: %s\n", 
+				v.type == ZTABLE_TRM ? "ZTABLE_TRM" : "ZTABLE_NON" );
 			return 0;
 		}
 

@@ -26,7 +26,19 @@ return {
 			dir = "localhost",
 			filter = "static"
 		},
-		
+	
+	--[[	
+		-- Tests (these can be built into the engine)
+		["cfilter.local"] = { filter = "c" },
+		["echofilter.local"] = { filter = "echo" },
+		["staticfilter.local"] = { 
+			filter = "static", 
+			alias = "static.local",
+			dir = "static.local",
+			root_default = "/index.html" 
+		},
+	--]]
+
 		-- Redirect does nothing of real importance
 		["redirect.hypno.local"] = { 
 			-- Where to redirect?

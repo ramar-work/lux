@@ -19,6 +19,7 @@ build/
 docs/
 example/c/app.so
 example/file
+example/file.local
 example/tls/misc/tls/supergreatwok.xyz
 example/carolinascholar.com
 include/

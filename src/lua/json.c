@@ -45,6 +45,7 @@ int json_decode ( lua_State *L ) {
 		return luaL_error( L, "Failed to convert to Lua." );
 	}
 
+lua_dumpstack( L );
 	lt_free( t ), free( t );
 	return 1;
 }

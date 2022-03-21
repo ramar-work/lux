@@ -156,23 +156,37 @@ int zjson_check ( const char *str, int len, char *err, int errlen ) {
 zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 	const char tokens[] = "\"{[}]:,\\"; // this should catch the backslash
 	unsigned char *b = NULL;
-	//int size = zjson_count( (unsigned char *)str, strlen( str ) );
 	zWalker w = {0};
 	zTable *t = NULL;
 	struct zjd zjdset[ ZJSON_MAX_DEPTH ], *d = zjdset;
 	memset( zjdset, 0, ZJSON_MAX_DEPTH * sizeof( struct zjd ) );
 	struct bot { char *key; unsigned char *val; int size; } bot;
 
+	int size = zjson_count( (unsigned char *)str, len );
+	if ( size < 1 ) {
+		snprintf( err, errlen, "%s", "Got invalid JSON count." );
+		return NULL;
+	}
+
 	//Return zTable
-	if ( !( t = lt_make( 10000 * 2 ) ) ) {
+	if ( !( t = lt_make( size * 2 ) ) ) {
 		snprintf( err, errlen, "%s", "Create table failed." );
 		return NULL;
 	}
 
+
+write( 2, str, len );
+write( 2, "\n", 1 );
+
 	//Walk through everything
-	for ( int i = 0; memwalk( &w, (unsigned char *)str, (unsigned char *)tokens, len, strlen( tokens ) ); ) {
+	//for ( int i = 0; memwalk( &w, (unsigned char *)str, (unsigned char *)tokens, len, strlen( tokens ) ); ) {
+	for ( int i = 0; strwalk( &w, str, tokens ); ) {
 		char *srcbuf, *copybuf, statbuf[ ZJSON_MAX_STATIC_LENGTH ] = { 0 };
 		int blen = 0;
+
+fprintf( stderr, "%c\n", w.chr );
+write( 2, w.src, w.size );
+write( 2, "\n", 1 );
 
 		if ( w.chr == '"' && !( d->inText = !d->inText ) ) { 
 			//Rewind until we find the beginning '"'
@@ -239,6 +253,8 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 				}
 			}
 			else if ( w.chr == '}' ) {
+fprintf( stderr, "Why is this failing now?\n" );
+write( 2, w.src, w.size - 1 );
 				if ( --i > 0 ) {
 					d->index = 0, d->inText = 0;
 					--d, d->isVal = 0, lt_ascend( t );
@@ -270,13 +286,15 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 						lt_finalize( t );
 					}
 				}
+
 				d->isVal = ( w.chr == ':' );
 			}
 		}
 	}
 
+	fprintf( stderr, "why ??? " );
 	lt_lock( t );
-//lt_kdump( t );
+lt_kdump( t );
 	return t;
 }
 
