@@ -37,7 +37,7 @@ unsigned char *zjson_trim
 	( unsigned char *msg, char *trim, int msglen, int *nlen ) {
 	//Define stuff
 	unsigned char *m = msg, *u = &msg[ msglen ];
-	int nl = msglen, sl = strlen( trim ); 
+	int nl = msglen, sl = strlen( trim );
 
 	//Adjust for end delimiter
 	if ( *u == '\0' && !memchr( trim, '\0', sl ) ) {
@@ -174,19 +174,16 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 		return NULL;
 	}
 
-
-write( 2, str, len );
-write( 2, "\n", 1 );
-
 	//Walk through everything
-	//for ( int i = 0; memwalk( &w, (unsigned char *)str, (unsigned char *)tokens, len, strlen( tokens ) ); ) {
-	for ( int i = 0; strwalk( &w, str, tokens ); ) {
+	for ( int i = 0; memwalk( &w, (unsigned char *)str, (unsigned char *)tokens, len, strlen( tokens ) ); ) {
+	//for ( int i = 0; strwalk( &w, str, tokens ); ) {
 		char *srcbuf, *copybuf, statbuf[ ZJSON_MAX_STATIC_LENGTH ] = { 0 };
 		int blen = 0;
-
-fprintf( stderr, "%c\n", w.chr );
+#if 0
+fprintf( stderr, "%c - %p - %d\n", w.chr, w.src, w.size );
 write( 2, w.src, w.size );
 write( 2, "\n", 1 );
+#endif
 
 		if ( w.chr == '"' && !( d->inText = !d->inText ) ) { 
 			//Rewind until we find the beginning '"'
@@ -218,7 +215,7 @@ write( 2, "\n", 1 );
 			}
 			else {
 				if ( !d->isVal ) {
-					//ZJSON_PRINTF( "Adding text key: %s\n", copybuf );
+					ZJSON_PRINTF( "Adding text key: %s\n", copybuf );
 					lt_addtextkey( t, copybuf ), d->inText = 0; //, d->isVal = 1;
 				}
 				else {
@@ -253,8 +250,34 @@ write( 2, "\n", 1 );
 				}
 			}
 			else if ( w.chr == '}' ) {
-fprintf( stderr, "Why is this failing now?\n" );
-write( 2, w.src, w.size - 1 );
+				if ( d->isVal ) {
+					int mallocd = 0;
+					//This should only run when values are null, t/f or numeric
+					srcbuf = ( char * )zjson_trim( w.src, "\t\n\r ", w.size - 1, &blen );
+
+					if ( blen < ZJSON_MAX_STATIC_LENGTH )
+						memcpy( statbuf, srcbuf, blen ), copybuf = statbuf; 
+					else {
+					#if 0
+						snprintf( err, errlen, "%s", "zjson max length is too large." );
+						return NULL;
+					#else
+						if ( !( copybuf = malloc( blen + 1 ) ) ) {
+							snprintf( err, errlen, "%s", "zjson out of memory." );
+							return NULL;
+						}
+						memset( copybuf, 0, blen + 1 );
+						memcpy( copybuf, srcbuf, blen );
+						mallocd = 1;
+					#endif
+					}
+					lt_addtextvalue( t, copybuf );
+					lt_finalize( t );
+					d->isVal = 0, d->inText = 0;
+					if ( mallocd ) {
+						free( copybuf );
+					}
+				}
 				if ( --i > 0 ) {
 					d->index = 0, d->inText = 0;
 					--d, d->isVal = 0, lt_ascend( t );
@@ -266,7 +289,7 @@ write( 2, w.src, w.size - 1 );
 					--d, d->isVal = 0, lt_ascend( t );
 				}
 			}
-			else if ( w.chr == ',' || w.chr == ':' ) {
+			else if ( w.chr == ',' || w.chr == ':' /*|| w.chr == '}'*/ ) {
 				( w.chr == ',' && !d->isObject ) ? d->index++ : 0; 
 				srcbuf = ( char * )zjson_trim( w.src, "\",: \t\n\r", w.size - 1, &blen );
 				if ( blen >= ZJSON_MAX_STATIC_LENGTH ) {
@@ -286,15 +309,12 @@ write( 2, w.src, w.size - 1 );
 						lt_finalize( t );
 					}
 				}
-
 				d->isVal = ( w.chr == ':' );
 			}
 		}
 	}
 
-	fprintf( stderr, "why ??? " );
 	lt_lock( t );
-lt_kdump( t );
 	return t;
 }
 

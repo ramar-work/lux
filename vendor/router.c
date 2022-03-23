@@ -117,6 +117,7 @@ static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 	}
 
 	while ( strwalk( &r, uri, "/" ) ) {
+fprintf( stderr, "pos: %d, size: %d, next: %d, len: %ld\n", r.pos, r.size, r.next, strlen( uri ) );
 		unsigned char *p = (unsigned char *)&uri[ r.pos ];
 		struct element *e = NULL;
 

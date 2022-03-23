@@ -177,13 +177,26 @@ int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
 //Check if there is a reserved keyword being requested
 static int is_reserved( const char *a ) {
 	for ( int i = 0; i < sizeof( mvcmeta ) / sizeof( struct mvcmeta_t ); i ++ ) {
+#if 0
+		if ( memstrat( mvcmeta[i].reserved, a, strlen( mvcmeta[i].reserved ) ) > -1 ) {
+			return 1;
+		}
+#else
 		zWalker w = {0};
 		for ( ; strwalk( &w, mvcmeta[i].reserved, "," ); ) {
+	//int sl = strlen( (char *)mvcmeta[ i ].reserved );
+		//for ( ; memwalk( &w, (unsigned char *)mvcmeta[i].reserved, (unsigned char *)",", sl, 1 ); ) {
+#if 0
+fprintf( stderr, 
+	"POS: %d Size: %d Len: %ld Next: %d\n",
+	w.pos, w.size, strlen(mvcmeta[i].reserved), w.next ); getchar();
+#endif
 			char buf[64];
 			memset( buf, 0, sizeof( buf ) );
 			memcpy( buf, w.src, ( w.chr == ',' ) ? w.size - 1 : w.size );
 			if ( strcmp( a, buf ) == 0 ) return 1;
 		}
+#endif
 	}
 	return 0;
 }
@@ -473,7 +486,7 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 	//Get its mimetype
 	if ( !( mime = zmime_get_by_filename( spath ) ) )
 		mime = zmime_get_default();
-#if 1
+#if 0
 	//write max should be checked.
 	//...
 	int dlen = 0;
@@ -857,6 +870,28 @@ static int return_as_response ( struct luadata_t *l ) {
 		lt_free( rt ), free( rt );
 		snprintf( l->err, LD_ERRBUF_LEN, "Status specified with no content." );
 		return 0;
+	}
+	//Finally, get any headers if there are any
+	int header_i = 0;
+	if ( ( header_i = lt_geti( rt, "headers" ) ) > -1 ) {
+		//You can use get keys or loop through the thing...
+		zKeyval *kv = lt_items( rt, "headers" );
+		for ( ; ( kv = lt_items( rt, "headers" ) ); ) {
+			if ( kv->key.type == ZTABLE_TRM )
+				break;
+			if ( kv->key.type	!= ZTABLE_TXT && (  kv->value.type	!= ZTABLE_TXT && kv->value.type != ZTABLE_INT ) ) { 
+				snprintf( l->err, LD_ERRBUF_LEN, "Got invalid header value." );
+				return 0; // die
+			}
+ 
+			if ( kv->value.type == ZTABLE_TXT )
+				http_set_header( l->res, kv->key.v.vchar, kv->value.v.vchar );
+			else if ( kv->value.type == ZTABLE_INT ) {
+				char intbuf[ 64 ] = {0};
+				snprintf( intbuf, sizeof( intbuf ), "%d", kv->value.v.vint );
+				http_set_header( l->res, kv->key.v.vchar, intbuf );
+			}
+		}
 	}
 
 	//Set structures
