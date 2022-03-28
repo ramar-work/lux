@@ -25,6 +25,7 @@
 #include "filesystem.h"
 #include "db.h"
 #include "json.h"
+#include "encdec.h"
 
 struct lua_fset functions[] = {
 	{ "echo", echo_set }
@@ -35,6 +36,10 @@ struct lua_fset functions[] = {
 , { "fs", fs_set }
 , { "db", db_set }
 , { "json", json_set }
+, { "enc", enc_set }
+#if 0
+, { "dec", dec_set }
+#endif
 ,	{ NULL }
 };
 

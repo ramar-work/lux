@@ -87,6 +87,7 @@ static int http_error( struct HTTPBody *res, int status, char *fmt, ... ) {
 }
 
 
+#if 0
 //TODO: This is an incredibly difficult way to make things 
 //read-only...  Is there a better one?
 static const char read_only_block[] = " \
@@ -100,6 +101,7 @@ static const char read_only_block[] = " \
 		return tt \
 	end \
 ";
+#endif
 
 
 static struct mvcmeta_t { 
@@ -129,7 +131,7 @@ int run_lua_buffer( lua_State *L, const char *buffer ) {
 }
 
 
-
+#if 0
 //In lieu of a C-only way to make members read only, use this
 static int make_read_only ( lua_State *L, const char *table ) {
 	//Certain tables (and their children) need to be read-only
@@ -147,6 +149,7 @@ static int make_read_only ( lua_State *L, const char *table ) {
 	}
 	return 1;
 }
+#endif
 
 
 
@@ -629,30 +632,32 @@ static int init_lua_request ( struct luadata_t *l ) {
 	lua_newtable( l->state );
 
 	//Add general request info
-	lua_pushstring( l->state, "contenttype" );
-	lua_pushstring( l->state, l->req->ctype );
-	lua_settable( l->state, 1 );
-	lua_pushstring( l->state, "ctype" );
-	lua_pushstring( l->state, l->req->ctype );
-	lua_settable( l->state, 1 );
-	lua_pushstring( l->state, "length" );
-	lua_pushinteger( l->state, l->req->clen );
-	lua_settable( l->state, 1 );
 	lua_pushstring( l->state, "path" );
-	lua_pushstring( l->state, l->req->ctype );
+	lua_pushstring( l->state, l->req->path );
 	lua_settable( l->state, 1 );
+
 	lua_pushstring( l->state, "method" );
 	lua_pushstring( l->state, l->req->method );
 	lua_settable( l->state, 1 );
-	lua_pushstring( l->state, "status" );
-	lua_pushinteger( l->state, l->req->status );
-	lua_settable( l->state, 1 );
+
 	lua_pushstring( l->state, "protocol" );
 	lua_pushstring( l->state, l->req->protocol );
 	lua_settable( l->state, 1 );
+
 	lua_pushstring( l->state, "host" );
 	lua_pushstring( l->state, l->req->host );
 	lua_settable( l->state, 1 );
+
+	lua_pushstring( l->state, "ctype" );
+	lua_pushstring( l->state, l->req->ctype );
+	lua_settable( l->state, 1 );
+
+	//If the method is NOT idempotent, don't bother with content-length
+	if ( l->req->idempotent ) {
+		lua_pushstring( l->state, "clength" );
+		lua_pushinteger( l->state, l->req->clen );
+		lua_settable( l->state, 1 );
+	}
 
 	//Add simple keys for headers and URL
 	for ( int pos=3, i = 0; i < 3; i++ ) {
@@ -660,11 +665,20 @@ static int init_lua_request ( struct luadata_t *l ) {
 		if ( r && *r ) {
 			lua_pushstring( l->state, str[i] ), lua_newtable( l->state );
 			for ( ; r && *r; r++ ) {
-				lua_pushstring( l->state, (*r)->field );
-			#if 0
-				lua_pushlstring( l->state, ( char * )(*r)->value, (*r)->size );
-			#else
+
+				//This needs to be looked at more
+				if ( strcmp( "Cookie", (*r)->field ) != 0 )
+					lua_pushstring( l->state, (*r)->field );
+				else {	
+					char *f = (char *)(*r)->field; 
+					*f = ( *f > 63 && *f < 91 ) ? *f + 32 : *f;
+					lua_pushstring( l->state, f );
+				}
+
+				//Add the lower case version of whatever the header title may be
 				lua_newtable( l->state );
+			#if 1
+				//This first run pushes the original values into the table
 				lua_pushstring( l->state, "value" ); 
 				lua_pushlstring( l->state, ( char * )(*r)->value, (*r)->size );
 				lua_settable( l->state, pos + 2 ); 	
@@ -672,6 +686,50 @@ static int init_lua_request ( struct luadata_t *l ) {
 				lua_pushinteger( l->state, (*r)->size );
 				lua_settable( l->state, pos + 2 ); 	
 			#endif
+
+				//For now, we only need to worry with authentication and cookies
+				if ( strcmp( "cookie", (*r)->field ) == 0 ) {
+
+					zw_t ww, *w = memset( &ww, 0, sizeof( zw_t ) );
+					//int count = 0;
+					for ( int x = 0, p = 0; memwalk( w, (*r)->value, (unsigned char *)"=;", (*r)->size, 2 ); ) {
+
+						//Get size and initialize a buffer
+						unsigned char *b, buf[ 256 ] = {0};
+						int si = 0, size = memchr( "=;", w->chr, 2 ) ? w->size - 1 : w->size;
+
+						//Die on sizes that are too large 
+						if ( size >= 256 ) {
+							snprintf( l->err, LD_ERRBUF_LEN, "Header %s too large.", i ? "value" : "key" );
+							return 0;
+						}
+
+						//Trim any excess from current value
+						b = trim( w->src, "\r\"' \t", size, &si );	
+						if ( si > 0 ) {
+							memcpy( buf, b, si );
+							if ( w->chr == '=' )
+								lua_pushstring( l->state, (char *)buf ), p++;
+							else if ( !p && w->chr == ';' )	{
+								lua_pushnumber( l->state, x++ ), lua_pushstring( l->state, (char *)buf );
+								lua_settable( l->state, pos + 2 );
+							}
+							else {
+								lua_pushstring( l->state, (char *)buf );
+								lua_settable( l->state, pos + 2 );
+								p = 0;
+							}
+						}
+					}
+				}
+				#if 0
+				//Set a count
+				lua_pushstring( l->state, "count" );
+				lua_pushnumber( l->state, count );
+				lua_settable( l->state, pos + 2 );
+				#endif
+		
+				//Finalize the table
 				lua_settable( l->state, pos );
 			}
 			lua_settable( l->state, 1 );

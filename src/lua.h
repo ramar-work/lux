@@ -35,41 +35,47 @@
 
 #define LD_ERRBUF_LEN 1024
 
-#define lua_pushibt(L, i, v, p) \
+#define lua_setintbool(L, i, v, p) \
 	lua_pushinteger(L, i), lua_pushboolean(L, v), lua_settable(L, p)
 
-#define lua_pushict(L, i, v, p) \
+#define lua_setintccl(L, i, v, p) \
 	lua_pushinteger(L, i), lua_pushcclosure(L, v), lua_settable(L, p)
 
-#define lua_pushift(L, i, v, p) \
+#define lua_setintfun(L, i, v, p) \
 	lua_pushinteger(L, i), lua_pushcfunction(L, v), lua_settable(L, p)
 
-#define lua_pushint(L, i, v, p) \
+#define lua_setintnum(L, i, v, p) \
 	lua_pushinteger(L, i), lua_pushnumber(L, v), lua_settable(L, p)
 
-#define lua_pushiit(L, i, v, p) \
+#define lua_setintint(L, i, v, p) \
 	lua_pushinteger(L, i), lua_pushinteger(L, v), lua_settable(L, p)
 
-#define lua_pushist(L, i, v, p) \
+#define lua_setintstr(L, i, v, p) \
 	lua_pushinteger(L, i), lua_pushstring(L, v), lua_settable(L, p)
 
-#define lua_pushsbt(L, s, v, p) \
+#define lua_setstrbool(L, s, v, p) \
 	lua_pushstring(L, s), lua_pushboolean(L, v), lua_settable(L, p)
 
-#define lua_pushsct(L, s, v, p) \
+#define lua_setstrccl(L, s, v, p) \
 	lua_pushstring(L, s), lua_pushcclosure(L, v), lua_settable(L, p)
 
-#define lua_pushsft(L, s, v, p) \
+#define lua_setstrfun(L, s, v, p) \
 	lua_pushstring(L, s), lua_pushcfunction(L, v), lua_settable(L, p)
 
-#define lua_pushsnt(L, s, v, p) \
+#define lua_setstrnum(L, s, v, p) \
 	lua_pushstring(L, s), lua_pushnumber(L, v), lua_settable(L, p)
 
-#define lua_pushsit(L, s, v, p) \
+#define lua_setstrint(L, s, v, p) \
 	lua_pushstring(L, s), lua_pushinteger(L, v), lua_settable(L, p)
 
-#define lua_pushsst(L, s, v, p) \
+#define lua_setstrstr(L, s, v, p) \
 	lua_pushstring(L, s), lua_pushstring(L, v), lua_settable(L, p)
+
+#define lua_setstrbin(L, s, v, b, p) \
+	lua_pushstring(L, s), lua_pushlstring(L, (const char *)v, b), lua_settable(L, p)
+
+#define lua_setintbin(L, i, v, b, p) \
+	lua_pushinteger(L, i), lua_pushlstring(L, (const char *)v, b), lua_settable(L, p)
 
 enum zlua_error {
 	ZLUA_NO_ERROR,

@@ -37,7 +37,7 @@
 #include <zwalker.h>
 #include <zhttp.h>
 #include "../lua.h"
-#if 0
+#if 1
 #include <gnutls/gnutls.h>
 #endif
 

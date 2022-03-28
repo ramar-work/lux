@@ -120,7 +120,9 @@ int extract_body ( wwwResponse *r ) {
 	
 		//move up nsrc, and get ready to read that
 		nsrc += szText + 2;
-		rr = realloc( rr, tot + sz );
+		if ( !( rr = realloc( rr, tot + sz ) ) ) {
+			return 1;
+		}
 		memset( &rr[ tot ], 0, sz );
 		memcpy( &rr[ tot ], nsrc, sz );
 
@@ -507,7 +509,7 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 }
 
 
-#if 0
+#if 1
 int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char *errmsg, int errlen ) {
 #if 1
 	//Define
@@ -522,32 +524,32 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 	memset( &xcred, 0, sizeof(gnutls_certificate_credentials_t));
 
 	//Do socket connect (but after initial connect, I need the file desc)
-	if ( RUN( !gnutls_check_version("3.4.6") ) )
+	if ( !gnutls_check_version("3.4.6") ) 
 		return ERR( errmsg, errlen, "%s\n", "GnuTLS 3.4.6 or later is required for this example." );	
 
-	if ( RUN( ( err = gnutls_global_init() ) < 0 ) )
+	if ( ( err = gnutls_global_init() ) < 0 ) 
 		return ERR( errmsg, errlen, "%s\n", gnutls_strerror( err ));
 
-	if ( RUN( ( err = gnutls_certificate_allocate_credentials( &xcred ) ) < 0 ))
+	if ( ( err = gnutls_certificate_allocate_credentials( &xcred ) ) < 0 )
 		return ERR( errmsg, errlen, "%s\n", gnutls_strerror( err ));
 
-	if ( RUN( (err = gnutls_certificate_set_x509_system_trust( xcred )) < 0 ))
+	if ( ( err = gnutls_certificate_set_x509_system_trust( xcred )) < 0 )
 		return ERR( errmsg, errlen, "%s\n", gnutls_strerror( err ));
 
 	//Set client certs this way...
 	//gnutls_certificate_set_x509_key_file( xcred, "cert.pem", "key.pem" );
 
 	//Initialize gnutls and set things up
-	if ( RUN( ( err = gnutls_init( &session, GNUTLS_CLIENT ) ) < 0 ))
+	if ( ( err = gnutls_init( &session, GNUTLS_CLIENT ) ) < 0 )
 		return ERR( errmsg, errlen, "%s\n", gnutls_strerror( err ));
 
-	if ( RUN( ( err = gnutls_server_name_set( session, GNUTLS_NAME_DNS, r->host, strlen(r->host)) ) < 0))
+	if ( ( err = gnutls_server_name_set( session, GNUTLS_NAME_DNS, r->host, strlen(r->host)) ) < 0 )
 		return ERR( errmsg, errlen, "%s\n", gnutls_strerror( err ));
 
-	if ( RUN( ( err = gnutls_set_default_priority( session ) ) < 0) )
+	if ( ( err = gnutls_set_default_priority( session ) ) < 0 ) 
 		return ERR( errmsg, errlen, "%s\n", gnutls_strerror( err ));
 	
-	if ( RUN( ( err = gnutls_credentials_set( session, GNUTLS_CRD_CERTIFICATE, xcred )) < 0) )
+	if ( ( err = gnutls_credentials_set( session, GNUTLS_CRD_CERTIFICATE, xcred )) < 0 )
 		return ERR( errmsg, errlen, "%s\n", gnutls_strerror( err ));
 
 	//Set random handshake details
@@ -556,7 +558,6 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 #if 0
 	//socket connect is the shorter way to do this...
 #else
-	//socket connect is the shorter way to do this...
 	struct addrinfo hints, *servinfo, *pp;
 	int rv, sockfd;
 	char b[10] = {0}, s[ INET6_ADDRSTRLEN ], ipv4[ INET_ADDRSTRLEN ];
@@ -1260,10 +1261,112 @@ write( 2, xbuf, ret );
 	return 1;
 }
 
+int extr_simple_args ( zhttp_t *r, zTable *t, char *err, int errlen ) {
+	static const char *items[] = { "headers", "query", NULL };
+	const char **i = items;
+	for ( int pos; *i; i++ ) {
+		if ( ( pos = lt_geti( t, *i ) ) > -1 ) {
+			lt_reset( t ); 
+			lt_set( t, pos + 1 );
+
+			//If this is a body and there is only one thing, then we need to throw that back...
+
+			for ( zKeyval *kv ; ( kv = lt_next( t ) ) ; ) {
+				if ( kv->key.type == ZTABLE_TRM )
+					return 1;	
+				else if ( kv->key.type != ZTABLE_TXT ) {
+					snprintf( err, errlen, "Got invalid type of %s key", *i );
+					return 0;
+				}
+
+				if ( kv->value.type == ZTABLE_TXT ) {
+					if ( strcmp( *i, "headers" ) == 0 )	
+						http_copy_header( r, kv->key.v.vchar, kv->value.v.vchar );
+					else if ( strcmp( *i, "query" ) == 0 ) {
+						http_copy_uripart( r, kv->key.v.vchar, kv->value.v.vchar );
+					}
+				}
+				else if ( kv->value.type == ZTABLE_INT ) {
+					char buf[ 64 ] = {0};
+					snprintf( buf, sizeof( buf ), "%d", kv->value.v.vint );	
+					if ( strcmp( *i, "headers" ) == 0 )	
+						http_copy_header( r, kv->key.v.vchar, buf );
+					else if ( strcmp( *i, "query" ) == 0 ) {
+						http_copy_uripart( r, kv->key.v.vchar, buf );
+					}
+				}
+				else {
+					snprintf( err, errlen, "%s", "Got invalid type of header key" );
+					return 0;
+				} 
+			}
+		}
+	}
+
+	return 1;
+}
 
 
+
+int extr_body_args ( zhttp_t *r, zTable *t, char *err, int errlen ) {
+	//Have a lot to figure out...
+	int pos ;
+
+	if ( ( pos = lt_geti( t, "body" ) ) > -1 ) {
+
+		//If method is not POST or PUT, die
+		
+
+		//If this is a body and there is only one thing, then that's all there is
+		lt_reset( t ); 
+		zKeyval *kv = lt_retkv( t, pos );
+
+		//Die if the value returned isn't text or table
+		if ( !kv || ( kv && kv->value.type != ZTABLE_TXT && kv->value.type != ZTABLE_TBL ) ) {
+			snprintf( err, errlen, "Got invalid type of value at body" );
+			return 0;
+		}
+	
+		//If it's a string, it's a body
+		if ( kv->value.type == ZTABLE_TXT ) {
+			r->clen = strlen( kv->value.v.vchar );
+			http_copy_formvalue( r, "xxx", kv->value.v.vchar, strlen( kv->value.v.vchar ) );
+			r->clen = strlen( kv->value.v.vchar );
+			//http_set_content_length( r, strlen( kv->value.v.vchar ) );
+			return 1;
+		}
+
+		//If it's a table
+		lt_set( t, pos + 1 );
+		for ( ; ( kv = lt_next( t ) ) ; ) {
+			if ( kv->key.type == ZTABLE_TRM )
+				return 1;	
+			else if ( kv->key.type != ZTABLE_TXT ) {
+				snprintf( err, errlen, "Got invalid type of key 'x' at body" );
+				return 0;
+			}
+
+			if ( kv->value.type == ZTABLE_TXT ) {
+				http_copy_formvalue( r, kv->key.v.vchar, kv->value.v.vchar, strlen( kv->value.v.vchar ) );
+			}
+			else if ( kv->value.type == ZTABLE_INT ) {
+				char buf[ 64 ] = {0};
+				snprintf( buf, sizeof( buf ), "%d", kv->value.v.vint );	
+				http_copy_formvalue( r, kv->key.v.vchar, buf, strlen( buf ) );
+			}
+			else {
+				snprintf( err, errlen, "%s", "Got invalid type of body key" );
+				return 0;
+			} 
+		}
+	}
+	return 1;
+}
+
+
+#if 0
 //TODO: This should move to lua.c or something
-int extr_args ( zhttp_t *r, zTable *t, const char *text ) {
+int extr_args ( zhttp_t *r, zTable *t const char *text ) {
 	int pos = lt_geti( t, text );
 	if ( pos > -1 ) {
 		lt_reset( t ), lt_set( t, pos + 1 );
@@ -1272,10 +1375,21 @@ int extr_args ( zhttp_t *r, zTable *t, const char *text ) {
 			if ( kv->key.type == ZTABLE_TRM ) {
 				return 1;	
 			}
-			if ( !strcmp( text, "headers" ) )
-				http_copy_header( r, kv->key.v.vchar, kv->value.v.vchar );
-			else if ( !strcmp( text, "query" ) )
+
+			if ( !strcmp( text, "headers" ) ) {
+				if ( kv->key.type != ZTABLE_TXT ) {
+					return 0;
+				}
+
+				if ( kv->key.type == ZTABLE_TXT && kv->value.type == ZTABLE_TXT )
+					http_copy_header( r, kv->key.v.vchar, kv->value.v.vchar );
+				
+
+			}
+			else if ( !strcmp( text, "query" ) ) {
 				http_copy_uripart( r, kv->key.v.vchar, kv->value.v.vchar );
+
+			}
 			else if ( !strcmp( text, "body" ) ) {
 				//You need to save something
 				int len = strlen( kv->value.v.vchar ); 
@@ -1285,7 +1399,7 @@ int extr_args ( zhttp_t *r, zTable *t, const char *text ) {
 	}
 	return 0;
 }
-
+#endif
 
 
 
@@ -1323,21 +1437,19 @@ int http_request ( lua_State *L ) {
 		}
 	}
 	else {
-		if ( !lua_isstring( L, 1 ) ) {
+		if ( !lua_isstring( L, 1 ) )
 			return luaL_error( L, "First argument must be a string when specifying multiple arguments" );
-		}
 
-		if ( !lua_istable( L, 1 ) ) {
+		if ( !lua_istable( L, 1 ) )
 			return luaL_error( L, "Second argument must be a table when specifying multiple arguments" );
-		}
 
-		addr = lua_tostring( L, 1 );
-		if ( !( rt = lt_make( 128 ) ) ) {
+		if ( !( rt = lt_make( 128 ) ) )
 			return luaL_error( L, "Could not allocate space for hash table." );
-		}
 		else if ( !lua_to_ztable( L, 2, rt ) ) {
 			return luaL_error( L, "Could not convert Lua data to hash table." );
 		}
+
+		addr = lua_tostring( L, 1 );
 	}	
 
 	//Pop all arguments
@@ -1351,9 +1463,8 @@ int http_request ( lua_State *L ) {
 	}
 	else {
 		//Get address if you haven't already
-		if ( !addr ) {
+		if ( !addr )
 			addr = lt_text( rt, "address" );
-		}
 
 		//Get the content-type, type (of request)
 		if ( lt_geti( rt, "method" ) == -1 )
@@ -1363,10 +1474,10 @@ int http_request ( lua_State *L ) {
 		}
 
 		//Get the content-type, type (of request)
-		if ( lt_geti( rt, "contenttype" ) == -1 )
+		if ( lt_geti( rt, "ctype" ) == -1 )
 			qhttp.ctype = zhttp_dupstr( "text/html" ); 
 		else {
-			qhttp.ctype = zhttp_dupstr( lt_text( rt, "contenttype" ) );
+			qhttp.ctype = zhttp_dupstr( lt_text( rt, "ctype" ) );
 		}
 
 		//Look for a user-agent if one was supplied
@@ -1375,18 +1486,25 @@ int http_request ( lua_State *L ) {
 		else {
 			http_copy_header( &qhttp, "User-Agent", lt_text( rt, "useragent" ) );
 		}
-		
+	
+		//Get header or query	
+		if ( lt_geti( rt, "headers" ) > -1 || lt_geti( rt, "query" ) > -1 )	{
+			if ( !extr_simple_args( &qhttp, rt, err, sizeof( err ) ) ) {
+				return luaL_error( L, err );
+			}
+		}
 
-		//Add all the headers, query and body parts
-		const char *str[] = { "headers", "query", "body", NULL  };
-		for ( const char **type = str; *type; type++ ) {
-			extr_args( &qhttp, rt, *type );
+		//Get any body if there is one
+		if ( lt_geti( rt, "body" ) > -1 ) {
+			if ( !extr_body_args( &qhttp, rt, err, sizeof( err ) ) ) {
+				return luaL_error( L, err );
+			}
 		}
 	}
 
 	//Path, port and address need to be finagled here
 	//...
-	int c, secure, port;
+	int c, secure, port, hlen = 0;
 	if ( !memcmp( "https", addr, 5 ) )
 		secure = 1, port = 443, addr = &addr[ 8 ];
 	else if ( !memcmp( "http", addr, 4 ) )
@@ -1413,72 +1531,50 @@ int http_request ( lua_State *L ) {
 
 	//This is just going to send the request
 	if ( !secure ) {
-		//I don't really want to die here...
 		if ( !make_http_request( addr, port, &qhttp, &rhttp, err, sizeof(err) ) ) {
 			return luaL_error( L, err ); 
 		}
 	}
 	else {
-		return luaL_error( L, err ); 
-	#if 0
 		if ( !make_https_request( addr, port, &qhttp, &rhttp, err, sizeof(err) ) ) {
 			return luaL_error( L, err ); 
 		}
-	#endif
 	}
 
-	//FINALLY, we need to put all the stuff in the response into a form that
-	//a scripting language can use
-	//write( 2, rhttp.msg, rhttp.mlen ); write( 2, "\n==\n", 4 );
-
-#if 1
 	//Prepare the table.
 	lua_newtable( L );
-
-	lua_pushstring( L, "status" );
-	lua_pushboolean( L, 1 );
-	lua_settable( L, 1 );
-
-	lua_pushstring( L, "results" );
-	lua_newtable( L );
-
-	lua_pushstring( L, "body" );
-	lua_pushlstring( L, (char *)rhttp.msg, rhttp.clen );
-	lua_settable( L, 3 );
-	
-	lua_pushstring( L, "size" );
-	lua_pushinteger( L, rhttp.clen );
-	lua_settable( L, 3 );
-
-	lua_pushstring( L, "contenttype" );
-	lua_pushstring( L, rhttp.ctype );
-	lua_settable( L, 3 );
-
+	lua_setstrbool( L, "status", 1, 1 );
+	lua_pushstring( L, "results" ), lua_newtable( L );
 #if 0
-	lua_pushstring( L, "redirect" );
-	lua_pushstring( L, w.ipv4 );
-	lua_settable( L, 3 );
-
-	lua_pushstring( L, "resolved_ip" );
-	lua_pushstring( L, w.ipv4 );
-	lua_settable( L, 3 );
-
-	lua_pushstring( L, "resolved_ipv6" );
-	lua_pushstring( L, w.ipv4 );
-	lua_settable( L, 3 );
-
-	lua_pushstring( L, "msglength" );
-	lua_pushinteger( L, w.len );
-	lua_settable( L, 3 );
-
-	lua_pushstring( L, "msg" );
-	lua_pushlstring( L, (char *)w.data, w.len );
-	lua_settable( L, 3 );
+	lua_setstrstr( L, "ctype", rhttp.ctype, 3 );
+ #if 0
+	lua_setstrstr( L, "ipv4", rhttp.ipv4, 3 );
+	lua_setstrstr( L, "ipv6", rhttp.ipv6, 3 );
+	lua_pushstrstr( L, "redirect", rhttp.ctype, 3 );
+ #endif
 #endif
+
+	//Check that you have headers
+	if ( ( hlen = memstrat( rhttp.msg, "\r\n\r\n", rhttp.mlen ) ) == -1 ) {
+		snprintf( err, sizeof( err ), "Header parsing failed" );
+		return luaL_error( L, err ); 
+	}
+
+	//Add the headers as a table of their own
+	lua_pushstring( L, "headers" ), lua_newtable( L );
+	for ( zhttpr_t ** x = http_get_header_keyvalues( &rhttp.msg, &hlen, &rhttp.error ); x && *x; x++ ) {
+		lua_setstrbin( L, (*x)->field, (*x)->value, (*x)->size, 5 );
+	}
+	lua_settable( L, 3 );
+
+	//Finally, add the body if there is one
+	if ( rhttp.clen ) {
+		lua_setstrbin( L, "body", rhttp.msg + ( hlen + 4 ), rhttp.clen, 3 );
+		lua_setstrint( L, "size", rhttp.clen, 3 );
+	}
 
 	lua_settable( L, 1 );
 	//http_free_body( &qhttp ), http_free_body( &rhttp );	
-#endif
 	return 1;
 }
 

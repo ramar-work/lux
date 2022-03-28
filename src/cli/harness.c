@@ -64,7 +64,7 @@
 	"-F, --form <arg>         Specify a body to use when making requests.\n" \
 	"-b, --binary <arg>       Specify a body to use when making requests. (assumes multipart)\n" \
 	"                         (Use multiple invocations for additional arguments)\n" \
-	"-e, --header <arg>       Specify a header to use when making requests.\n" \
+	"-E, --header <arg>       Specify a header to use when making requests.\n" \
 	"                         (Use multiple invocations for additional arguments)\n" \
 	"-t, --test <arg>         Use <arg> to run a test.\n" \
 	"-M, --multipart          Use a multipart request when using POST or PUT\n" \
@@ -248,7 +248,7 @@ int main ( int argc, char * argv[] ) {
 			arg.dumpResp = 1;
 		else if ( !strcmp( *argv, "-t" ) || !strcmp( *argv, "--test" ) )
 			arg.luatest = *( ++argv );
-		else if ( !strcmp( *argv, "-E" ) || !strcmp( *argv, "--headers" ) ) {
+		else if ( !strcmp( *argv, "-E" ) || !strcmp( *argv, "--header" ) ) {
 			char * a = *( ++argv );
 			add_item( &arg.headers, a, unsigned char *, &arg.hlen );
 		}
@@ -539,14 +539,14 @@ int main ( int argc, char * argv[] ) {
 	//Add any extra headers
 	if ( arg.headers ) { 
 		for ( char **headers = arg.headers; *headers; headers++ ) {
-			if ( index( *headers, '=' ) ) { 
+			if ( index( *headers, ':' ) ) { 
 				int a = 0, b = 0, eq = 0;
 				char aa[ 1024 ] = { 0 }, bb[ 1024 ] = { 0 };
 				for ( char *header = *headers; *header; header++ ) {
-					if ( !( eq += ( *header == '=' ) ) ) 
+					if ( !( eq += ( *header == ':' ) ) ) 
 						aa[ a++ ] = *header;
 					else {
-						*header != '=' ? bb[ b++ ] = *header : 0;
+						*header != ':' ? bb[ b++ ] = *header : 0;
 					}
 				}
 				http_copy_header( &req, aa, bb );
@@ -628,6 +628,8 @@ int main ( int argc, char * argv[] ) {
 	//Stop and dump the request
 	if ( arg.dumpHttp ) {
 		print_httpbody( &req );
+		write( 2, req.msg, req.mlen );
+		http_free_request( &req );
 		return 0;
 	}
 

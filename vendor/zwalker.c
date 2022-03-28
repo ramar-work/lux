@@ -147,7 +147,6 @@ getchar();
 		return 0;
 	}	
 #endif
-	fprintf(stderr, "Got token '%c'.\n", *( w->ptr - 1 ) );
 	//TODO: If you want to include the token, specify it...
 	w->size = w->next - w->pos;
 	w->chr = *( w->ptr - 1 );

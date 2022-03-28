@@ -53,6 +53,7 @@ SRC = \
 	@srcdir@/src/lua/lib.c \
 	@srcdir@/src/lua/db.c \
 	@srcdir@/src/lua/echo.c \
+	@srcdir@/src/lua/encdec.c \
 	@srcdir@/src/lua/lua.c \
 	@srcdir@/src/lua/json.c \
 	@srcdir@/src/lua/rand.c \

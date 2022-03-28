@@ -108,6 +108,12 @@ static const char base[] = {
 ,	['f'] = 15
 };
 
+static const char cdisph[] = "Content-Disposition: " ;
+
+static const char cdispt[] = "form-data;" ;
+
+static const char nameh[] = "name=";
+
 static const char default_content_type[] = 
 	"application/octet-stream";
 
@@ -1061,29 +1067,31 @@ char * http_get_host ( zhttp_t *en, zhttpr_t **list ) {
 
 
 
-zhttpr_t ** http_get_query_strings ( zhttp_t *en, char *p, int plen ) {
+zhttpr_t ** http_get_query_strings ( char *p, int plen, short *err ) {
 	zhttpr_t **list = NULL;
 
 	//Process the query string if there is one...
-	if ( strlen( en->path ) == 1 || !memchr( en->path, '?', strlen( en->path ) ) )
-		return en->url = NULL;
+	if ( strlen( p ) == 1 || !memchr( p, '?', plen ) )
+		return NULL;
 	else {
 		zhttpr_t *b = NULL; 
 		zWalker z = {0};
-		for ( int l, len = 0; strwalk( &z, en->path, "?&=" );  ) {
-			unsigned char *t = (unsigned char *)&en->path[ z.pos ];
+		for ( int l, len = 0; strwalk( &z, p, "?&=" );  ) {
+			unsigned char *t = (unsigned char *)&p[ z.pos ];
 			if ( z.chr == '?' ) 
 				continue;
 			else if ( z.chr == '=' ) {
 				if ( !( b = init_record() ) ) {
-					fatal_error( en, ZHTTP_OUT_OF_MEMORY );
+					//fatal_error( en, ZHTTP_OUT_OF_MEMORY );
+					*err = ZHTTP_OUT_OF_MEMORY;
 					return NULL;
 				}
 				b->field = zhttp_copystr( t, z.size - 1 ); 
 			}
 			else {
 				if ( !b ) {
-					fatal_error( en, ZHTTP_INCOMPLETE_QUERYSTRING );
+					//fatal_error( en, ZHTTP_INCOMPLETE_QUERYSTRING );
+					*err = ZHTTP_INCOMPLETE_QUERYSTRING;
 					return NULL;
 				}
 				b->value = t; 
@@ -1093,11 +1101,11 @@ zhttpr_t ** http_get_query_strings ( zhttp_t *en, char *p, int plen ) {
 			}
 		}
 	}
-	return en->url = list;
+	return list;
 }
 
 //Store each of the headers
-zhttpr_t ** http_get_header_keyvalues ( zhttp_t *en, unsigned char **p, int *plen ) {
+zhttpr_t ** http_get_header_keyvalues ( unsigned char **p, int *plen, short *err ) {
 	int len = 0;
 	//int flen = strlen( en->path ) + strlen( en->method ) + strlen( en->protocol ) + 4;
 	const unsigned char chars[] = "\r\n";
@@ -1121,17 +1129,29 @@ zhttpr_t ** http_get_header_keyvalues ( zhttp_t *en, unsigned char **p, int *ple
 		if ( ( pos = memchrat( t, ':', z.size ) ) >= 0 ) { 
 			//Make a record for the new header line	
 			if ( !( b = init_record() ) ) {
-				fatal_error( en, ZHTTP_OUT_OF_MEMORY );
-				return 0;
+				//fatal_error( en, ZHTTP_OUT_OF_MEMORY );
+				*err = ZHTTP_OUT_OF_MEMORY;
+				return NULL;
 			}
 			b->field = zhttp_copystr( t, pos ); 
+			
+			//We need to trim the values on the other side
+		#if 1
+			t += ++pos;
+			int plen = 0; 
+			//unsigned char *a = httptrim( t, "\r\t ", z.size - pos, &plen );  
+			b->value = httptrim( t, "\r\t ", z.size - pos, &plen );
+			b->size = plen;
+		#else
 			b->value = ( t += pos + 2 ); 
 			b->size = ( z.size - pos - (( z.chr == '\r' ) ? 3 : 2 ) ); 
+		#endif
 			zhttp_add_item( &list, b, zhttpr_t *, &len );
 		}
 	}
 
-	return en->headers = list;
+	//return en->headers = list;
+	return list;
 }
 
 
@@ -1179,11 +1199,11 @@ zhttp_t * http_parse_header ( zhttp_t *en, int plen ) {
 	if ( !http_get_protocol( en, &p, &plen ) )
 		return fatal_error( en, ZHTTP_UNSUPPORTED_PROTOCOL );
 
-	if ( !( en->headers = http_get_header_keyvalues( en, &p, &plen ) ) )
+	if ( !( en->headers = http_get_header_keyvalues( &p, &plen, &(en->error) ) ) )
 		return fatal_error( en, ZHTTP_MALFORMED_HEADERS );
 
-	if ( en->expectsURL && !http_get_query_strings( en, en->path, strlen( en->path ) ) )
-		return fatal_error( en, ZHTTP_INCOMPLETE_QUERYSTRING );
+	if ( en->expectsURL && !( en->url = http_get_query_strings( en->path, strlen( en->path ), &(en->error) ) ) )
+		return fatal_error( en, en->error );
 
 	if ( !http_check_for_chunked_encoding( en, en->headers ) )
 		0; //return fatal_error( en, ZHTTP_INVALID_PORT );
@@ -1457,12 +1477,67 @@ zhttp_t * http_parse_response ( zhttp_t *en, char *err, int errlen ) {
 } 
 #endif
 
+#if 0
+static int http_get_expected_header_length ( zhttp_t *en ) {
+	return -1;
+}
+
+static int http_get_expected_content_length ( zhttp_t *en, HttpContentType rtype ) {
+	int length = 0;
+	zhttpr_t **body = en->body;
+
+	//Check for the proper method
+	for ( const char **method = zhttp_supported_methods2; *method; method++ ) {
+		if ( strcmp( *method, m ) == 0 ) {
+			for ( const char **imethod = zhttp_idempotent_methods2; *imethod; imethod++ ) {
+				if ( strcmp( *imethod, m ) == 0 ) {
+					en->idempotent = 1;	
+					break; 
+				}
+			}
+		}
+	}
+
+	//Return a negative content length in this case
+	if ( !en->idempotent ) {
+		return -1;
+	}
+
+	if ( !body || !( *body ) ) {
+		return -1;
+	}
+
+	//TODO: Catch each of these or use a static buffer and append ONE time per struct...
+	if ( rtype == ZHTTP_OTHER )
+		length = (*body)->size;
+	else if ( rtype == ZHTTP_URL_ENCODED ) {
+		for ( ; body && *body; body++ ) {
+			( *en->body != *body ) ? length ++ : 0;
+			length += strlen( (*body)->field ) + 1 + (*body)->size;
+		}
+	}
+	else {
+		//Handle multipart requests
+		int blen = strlen( en->boundary );
+		//Each block will contain a combination of the following characters
+		int clen = sizeof( "\r\n\"\r\n\r\n\r\n" ) + sizeof( cdisph ) + sizeof( cdispt ) + sizeof( nameh ) - 1;
+		for ( ; body && *body; body++ ) {
+			length += blen + clen + strlen( r->field ) + r->size;
+		}
+		//Account for the trailing final boundary which includes 2 dashes
+		length += blen + 2;
+	}
+	return length;
+}
+#endif
 
 
 //Finalize an HTTP request (really just returns a unsigned char, but this can handle it)
 zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 	unsigned char *msg = NULL, *hmsg = NULL;
 	HttpContentType rtype = ZHTTP_OTHER;
+	en->atype = ZHTTP_MESSAGE_MALLOC;
+	en->type = ZHTTP_IS_CLIENT;
 
 	char clen[ 32 ] = {0};
 	en->clen = 0, en->mlen = 0, en->hlen = 0;
@@ -1498,6 +1573,32 @@ zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 		}
 	}
 
+	//You can get the content-length without generating first
+	//#1 - Loop through and just add sizes
+	//#2 - Modify the content-length as you add body parts
+#if 0
+	int hlen = http_get_expected_header_length( en, rtype );
+	int clen = http_get_expected_content_length( en, rtype );
+
+	if ( en->idempotent && clen == -1 ) {
+		snprintf( err, errlen, "Invalid length for idempotent request." );
+		return NULL;
+	}
+
+	if ( ( clen + hlen + 4 ) < ZHTTP_PREAMBLE_SIZE )
+		en->msg = en->preamble, en->atype = ZHTTP_MESSAGE_STATIC;
+	else {
+		en->atype = ZHTTP_MESSAGE_STATIC;
+		if ( !( en->msg = malloc( clen + hlen + 4 ) ) || !memset( en->msg, 0, clen + hlen + 4 ) ) {
+			snprintf( err, errlen, "Couldn't allocate space for request message." );
+			return NULL;
+		}
+	}
+
+	//Do all the message creation stuff here...	
+	
+#else
+
 	//TODO: Catch each of these or use a static buffer and append ONE time per struct...
 	if ( !strcmp( en->method, "POST" ) || !strcmp( en->method, "PUT" ) ) {
 		//app/xwww is % encoded
@@ -1519,9 +1620,6 @@ zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 		}
 		else {
 			//Handle multipart requests
-			static const char cdisph[] = "Content-Disposition: " ;
-			static const char cdispt[] = "form-data;" ;
-			static const char nameh[] = "name=";
 			for ( zhttpr_t **body = en->body; body && *body; body++ ) {
 				zhttpr_t *r = *body;
 				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)en->boundary, strlen( en->boundary ) ); 
@@ -1592,6 +1690,7 @@ zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 	memcpy( &en->msg[0], hmsg, en->hlen ), en->mlen += en->hlen; 
 	memcpy( &en->msg[en->mlen], msg, en->clen ), en->mlen += en->clen; 
 	free( msg ), free( hmsg );
+#endif
 	return en;
 }
 

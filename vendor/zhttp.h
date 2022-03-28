@@ -335,6 +335,11 @@ unsigned char * zhttp_dupblk( const unsigned char *v, int vlen ) ;
 
 unsigned char *zhttp_append_to_uint8t ( unsigned char **, int *, unsigned char *, int );
 
+
+zhttpr_t ** http_get_header_keyvalues ( unsigned char **, int *, short * );
+zhttpr_t ** http_get_query_strings ( char *, int, short * );
+//zhttpr_t ** http_get_query_strings ( char *, int );
+
 //zhttp_t * http_parse_header( zhttp_t * );
 zhttp_t * http_parse_header ( zhttp_t *, int );
 
