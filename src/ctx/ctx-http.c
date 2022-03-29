@@ -83,7 +83,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 
 	//Get the time at the start
 	int total = 0, nsize, mult = 1, size = CTX_READ_SIZE; 
-	int hlen = 0, mlen = 0;
+	int hlen = 0, mlen = 0, bsize = ZHTTP_PREAMBLE_SIZE;
 	struct timespec timer = {0};
 	unsigned char *x = NULL, *xp = NULL;
 	clock_gettime( CLOCK_REALTIME, &timer );	
@@ -101,7 +101,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 #endif
 
 	//Read whatever the server sends and read until complete.
-	for ( int rd, recvd = -1, bsize = ZHTTP_PREAMBLE_SIZE; recvd < 0;  ) {
+	for ( int rd, recvd = -1; recvd < 0 || bsize <= 0;  ) {
 		if ( ( rd = recv( fd, x, bsize, MSG_DONTWAIT ) ) == 0 ) {
 			conn->count = -2; //most likely resources are unavailable
 			return 0;		
@@ -138,6 +138,12 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 				, bsize, total, recvd );
 		#endif
 		}
+	}
+
+	//Stop if the header was just too big
+	if ( bsize <= 0 ) {
+		conn->count = -3;
+		return http_set_error( rs, 500, "Header too large" ); 
 	}
 
 	//This should probably be a while loop
