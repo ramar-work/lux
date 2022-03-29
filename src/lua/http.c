@@ -1574,7 +1574,7 @@ int http_request ( lua_State *L ) {
 	}
 
 	lua_settable( L, 1 );
-	//http_free_body( &qhttp ), http_free_body( &rhttp );	
+	http_free_body( &qhttp ), http_free_body( &rhttp );	
 	return 1;
 }
 

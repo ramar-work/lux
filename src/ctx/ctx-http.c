@@ -146,15 +146,13 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 		return http_set_error( rs, 500, (char *)rq->errmsg ); 
 	}
 
-	//If the message is not idempotent, stop and return.
-	//print_httpbody( rq );
-
 #if 0
 	//Dump a message
 	fprintf( stderr, "MESSAGE SO FAR:\n" );
 	write( 2, rq->preamble, total );
 #endif
 
+	//If the message is not idempotent, stop and return.
 	if ( !rq->idempotent ) {
 		//rq->atype = ZHTTP_MESSAGE_STATIC;
 		FPRINTF( "Read complete.\n" );
@@ -169,8 +167,8 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 
 	//Check to see if we've fully received the message
 	if ( total == ( hlen + BHSIZE + rq->clen ) ) {
-		rq->msg = rq->preamble + ( hlen + BHSIZE );
-		if ( !http_parse_content( rq, rq->msg, rq->clen ) ) {
+		rq->msg = &rq->preamble[ ( hlen + BHSIZE ) ];
+		if ( rq->clen && !http_parse_content( rq, rq->msg, rq->clen ) ) {
 			conn->count = -3;
 			return http_set_error( rs, 500, (char *)rq->errmsg ); 
 		}

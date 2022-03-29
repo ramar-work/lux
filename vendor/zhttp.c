@@ -1603,9 +1603,13 @@ zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 	if ( !strcmp( en->method, "POST" ) || !strcmp( en->method, "PUT" ) ) {
 		//app/xwww is % encoded
 		if ( rtype == ZHTTP_OTHER ) {
-			//Assumes JSON or a single file or something
-			zhttpr_t **body = en->body;
-			zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)(*body)->value, (*body)->size ); 
+			if ( !en->body ) 
+				en->clen = 0;	
+			else {
+				//Assumes JSON or a single file or something
+				zhttpr_t **body = en->body;
+				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)(*body)->value, (*body)->size ); 
+			}
 		}
 		else if ( rtype == ZHTTP_URL_ENCODED ) {
 			for ( zhttpr_t **body = en->body; body && *body; body++ ) {
