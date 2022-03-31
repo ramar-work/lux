@@ -83,30 +83,21 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 
 	//Get the time at the start
 	int total = 0, nsize, mult = 1, size = CTX_READ_SIZE; 
-	int hlen = 0, mlen = 0, bsize = ZHTTP_PREAMBLE_SIZE;
+	int hlen = -1, mlen = 0, bsize = ZHTTP_PREAMBLE_SIZE;
 	struct timespec timer = {0};
 	unsigned char *x = NULL, *xp = NULL;
 	clock_gettime( CLOCK_REALTIME, &timer );	
 
-#if 1
 	//Set another pointer for just the headers
 	memset( x = rq->preamble, 0, ZHTTP_PREAMBLE_SIZE );
-#else
-	//Allocate space for the first call
-	if ( !( rq->msg = malloc( size ) ) || !memset( rq->msg, 0, size ) )
-		return http_set_error( rs, 500, "Could not allocate initial read buffer." ); 
-
-	if ( !memset( x = rq->msg, 0, size ) )
-		return 0;
-#endif
 
 	//Read whatever the server sends and read until complete.
 	for ( int rd, recvd = -1; recvd < 0 || bsize <= 0;  ) {
-		if ( ( rd = recv( fd, x, bsize, MSG_DONTWAIT ) ) == 0 ) {
+		rd = recv( fd, x, bsize, MSG_DONTWAIT ); 
+		if ( rd == 0 ) {
 			conn->count = -2; //most likely resources are unavailable
 			return 0;		
-		}
-		else if ( rd < 1 ) {
+		} else if ( rd < 1 ) {
 			struct timespec n = {0};
 			clock_gettime( CLOCK_REALTIME, &n );
 			if ( errno != EAGAIN && errno != EWOULDBLOCK ) {
@@ -127,7 +118,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 		else {
 			FPRINTF( "Received %d additional header bytes on fd %d\n", rd, fd ); 
 			bsize -= rd, total += rd, x += rd;
-			recvd = http_header_received( rq->preamble, total );
+			recvd = http_header_received( rq->preamble, total ); 
 			hlen = recvd; //rq->mlen = total;
 		#if 0
 			//rq->hlen = total - 4;
@@ -140,8 +131,15 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 		}
 	}
 
+#if 0
+	//Dump a message
+	fprintf( stderr, "MESSAGE SO FAR:\n" );
+	fprintf( stderr, "HEADER LENGTH %d\n", hlen );
+	write( 2, rq->preamble, total );
+#endif
+
 	//Stop if the header was just too big
-	if ( bsize <= 0 ) {
+	if ( hlen == -1 ) {
 		conn->count = -3;
 		return http_set_error( rs, 500, "Header too large" ); 
 	}
@@ -152,18 +150,15 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 		return http_set_error( rs, 500, (char *)rq->errmsg ); 
 	}
 
-#if 0
-	//Dump a message
-	fprintf( stderr, "MESSAGE SO FAR:\n" );
-	write( 2, rq->preamble, total );
-#endif
-
 	//If the message is not idempotent, stop and return.
+	//print_httpbody( rq );
 	if ( !rq->idempotent ) {
 		//rq->atype = ZHTTP_MESSAGE_STATIC;
 		FPRINTF( "Read complete.\n" );
 		return 1;
 	}
+
+	//write( 2, rq->preamble, total );
 
 #if 0
 	fprintf( stderr, "%d ?= %d\n", rq->mlen, rq->hlen + 4 + rq->clen );
@@ -173,11 +168,12 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 
 	//Check to see if we've fully received the message
 	if ( total == ( hlen + BHSIZE + rq->clen ) ) {
-		rq->msg = &rq->preamble[ ( hlen + BHSIZE ) ];
-		if ( rq->clen && !http_parse_content( rq, rq->msg, rq->clen ) ) {
+		rq->msg = rq->preamble + ( hlen + BHSIZE );
+		if ( !http_parse_content( rq, rq->msg, rq->clen ) ) {
 			conn->count = -3;
 			return http_set_error( rs, 500, (char *)rq->errmsg ); 
 		}
+		print_httpbody( rq );
 		FPRINTF( "Read complete.\n" );
 		return 1;
 	}
