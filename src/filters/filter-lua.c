@@ -625,48 +625,29 @@ static int init_lua_routes ( struct luadata_t *l ) {
 //Initialize HTTP in Lua
 static int init_lua_request ( struct luadata_t *l ) {
 	//Loop through all things
-	const char *str[] = { "headers", "url", "body" };
+	const char *str[] = { "headers", "url" };
 	struct HTTPRecord **ii[] = { l->req->headers, l->req->url, l->req->body };
 
 	//Add one table for all structures
 	lua_newtable( l->state );
 
 	//Add general request info
-	lua_pushstring( l->state, "path" );
-	lua_pushstring( l->state, l->req->path );
-	lua_settable( l->state, 1 );
-
-	lua_pushstring( l->state, "method" );
-	lua_pushstring( l->state, l->req->method );
-	lua_settable( l->state, 1 );
-
-	lua_pushstring( l->state, "protocol" );
-	lua_pushstring( l->state, l->req->protocol );
-	lua_settable( l->state, 1 );
-
-	lua_pushstring( l->state, "host" );
-	lua_pushstring( l->state, l->req->host );
-	lua_settable( l->state, 1 );
-
-	lua_pushstring( l->state, "ctype" );
-	lua_pushstring( l->state, l->req->ctype );
-	lua_settable( l->state, 1 );
+	lua_setstrstr( l->state, "path", l->req->path, 1 );
+	lua_setstrstr( l->state, "method", l->req->method, 1 );
+	lua_setstrstr( l->state, "protocol", l->req->protocol, 1 );
+	lua_setstrstr( l->state, "host", l->req->host, 1 );
+	lua_setstrstr( l->state, "ctype", l->req->ctype, 1 );
 
 	//If the method is NOT idempotent, don't bother with content-length
-	if ( l->req->idempotent ) {
-		lua_pushstring( l->state, "clength" );
-		lua_pushinteger( l->state, l->req->clen );
-		lua_settable( l->state, 1 );
-	}
+	if ( l->req->idempotent )
+		lua_setstrint( l->state, "clength", l->req->clen, 1 );
 
 	//Add simple keys for headers and URL
-	for ( int pos=3, i = 0; i < 3; i++ ) {
+	for ( int pos=3, i = 0; i < 2; i++ ) {
 		struct HTTPRecord **r = ii[i];
 		if ( r && *r ) {
 			lua_pushstring( l->state, str[i] ), lua_newtable( l->state );
 			for ( ; r && *r; r++ ) {
-
-				//This needs to be looked at more
 				if ( strcmp( "Cookie", (*r)->field ) != 0 )
 					lua_pushstring( l->state, (*r)->field );
 				else {	
@@ -677,15 +658,8 @@ static int init_lua_request ( struct luadata_t *l ) {
 
 				//Add the lower case version of whatever the header title may be
 				lua_newtable( l->state );
-			#if 1
-				//This first run pushes the original values into the table
-				lua_pushstring( l->state, "value" ); 
-				lua_pushlstring( l->state, ( char * )(*r)->value, (*r)->size );
-				lua_settable( l->state, pos + 2 ); 	
-				lua_pushstring( l->state, "size" ); 
-				lua_pushinteger( l->state, (*r)->size );
-				lua_settable( l->state, pos + 2 ); 	
-			#endif
+				lua_setstrbin( l->state, "value", ( char * )(*r)->value, (*r)->size, pos + 2 );
+				lua_setstrint( l->state, "size", (*r)->size, pos + 2 );
 
 				//For now, we only need to worry with authentication and cookies
 				if ( strcmp( "cookie", (*r)->field ) == 0 ) {
@@ -722,19 +696,36 @@ static int init_lua_request ( struct luadata_t *l ) {
 						}
 					}
 				}
-				#if 0
-				//Set a count
-				lua_pushstring( l->state, "count" );
-				lua_pushnumber( l->state, count );
-				lua_settable( l->state, pos + 2 );
-				#endif
-		
-				//Finalize the table
 				lua_settable( l->state, pos );
 			}
 			lua_settable( l->state, 1 );
 		}
 	}
+
+	//We gotta do the body now	
+	struct HTTPRecord **b; 
+	if ( ( b = l->req->body ) ) {
+		lua_pushstring( l->state, "body" ), lua_newtable( l->state );
+		if ( l->req->formtype == ZHTTP_OTHER ) {
+			lua_setstrbin( l->state, "value", (*b)->value, (*b)->size, 3 );
+			lua_setstrint( l->state, "size", (*b)->size, 3 );
+		}
+		else {
+			for ( ; b && *b; b++ ) {
+				lua_pushstring( l->state, (*b)->field );
+				lua_newtable( l->state );
+				lua_setstrbin( l->state, "value", (*b)->value, (*b)->size, 5 );
+				lua_setstrint( l->state, "size", (*b)->size, 5 );
+			#if 0
+				//Content-disposition
+				//Filename?
+				//Any other fields?
+			#endif
+				lua_settable( l->state, 3 );
+			} 
+		}
+		lua_settable( l->state, 1 );			
+	}	
 
 	//Set global name
 	return 1;
@@ -1014,6 +1005,8 @@ int has_views( struct imvc_t **list ) {
 
 //The entry point for a Lua application
 const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
+
+	FPRINTF( "Proc started\n" );
 
 	//Define variables and error positions...
 	ztable_t zc = {0}, zm = {0};

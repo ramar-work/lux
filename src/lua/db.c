@@ -163,7 +163,14 @@ int db_exec ( lua_State *L ) {
 			}
 
 			if ( kv->value.type == ZTABLE_TXT ) {
-				tv->value = zhttp_dupstr( kv->value.v.vchar ), tv->len = strlen( kv->value.v.vchar );
+				if ( !kv->value.v.vchar ) {
+					tv->value = zhttp_dupstr( "" ); 
+					tv->len = 0;
+				}
+				else {
+					tv->value = zhttp_dupstr( kv->value.v.vchar ); 
+					tv->len = strlen( kv->value.v.vchar );
+				}
 			}
 			else if ( kv->value.type == ZTABLE_INT ) {
 				char buf[ 64 ] = { 0 };
