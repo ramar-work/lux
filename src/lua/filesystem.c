@@ -411,6 +411,39 @@ int fs_list ( lua_State *L ) {
 }
 
 
+
+int fs_mkdir ( lua_State *L ) {
+	const char *dir = NULL, *mode = NULL; 
+	char pathbuf[ PATH_MAX ];
+
+	//Check for a string argument
+	luaL_checktype( L, 1, LUA_TSTRING );
+	if ( !( dir = lua_tostring( L, 1 ) ) ) {
+		return luaL_error( L, "Directory cannot be an empty string or nil" );
+	}
+
+#if 0
+	//Mode as a string is probably simplest...
+	//Block characters that don't match rw or x and 
+	//Number is not bad either, but you'll have to break it up...
+#endif
+
+	//Seems like this should never happen
+	if ( !sw_path( L, dir, pathbuf, sizeof( pathbuf ) ) ) {
+		return luaL_error( L, "Could not find shadow directory" );
+	}
+
+	//TODO: Fix this so that not everybody can read it...
+	if ( mkdir( pathbuf, 0777 ) == -1 ) {
+		return luaL_error( L, "Could not create directory: %s: %s", dir, strerror( errno ) );
+	}
+
+	lua_pushboolean( L, 1 );
+	return 1;
+}
+
+
+
 #if 0
 int fs_open ( lua_State *L ) {
 	luaL_checktype( L, 1, LUA_TSTRING );
@@ -418,7 +451,9 @@ int fs_open ( lua_State *L ) {
 }
 
 
-int fs_close ( lua_State *L ) {
+
+
+int fs_remove ( lua_State *L ) {
 	luaL_checktype( L, 1, LUA_TSTRING );
 	return 0;
 }
@@ -432,8 +467,8 @@ struct luaL_Reg fs_set[] = {
 ,	{ "exists", fs_exists }
 ,	{ "pwd", fs_pwd }
 ,	{ "list", fs_list }
-#if 0
 ,	{ "mkdir", fs_mkdir }
+#if 0
 ,	{ "rmdir", fs_rmdir }
 ,	{ "delete", fs_remove }
 #endif
