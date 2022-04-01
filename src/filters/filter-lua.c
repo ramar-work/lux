@@ -553,8 +553,12 @@ static void dump_records( struct HTTPRecord **r ) {
 
 
 static char * getpath( char *rpath, char *apath, int plen ) {
-	if ( plen < strlen( rpath ) ) return NULL;
-	for ( char *p = apath, *path = rpath; *path && *path != '?'; ) *(p++) = *(path++);
+	if ( plen < strlen( rpath ) )
+		return NULL;
+	
+	for ( char *p = apath, *path = rpath; *path && *path != '?'; ) 
+		*(p++) = *(path++);
+
 	return apath;
 }
 
@@ -636,7 +640,13 @@ static int init_lua_request ( struct luadata_t *l ) {
 	lua_setstrstr( l->state, "method", l->req->method, 1 );
 	lua_setstrstr( l->state, "protocol", l->req->protocol, 1 );
 	lua_setstrstr( l->state, "host", l->req->host, 1 );
-	lua_setstrstr( l->state, "ctype", l->req->ctype, 1 );
+
+	//In some cases browsers omit the content-type
+	if ( !strcmp( l->req->method, "GET" ) && !strcmp( l->req->ctype, "application/octet-stream" ) ) 
+		lua_setstrstr( l->state, "ctype", "text/html", 1 );
+	else {
+		lua_setstrstr( l->state, "ctype", l->req->ctype, 1 );
+	}
 
 	//If the method is NOT idempotent, don't bother with content-length
 	if ( l->req->idempotent )

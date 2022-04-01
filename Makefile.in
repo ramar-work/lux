@@ -196,7 +196,8 @@ vendor/libssl.a vendor/libcrypto.a &:
 
 # vendor/liblua.a - Build Lua 5.4.3
 vendor/liblua.a: 
-	-@cd vendor/ && tar xzf lua-5.4.3.tar.gz && cd lua-5.4.3 && make && mv src/liblua.a ../
+	-@cd vendor/ && tar xzf lua-5.4.3.tar.gz && \
+		cd lua-5.4.3 && make MYCFLAGS="-fPIC" && mv src/liblua.a ../
 
 #	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
 #	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 

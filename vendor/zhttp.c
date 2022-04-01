@@ -983,8 +983,6 @@ char * http_get_protocol ( zhttp_t *en, unsigned char **p, int *plen ) {
 }
 
 
-
-
 int http_get_content_length ( zhttpr_t **list ) {
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
 		if ( strcmp( (*slist)->field, "Content-Length" ) == 0 ) {
@@ -1039,7 +1037,7 @@ char * http_get_boundary ( zhttpr_t **list ) {
 }
 
 
-char * http_get_host ( zhttp_t *en, zhttpr_t **list ) {
+char * http_get_host ( zhttp_t *en, zhttpr_t **list, int *p ) {
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
 		if ( strcmp( (*slist)->field, "Host" ) == 0 ) {
 			int s = (*slist)->size;
@@ -1047,7 +1045,7 @@ char * http_get_host ( zhttp_t *en, zhttpr_t **list ) {
 			for ( ; *v != '\r' && *v != ':' ; v++, s-- ) ;
 			if ( *v == '\r' ) {
 				*v = '\0', v++;
-				return en->host = (char *)(*slist)->value;
+				return (char *)(*slist)->value;
 			}
 			else {
 				int port = 0;
@@ -1055,11 +1053,11 @@ char * http_get_host ( zhttp_t *en, zhttpr_t **list ) {
 				*v = '\0', v++, s--;
 				memset( pb, 0, sizeof( pb ) ), memcpy( pb, v, s );
 				if ( !zhttp_satoi( pb, &port ) || port < 1 || port > 65535 ) {
-					en->port = -1;
+					*p = -1;
 					return NULL;
 				}
-				en->port = port, en->host = (char *)(*slist)->value;
-				return en->host; 
+				*p = port;
+				return (char *)(*slist)->value;
 			}
 		}
 	}
@@ -1083,7 +1081,6 @@ zhttpr_t ** http_get_query_strings ( char *p, int plen, short *err ) {
 				continue;
 			else if ( z.chr == '=' ) {
 				if ( !( b = init_record() ) ) {
-					//fatal_error( en, ZHTTP_OUT_OF_MEMORY );
 					*err = ZHTTP_OUT_OF_MEMORY;
 					return NULL;
 				}
@@ -1091,7 +1088,6 @@ zhttpr_t ** http_get_query_strings ( char *p, int plen, short *err ) {
 			}
 			else {
 				if ( !b ) {
-					//fatal_error( en, ZHTTP_INCOMPLETE_QUERYSTRING );
 					*err = ZHTTP_INCOMPLETE_QUERYSTRING;
 					return NULL;
 				}
@@ -1189,7 +1185,7 @@ zhttp_t * http_parse_header ( zhttp_t *en, int plen ) {
 
 	if ( plen < 1 )
 		return fatal_error( en, ZHTTP_HEADER_LENGTH_UNSET );
-
+#if 1
 	if ( !http_get_method( en, &p, &plen ) )
 		return fatal_error( en, ZHTTP_UNSUPPORTED_METHOD );
 
@@ -1199,29 +1195,50 @@ zhttp_t * http_parse_header ( zhttp_t *en, int plen ) {
 	//TODO: Handle blank vs invalid?
 	if ( !http_get_protocol( en, &p, &plen ) )
 		return fatal_error( en, ZHTTP_UNSUPPORTED_PROTOCOL );
+#else
+	if ( !( en->method = http_get_method( &p, &plen, &en->idempotent ) ) )
+		return fatal_error( en, ZHTTP_UNSUPPORTED_METHOD );
 
+	if ( !( en->path = http_get_path( &p, &plen, &en->expectsURL ) ) )
+		return fatal_error( en, ZHTTP_BAD_PATH );
+
+	//TODO: Handle blank vs invalid?
+	if ( !( en->protocol = http_get_protocol( &p, &plen ) ) )
+		return fatal_error( en, ZHTTP_UNSUPPORTED_PROTOCOL );
+#endif
+
+#if 1
 	if ( !( en->headers = http_get_header_keyvalues( &p, &plen, &(en->error) ) ) )
 		return fatal_error( en, ZHTTP_MALFORMED_HEADERS );
+#else
+	if ( !( en->headers = http_get_header_keyvalues( &p, &plen ) ) )
+		return fatal_error( en, ZHTTP_MALFORMED_HEADERS );
+#endif
 
+#if 1
 	if ( en->expectsURL && !( en->url = http_get_query_strings( en->path, strlen( en->path ), &(en->error) ) ) )
 		return fatal_error( en, en->error );
+#else
+	if ( en->expectsURL && !( en->url = http_get_query_strings( en->path, strlen( en->path ) ) ) )
+		return fatal_error( en, en->error );
+#endif
 
 	if ( !http_check_for_chunked_encoding( en, en->headers ) )
 		0; //return fatal_error( en, ZHTTP_INVALID_PORT );
 
-	if ( !http_get_host( en, en->headers ) && en->port == -1 )
+	if ( !( en->host = http_get_host( en, en->headers, &en->port ) ) && en->port == -1 )
 		return fatal_error( en, ZHTTP_INVALID_PORT );
+
+	if ( !( en->ctype = http_get_content_type( en->headers, &en->formtype ) ) )
+		return fatal_error( en, ZHTTP_UNSPECIFIED_CONTENT_TYPE );
 
 	if ( en->idempotent && ( en->clen = http_get_content_length( en->headers ) ) == -1 )
 		return fatal_error( en, ZHTTP_INVALID_CONTENT_LENGTH );
 
-	if ( en->idempotent && !( en->ctype = http_get_content_type( en->headers, &en->formtype ) ) )
-		return fatal_error( en, ZHTTP_UNSPECIFIED_CONTENT_TYPE );
-
 	if ( en->formtype == ZHTTP_MULTIPART && !( en->boundary = http_get_boundary( en->headers ) ) )
 		return fatal_error( en, ZHTTP_UNSPECIFIED_MULTIPART_BOUNDARY );
 
-	return en;	
+	return en;
 }
 
 
