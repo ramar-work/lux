@@ -1323,42 +1323,38 @@ zhttpr_t ** http_parse_multipart_form ( unsigned char *p, int clen, char *bnd ) 
 	snprintf( boundary, 64, "--%s", bnd );
 	blen = strlen( boundary );
 
-	for ( int pp = 0; ( pp = memblkat( p, boundary, len1, blen ) ) > -1; ) {
-		int len2 = pp, inner = 0, count = 0;
-		unsigned char *i = p;
-	#if 0 
-		fprintf( stderr, "START POINT======== len: %d \n", len2 ); 
-		write( 2, i, len2 );  getchar();
-	#endif
+	for ( int cpos, len2, pp = 0; ( len2 = pp = memblkat( p, boundary, len1, blen ) ) > -1; ) {
 		if ( len2 > 0 ) {	
-			zhttpr_t *b = init_record();
-			b->type = ZHTTP_MULTIPART;
-			i += blen + 1, len2 -= blen - 1;
+			unsigned char *i = p;
+			i += blen + 2, len2 -= blen;
 
-			//Boundary was found, so we need to move up again
-			while ( ( inner = memblkat( i, "\r\n", len2, 2 ) ) > -1 ) {
-			#if 0
-				write( 2, i, inner ); 
-				fprintf( stderr, "count: %d, inner: %d\n", count, inner ); getchar();
-			#endif
-				if ( inner == 1 ) 
-					; //skip me
-				else if ( count > 1 )
-					b->size = inner - 1, b->value = i + 1;
-				else if ( count == 1 )
-					b->ctype = zhttp_msg_get_value( "Content-Type: ", "\r", i, inner );
-				else if ( count == 0 ) {
-					b->disposition = 
-						zhttp_msg_get_value( "Content-Disposition: ", ";", i, inner + 1 );
-					b->field = zhttp_msg_get_value( "name=\"", "\"", i, inner + 1 );
-					if ( memblkat( i, "filename=", inner, 9 ) > -1 ) {
-						b->filename = zhttp_msg_get_value( "filename=\"", "\"", i, inner - 1 );
-					}
+			//Find the content within the multipart block
+			if ( ( cpos = memblkat( i, "\r\n\r\n", len2, 4 ) ) > -1 ) {
+				zhttpr_t *b = init_record();
+				b->type = ZHTTP_MULTIPART;
+				unsigned char *h = i;
+				int hsize = cpos;
+				cpos += 4, i += cpos, len2 -= cpos + 4;
+
+				//Set the body first
+				b->value = i, b->size = len2;
+
+				//Then set the field name and preamble, etc
+				b->ctype = zhttp_msg_get_value( "Content-Type: ", "\r", h, hsize );
+				b->disposition = zhttp_msg_get_value( "Content-Disposition: ", ";", h, hsize );
+				b->field = zhttp_msg_get_value( "name=\"", "\"", h, hsize );
+				if ( memblkat( h, "filename=", hsize, 9 ) > -1 ) {
+					b->filename = zhttp_msg_get_value( "filename=\"", "\"", h, hsize );
 				}
-				++inner, len2 -= inner, i += inner, count++;
+
+				//Add it to the body set if we found a valid key
+				if ( !b->field ) 
+					free( b );	
+				else {
+					zhttp_add_item( &list, b, zhttpr_t *, &len );
+					b = NULL;
+				}
 			}
-			zhttp_add_item( &list, b, zhttpr_t *, &len );
-			b = NULL;
 		}
 		++pp, len1 -= pp, p += pp;	
 	}

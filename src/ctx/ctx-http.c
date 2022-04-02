@@ -95,8 +95,8 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	for ( int rd, recvd = -1; recvd < 0 || bsize <= 0;  ) {
 		rd = recv( fd, x, bsize, MSG_DONTWAIT ); 
 		if ( rd == 0 ) {
-			conn->count = -2; //most likely resources are unavailable
-			return 0;		
+			//conn->count = -2; //most likely resources are unavailable
+			break;		
 		} else if ( rd < 1 ) {
 			struct timespec n = {0};
 			clock_gettime( CLOCK_REALTIME, &n );
@@ -120,6 +120,11 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 			bsize -= rd, total += rd, x += rd;
 			recvd = http_header_received( rq->preamble, total ); 
 			hlen = recvd; //rq->mlen = total;
+			if ( recvd == ZHTTP_PREAMBLE_SIZE ) {
+				
+				FPRINTF( "At end of buffer...\n" );
+				break;	
+			}	
 		#if 0
 			//rq->hlen = total - 4;
 			FPRINTF( 
@@ -131,7 +136,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 		}
 	}
 
-#if 0
+#if 1
 	//Dump a message
 	fprintf( stderr, "MESSAGE SO FAR:\n" );
 	fprintf( stderr, "HEADER LENGTH %d\n", hlen );
@@ -158,12 +163,15 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 		return 1;
 	}
 
-	//write( 2, rq->preamble, total );
-
 #if 0
 	fprintf( stderr, "%d ?= %d\n", rq->mlen, rq->hlen + 4 + rq->clen );
 	conn->count = -3;
 	return http_set_error( rs, 200, "OK" ); 
+#endif
+#if 1
+	write( 2, rq->preamble, total );
+	write( 2, "\n", 1 );
+	write( 2, "\n", 1 );
 #endif
 
 	//Check to see if we've fully received the message
@@ -173,7 +181,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 			conn->count = -3;
 			return http_set_error( rs, 500, (char *)rq->errmsg ); 
 		}
-		print_httpbody( rq );
+		//print_httpbody( rq );
 		FPRINTF( "Read complete.\n" );
 		return 1;
 	}
@@ -260,6 +268,13 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 			clock_gettime( CLOCK_REALTIME, &timer );	
 		}
 	}
+
+#if 0
+	FPRINTF( "MESSAGE CONTENTS\n" );
+	write( 2, rq->msg, crecvd );
+	write( 2, "\n", 1 );
+	write( 2, "\n", 1 );
+#endif
 
 	//Finally, process the body (chunked may still need something fancy)
 	if ( !http_parse_content( rq, rq->msg, rq->clen ) ) {

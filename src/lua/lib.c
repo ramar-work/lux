@@ -37,9 +37,7 @@ struct lua_fset functions[] = {
 , { "db", db_set }
 , { "json", json_set }
 , { "enc", enc_set }
-#if 0
 , { "dec", dec_set }
-#endif
 ,	{ NULL }
 };
 
