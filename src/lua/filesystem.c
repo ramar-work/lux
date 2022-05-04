@@ -120,10 +120,11 @@ int fs_read ( lua_State *L ) {
 	char pathbuf[ PATH_MAX ];
 	const char *funct = "fs.read", *filename = lua_tostring( L, 1 );
 	unsigned char *rb = NULL;
+	zTable * ct = NULL;
 
 	//Seems like this should never happen
 	if ( !sw_path( L, filename, pathbuf, sizeof(pathbuf) ) ) {
-		return luaL_error( L, "Could not find shadow directory" );
+		return luaL_error( L, "%s: Could not find shadow directory", __func__ );
 	}
 
 	//Do a stat and compare against a decent size
@@ -134,8 +135,7 @@ int fs_read ( lua_State *L ) {
 
 	//Pop and get limits, etc
 	lua_pop( L, 1 );
-	zTable * ct = get_config_limits( L );	
-	if ( !ct )
+	if ( !( ct =  get_config_limits( L ) ) )
 		rlimit = 100000;
 	else {
 		int i = lt_geti( ct, "readlimit" );
@@ -150,7 +150,7 @@ int fs_read ( lua_State *L ) {
 	//Read a file if the sizes are right
 	if ( sb.st_size > rlimit ) {
 		//free( fspath );
-		return luaL_error( L, "Could not find shadow directory" );
+		return luaL_error( L, "Size of file at %s (%d bytes) exceeds read limit %d", pathbuf, sb.st_size, rlimit );
 	}
 
 	if ( ( fd = open( pathbuf, O_RDONLY ) ) == -1 ) {

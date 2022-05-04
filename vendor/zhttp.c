@@ -89,6 +89,21 @@ static const char *zhttp_supported_protocols2[] = {
 , NULL
 };
 
+
+static const char *zhttp_content_type_id[] = { 
+	"Content-Type"
+, "content-type"
+, "Content-type"
+, NULL 
+};
+
+static const char *zhttp_content_length_id[] = { 
+	"Content-Length"
+, "content-length"
+, "Content-length"
+, NULL 
+};
+
 static const char base[] = { 
 	['0'] = 0
 ,	['1'] = 1
@@ -985,16 +1000,18 @@ char * http_get_protocol ( zhttp_t *en, unsigned char **p, int *plen ) {
 
 int http_get_content_length ( zhttpr_t **list ) {
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
-		if ( strcmp( (*slist)->field, "Content-Length" ) == 0 ) {
-			char clenbuf[64];
-			int clen;
+		for ( const char **id = zhttp_content_length_id; *id; id++ ) { 
+			if ( strcmp( (*slist)->field, *id ) == 0 ) {
+				char clenbuf[64];
+				int clen;
 
-			memset( clenbuf, 0, sizeof( clenbuf ) ), memcpy( clenbuf, (*slist)->value, (*slist)->size );
+				memset( clenbuf, 0, sizeof( clenbuf ) ), memcpy( clenbuf, (*slist)->value, (*slist)->size );
 
-			if ( zhttp_satoi( clenbuf, &clen ) )
-				return ( clen < 0 ) ? -1 : clen;
-			else {
-				return -1;
+				if ( zhttp_satoi( clenbuf, &clen ) )
+					return ( clen < 0 ) ? -1 : clen;
+				else {
+					return -1;
+				}
 			}
 		}
 	}
@@ -1004,18 +1021,20 @@ int http_get_content_length ( zhttpr_t **list ) {
 
 char * http_get_content_type ( zhttpr_t **list, HttpContentType *type ) {
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
-		if ( strcmp( (*slist)->field, "Content-Type" ) == 0 ) {
-			//This is a long-winded way to nul-terminate a block 
-			for ( unsigned char *v = (*slist)->value; ( *v != '\r' && *v != ';' ) || ( *v = '\0' ); v++ );
-			char *ctype = (char *)(*slist)->value;
-			if ( strcmp( ctype, zhttp_multipart ) == 0 )
-				*type = ZHTTP_MULTIPART;
-			else if ( strcmp( ctype, zhttp_url_encoded ) == 0 )
-				*type = ZHTTP_URL_ENCODED;
-			else {
-				*type = ZHTTP_OTHER;
+		for ( const char **id = zhttp_content_type_id; *id; id++ ) { 
+			if ( strcmp( (*slist)->field, *id ) == 0 ) {
+				//This is a long-winded way to nul-terminate a block 
+				for ( unsigned char *v = (*slist)->value; ( *v != '\r' && *v != ';' ) || ( *v = '\0' ); v++ );
+				char *ctype = (char *)(*slist)->value;
+				if ( strcmp( ctype, zhttp_multipart ) == 0 )
+					*type = ZHTTP_MULTIPART;
+				else if ( strcmp( ctype, zhttp_url_encoded ) == 0 )
+					*type = ZHTTP_URL_ENCODED;
+				else {
+					*type = ZHTTP_OTHER;
+				}
+				return ctype;
 			}
-			return ctype;
 		}
 	}
 
@@ -1232,7 +1251,7 @@ zhttp_t * http_parse_header ( zhttp_t *en, int plen ) {
 	if ( !( en->ctype = http_get_content_type( en->headers, &en->formtype ) ) )
 		return fatal_error( en, ZHTTP_UNSPECIFIED_CONTENT_TYPE );
 
-	if ( en->idempotent && ( en->clen = http_get_content_length( en->headers ) ) == -1 )
+	if ( en->idempotent && ( en->clen = http_get_content_length( en->headers ) ) < 0 )
 		return fatal_error( en, ZHTTP_INVALID_CONTENT_LENGTH );
 
 	if ( en->formtype == ZHTTP_MULTIPART && !( en->boundary = http_get_boundary( en->headers ) ) )
@@ -1964,6 +1983,12 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 	ZHTTP_PRINTF( fb, "r->protocol: '%s'\n", r->protocol );
 	ZHTTP_PRINTF( fb, "r->host: '%s'\n", r->host );
 	ZHTTP_PRINTF( fb, "r->boundary: '%s'\n", r->boundary );
+	ZHTTP_PRINTF( fb, "r->port: %d\n", r->port );
+
+	ZHTTP_PRINTF( fb, "r->idempotent: '%d'\n", r->idempotent );
+	ZHTTP_PRINTF( fb, "r->chunked: '%d'\n", r->chunked );
+	ZHTTP_PRINTF( fb, "r->svctype: '%s'\n", !r->type ? "client" : "server" );
+	ZHTTP_PRINTF( fb, "r->formtype: '%s'\n", print_formtype( r->formtype ) );
 
 	switch ( r->atype ) {
 		case ZHTTP_MESSAGE_STATIC:
@@ -1979,6 +2004,23 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 			ZHTTP_PRINTF( fb, "Message allocation type: '%s'\n", "other" );
 			break;	
 	}
+
+#if 0
+	switch ( r->formtype ) {
+		case ZHTTP_NO_CONTENT:
+			ZHTTP_PRINTF( fb, "Form type: '%s'\n", "other" );
+			break;	
+		case ZHTTP_URL_ENCODED:
+			ZHTTP_PRINTF( fb, "Form type: '%s'\n", "other" );
+			break;	
+		case ZHTTP_MULTIPART:
+			ZHTTP_PRINTF( fb, "Form type: '%s'\n", "other" );
+			break;	
+		case ZHTTP_OTHER:
+			ZHTTP_PRINTF( fb, "Form type: '%s'\n", "other" );
+			break;	
+	}
+#endif
 
 	//Print out headers and more
 	const char *names[] = { "r->headers", "r->url", "r->body" };

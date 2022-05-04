@@ -90,9 +90,10 @@ int lua_to_ztable ( lua_State *, int, zTable * ) ;
 int lua_exec_file( lua_State *, const char *, char *, int );
 int lua_merge ( lua_State * );
 int lua_count ( lua_State *, int );
+int lua_xcount ( lua_State *, int );
 void lua_istack ( lua_State * );
 int lua_retglobal( lua_State *, const char *, int );
-int lua_getv ( lua_State *, const char *, int, int );
+const char *lua_getv ( lua_State *, const char *, int );
 
 //int http_error( struct HTTPBody *, int, char *, ... );
 //unsigned char *read_file ( const char *, int *, char *, int );

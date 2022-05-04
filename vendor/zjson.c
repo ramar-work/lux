@@ -222,6 +222,7 @@ write( 2, "\n", 1 );
 					//ZJSON_PRINTF( "blen: %d\n", blen );
 					//ZJSON_PRINTF( "ptr: %p\n", copybuf );
 					//ZJSON_PRINTF( "Adding text value: %s\n", copybuf );
+					ZJSON_PRINTF( "Adding text value: %s\n", copybuf );
 					lt_addtextvalue( t, copybuf ), lt_finalize( t );
 					d->isVal = 0, d->inText = 0;
 					( mallocd ) ? free( copybuf ) : 0;
@@ -300,11 +301,11 @@ write( 2, "\n", 1 );
 				else if ( blen ) {
 					memcpy( statbuf, srcbuf, blen + 1 );	
 					if ( w.chr == ':' ) {
-						//ZJSON_PRINTF( "Adding text key: %s\n", statbuf );
+						ZJSON_PRINTF( "Adding text key: %s\n", statbuf );
 						lt_addtextkey( t, statbuf );
 					}
 					else {
-						//ZJSON_PRINTF( "Adding text value: %s\n", statbuf );
+						ZJSON_PRINTF( "Adding text value: %s\n", statbuf );
 						lt_addtextvalue( t, statbuf );
 						lt_finalize( t );
 					}

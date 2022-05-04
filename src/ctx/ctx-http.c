@@ -156,7 +156,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	}
 
 	//If the message is not idempotent, stop and return.
-	//print_httpbody( rq );
+	print_httpbody( rq );
 	if ( !rq->idempotent ) {
 		//rq->atype = ZHTTP_MESSAGE_STATIC;
 		FPRINTF( "Read complete.\n" );
@@ -220,6 +220,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 
 	//Take any excess in the preamble and move that into xp
 	int crecvd = total - ( hlen + BHSIZE );
+FPRINTF( "crecvd: %d, %d, %d, %d\n", crecvd, (hlen + BHSIZE), nsize, rq->clen );
 	if ( crecvd > 0 ) {
 		unsigned char *hp = rq->preamble + ( hlen + BHSIZE );
 		memmove( xp, hp, crecvd );

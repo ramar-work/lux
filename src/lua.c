@@ -242,7 +242,9 @@ int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 	
 //Copy all records from a ztable_t to a Lua table at any point in the stack.
 int ztable_to_lua ( lua_State *L, ztable_t *t ) {
-	short ti[ 64 ] = { 0 }, *xi = ti; 
+	short ti[ 128 ] = { 0 }, *xi = ti; 
+
+	lt_kfdump( t, 1 );
 
 	//Push a table and increase Lua's "save table" index
 	lua_newtable( L );
@@ -254,10 +256,13 @@ int ztable_to_lua ( lua_State *L, ztable_t *t ) {
 	//Loop through all values and copy
 	for ( zKeyval *kv ; ( kv = lt_next( t ) ); ) {
 		zhValue k = kv->key, v = kv->value;
-
-		if ( k.type == ZTABLE_NON )
+#if 1
+		if ( k.type == ZTABLE_NON ) { 
+fprintf( stderr, "AT END OF TABLE\n" );
 			return 1;	
-		else if ( k.type == ZTABLE_INT ) //Arrays start at 1 in Lua, so increment by 1
+		}
+#endif
+		if ( k.type == ZTABLE_INT ) //Arrays start at 1 in Lua, so increment by 1
 			lua_pushnumber( L, k.v.vint + 1 );				
 		else if ( k.type == ZTABLE_FLT )
 			lua_pushnumber( L, k.v.vfloat );				
@@ -271,8 +276,6 @@ int ztable_to_lua ( lua_State *L, ztable_t *t ) {
 
 		if ( v.type == ZTABLE_NUL )
 			;
-		else if ( v.type == ZTABLE_USR )
-			lua_pushstring( L, "usrdata received" );
 		else if ( v.type == ZTABLE_INT )
 			lua_pushnumber( L, v.v.vint );				
 		else if ( v.type == ZTABLE_FLT )
@@ -285,10 +288,15 @@ int ztable_to_lua ( lua_State *L, ztable_t *t ) {
 			lua_newtable( L );
 			*( ++xi ) = lua_gettop( L );
 		}
-		else /* ZTABLE_TRM || ZTABLE_NON */ {
-		#if 0
-			fprintf( stderr, "Got value of type: %s\n", 
-				v.type == ZTABLE_TRM ? "ZTABLE_TRM" : "ZTABLE_NON" );
+		else /* ZTABLE_TRM || ZTABLE_NON || ZTABLE_USR */ {
+		#if 1
+			if ( v.type == ZTABLE_TRM )
+				fprintf( stderr, "Got value of type: %s\n", "ZTABLE_TRM" );
+			else if ( v.type == ZTABLE_NON )
+				fprintf( stderr, "Got value of type: %s\n", "ZTABLE_NON" );
+			else if ( v.type == ZTABLE_USR ) {
+				fprintf( stderr, "Got value of type: %s\n", "ZTABLE_USR" );
+			}
 		#endif
 			return 0;
 		}
@@ -302,6 +310,39 @@ int ztable_to_lua ( lua_State *L, ztable_t *t ) {
 
 
 //Count the elements in a table.
+int lua_xcount ( lua_State *L, int i ) {
+	int count = 0;
+
+	if ( !lua_istable( L, i ) ) {
+		fprintf( stderr, "[%s, %d] Value at %i is not a table\n", __FILE__, __LINE__, i );
+		return 0;
+	}
+
+	//Descend, but keep in mind that we always have a count...
+	lua_pushnil( L );
+	for ( int v; lua_next( L, i ) != 0; ) {
+		if ( ( v = lua_type( L, -1 ) ) == LUA_TTABLE ) {
+			count += lua_count( L, i + 2 ); 
+		}
+
+		if ( lua_type( L, -2 ) == LUA_TSTRING )
+			fprintf( stderr, "KEY IS %s => ", lua_tostring( L, -2 ) );	
+		else {
+			fprintf( stderr, "KEY IS %s => ", lua_typename( L, lua_type( L, -2 ) ) );	
+		}
+
+		fprintf( stderr, "(points to type %s)\n", lua_typename( L, lua_type( L, -1 ) ) );	
+		lua_pop( L, 1 );
+getchar();
+		count++;
+	}
+
+	return count;
+}
+
+
+
+//Count the elements in a table.
 int lua_count ( lua_State *L, int i ) {
 	int count = 0;
 
@@ -312,10 +353,20 @@ int lua_count ( lua_State *L, int i ) {
 
 	//Descend, but keep in mind that we always have a count...
 	lua_pushnil( L );
-	for ( int v; lua_next( L, i ); ) {
+	for ( int v; lua_next( L, i ) != 0; ) {
 		if ( ( v = lua_type( L, -1 ) ) == LUA_TTABLE ) {
 			count += lua_count( L, i + 2 ); 
 		}
+#if 0
+		if ( lua_type( L, -2 ) != LUA_TSTRING ) {
+			fprintf( stderr, "KEY IS %s => ", lua_typename( L, lua_type( L, -2 ) ) );	
+		}
+		else {
+			fprintf( stderr, "KEY IS %s => ", lua_tostring( L, -2 ) );	
+		}
+
+		fprintf( stderr, "( points to type %s)\n", lua_typename( L, lua_type( L, -2 ) ) );	
+#endif
 		lua_pop( L, 1 );
 		count++;
 	}
@@ -453,22 +504,17 @@ int lua_to_ztable ( lua_State *L, int index, ztable_t *t ) {
 
 
 //Retrieve a value from a table (and return the index it was found at or -1)
-int lua_getv ( lua_State *L, const char *key, int index, int type ) {
+const char * lua_getv ( lua_State *L, const char *key, int index ) {
 	lua_pushnil( L );
 
 	for ( int kv, vv; lua_next( L, index ) != 0; ) {
-		const char *k = NULL;
-		
-		//If the key matches, then check the value.
-		//You should return the index and wipe it
-		if ( ( kv = lua_type( L, -2 ) ) == LUA_TSTRING && ( k = lua_tostring( L, -2 ) ) ) { 
-			//fprintf( stderr, "key: %s => %s\n", key, k );
-			if ( ( ( vv = lua_type( L, -1 ) ) == type ) && strcmp( key, k ) == 0 ) {
-				return lua_gettop( L );
+		if ( ( kv = lua_type( L, -2 ) ) == LUA_TSTRING ) {
+			if ( strcmp( key, lua_tostring( L, -2 ) )	== 0 && lua_type( L, -1 ) == LUA_TSTRING ) {
+				return lua_tostring( L, -1 );
 			}
 		}
 		lua_pop( L, 1 );
 	}
 
-	return -1;
+	return NULL;
 } 

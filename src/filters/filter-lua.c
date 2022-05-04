@@ -104,10 +104,13 @@ static const char read_only_block[] = " \
 #endif
 
 
+
+//TODO: Change me to accept a function pointer...
 static struct mvcmeta_t { 
 	const char *dir; 
 	const char *ext;
 	const char *reserved; 
+	int (*fp)( int );
 } mvcmeta [] = {
 	{ "app", "lua", "model,models" }
 ,	{ "sql", "sql", "query,queries" }
@@ -658,6 +661,7 @@ static int init_lua_request ( struct luadata_t *l ) {
 		if ( r && *r ) {
 			lua_pushstring( l->state, str[i] ), lua_newtable( l->state );
 			for ( ; r && *r; r++ ) {
+			#if 0	
 				if ( strcmp( "Cookie", (*r)->field ) != 0 )
 					lua_pushstring( l->state, (*r)->field );
 				else {	
@@ -665,12 +669,18 @@ static int init_lua_request ( struct luadata_t *l ) {
 					*f = ( *f > 63 && *f < 91 ) ? *f + 32 : *f;
 					lua_pushstring( l->state, f );
 				}
+			#else
+				char *f = (char *)(*r)->field; 
+				*f = ( *f > 63 && *f < 91 ) ? *f + 32 : *f;
+				lua_pushstring( l->state, f );
+			#endif
 
 				//Add the lower case version of whatever the header title may be
 				lua_newtable( l->state );
 				lua_setstrbin( l->state, "value", ( char * )(*r)->value, (*r)->size, pos + 2 );
 				lua_setstrint( l->state, "size", (*r)->size, pos + 2 );
 
+			#if 0 
 				//For now, we only need to worry with authentication and cookies
 				if ( strcmp( "cookie", (*r)->field ) == 0 ) {
 
@@ -706,6 +716,7 @@ static int init_lua_request ( struct luadata_t *l ) {
 						}
 					}
 				}
+			#endif
 				lua_settable( l->state, pos );
 			}
 			lua_settable( l->state, 1 );
@@ -1077,8 +1088,20 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		lua_setglobal( ld.state, t->name );
 	}
 
+FPRINTF( "DUMPSTACK AT LINE %d\n", __LINE__ );
+lua_dumpstack( ld.state );
+FPRINTF( "STACK COUNT: %d\n", lua_gettop( ld.state ) );
+
 	//Set package path
 	if ( lua_retglobal( ld.state, "package", LUA_TTABLE ) ) {
+FPRINTF( "DUMPSTACK AT LINE %d\n", __LINE__ );
+FPRINTF( "STACK COUNT: %d\n", lua_gettop( ld.state ) );
+//FPRINTF( "TABLE VALUE COUNT: %d\n", lua_xcount( ld.state, 1 ) );
+
+
+//lua_dumpstack( ld.state );
+//lua_to_ztable( ld.state, 1,  );
+
 	#if 0
 		struct kv { const char *n, *fmt; } kv[] = { { "path", extfmt }, { "cpath", libcfmt },	{ NULL } };
 		for ( struct kv *k = kv; k->n ; k++ ) {
@@ -1092,14 +1115,28 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		lua_setglobal( ld.state, "package" );
 	#else
 		//Get the path of whatever we're talking about
-		char *op, ppath[ PATH_MAX / 2 ] = { 0 }, cpath[ PATH_MAX / 2 ] = {0};
-		op = (char *)lua_tostring( ld.state, lua_getv( ld.state, "path", 1, LUA_TSTRING ) );
-		snprintf( ppath, sizeof( ppath ) - 1, extfmt, op, ld.root, ld.root );
-		op = (char *)lua_tostring( ld.state, lua_getv( ld.state, "cpath", 1, LUA_TSTRING ) );
-		snprintf( cpath, sizeof( cpath ) - 1, libcfmt, op, ld.root );
+		//char lpath[ 1024 ] = {0}, lcpath[ 1024 ] = {0};
+		char ppath[ PATH_MAX / 2 ] = { 0 }, cpath[ PATH_MAX / 2 ] = {0};
+		//op = (char *)lua_tostring( ld.state, lua_getv( ld.state, "path", 1, LUA_TSTRING ) );
+		const char *lpath = lua_getv( ld.state, "path", 1 );
+//fprintf( stderr, "oppath: %s, ", lpath );
+		snprintf( ppath, sizeof( ppath ) - 1, extfmt, lpath, ld.root, ld.root );
+		lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
+//fprintf( stderr, "count: %d\n", lua_gettop( ld.state ) );
+
+		//op = (char *)lua_tostring( ld.state, lua_getv( ld.state, "cpath", 1, LUA_TSTRING ) );
+		const char *lcpath = lua_getv( ld.state, "cpath", 1 );
+//fprintf( stderr, "ocpath: %s\n", lcpath );
+		snprintf( cpath, sizeof( cpath ) - 1, libcfmt, lcpath, ld.root );
+		lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
+//fprintf( stderr, "nppath: %s, ncpath: %s\n", ppath, cpath );
+//fprintf( stderr, "count: %d\n", lua_gettop( ld.state ) );
+		
+		//lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
+//exit( 1 );
 
 		//Reset the package path here...
-		lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
+		//lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
 		
 		//Re-add to the table
 		lua_pushstring( ld.state, "path" );

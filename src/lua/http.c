@@ -58,6 +58,19 @@
  #define VPRINTF( ... ) fprintf( stderr, __VA_ARGS__ ) ; fflush(stderr);
 #endif
 
+static const char *content_type_id[] = { 
+	"Content-Type: "
+, "content-type: "
+, "Content-type: "
+, NULL 
+};
+
+static const char *content_length_id[] = { 
+	"Content-Length: "
+, "content-length: "
+, "Content-length: "
+, NULL 
+};
 
 //User-Agent
 static const char default_ua[] = 
@@ -228,10 +241,15 @@ void *get_in_addr(struct sockaddr *sa) {
 
 
 static int get_content_length (char *msg, int mlen) {
-	int pos;
-	if ( (pos = memstrat( msg, "Content-Length", mlen )) == -1 ) { 
-		return -1;
+	int pos = -1;
+
+	for ( const char **id = content_length_id; *id; id++ ) {
+		if ( ( pos = memstrat( msg, *id, mlen ) ) > -1 ) break;	
 	}
+
+	if ( pos == -1 ) {
+		return -1;
+	} 
 
 	int r = memchrat( &msg[ pos ], '\r', mlen - pos );	
 	int s = memchrat( &msg[ pos ], ' ', mlen - pos );	
@@ -244,11 +262,23 @@ static int get_content_length (char *msg, int mlen) {
 
 
 static char * get_content_type (char *dest, char *msg, int mlen) {
+#if 0
 	int pos;
 	if ( (pos = memstrat( msg, "Content-Type", mlen )) == -1 ) { 
 		return NULL;
 	}
+#endif
 
+	int pos = -1;
+
+	for ( const char **id = content_type_id; *id; id++ ) {
+		if ( ( pos = memstrat( msg, *id, mlen ) ) > -1 ) break;	
+	}
+
+	if ( pos == -1 ) {
+		return NULL;
+	}
+ 
 	//TODO: Make this safer
 	int r = memchrat( &msg[ pos ], '\r', mlen - pos );	
 	int s = memchrat( &msg[ pos ], ' ', mlen - pos );	
@@ -1560,12 +1590,20 @@ int http_request ( lua_State *L ) {
 		return luaL_error( L, err ); 
 	}
 
+print_httpbody( &rhttp );
+write( 2, rhttp.msg, rhttp.mlen );
+
 	//Add the headers as a table of their own
 	lua_pushstring( L, "headers" ), lua_newtable( L );
 	for ( zhttpr_t ** x = http_get_header_keyvalues( &rhttp.msg, &hlen, &rhttp.error ); x && *x; x++ ) {
 		lua_setstrbin( L, (*x)->field, (*x)->value, (*x)->size, 5 );
 	}
 	lua_settable( L, 3 );
+
+	//Stop if the body length is invalid...
+	if ( rhttp.clen < 0 ) {
+		return luaL_error( L, "Received invalid content length: %d\n", rhttp.clen ); 
+	}
 
 	//Finally, add the body if there is one
 	if ( rhttp.clen ) {

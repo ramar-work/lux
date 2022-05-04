@@ -49,7 +49,7 @@
 //...
 struct arg {
 	char *package;
-	char *directory;
+	char *instance;
 	char *source;
 	char *repository;
 	int verbose;
@@ -163,7 +163,7 @@ int main ( int argc, char *argv[] ) {
 
 	while ( *argv ) {
 		if ( !strcmp( *argv, "-i" ) || !strcmp( *argv, "--install-to" ) )
-			arg.directory = *( ++argv );
+			arg.instance = *( ++argv );
 		else if ( !strcmp( *argv, "-p" ) || !strcmp( *argv, "--package" ) )
 			arg.package = *( ++argv );
 		else if ( !strcmp( *argv, "-s" ) || !strcmp( *argv, "--source" ) )
@@ -178,16 +178,18 @@ int main ( int argc, char *argv[] ) {
 	}
 
 	//Check for a directory
-	if ( !arg.directory ) {
-		fprintf( stderr, "Directory: %s\n", strerror( errno ) );
+	if ( !arg.instance ) {
+		fprintf( stderr, "No instance specified!\n" );
 		return 1;
 	}
-return 0;
+
 	//Check for a package
 	if ( !arg.package ) {
-		fprintf( stderr, "Package failed: %s\n", strerror( errno ) );
+		fprintf( stderr, "No package specified!\n" );
 		return 1;
 	}
+#if 0
+	//Check the package name to see if it's file or http[s]
 
 	//Depending on location, 
 	printf( "package: %s\n", arg.package );
@@ -195,6 +197,6 @@ return 0;
 		fprintf( stderr, "\n" );
 		return 1;
 	}
-
+#endif
 	return 0;
 }

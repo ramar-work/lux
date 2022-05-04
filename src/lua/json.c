@@ -36,7 +36,6 @@ int json_decode ( lua_State *L ) {
 	}
 
 	lua_pop( L, 1 );
-
 	if ( !( t = zjson_decode( json, strlen( json ), err, sizeof( err ) ) ) ) {
 		return luaL_error( L, "Failed to deserialize JSON at json_decode(): %s", err );
 	}
@@ -45,6 +44,7 @@ int json_decode ( lua_State *L ) {
 		return luaL_error( L, "Failed to convert to Lua." );
 	}
 
+	lt_kfdump( t, 2 );
 	lt_free( t ), free( t );
 	return 1;
 }
@@ -76,7 +76,7 @@ int json_encode ( lua_State *L ) {
 	//Pop the value and encode the above ztable if that did not fail
 	lua_pop( L, 1 );
 	if ( !( src = zjson_encode( zt, err, sizeof( err ) ) ) ) {
-		return luaL_error( L, "Encoding failed." );
+		return luaL_error( L, "Encoding failed: %s", err );
 	}
 
 	lua_pushstring( L, src );
