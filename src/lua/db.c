@@ -29,17 +29,22 @@ static const char *engines[] = {
 
 //Accepts three arguments { db, [query,file], bind_args }
 int db_exec ( lua_State *L ) {
+	//Define everything at the top
+	const char *connstr = NULL, *query = NULL;
+	char file[ 1024 ] = {0}, conn[ 1024 ] = {0}, shadow[ 1024 ] = {0};
+	int pos, len = 0, inc = 0;
+	char err[ 1024 ] = { 0 };
+	zTable tt, *t, *results;
+	zdb_t zdb = { 0 }; 
+	zdbv_t **zdbbind = NULL;
+
 	//Check for arguments...
 	luaL_checktype( L, 1, LUA_TTABLE );
 
 	//Within this table need to exist a few keys
-#if 1
-	char err[ 1024 ] = { 0 };
-	zTable tt, *results, *t = &tt;
+	//TODO: Doing this statically will save time, energy and memory
+	t = &tt;
 	lt_init( t, NULL, 32 ); 
-#else
-	//Doing this statically will save time, energy and memory
-#endif
 
 	//Convert to C table for slightly easier key extraction	
 	if ( !lua_to_ztable( L, 1, t ) || !lt_lock( t ) ) {
@@ -47,23 +52,11 @@ int db_exec ( lua_State *L ) {
 		return luaL_error( L, "Failed to convert to zTable" );
 	}
 
-	//lt_lock( t );
-#if 0
-	//Lock and dump?
-	lt_dump( t );
-	getchar();
-#endif
-
 	//After we're done getting the table, that should be it
 	lua_pop( L, 1 );	
 
 	//Check for needed args, starting with dbname (or conn str, whatever)
-	const char *connstr = NULL, *query = NULL;
-	char file[ 1024 ] = {0}, conn[ 1024 ] = {0}, shadow[ 1024 ] = {0};
-	int pos, len = 0, inc = 0;
 	//Then we have to initialize the underlying lib
-	zdb_t zdb = { 0 }; 
-	zdbv_t **zdbbind = NULL;
 
 	//Db should point to a real file
 	//Conn should be what we use
@@ -73,12 +66,12 @@ int db_exec ( lua_State *L ) {
 	}
 	else {
 		//Check for a valid engine (since right now it's only sqlite)
-		const char **k = engines, *dbstr = lt_text_at( t, pos );
-		for ( ; *k; k++ ) {
+		const char *dbstr = lt_text_at( t, pos );
+		for ( const char **k = engines; *k; k++ ) {
 			int len = strlen( *k );
 			if ( strlen( dbstr ) >= len && memcmp( *k, dbstr, len ) == 0 ) {
 				connstr = dbstr += len;
-				break; 
+				break;
 			}
 		}
 		if ( !connstr ) {
@@ -89,14 +82,11 @@ int db_exec ( lua_State *L ) {
 	}
 
 	//Get the shadow path if there is one
+	//TODO: Eventually, this should be replaced with lua_retglobal
 	lua_getglobal( L, "shadow" ); 
-#if 0
-	if ( lua_isstring( L, -1 ) ) {
-#else 
 	if ( lua_isnil( L, -1 ) )
 		lua_pop( L, 1 ); 
 	else {
-#endif
 		//Translate the connection to the right path
 		snprintf( shadow, sizeof( shadow ), "%s", lua_tostring( L, -1 ) );
 		snprintf( conn, sizeof( conn ), "%s/%s", shadow, connstr );
@@ -104,9 +94,8 @@ int db_exec ( lua_State *L ) {
 	}
 
 	//Then get the query
-	if ( ( pos = lt_geti( t, "string" ) ) > -1 ) {
+	if ( ( pos = lt_geti( t, "string" ) ) > -1 )
 		query = lt_text_at( t, pos );
-	}
 	else if ( ( pos = lt_geti( t, "file" ) ) > -1 ) {
 		char *f = NULL;
 		if ( ( f = lt_text_at( t, pos ) ) )
@@ -124,6 +113,27 @@ int db_exec ( lua_State *L ) {
 		lt_free( t );
 		return luaL_error( L, "Neither 'string' nor 'file' were present in call to %s", "db_exec" );
 	}
+
+	#if 0
+	//Extract a type as well... 
+	if ( ( pos = lt_geti( t, "memory" ) ) > -1 ) {
+		char *type = lt_text_at( t, pos );
+		if ( !type ) {
+			return luaL_error( L, "type key was specified, but was not a string\n" );
+		}
+
+		if ( strcmp( type, "true" ) == 0 ) {
+			//This is incredibly difficult to do with just memory...	
+		}	
+		else if ( strcmp( type, "false" ) == 0 ) {
+		}
+		else {
+			return luaL_error( L, "Got invalid value for 'type' key.\n" );
+		}
+		lt_dump( t );
+		exit( 0 );
+	}	 
+	#endif
 
 	//Finally, handle bind args if there are any
 	if ( ( pos = lt_geti( t, "bindargs" ) ) > -1 ) {

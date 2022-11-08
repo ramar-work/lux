@@ -539,7 +539,7 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 }
 
 
-#if 1
+#ifndef NO_HTTPS_SUPPORT
 int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char *errmsg, int errlen ) {
 #if 1
 	//Define
@@ -1566,9 +1566,13 @@ int http_request ( lua_State *L ) {
 		}
 	}
 	else {
+#ifndef NO_HTTPS_SUPPORT
 		if ( !make_https_request( addr, port, &qhttp, &rhttp, err, sizeof(err) ) ) {
 			return luaL_error( L, err ); 
 		}
+#else
+		return luaL_error( L, "HTTPS support is not compiled in." ); 
+#endif
 	}
 
 	//Prepare the table.
@@ -1590,8 +1594,10 @@ int http_request ( lua_State *L ) {
 		return luaL_error( L, err ); 
 	}
 
+#if 0
 print_httpbody( &rhttp );
 write( 2, rhttp.msg, rhttp.mlen );
+#endif
 
 	//Add the headers as a table of their own
 	lua_pushstring( L, "headers" ), lua_newtable( L );

@@ -46,14 +46,19 @@
 #include "../config.h"
 #include "../log.h"
 #include "../server.h"
-#include "../ctx/ctx-http.h"
-#include "../ctx/ctx-https.h"
-#include "../ctx/ctx-dns.h"
 #include "../filters/filter-static.h"
 #include "../filters/filter-echo.h"
 #include "../filters/filter-dirent.h"
 #include "../filters/filter-redirect.h"
 #include "../filters/filter-lua.h"
+#include "../ctx/ctx-http.h"
+
+#ifndef NO_HTTPS_SUPPORT
+ #include "../ctx/ctx-https.h"
+#endif
+#ifndef NO_DNS_SUPPORT
+ #include "../ctx/ctx-dns.h"
+#endif
 
 #ifndef PIDDIR
  #define PIDDIR "/var/run/"
@@ -514,13 +519,13 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 	if (( fdset[0] = listen_fd = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1 ) {
 		snprintf( err, errlen, "Couldn't open socket! Error: %s\n", strerror( errno ) );
-		fprintf( logfd, err );
+		fprintf( logfd, "%s", err );
 		return 0;
 	}
 
 	if ( setsockopt( listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on) ) == -1 ) {
 		snprintf( err, errlen, "Couldn't set socket to reusable! Error: %s\n", strerror( errno ) );
-		fprintf( logfd, err );
+		fprintf( logfd, "%s", err );
 		return 0;
 	}
 
@@ -528,7 +533,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	//This may only be valid via BSD
 	if ( setsockopt( listen_fd, SOL_SOCKET, SO_NOSIGPIPE, (char *)&on, sizeof(on) ) == -1 ) {
 		snprintf( err, errlen, "Couldn't set socket sigpipe behavior! Error: %s\n", strerror( errno ) );
-		fprintf( logfd, err );
+		fprintf( logfd, "%s", err );
 		return 0;
 	}
 	#endif
@@ -536,7 +541,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	/*
 	if ( fcntl( listen_fd, F_SETFD, O_NONBLOCK ) == -1 ) {
 		snprintf( err, errlen, "fcntl error: %s\n", strerror(errno) ); 
-		fprintf( logfd, err );
+		fprintf( logfd, "%s", err );
 		return 0;
 	}
 	*/
@@ -544,19 +549,19 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	//One of these two should set non blocking functionality
 	if ( ioctl( listen_fd, FIONBIO, (char *)&on ) == -1 ) {
 		snprintf( err, errlen, "fcntl error: %s\n", strerror(errno) ); 
-		fprintf( logfd, err );
+		fprintf( logfd, "%s", err );
 		return 0;
 	}
 
 	if ( bind( listen_fd, (struct sockaddr *)si, sizeof(struct sockaddr_in)) == -1 ) {
 		snprintf( err, errlen, "Couldn't bind socket to address! Error: %s\n", strerror( errno ) );
-		fprintf( logfd, err );
+		fprintf( logfd, "%s", err );
 		return 0;
 	}
 
 	if ( listen( listen_fd, BACKLOG) == -1 ) {
 		snprintf( err, errlen, "Couldn't listen for connections! Error: %s\n", strerror( errno ) );
-		fprintf( logfd, err );
+		fprintf( logfd, "%s", err );
 		return 0;
 	}
 
@@ -599,21 +604,21 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	//TODO: Using threads may make this easier... https://www.geeksforgeeks.org/zombie-processes-prevention/
 	if ( signal( SIGCHLD, SIG_IGN ) == SIG_ERR ) {
 		snprintf( err, errlen, "Failed to set SIGCHLD\n" );
-		fprintf( logfd, err );
+		fprintf( logfd, "%s", err );
 		return 0;
 	}
 
 	//Needed for lots of send() activity
 	if ( signal( SIGPIPE, SIG_IGN ) == SIG_ERR ) {
 		snprintf( err, errlen, "Failed to set SIGPIPE\n" );
-		fprintf( logfd, err );
+		fprintf( logfd, "%s", err );
 		return 0;
 	}
 
 	#if 0
 	if ( signal( SIGSEGV, SIG_IGN ) == SIG_ERR ) {
 		snprintf( err, errlen, "Failed to set SIGCHLD\n" );
-		fprintf( logfd, err );
+		fprintf( logfd, "%s", err );
 		return 0;
 	}
 	#endif

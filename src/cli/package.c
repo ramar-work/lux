@@ -154,7 +154,7 @@ int unpack_archive ( const char *name, const char *dir ) {
 
 
 int main ( int argc, char *argv[] ) {
-	struct arg arg;
+	struct arg arg = { 0 };
 
 	if ( argc < 2 ) {
 		fprintf( stderr, PP ":\n%s\n", HELP );
@@ -177,6 +177,7 @@ int main ( int argc, char *argv[] ) {
 		argv++;
 	}
 
+#if 0
 	//Check for a directory
 	if ( !arg.instance ) {
 		fprintf( stderr, "No instance specified!\n" );
@@ -188,12 +189,11 @@ int main ( int argc, char *argv[] ) {
 		fprintf( stderr, "No package specified!\n" );
 		return 1;
 	}
-#if 0
 	//Check the package name to see if it's file or http[s]
 
 	//Depending on location, 
 	printf( "package: %s\n", arg.package );
-	if ( !unpack_archive( arg.package, arg.directory ) ) {
+	if ( !unpack_archive( arg.package, arg.instance ) ) {
 		fprintf( stderr, "\n" );
 		return 1;
 	}

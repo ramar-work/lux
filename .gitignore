@@ -3,6 +3,7 @@ Makefile
 TASKS
 TODO
 src.vim
+.src.vim
 configure.scan
 configure
 config.status

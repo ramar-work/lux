@@ -20,24 +20,28 @@
 #include "echo.h"
 #include "lua.h"
 #include "rand.h"
-#include "hash.h"
 #include "http.h"
 #include "filesystem.h"
 #include "db.h"
 #include "json.h"
 #include "encdec.h"
+#ifndef NO_HTTPS_SUPPORT
+ #include "hash.h"
+#endif
 
 struct lua_fset functions[] = {
 	{ "echo", echo_set }
 , { "lua", lua_set }
 , { "rand", rand_set }
-, { "hash", hash_set }
 , { "http", http_set }
 , { "fs", fs_set }
 , { "db", db_set }
 , { "json", json_set }
 , { "enc", enc_set }
 , { "dec", dec_set }
+#ifndef NO_HTTPS_SUPPORT
+, { "hash", hash_set }
+#endif
 ,	{ NULL }
 };
 

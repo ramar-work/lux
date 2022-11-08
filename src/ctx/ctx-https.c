@@ -18,6 +18,7 @@
  * - Added interval for fake polling.
  *  
  * ------------------------------------------- */
+#ifndef NO_HTTPS_SUPPORT
 #include "ctx-https.h"
 
 //Interval for fake polling here...
@@ -452,6 +453,4 @@ write_gnutls ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *c
 	FPRINTF( "Write complete.\n" );
 	return 1;
 }
-
-
-
+#endif

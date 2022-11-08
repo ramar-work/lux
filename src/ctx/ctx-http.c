@@ -136,7 +136,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 		}
 	}
 
-#if 1
+#if 0
 	//Dump a message
 	fprintf( stderr, "MESSAGE SO FAR:\n" );
 	fprintf( stderr, "HEADER LENGTH %d\n", hlen );
@@ -168,7 +168,7 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	conn->count = -3;
 	return http_set_error( rs, 200, "OK" ); 
 #endif
-#if 1
+#if 0
 	write( 2, rq->preamble, total );
 	write( 2, "\n", 1 );
 	write( 2, "\n", 1 );

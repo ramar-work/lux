@@ -20,6 +20,7 @@
  * ---------
  * - 
  * ------------------------------------------- */
+#ifndef NO_HTTPS_SUPPORT
 #include <sys/stat.h>
 #include <stddef.h>
 #include <zwalker.h>
@@ -31,7 +32,7 @@
 #include "../config.h"
 
 #ifdef INCLUDE_GNUTLS 
-#include <gnutls/gnutls.h>
+ #include <gnutls/gnutls.h>
 #endif
 
 #ifndef CTXHTTPS_H
@@ -80,4 +81,5 @@ const int write_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata
 void create_gnutls( void ** );
 
 void free_gnults( void **p );
+#endif
 #endif

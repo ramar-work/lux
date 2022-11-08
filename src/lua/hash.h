@@ -16,6 +16,7 @@
  * ---------
  * -
  * ------------------------------------------- */
+#ifndef NO_HTTPS_SUPPORT
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -33,4 +34,5 @@ int generate_sha384( lua_State * );
 int generate_sha512( lua_State * );
 extern struct luaL_Reg hash_set[];
 
+#endif
 #endif

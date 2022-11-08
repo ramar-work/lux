@@ -876,7 +876,7 @@ static int return_as_response ( struct luadata_t *l ) {
 	//Lock the ztable to enable proper hashing and collision mgmt
 	if ( !lt_lock( rt ) ) {
 		//This can fail...
-		snprintf( l->err, LD_ERRBUF_LEN, lt_strerror( rt ) );
+		snprintf( l->err, LD_ERRBUF_LEN, "%s", lt_strerror( rt ) );
 		return 0;
 	}
 
@@ -1088,65 +1088,31 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		lua_setglobal( ld.state, t->name );
 	}
 
-FPRINTF( "DUMPSTACK AT LINE %d\n", __LINE__ );
-lua_dumpstack( ld.state );
-FPRINTF( "STACK COUNT: %d\n", lua_gettop( ld.state ) );
-
 	//Set package path
 	if ( lua_retglobal( ld.state, "package", LUA_TTABLE ) ) {
-FPRINTF( "DUMPSTACK AT LINE %d\n", __LINE__ );
-FPRINTF( "STACK COUNT: %d\n", lua_gettop( ld.state ) );
-//FPRINTF( "TABLE VALUE COUNT: %d\n", lua_xcount( ld.state, 1 ) );
-
-
-//lua_dumpstack( ld.state );
-//lua_to_ztable( ld.state, 1,  );
-
-	#if 0
-		struct kv { const char *n, *fmt; } kv[] = { { "path", extfmt }, { "cpath", libcfmt },	{ NULL } };
-		for ( struct kv *k = kv; k->n ; k++ ) {
-			char ppath[ PATH_MAX ] = { 0 };
-			char *op = (char *)lua_tostring( ld.state, lua_getv( ld.state, k->n, 1, LUA_TSTRING ) );
-			snprintf( ppath, sizeof( ppath ) - 1, k->fmt, op, ld.root, ld.root );
-			lua_pushstring( ld.state, k->n );
-			lua_pushstring( ld.state, ppath );
-			lua_settable( ld.state, 1 );
-		}	
-		lua_setglobal( ld.state, "package" );
-	#else
 		//Get the path of whatever we're talking about
-		//char lpath[ 1024 ] = {0}, lcpath[ 1024 ] = {0};
 		char ppath[ PATH_MAX / 2 ] = { 0 }, cpath[ PATH_MAX / 2 ] = {0};
-		//op = (char *)lua_tostring( ld.state, lua_getv( ld.state, "path", 1, LUA_TSTRING ) );
 		const char *lpath = lua_getv( ld.state, "path", 1 );
-//fprintf( stderr, "oppath: %s, ", lpath );
 		snprintf( ppath, sizeof( ppath ) - 1, extfmt, lpath, ld.root, ld.root );
 		lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
-//fprintf( stderr, "count: %d\n", lua_gettop( ld.state ) );
 
-		//op = (char *)lua_tostring( ld.state, lua_getv( ld.state, "cpath", 1, LUA_TSTRING ) );
 		const char *lcpath = lua_getv( ld.state, "cpath", 1 );
-//fprintf( stderr, "ocpath: %s\n", lcpath );
 		snprintf( cpath, sizeof( cpath ) - 1, libcfmt, lcpath, ld.root );
 		lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
-//fprintf( stderr, "nppath: %s, ncpath: %s\n", ppath, cpath );
-//fprintf( stderr, "count: %d\n", lua_gettop( ld.state ) );
-		
-		//lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
-//exit( 1 );
 
-		//Reset the package path here...
-		//lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
-		
 		//Re-add to the table
+		#if 1
+		lua_setstrstr( ld.state, "path", ppath, 1 );
+		lua_setstrstr( ld.state, "cpath", cpath, 1 );
+		#else
 		lua_pushstring( ld.state, "path" );
 		lua_pushstring( ld.state, ppath );
 		lua_settable( ld.state, 1 );
 		lua_pushstring( ld.state, "cpath" );
 		lua_pushstring( ld.state, cpath );
 		lua_settable( ld.state, 1 );
+		#endif
 		lua_setglobal( ld.state, "package" );
-	#endif
 	}
 
 	//Execute each model

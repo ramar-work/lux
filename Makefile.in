@@ -10,7 +10,7 @@
 ## Copyright 2022 Ironhead, Inc.
 ## --------------------------------------------------------- ##
 NAME = @PACKAGE_NAME@
-VERSION = @PACKAGE_VERSION@ 
+VERSION = @PACKAGE_VERSION@
 PREFIX = @prefix@
 LOGDIR = /var/log
 EXEC_PREFIX = @exec_prefix@
@@ -20,14 +20,15 @@ srcdir = @srcdir@
 VPATH = @srcdir@
 SRVUSER = ramar
 SRVGROUP = ramar
-IFLAGS = -Ivendor -Ivendor/lua-5.4.3/src -I/usr/include/lua5.3
-LDFLAGS = -ldl -lpthread -lm -lgnutls
+IFLAGS = -Ivendor -Ivendor/lua-5.4.3/src
+#LDFLAGS = -L/usr/lib -L/usr/lib/x86_64-linux-gnu -ldl -lpthread -lm
+LDFLAGS = -ldl -lpthread -lm
 DEBUGFLAGS = -DDEBUG_H
 MODEL = HTHREAD_H
 ASAN_OPTIONS = log_path=asan.log
-CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -DINCLUDE_GNUTLS -D$(MODEL) $(IFLAGS)
-GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-strict-aliasing \
-	-Wno-format-truncation -Wno-return-local-addr -DINCLUDE_GNUTLS -D$(MODEL) -O2 $(IFLAGS)
+CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -Wno-unused-result -D$(MODEL) $(IFLAGS)
+GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing \
+	-Wno-format-truncation -Wno-return-local-addr -D$(MODEL) -O2 $(IFLAGS)
 CFLAGS = $(GCCFLAGS)
 CC = gcc
 SRC = \
@@ -70,21 +71,39 @@ TARGET = main
 TESTS = luabind router util
 UNAME = $(shell uname)
 DOMAIN = localhost 
+DISTDIR = $(NAME)-$(VERSION)
+FILES = configure LICENSE Makefile.in README.md
 
 # main - Compiles all code needed to get hypno running
+#main: vendor/libssl.a
+#main: vendor/libcrypto.a
 main: vendor/liblua.a
-main: vendor/libssl.a
-main: vendor/libcrypto.a
+main: CFLAGS += -DNO_HTTPS_SUPPORT
 main: $(OBJ)
+	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
+
+
+# main-ssl: Identical to main except with these SSL targets.
+main-ssl: vendor/libssl.a
+main-ssl: vendor/libcrypto.a
+main-ssl: vendor/liblua.a
+main-ssl: LDFLAGS += -lgnutls
+main-ssl: CFLAGS += -DINCLUDE_GNUTLS
+main-ssl: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a 
-	$(CC) $(LDFLAGS) -llzma -lbz2 -lz $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a $(srcdir)/vendor/libarchive.a
 
+
+#	$(CC) $(LDFLAGS) -llzma -lbz2 -lz $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a $(srcdir)/vendor/libarchive.a
 # debug - Builds code with debugging flags on
 debug: debug-clang
 	@printf '' > /dev/null
+
 
 clang: CC = clang
 clang: CFLAGS = $(CLANGFLAGS) -g $(DEBUGFLAGS)
@@ -163,7 +182,7 @@ examples:
 
 vendor/sqlite3.o: CFLAGS+=-Wno-misleading-indentation -Wno-deprecated-declarations
 vendor/sqlite3.o:
-	$(CC) $(CFLAGS) -c -o vendor/sqlite3.o vendor/sqlite3.c
+	$(CC) $(CFLAGS) -lpthread -c -o vendor/sqlite3.o vendor/sqlite3.c
 
 
 # repl - Build and test libraries for REPL usage
@@ -197,7 +216,7 @@ vendor/libssl.a vendor/libcrypto.a &:
 # vendor/liblua.a - Build Lua 5.4.3
 vendor/liblua.a: 
 	-@cd vendor/ && tar xzf lua-5.4.3.tar.gz && \
-		cd lua-5.4.3 && make MYCFLAGS="-fPIC" posix && mv src/liblua.a ../
+		cd lua-5.4.3 && make MYCFLAGS="-fPIC" && mv src/liblua.a ../
 
 #	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
 #	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
@@ -260,6 +279,38 @@ changelog:
 	@printf "## HISTORY\n\n"
 	@git log --full-history --author=Antonio | sed '{ s/^   /- /; }'
 	@printf "\n<link rel=stylesheet href=changelog.css>\n"
+
+# Create a package (in a different way)
+dist: $(DISTDIR).tar.gz
+
+# Create a package archive 
+$(DISTDIR).tar.gz: $(DISTDIR)
+	tar chof - $(DISTDIR) | gzip -9 -c > $@	
+	rm -rf $(DISTDIR)
+
+# Create a package directory
+$(DISTDIR):
+	rm -f $(DISTDIR).tar.gz
+	rm -rf $(DISTDIR)
+	mkdir -p $(DISTDIR)/src \
+		$(DISTDIR)/vendor \
+		$(DISTDIR)/include \
+		$(DISTDIR)/etc \
+		$(DISTDIR)/bin \
+		$(DISTDIR)/lib
+	cp $(FILES) $(DISTDIR)/
+	cp -r src/* $(DISTDIR)/src/
+	cp -r vendor/*.[ch] vendor/lua-5.4.3 $(DISTDIR)/vendor/
+
+# Check that packaging worked (super useful for other distributions...) 
+distcheck:
+	gzip -cd $(DISTDIR).tar.gz | tar xvf -
+	cd $(DISTDIR) && ./configure
+	cd $(DISTDIR) && $(MAKE)
+	cd $(DISTDIR) && $(MAKE) clean
+	rm -rf $(DISTDIR)
+	@echo "*** package $(DISTDIR).tar.gz is ready for distribution."
+	
 #endif
 
 copyright-update:
@@ -303,4 +354,4 @@ cert:
 		-out tmp/$(CERTNAME).crt \
 		-days 365 -nodes -subj '/CN=$(DOMAIN)'
 
-.PHONY: docs
+.PHONY: docs dist distcheck

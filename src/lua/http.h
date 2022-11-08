@@ -37,8 +37,9 @@
 #include <zwalker.h>
 #include <zhttp.h>
 #include "../lua.h"
-#if 1
-#include <gnutls/gnutls.h>
+
+#ifndef NO_HTTPS_SUPPORT
+ #include <gnutls/gnutls.h>
 #endif
 
 #ifndef WEB_H
