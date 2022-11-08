@@ -28,6 +28,7 @@ ASAN_OPTIONS = log_path=asan.log
 CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -Wno-unused-result -D$(MODEL) $(IFLAGS)
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing \
 	-Wno-format-truncation -Wno-return-local-addr -D$(MODEL) -O2 $(IFLAGS)
+INITMETHOD = systemd
 CFLAGS = $(GCCFLAGS)
 CC = gcc
 SRC = \
@@ -130,9 +131,14 @@ debug-gcc: main
 debug-fork: main
 	@printf '' > /dev/null
 
+# install - Runs a full system install
+install: filesystem-install
+install: $(INITMETHOD)-install
+	@printf '' > /dev/null
 
-# install - Installs targets to $PREFIX/{bin,share} and /var/lib
-install:
+
+# filesystem-install - Installs targets to $PREFIX/{bin,share} and /var/lib
+filesystem-install:
 	cp $(srcdir)/bin/* $(PREFIX)/bin/
 	-test -d $(PREFIX)/share/$(NAME)/ || mkdir -p $(PREFIX)/share/$(NAME)/
 	test -d $(PREFIX)/share/$(NAME)/
@@ -146,15 +152,16 @@ install:
 	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(NAME)/
 
 
-# cygwin-install - Installs hypno as a service suitable for use with Cygwin 
-cygwin-install:
-	cygstart --action=runas cygrunsrv --install hypno --user $(USER) -p /usr/local/bin/hypno-server -a '--start --config /var/www/config.lua'
-
-
 # systemd-install - Installs systemd on Linux systems
 systemd-install:
 	sed '{ s#__PREFIX__#$(PREFIX)#; s#__SRVUSER__#$(SRVUSER)#; s#__SRVGROUP__#$(SRVGROUP)#; s#__LOGDIR__#$(LOGDIR)#g; s#__WWWROOT__#$(WWWROOT)# }' \
 		$(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service > /etc/systemd/system/hypno.service
+
+
+
+# cygwin-install - Installs hypno as a service suitable for use with Cygwin 
+cygwin-install:
+	cygstart --action=runas cygrunsrv --install hypno --user $(USER) -p /usr/local/bin/hypno-server -a '--start --config /var/www/config.lua'
 
 
 
@@ -212,8 +219,7 @@ vendor/libssl.a vendor/libcrypto.a &:
 
 # vendor/liblua.a - Build Lua 5.4.3
 vendor/liblua.a: 
-	-@cd vendor/ && tar xzf lua-5.4.3.tar.gz && \
-		cd lua-5.4.3 && make MYCFLAGS="-fPIC" && mv src/liblua.a ../
+	-@cd vendor/ && cd lua-5.4.3 && make MYCFLAGS="-fPIC" && mv src/liblua.a ../
 
 #	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
 #	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
