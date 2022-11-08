@@ -628,7 +628,7 @@ int main ( int argc, char * argv[] ) {
 	//Stop and dump the request
 	if ( arg.dumpHttp ) {
 		print_httpbody( &req );
-		ssize_t written = write( 2, req.msg, req.mlen );
+		write( 2, req.msg, req.mlen );
 		http_free_request( &req );
 		return 0;
 	}
@@ -703,13 +703,13 @@ int main ( int argc, char * argv[] ) {
 
 		//Just show the status
 		if ( test.expected.status != res.status ) {
-			ssize_t written = write( 2, res.msg, res.mlen );
+			write( 2, res.msg, res.mlen );
 			fflush( stderr );
 		}
 
 		//Dump the response
 		if ( arg.dumpResp ) {
-			ssize_t written = write( 1, res.msg, res.mlen );
+			write( 1, res.msg, res.mlen );
 			fflush( stdout );
 		}
 
@@ -718,15 +718,15 @@ int main ( int argc, char * argv[] ) {
 
 	//Show whatever message should have come out
 	if ( arg.headerf ) {
-		ssize_t written = write( header_fd, res.msg, res.mlen - res.clen );
+		write( header_fd, res.msg, res.mlen - res.clen );
 	}
 
 	if ( arg.msgonly || arg.bodyf ) {
 		int sp = res.mlen - res.clen;	
-		ssize_t written = write( body_fd, &res.msg[ sp ], res.mlen - sp );
+		write( body_fd, &res.msg[ sp ], res.mlen - sp );
 	}
 	else if ( !arg.headerf ) {
-		ssize_t written = write( body_fd, res.msg, res.mlen );
+		write( body_fd, res.msg, res.mlen );
 		fflush( stdout );
 	}
 
