@@ -21,7 +21,6 @@ VPATH = @srcdir@
 SRVUSER = ramar
 SRVGROUP = ramar
 IFLAGS = -Ivendor -Ivendor/lua-5.4.3/src
-#LDFLAGS = -L/usr/lib -L/usr/lib/x86_64-linux-gnu -ldl -lpthread -lm
 LDFLAGS = -ldl -lpthread -lm
 DEBUGFLAGS = -DDEBUG_H
 MODEL = HTHREAD_H
@@ -75,8 +74,6 @@ DISTDIR = $(NAME)-$(VERSION)
 FILES = configure LICENSE Makefile.in README.md
 
 # main - Compiles all code needed to get hypno running
-#main: vendor/libssl.a
-#main: vendor/libcrypto.a
 main: vendor/liblua.a
 main: CFLAGS += -DNO_HTTPS_SUPPORT
 main: $(OBJ)
@@ -94,9 +91,9 @@ main-ssl: LDFLAGS += -lgnutls
 main-ssl: CFLAGS += -DINCLUDE_GNUTLS
 main-ssl: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a  
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a 
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
 
 
 #	$(CC) $(LDFLAGS) -llzma -lbz2 -lz $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a $(srcdir)/vendor/libarchive.a
