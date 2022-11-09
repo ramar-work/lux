@@ -9,15 +9,16 @@
 ## @author
 ## Copyright 2022 Ironhead, Inc.
 ## --------------------------------------------------------- ##
-NAME = @PACKAGE_NAME@
+BINNAME = @PACKAGE_NAME@
 VERSION = @PACKAGE_VERSION@
 PREFIX = @prefix@
-LOGDIR = /var/log
 EXEC_PREFIX = @exec_prefix@
 BINDIR = @bindir@
+LOGDIR = /var/log
 WWWROOT = /var/www
+WWWPORT = 80
 SVCPATH = /etc/systemd/system
-SVCPATH = `pkg-config systemd --variable=systemduserunitdir`
+SVCPATH = `pkg-config systemd --variable=systemduserunitdir 2>/dev/null`
 srcdir = @srcdir@
 VPATH = @srcdir@
 SRVUSER = ramar
@@ -73,17 +74,17 @@ TARGET = main
 TESTS = luabind router util
 UNAME = $(shell uname)
 DOMAIN = localhost 
-DISTDIR = $(NAME)-$(VERSION)
-FILES = configure LICENSE Makefile.in README.md
+DISTDIR = $(BINNAME)-$(VERSION)
+FILES = configure configure.ac install-sh LICENSE Makefile.in README.md
 
 # main - Compiles all code needed to get hypno running
 main: vendor/liblua.a
 main: CFLAGS += -DNO_HTTPS_SUPPORT
 main: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
-	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
-	$(CC) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
 
 
 # main-ssl: Identical to main except with these SSL targets.
@@ -94,9 +95,9 @@ main-ssl: LDFLAGS += -lgnutls
 main-ssl: CFLAGS += -DINCLUDE_GNUTLS
 main-ssl: $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(NAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(NAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(NAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
+	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
 
 
 #	$(CC) $(LDFLAGS) -llzma -lbz2 -lz $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a $(srcdir)/vendor/libarchive.a
@@ -138,50 +139,42 @@ install: filesystem-install $(INITMETHOD)-install
 	@printf '' > /dev/null
 
 
+echos:
+	echo $(BINDIR)
+	echo $(BINNAME)
+	echo $(PREFIX)
+	echo @LIBS@
+
 # filesystem-install - Installs targets to $PREFIX/{bin,share} and /var/lib
 filesystem-install:
 	install -d $(PREFIX)/bin
 	install -m 0755 $(srcdir)/bin/hypno-cli $(PREFIX)/bin/
 	install -m 0755 $(srcdir)/bin/hypno-harness $(PREFIX)/bin/
 	install -m 0755 $(srcdir)/bin/hypno-server $(PREFIX)/bin/
-	install -d $(PREFIX)/share/$(NAME)
-	install -m 644 $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
-	install -d /etc/$(NAME)
-	install -m 644 $(srcdir)/etc/etc.hypno.hypno.lua /etc/$(NAME)/hypno.lua
+	install -d $(PREFIX)/share/$(BINNAME)
+	install -m 644 $(srcdir)/share/* $(PREFIX)/share/$(BINNAME)/
+	install -d /etc/$(BINNAME)
+	install -m 644 $(srcdir)/etc/etc.hypno.hypno.lua /etc/$(BINNAME)/hypno.lua
 	-mkdir -p $(WWWROOT)/ && chown $(SRVUSER):$(SRVGROUP) $(WWWROOT)/
 
 
 # lib-install - Create and install library directory for extensions
 lib-install:
-	install -d /var/lib/$(NAME)
-	install -m 0755 $(srcdir)/lib/* /var/lib/$(NAME)/
-	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(NAME)/
+	install -d /var/lib/$(BINNAME)
+	install -m 0755 $(srcdir)/lib/* /var/lib/$(BINNAME)/
+	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(BINNAME)/
 
-
-x-install:
-	install -d $(PREFIX)/bin
-	install -m 0755 $(srcdir)/bin/hypno-cli $(PREFIX)/bin/
-	install -m 0755 $(srcdir)/bin/hypno-harness $(PREFIX)/bin/
-	install -m 0755 $(srcdir)/bin/hypno-server $(PREFIX)/bin/
-	-test -d $(PREFIX)/share/$(NAME)/ || mkdir -p $(PREFIX)/share/$(NAME)/
-	test -d $(PREFIX)/share/$(NAME)/
-	cp $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
-	-test -d /etc/$(NAME) || mkdir -p /etc/$(NAME)/
-	cp $(srcdir)/share/etc.hypno.hypno.lua /etc/$(NAME)/hypno.lua
-	-mkdir -p $(WEBDIR)/ && chown $(SRVUSER):$(SRVGROUP) $(WEBDIR)/
-	-test -d /var/lib/$(NAME)/ || mkdir /var/lib/$(NAME)/
-	test -d /var/lib/$(NAME)/
-	-cp $(srcdir)/lib/* /var/lib/$(NAME)/
-	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(NAME)/
 
 # systemd-install - Installs systemd on Linux systems
-#systemd-install: SVCPATH = ./svc
 systemd-install:
-	@echo $(SVCPATH)/$(NAME).service
-
-xx-install:
-	sed '{ s#__PREFIX__#$(PREFIX)#; s#__SRVUSER__#$(SRVUSER)#; s#__SRVGROUP__#$(SRVGROUP)#; s#__LOGDIR__#$(LOGDIR)#g; s#__WWWROOT__#$(WWWROOT)# }' \
-		$(srcdir)/etc/etc.systemd.system.hypno.service > $(SVCPATH)/$(NAME).service
+	sed "{ \
+		s#__PREFIX__#$(PREFIX)#; \
+		s#__SRVUSER__#$(SRVUSER)#; \
+		s#__SRVGROUP__#$(SRVGROUP)#; \
+		s#__LOGDIR__#$(LOGDIR)#g; \
+		s#__WWWROOT__#$(WWWROOT)#; \
+		s/__WWWPORT__/$(WWWPORT)/; \
+	}" $(srcdir)/etc/etc.systemd.system.hypno.service > $(SVCPATH)/$(BINNAME).service
 
 
 
@@ -193,16 +186,16 @@ cygwin-install:
 
 # uninstall - Uninstalls hypno
 uninstall:
-	rm -f $(PREFIX)/bin/$(NAME)-cli
-	rm -f $(PREFIX)/bin/$(NAME)-harness
-	rm -f $(PREFIX)/bin/$(NAME)-server
-	rm -f $(SVCPATH)
-	rm -f /etc/$(NAME)/*
-	-rmdir /etc/$(NAME)
-	rm -f /var/lib/$(NAME)/*
-	-rmdir /var/lib/$(NAME)
-	rm -f $(PREFIX)/share/$(NAME)/*
-	-rmdir $(PREFIX)/share/$(NAME)
+	rm -f $(PREFIX)/bin/$(BINNAME)-cli
+	rm -f $(PREFIX)/bin/$(BINNAME)-harness
+	rm -f $(PREFIX)/bin/$(BINNAME)-server
+	rm -f $(SVCPATH)/$(BINNAME).service
+	rm -f /etc/$(BINNAME)/*
+	-rmdir /etc/$(BINNAME)
+	rm -f /var/lib/$(BINNAME)/*
+	-rmdir /var/lib/$(BINNAME)
+	rm -f $(PREFIX)/share/$(BINNAME)/*
+	-rmdir $(PREFIX)/share/$(BINNAME)
 
 
 # examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
@@ -214,7 +207,7 @@ examples:
 		hosts = {}; for k,v in pairs(a.hosts) do table.insert( hosts, 'http://' .. k ) end; \
 		print( 'Hosts at example/config.lua are:\n' .. table.concat( hosts, '\n' ) );"
 	@printf "Starting hypno-server, and listening for requests at port 2222...\n"
-	@$(srcdir)/bin/$(NAME)-server \
+	@$(srcdir)/bin/$(BINNAME)-server \
 		--start --port $(PORT) --config $(srcdir)/example/config.lua --user $$USER
 
 
@@ -230,7 +223,7 @@ repl:
 	$(CC) $(CFLAGS) -fPIC -c vendor/zhasher.c -o shared/zhasher.o
 	$(CC) $(CFLAGS) -fPIC -c src/luabind.c -o shared/luabind.o
 	$(CC) $(CFLAGS) -fPIC -c src/lua-db.c -o shared/lua-db.o
-	$(CC) -shared $(LDFLAGS) $(CFLAGS) -fPIC -o lib$(NAME).so shared/database.o \
+	$(CC) -shared $(LDFLAGS) $(CFLAGS) -fPIC -o lib$(BINNAME).so shared/database.o \
 		shared/lua-db.o shared/zhasher.o shared/luabind.o
 	lua -l libhypno - < tests/lua-db/dbtest.lua
  
@@ -244,8 +237,8 @@ test:
 
 # test-invoke - Run a test invocation
 test-invoke:
-	echo sudo ASAN_OPTIONS=$$ASAN_OPTIONS bin/hypno-server --start --port 80 --config ../www/config.lua -x
-	sudo ASAN_OPTIONS=$$ASAN_OPTIONS bin/hypno-server --start --port 80 --config ../www/config.lua -x
+	echo sudo ASAN_OPTIONS=$$ASAN_OPTIONS bin/hypno-server --start --port $(WWWROOT) --config ../www/config.lua -x
+	sudo ASAN_OPTIONS=$$ASAN_OPTIONS bin/hypno-server --start --port $(WWWROOT) --config ../www/config.lua -x
 
 # vendor/libssl.a - Build OpenSSL
 vendor/libssl.a vendor/libcrypto.a &:
@@ -289,12 +282,12 @@ stress:
 
 # pkg - Make a package of the latest tagged version for distribution
 pkg:
-	git archive --format tar HEAD | gzip > build/$(NAME)-`git tag | tail -n 1`.tar.gz
+	git archive --format tar HEAD | gzip > build/$(BINNAME)-`git tag | tail -n 1`.tar.gz
 
 # pkgtest - Make a package of the latest version of dev
 pkgtest:
 	git archive --format tar HEAD | \
-		gzip > $(NAME)-`git tag | tail -n 1`.tar.gz
+		gzip > $(BINNAME)-`git tag | tail -n 1`.tar.gz
 
 # umakefile - Generate a Makefile appropriate for a regular user
 nmakefile:
