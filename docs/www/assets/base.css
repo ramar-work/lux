@@ -1,0 +1,588 @@
+/* ---------------------------------------------- *
+base.css
+========
+
+Author
+------
+Antonio R. Collins II (ramar@collinsdesign.net)
+
+Copyright
+---------
+Copyright 2016-Present, "Tubular Modular"
+Original Author Date: Tue Jul 26 07:26:29 2016 -0400
+
+Summary
+-------
+Default stylesheet. 
+
+ * ---------------------------------------------- */
+html, body, div, 
+h1, h2, h3, h4, h5, h6, 
+p, pre,
+a, img, b, u, i, center, dl, dt, dd, ol, ul, li,
+fieldset, form, label, legend, table, caption, 
+tbody, tfoot, thead, tr, th, td, article, aside, 
+canvas, details, embed, figure, figcaption, 
+footer, header, hgroup, menu, nav, output, ruby, 
+section, summary, time, mark, audio, video {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	font-size: 100%;
+	font: inherit;
+	vertical-align: baseline;
+}
+/* HTML5 display-role reset for older browsers */
+article, aside, details, figcaption, figure, 
+footer, header, hgroup, menu, nav, section {
+	display: block;
+}
+body {
+	line-height: 1;
+}
+ol, ul {
+	list-style: none;
+}
+blockquote, q {
+	quotes: none;
+}
+blockquote:before, blockquote:after, q:before, q:after {
+	content: '';
+	content: none;
+}
+table {
+	border-collapse: collapse;
+	border-spacing: 0;
+}
+
+/*global*/
+html {
+	font-family: "Kanit", sans-serif;
+	background-color: #000307;
+	background-color: #000711; 
+	background-color: rgb(243,250,255);
+	background-color: #fff; 
+	color: #000;
+	color: #000307;
+	color: #000711; 
+}
+
+pre {
+	font-family: monaco, "Bitstream Vera Sans Mono", monospace;
+	width: 95%;
+	margin: 0 auto;
+	background-color: white;
+	color: black;
+	margin-top: 10;
+	padding: 5;
+}
+
+h1,h2,h3,h4,h5,h6 {
+	margin-bottom: 10px;
+}
+
+h1 { font-size: 4em; }
+h2 { font-size: 3.5em; }
+h3 { font-size: 3.0em; }
+h4 { font-size: 2.7em; }
+h5 { font-size: 2.4em; }
+h6 { font-size: 2.0em; }
+
+
+header {
+	display: none;
+/*
+	position: fixed;
+	min-width: 60px;
+	max-width: 140px;
+	min-height: 80px;
+	padding-left: 10px;
+	top: 90%;
+	height: 5%;
+	top: 0%;
+	height: 50%;
+	width: 10%;
+	z-index: 9999999;
+*/
+}
+
+header ul {
+	position: relative;
+	top: 20px;
+}
+
+header li {
+	position: relative;
+}
+
+header li a {
+	color: white;
+	text-decoration: none;
+	font-size: 15px;
+	font-weight: bold;
+	line-height: 1.5em;	
+	transition: background-color 0.3s, color 0.3s;
+	padding-right: 30px;
+	background: rgba(0, 7, 17, 0.7);
+}
+
+header li a:hover {
+	color: black;
+	/*background-color: #fff;*/
+	background: rgba(255, 255, 255, 1);
+}
+
+/*slap the icon on here, let's see what happens...*/
+header .icon {
+	display: inline-block;
+	color: white;
+	text-align: center;
+	font-size: 17px;
+	position: relative;
+	margin: 0 auto;
+	background: rgba(0, 3, 7, 1);
+	border: 5px solid white;
+	border-radius: 35px;
+	top: 10px;
+	left: -4px;
+	width: 50px;
+	height: 50px;
+}
+
+header .icon span {
+	position: relative;
+	top: 10px;
+}
+
+header .icon span:nth-child(2) {
+	position: relative;
+	font-size: 9px;
+	text-transform: uppercase;
+	letter-spacing: 1.5px;
+	left: 1px;
+}
+
+footer {
+	position: relative;	
+	background: rgb( 0, 0, 0 );
+	color: white;
+	font-size: 0.6em;
+	text-align: center;
+	top: 0px;
+	line-height: 13px;
+	min-height: 50px;
+	padding-top: 20px;
+	padding-bottom: 20px;
+	margin-bottom: 0px;
+	width: 100%;
+}
+
+footer a ,
+footer a:visited {
+	color: white;
+}
+
+.container {
+	width: 100%;
+	height: auto;
+}
+
+.container-full {
+	position: relative;
+	width: 100%;
+	display: block;
+	z-index: 19;
+}
+
+.container-top,.container-bottom {
+	position: fixed;
+	top: 0px;
+	left: 0px;	
+	height: 40px;
+  background-image: linear-gradient(to top, rgba(0,3,7,0), rgba(0,3,7,1));
+}
+
+.project li .half .container-full { 
+	display: none;
+  background: rgba(0,3,7,1);
+}
+
+.project li h6 {
+	font-size: 1.2em;
+	font-weight: bold;
+}
+
+.project li .stack li {
+	list-style: square;
+	text-indent: 20px;
+	margin-bottom: 5px;
+}
+
+.project li a.link ,
+.project li a.link:visited {
+	color: white;
+	font-weight: bold;
+	display: block;
+	margin-top: 5px;
+	margin-bottom: 5px;
+	text-decoration: none;
+}
+
+.project li .full {
+	width: 75%;
+	height: 80%;
+	margin: 0 auto;
+	margin-top: 30%; 
+	min-width: 300px;
+	min-height: 300px;
+}
+
+.project li .full:nth-child(1) {
+	margin-top: 20%; 
+}
+
+.project li .half {
+	position: relative;
+	display: inline-block;
+	margin-top: 0%;
+	margin-right: 2%;
+	width: 38%;
+	height: 50%;
+}
+
+.project li .half p {
+	font-size: 1.2em;
+	line-height: 1.2em;
+	margin-bottom: 10px;
+}
+
+.project li .images {
+	display: inline-block;
+	width: 55%; 
+	float: right;
+}
+
+.project li .images li {
+	margin: 0 auto;
+	vertical-align: top;
+	display: inline-block;
+	width: 30%;
+	height: auto;
+	position: relative;
+	margin-left: 1%;
+	margin-right: 1%;
+	margin-bottom: 7px;
+}
+
+.project li .images li:nth-child(1) {
+	display: inline-block;
+	width: 100%;
+	height: auto;
+	margin-bottom: 10px;
+	margin-left: 0px;
+	margin-right: 0px;
+	filter: sepia(0%);
+	transition: filter 0.2s background-color 0.2s;
+}
+
+.project li .images li:not(:nth-child(1)):hover {
+	opacity: 0.8;
+	filter: sepia(60%);
+	background-color: orange;
+}
+
+.project li .half img {
+	width: 100%;
+}
+
+.project li .images li img {
+	width: 100%;
+}
+
+.project li:nth-child(even) .half {
+	float: right;
+}
+
+.project li:nth-child(even) .images {
+	float: left;
+}
+
+.project li.project-li {
+	margin-bottom: 30px;
+}
+
+.middle {
+	width: 70%;
+	min-width: 300px;
+	margin: 0 auto;
+	margin-top: 15%;
+	min-height: 80%;
+}
+
+.middle ul.langs {
+	list-style: inside; 	
+	list-style-type: disc; 	
+	line-height: 1.2em;
+	margin-bottom: 40px;
+}
+
+.middle ul.contact {
+	font-size: 1.2em;
+}
+
+.middle ul.contact li:nth-child(1) {
+	font-weight: bold;
+	text-decoration: underline;
+	line-height: 1.7em;
+}
+
+.middle p {
+	margin-bottom: 10px;
+}
+
+.middle pre {
+	margin-top: 20px;
+	margin-bottom: 20px;
+	padding: 10px;
+}
+
+.middle ul {
+	margin-bottom: 20px;
+}
+
+.blog {
+	z-index: 0;
+}
+
+.blog h1 a,
+.blog h2 a,
+.blog h3 a,
+.blog h1 a:visited,
+.blog h2 a:visited,
+.blog h3 a:visited
+{
+	text-decoration: none;
+	letter-spacing: 2px;
+	color: #000711; 
+}
+
+
+.blog div.time {
+	font-size: 0.7em;
+	word-spacing: 3px;
+	text-align: right;
+	margin-bottom: 15px;
+}
+
+.blog div.time span {
+	word-spacing: 0px;
+}
+
+.blog div.post {
+	margin-bottom: 55px;
+}
+
+.blog div.post a.comments {
+	color: white;	
+	font-size: 0.8em;
+}
+
+.blog div.post .featured-image {
+	position: relative;
+	width: 100%;
+	height: 200px;
+	overflow: hidden;
+	margin-bottom: 10px;	
+}
+
+.blog div.post .featured-image img {
+	position: relative;
+	width: 100%;
+	top: -300px;
+}
+
+.blog div.post p {
+	line-height: 1.2em;	
+	font-size: 1.4em;	
+}
+
+
+/*The text itself*/
+.contact p {
+	line-height: 1.2em;	
+	font-size: 1.6em;	
+	margin-top: 40px;
+	margin-bottom: 40px;
+}
+
+.contact {
+	position: relative;
+	padding-bottom: 10px;
+}
+
+.contact ul {
+	margin-bottom: 40px;	
+}
+
+.contact ul li {
+	list-style-type: none;	
+}
+
+.contact ul li li {
+	font-size: 1.3em;	
+	margin-left: 20px;	
+	line-height: 1.3em;
+}
+
+.contact section {
+	margin-bottom: 80px;	
+	border-bottom: 1px solid white;
+}
+
+.switch-theme {
+	margin-top: 12px; 
+	font-size: 0.7em;
+}
+
+.switch-theme a:hover {
+	text-decoration: underline;	
+}
+
+.switch-theme p {
+	font-size: 0.8em;
+	margin-bottom: 3px;
+}
+
+@media screen and (max-width: 666px) {
+
+	header {
+		height: 80px;
+		width: 100%;
+		max-width: 100%;
+		text-align: center;
+		/*background: rgba(0, 3, 7, 1);*/
+	}
+
+	header ul {
+		top: -40px; /*clear the logo*/
+		left: 100px;
+		text-align: center;
+	}
+
+	header .icon {
+		font-size: 0.8em;
+		width: 40px;	
+		height: 40px;
+		left: -50px;
+		top: 15px;
+	}
+
+	header .icon span:nth-child(2) {
+		font-size: 0.5em;
+	}
+
+	header li a {
+		position: relative;
+		left: -70px;
+		font-size: 0.8em;
+		padding-right: 20px;
+		padding-left: 20px;
+	}
+
+	.middle {
+		position:relative;
+		top: 70px;
+	}
+
+	.project li .full {
+		margin-top: 22%; 
+		height: 90%;
+	}
+
+	.project li {
+		/*margin-bottom: 100px;*/
+	}
+
+	.project li .half ,
+	.project li .images {
+		width: 100%;
+		float: none;
+	}
+
+	.project li .images {
+		width: 80%;
+		position: relative;
+		left: 10%;
+	}
+
+	.project li .images li {
+		width: 20%;
+	}
+
+	.project li .half img {
+		margin: 0 auto; 
+		width: 75%;
+		margin-left: 12.5%;
+	}
+
+	.project li .half { 
+		max-height: 300px;
+		margin-bottom: 30px;
+		overflow: auto;
+		padding-bottom: 10px;
+		padding-right: 20px;
+	}
+	
+	/*
+	.project li .half .container-full { 
+		display: block;
+		position: absolute;
+		bottom: 0px;
+		height: 10px;
+	}
+	*/
+
+	/* width */
+	.project li ::-webkit-scrollbar {
+		width: 10px;
+	}
+
+	/* Track */
+	.project li ::-webkit-scrollbar-track {
+		background: #f1f1f1; 
+		border-radius: 5px;
+		-moz-border-radius: 5px;
+		-gecko-border-radius: 5px;
+	}
+	 
+	/* Handle */
+	.project li ::-webkit-scrollbar-thumb {
+		background: #888; 
+		border-radius: 5px;
+		-moz-border-radius: 5px;
+		-gecko-border-radius: 5px;
+	}
+
+	/* Handle on hover */
+	.project li ::-webkit-scrollbar-thumb:hover {
+		background: #555; 
+	}
+
+	.project li h1 {
+		font-size: 1.1em;	
+		font-weight: bold;
+	}
+
+	.project li .half h1 {
+		font-size: 2.0em;	
+		font-weight: bold;
+		text-align: center;
+	}
+
+	.switch-theme {
+		position: absolute;
+		top: 15px;
+		left: 20px;
+		color: white;
+	}
+}

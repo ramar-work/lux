@@ -17,7 +17,6 @@ autom4te.cache/
 artwork/
 bin/
 build/
-docs/
 example/c/app.so
 example/file
 example/file.local

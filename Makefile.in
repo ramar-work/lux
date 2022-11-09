@@ -71,7 +71,6 @@ SRC = \
 	@srcdir@/src/filters/filter-lua.c
 OBJ = ${SRC:.c=.o}
 TARGET = main
-TESTS = luabind router util
 UNAME = $(shell uname)
 DOMAIN = localhost 
 DISTDIR = $(BINNAME)-$(VERSION)
@@ -86,64 +85,23 @@ main: $(OBJ)
 	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
 	$(CC) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
 
-
-# main-ssl: Identical to main except with these SSL targets.
-main-ssl: vendor/libssl.a
-main-ssl: vendor/libcrypto.a
-main-ssl: vendor/liblua.a
-main-ssl: LDFLAGS += -lgnutls
-main-ssl: CFLAGS += -DINCLUDE_GNUTLS
-main-ssl: $(OBJ)
+# with-ssl: Identical to main except with inclusion of SSL targets.
+with-ssl: $(OBJ) vendor/liblua.a vendor/libssl.a vendor/libcrypto.a
+with-ssl: LDFLAGS += -lgnutls
+with-ssl: CFLAGS += -DINCLUDE_GNUTLS
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
 
-
-#	$(CC) $(LDFLAGS) -llzma -lbz2 -lz $(CFLAGS) $(srcdir)/src/cli/package.c -o $(srcdir)/bin/$(NAME)-package $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a $(srcdir)/vendor/libarchive.a
-# debug - Builds code with debugging flags on
-debug: debug-clang
-	@printf '' > /dev/null
-
-
-clang: CC = clang
-clang: CFLAGS = $(CLANGFLAGS) -g $(DEBUGFLAGS)
-clang: vendor/liblua.a
-clang: vendor/libssl.a
-clang: vendor/libcrypto.a
-clang: main
-	@printf '' > /dev/null
-
-debug-clang: CC = clang
-debug-clang: CFLAGS = $(CLANGFLAGS)
-debug-clang: CFLAGS += -g -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
-debug-clang: vendor/liblua.a
-debug-clang: vendor/libssl.a
-debug-clang: vendor/libcrypto.a
-debug-clang: main
-	@printf '' > /dev/null
-
-debug-gcc: CC = gcc
-debug-gcc: CFLAGS += -g -O0 $(DEBUGFLAGS)
-debug-gcc: vendor/liblua.a
-debug-gcc: vendor/libssl.a
-debug-gcc: vendor/libcrypto.a
-debug-gcc: main
-	@printf '' > /dev/null
-
-debug-fork: main
+# debug - Builds code with debugging flags on (need logic for if CC == clang)
+debug: CFLAGS += -g -O0 -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
+debug: main
 	@printf '' > /dev/null
 
 # install - Runs a full system install
 install: filesystem-install $(INITMETHOD)-install
 	@printf '' > /dev/null
-
-
-echos:
-	echo $(BINDIR)
-	echo $(BINNAME)
-	echo $(PREFIX)
-	echo @LIBS@
 
 # filesystem-install - Installs targets to $PREFIX/{bin,share} and /var/lib
 filesystem-install:
@@ -157,13 +115,11 @@ filesystem-install:
 	install -m 644 $(srcdir)/etc/etc.hypno.hypno.lua /etc/$(BINNAME)/hypno.lua
 	-mkdir -p $(WWWROOT)/ && chown $(SRVUSER):$(SRVGROUP) $(WWWROOT)/
 
-
 # lib-install - Create and install library directory for extensions
 lib-install:
 	install -d /var/lib/$(BINNAME)
 	install -m 0755 $(srcdir)/lib/* /var/lib/$(BINNAME)/
 	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(BINNAME)/
-
 
 # systemd-install - Installs systemd on Linux systems
 systemd-install:
@@ -176,13 +132,9 @@ systemd-install:
 		s/__WWWPORT__/$(WWWPORT)/; \
 	}" $(srcdir)/etc/etc.systemd.system.hypno.service > $(SVCPATH)/$(BINNAME).service
 
-
-
 # cygwin-install - Installs hypno as a service suitable for use with Cygwin 
 cygwin-install:
 	cygstart --action=runas cygrunsrv --install hypno --user $(USER) -p /usr/local/bin/hypno-server -a '--start --config /var/www/config.lua'
-
-
 
 # uninstall - Uninstalls hypno
 uninstall:
@@ -197,11 +149,9 @@ uninstall:
 	rm -f $(PREFIX)/share/$(BINNAME)/*
 	-rmdir $(PREFIX)/share/$(BINNAME)
 
-
 # examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
 examples: PORT=2222
 examples: $(TARGET) 
-examples: 
 	@clear
 	@lua -e "a=loadfile( 'example/config.lua' )(); \
 		hosts = {}; for k,v in pairs(a.hosts) do table.insert( hosts, 'http://' .. k ) end; \
@@ -210,46 +160,18 @@ examples:
 	@$(srcdir)/bin/$(BINNAME)-server \
 		--start --port $(PORT) --config $(srcdir)/example/config.lua --user $$USER
 
-
+# vendor/sqlite3.o - Build SQLite from our local copy
 vendor/sqlite3.o: CFLAGS+=-Wno-misleading-indentation -Wno-deprecated-declarations
 vendor/sqlite3.o:
 	$(CC) $(CFLAGS) -lpthread -c -o vendor/sqlite3.o vendor/sqlite3.c
 
-
-# repl - Build and test libraries for REPL usage
-#	test -f sqlite3.o || $(CC) $(CFLAGS) -fPIC -c vendor/sqlite3.c -o shared/sqlite3.o
-repl:
-	$(CC) $(CFLAGS) -fPIC -c src/database.c -o shared/database.o
-	$(CC) $(CFLAGS) -fPIC -c vendor/zhasher.c -o shared/zhasher.o
-	$(CC) $(CFLAGS) -fPIC -c src/luabind.c -o shared/luabind.o
-	$(CC) $(CFLAGS) -fPIC -c src/lua-db.c -o shared/lua-db.o
-	$(CC) -shared $(LDFLAGS) $(CFLAGS) -fPIC -o lib$(BINNAME).so shared/database.o \
-		shared/lua-db.o shared/zhasher.o shared/luabind.o
-	lua -l libhypno - < tests/lua-db/dbtest.lua
- 
-# test -  Build all test files
-test: $(OBJ) 
-test: CFLAGS += -g -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS) -DTEST_H
-test:
-	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	for t in $(TESTS); do $(CC) $(LDFLAGS) $(CFLAGS) -o bin/$$t src/test/$${t}-test.c $(OBJ); done
-
-
-# test-invoke - Run a test invocation
-test-invoke:
-	echo sudo ASAN_OPTIONS=$$ASAN_OPTIONS bin/hypno-server --start --port $(WWWROOT) --config ../www/config.lua -x
-	sudo ASAN_OPTIONS=$$ASAN_OPTIONS bin/hypno-server --start --port $(WWWROOT) --config ../www/config.lua -x
-
-# vendor/libssl.a - Build OpenSSL
+# vendor/libssl.a - Build OpenSSL libs statically
 vendor/libssl.a vendor/libcrypto.a &:
 	-@cd vendor/ && tar xzf openssl-1.1.1l.tar.gz && cd openssl-1.1.1l && ./config && make && mv libssl.a libcrypto.a ../
 
-# vendor/liblua.a - Build Lua 5.4.3
+# vendor/liblua.a - Build Lua 5.4.3 statically
 vendor/liblua.a: 
 	-@cd vendor/ && cd lua-5.4.3 && make MYCFLAGS="-fPIC" && mv src/liblua.a ../
-
-#	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
-#	$(CC) $(CFLAGS) -o $(srcdir)/vendor/sqlite3.o -c $(srcdir)/vendor/sqlite3.c 
 
 # clean - Get rid of object files and tests 
 clean:
@@ -257,58 +179,10 @@ clean:
 	-@find $(srcdir)/bin/ -maxdepth 1 -type f | xargs rm
 	-@find $(srcdir)/vendor/ -maxdepth 1 -type f -name "*.o" | xargs rm
 
-#-@find $(srcdir)/vendor/ -maxdepth 1 -type f -name "*.o" ! -name "sqlite3.o" | xargs rm
-
 # list - List all the targets and what they do
 list:
 	@printf 'Available options are:\n'
 	@sed -n '/^# / { s/# //; 1d; p; }' Makefile | awk -F '-' '{ printf "  %-20s - %s\n", $$1, $$2 }'
-
-# plat - Build on a different platform by specifying the target
-# figure out host and ping it to see if its running
-# either package this or scp -r * to host
-# go to host and try to build with commands
-# exit
-plat:
-	make -f build/Makefile.arch boom
-	echo $(OS)	
-	
-#if 0
-# stress - Stress test the server
-stress: LIMIT=512
-stress: URL="http://carolinascholar.com/login?xasdfas=asdfsa" 
-stress:
-	tests/stress.sh $(LIMIT) $(URL)
-
-# pkg - Make a package of the latest tagged version for distribution
-pkg:
-	git archive --format tar HEAD | gzip > build/$(BINNAME)-`git tag | tail -n 1`.tar.gz
-
-# pkgtest - Make a package of the latest version of dev
-pkgtest:
-	git archive --format tar HEAD | \
-		gzip > $(BINNAME)-`git tag | tail -n 1`.tar.gz
-
-# umakefile - Generate a Makefile appropriate for a regular user
-nmakefile:
-	@sed '/^# /d' Makefile | cpp - | sed '/^# /d'
-
-# changelog - Generate a full changelog from the commit history
-changelog:
-	@printf "# CHANGELOG\n\n"
-	@printf "## STATS\n\n"
-	@printf -- "- Commit count: "
-	@git log --full-history --oneline | wc -l
-	@printf -- "- Project Inception "
-	@git log --full-history | grep Date: | tail -n 1
-	@printf -- "- Last Commit "
-	@git log -n 1 | grep Date:
-	@printf -- "- Authors:\n"
-	@git log --full-history | grep Author: | sort | uniq | sed '{ s/Author: //; s/^/\t- /; }'
-	@printf "\n"
-	@printf "## HISTORY\n\n"
-	@git log --full-history --author=Antonio | sed '{ s/^   /- /; }'
-	@printf "\n<link rel=stylesheet href=changelog.css>\n"
 
 # Create a package (in a different way)
 dist: $(DISTDIR).tar.gz
@@ -341,10 +215,7 @@ distcheck:
 	rm -rf $(DISTDIR)
 	@echo "*** package $(DISTDIR).tar.gz is ready for distribution."
 	
-#endif
-
-
-# Run common tests
+# check - Run common tests
 # Test:
 # server
 # harness
@@ -353,28 +224,12 @@ distcheck:
 check: main
 	@echo "*** all tests passed"	
 
+# copyright-update - Update copyright info across all source code
 copyright-update:
 	@find src -type f -name "*.[ch]" | \
 		xargs sed -i "s/Copyright 2020-$$(( `date +%Y` - 1 ))/Copyright 2020-`date +%Y`/"
 
-docs:
-	-@mkdir docs/
-	FF=/tmp/readme.`date +%F`.$$RANDOM.md; \
-	markdown README.md > $$FF && \
-	for n in `grep --line-number 'pre>' $$FF | \
-		sed '{ s#<pre>#,#; s#</pre>#|# }' | \
-		awk -F ':' '{ printf "%d%s", $$1, $$2 }' | \
-		sed '{ s/ //g; s/|/ /g }'`; \
-	do \
-		L=`echo $$n | awk -F ',' '{ print $$1 }'`; \
-		R=`echo $$n | awk -F ',' '{ print $$2 }'`; \
-		sed -i "{ \
-			$$(( $$L + 1 )),$$(( $$R - 1 ))s/</\&lt/g; \
-			$$(( $$L + 1 )),$$(( $$R - 1 ))s/>/\&gt;/g \
-		}" $$FF; \
-	done && \
-	mv $$FF docs/index.html
-
+# Makefile - Generate a Makefile
 Makefile: Makefile.in config.status
 	./config.status $@
 
@@ -386,6 +241,7 @@ README.md: docs
 
 # By default, we need to be running https
 # A command-line for generating self signed certs is below
+# cert - Generate a certificate
 cert: CERTNAME=cert
 cert:
 	-mkdir tmp/
