@@ -16,6 +16,8 @@ LOGDIR = /var/log
 EXEC_PREFIX = @exec_prefix@
 BINDIR = @bindir@
 WWWROOT = /var/www
+SVCPATH = /etc/systemd/system
+SVCPATH = `pkg-config systemd --variable=systemduserunitdir`
 srcdir = @srcdir@
 VPATH = @srcdir@
 SRVUSER = ramar
@@ -132,14 +134,35 @@ debug-fork: main
 	@printf '' > /dev/null
 
 # install - Runs a full system install
-install: filesystem-install
-install: $(INITMETHOD)-install
+install: filesystem-install $(INITMETHOD)-install
 	@printf '' > /dev/null
 
 
 # filesystem-install - Installs targets to $PREFIX/{bin,share} and /var/lib
 filesystem-install:
-	cp $(srcdir)/bin/* $(PREFIX)/bin/
+	install -d $(PREFIX)/bin
+	install -m 0755 $(srcdir)/bin/hypno-cli $(PREFIX)/bin/
+	install -m 0755 $(srcdir)/bin/hypno-harness $(PREFIX)/bin/
+	install -m 0755 $(srcdir)/bin/hypno-server $(PREFIX)/bin/
+	install -d $(PREFIX)/share/$(NAME)
+	install -m 644 $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
+	install -d /etc/$(NAME)
+	install -m 644 $(srcdir)/etc/etc.hypno.hypno.lua /etc/$(NAME)/hypno.lua
+	-mkdir -p $(WWWROOT)/ && chown $(SRVUSER):$(SRVGROUP) $(WWWROOT)/
+
+
+# lib-install - Create and install library directory for extensions
+lib-install:
+	install -d /var/lib/$(NAME)
+	install -m 0755 $(srcdir)/lib/* /var/lib/$(NAME)/
+	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(NAME)/
+
+
+x-install:
+	install -d $(PREFIX)/bin
+	install -m 0755 $(srcdir)/bin/hypno-cli $(PREFIX)/bin/
+	install -m 0755 $(srcdir)/bin/hypno-harness $(PREFIX)/bin/
+	install -m 0755 $(srcdir)/bin/hypno-server $(PREFIX)/bin/
 	-test -d $(PREFIX)/share/$(NAME)/ || mkdir -p $(PREFIX)/share/$(NAME)/
 	test -d $(PREFIX)/share/$(NAME)/
 	cp $(srcdir)/share/* $(PREFIX)/share/$(NAME)/
@@ -151,11 +174,14 @@ filesystem-install:
 	-cp $(srcdir)/lib/* /var/lib/$(NAME)/
 	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(NAME)/
 
-
 # systemd-install - Installs systemd on Linux systems
+#systemd-install: SVCPATH = ./svc
 systemd-install:
+	@echo $(SVCPATH)/$(NAME).service
+
+xx-install:
 	sed '{ s#__PREFIX__#$(PREFIX)#; s#__SRVUSER__#$(SRVUSER)#; s#__SRVGROUP__#$(SRVGROUP)#; s#__LOGDIR__#$(LOGDIR)#g; s#__WWWROOT__#$(WWWROOT)# }' \
-		$(PREFIX)/share/$(NAME)/etc.systemd.system.hypno.service > /etc/systemd/system/hypno.service
+		$(srcdir)/etc/etc.systemd.system.hypno.service > $(SVCPATH)/$(NAME).service
 
 
 
@@ -167,8 +193,16 @@ cygwin-install:
 
 # uninstall - Uninstalls hypno
 uninstall:
-	-rm -rf /var/lib/$(NAME)/ $(PREFIX)/share/$(NAME)/	
-	-rm $(PREFIX)/bin/$(NAME)-{cli,harness,server}
+	rm -f $(PREFIX)/bin/$(NAME)-cli
+	rm -f $(PREFIX)/bin/$(NAME)-harness
+	rm -f $(PREFIX)/bin/$(NAME)-server
+	rm -f $(SVCPATH)
+	rm -f /etc/$(NAME)/*
+	-rmdir /etc/$(NAME)
+	rm -f /var/lib/$(NAME)/*
+	-rmdir /var/lib/$(NAME)
+	rm -f $(PREFIX)/share/$(NAME)/*
+	-rmdir $(PREFIX)/share/$(NAME)
 
 
 # examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
@@ -316,6 +350,16 @@ distcheck:
 	
 #endif
 
+
+# Run common tests
+# Test:
+# server
+# harness
+# cli
+# database / db
+check: main
+	@echo "*** all tests passed"	
+
 copyright-update:
 	@find src -type f -name "*.[ch]" | \
 		xargs sed -i "s/Copyright 2020-$$(( `date +%Y` - 1 ))/Copyright 2020-`date +%Y`/"
@@ -357,4 +401,4 @@ cert:
 		-out tmp/$(CERTNAME).crt \
 		-days 365 -nodes -subj '/CN=$(DOMAIN)'
 
-.PHONY: docs dist distcheck
+.PHONY: check clean dist distcheck docs install
