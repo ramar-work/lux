@@ -1,10 +1,72 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
-
 AC_PREREQ([2.69])
 AC_INIT([hypno], [0.3.1a], [ramar@ramar.work])
 AC_CONFIG_SRCDIR([example/c/dylib.c])
+
+# Define files to perform substitutions on
 #AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_FILES([Makefile])
+#                 example/Makefile
+#                 example/c/Makefile
+#                 tests/Makefile
+#                 vendor/lua-5.4.3/Makefile
+#                 vendor/lua-5.4.3/src/Makefile
+#                 vendor/smtp-client/Makefile])
+
+# Variables that would have a default variable in the Makefile
+wwwroot="/var/www"
+wwwport=80
+srvuser="http"
+srvgroup="http"
+logdir="/var/log/hypno"
+svcpath=`pkg-config systemd --variable=systemduserunitdir 2>/dev/null`
+default_svcpath="/usr/lib/systemd/user"
+initsys="systemd"
+systemd="yes"
+sysv="no"
+sysvpath="/etc/init.d"
+modelflags="HTHREAD_H"
+default_domain="localhost"
+
+AC_ARG_WITH([www-root], AC_HELP_STRING([--with-www-root=DIR],[Set default web directory for applications]), [wwwroot=${withval}])
+AC_SUBST(wwwroot)
+
+AC_ARG_WITH([www-port], AC_HELP_STRING([--with-www-port=PORT],[Set default server port for listening]), [wwwport=${withval}])
+AC_SUBST(wwwport)
+
+AC_ARG_WITH([server-user], AC_HELP_STRING([--with-server-user],[Set default user for managing the web server]), [srvuser=${withval}])
+AC_SUBST(srvuser)
+
+AC_ARG_WITH([server-group], AC_HELP_STRING([--with-server-group],[Set default group for managing the web server]),[srvgroup=${withval}])
+AC_SUBST(srvgroup)
+
+AC_ARG_WITH([log-dir], AC_HELP_STRING([--with-log-dir],[Set access and error log directory]), [logdir=${withval}])
+AC_SUBST(logdir)
+
+# Use enable systemd or enable sysv here
+AC_ARG_ENABLE([systemd], AC_HELP_STRING([--enable-systemd],[Use systemd units for daemon management (default)]), [systemd=${enableval}])
+
+AC_ARG_ENABLE([sysv], AC_HELP_STRING([--enable-sysv],[Use sysv-style init scripts for daemon management]), [sysv=yes], [systemd=no])
+
+# If systemd is enabled, make sure that we actually found something...
+AS_IF([test "x$systemd" == xyes],
+	[
+	AC_ARG_WITH([systemd-unit-path], 
+	AC_HELP_STRING([--with-systemd-unit-path],[Use an alternate systemd unit file path for installation]), 
+	[svcpath=${withval}])
+	]
+)
+
+# If sysv is in use instead, try to use those conventions
+AS_IF([test "x${sysv}" == xyes],[svcpath=${sysvpath}; initsys="sysv"])
+
+# Finally, if there is no service file path, set with the basic one.
+AS_IF([test -z "${svcpath}"],[svcpath=${default_svcpath}])
+
+# Replace these paths
+AC_SUBST(initsys)
+AC_SUBST(svcpath)
 
 # Checks for programs.
 AC_PROG_AWK
@@ -62,12 +124,18 @@ AC_FUNC_STRERROR_R
 AC_FUNC_STRTOD
 AC_CHECK_FUNCS([clock_gettime fdatasync floor getpagesize gettimeofday inet_ntoa localtime_r memchr memmove memset mkdir realpath select setenv setlocale socket strcasecmp strchr strcspn strdup strerror strpbrk strrchr strspn strstr strtoul utime])
 
-#                 example/Makefile
-#                 example/c/Makefile
-#                 tests/Makefile
-#                 vendor/lua-5.4.3/Makefile
-#                 vendor/lua-5.4.3/src/Makefile
-#                 vendor/smtp-client/Makefile])
-AC_CONFIG_FILES([Makefile])
+cat << EOF
+
+hypno configured with:
+Path: $wwwroot
+Default port: $wwwport
+Default server user: $srvuser
+Default server group: $srvgroup
+Default logging directory: $logdir
+Init system: $initsys
+Daemon service file path: $svcpath
+Chosen threading model: $modelflags
+Default domain: $default_domain
+EOF
 
 AC_OUTPUT

@@ -14,24 +14,25 @@ VERSION = @PACKAGE_VERSION@
 PREFIX = @prefix@
 EXEC_PREFIX = @exec_prefix@
 BINDIR = @bindir@
-LOGDIR = /var/log
-WWWROOT = /var/www
-WWWPORT = 80
-SVCPATH = /etc/systemd/system
-SVCPATH = `pkg-config systemd --variable=systemduserunitdir 2>/dev/null`
+#LOGDIR = /var/log/hypno
+LOGDIR = @logdir@
+#WWWROOT = /var/www
+WWWROOT = @wwwroot@
+#WWWPORT = 80
+WWWPORT = @wwwport@
+#SVCPATH = `pkg-config systemd --variable=systemduserunitdir 2>/dev/null`
+SVCPATH = @svcpath@
 srcdir = @srcdir@
 VPATH = @srcdir@
-SRVUSER = ramar
-SRVGROUP = ramar
+SRVUSER = @srvuser@
+SRVGROUP = @srvgroup@
 IFLAGS = -Ivendor -Ivendor/lua-5.4.3/src
 LDFLAGS = -ldl -lpthread -lm
 DEBUGFLAGS = -DDEBUG_H
 MODEL = HTHREAD_H
 ASAN_OPTIONS = log_path=asan.log
-CLANGFLAGS = -Wall -Werror -Wno-unused -Wno-format-security -Wno-unused-result -D$(MODEL) $(IFLAGS)
-GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing \
-	-Wno-format-truncation -Wno-return-local-addr -D$(MODEL) -O2 $(IFLAGS)
-INITMETHOD = systemd
+GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing -Wno-format-truncation -Wno-return-local-addr -D$(MODEL) -O2 $(IFLAGS)
+INITMETHOD = @initsys@
 CFLAGS = $(GCCFLAGS)
 CC = gcc
 SRC = \
@@ -70,25 +71,23 @@ SRC = \
 	@srcdir@/src/filters/filter-redirect.c \
 	@srcdir@/src/filters/filter-lua.c
 OBJ = ${SRC:.c=.o}
-TARGET = main
 UNAME = $(shell uname)
-DOMAIN = localhost 
+DOMAIN = @default_domain@
 DISTDIR = $(BINNAME)-$(VERSION)
 FILES = configure configure.ac install-sh LICENSE Makefile.in README.md
 
 # main - Compiles all code needed to get hypno running
-main: vendor/liblua.a
 main: CFLAGS += -DNO_HTTPS_SUPPORT
-main: $(OBJ)
+main: $(OBJ) vendor/liblua.a
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	$(CC) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
 	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
 	$(CC) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
 
 # with-ssl: Identical to main except with inclusion of SSL targets.
-with-ssl: $(OBJ) vendor/liblua.a vendor/libssl.a vendor/libcrypto.a
 with-ssl: LDFLAGS += -lgnutls
 with-ssl: CFLAGS += -DINCLUDE_GNUTLS
+with-ssl: $(OBJ) vendor/liblua.a vendor/libssl.a vendor/libcrypto.a
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
 	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
@@ -151,7 +150,7 @@ uninstall:
 
 # examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
 examples: PORT=2222
-examples: $(TARGET) 
+examples: main
 	@clear
 	@lua -e "a=loadfile( 'example/config.lua' )(); \
 		hosts = {}; for k,v in pairs(a.hosts) do table.insert( hosts, 'http://' .. k ) end; \
@@ -228,20 +227,7 @@ check: main
 copyright-update:
 	@find src -type f -name "*.[ch]" | \
 		xargs sed -i "s/Copyright 2020-$$(( `date +%Y` - 1 ))/Copyright 2020-`date +%Y`/"
-
-# Makefile - Generate a Makefile
-Makefile: Makefile.in config.status
-	./config.status $@
-
-config.status: configure
-	./config.status --recheck
-
-README.md: docs
-	printf '' >/dev/null
-
-# By default, we need to be running https
-# A command-line for generating self signed certs is below
-# cert - Generate a certificate
+# cert - Generate a certificate for use with example sites
 cert: CERTNAME=cert
 cert:
 	-mkdir tmp/
@@ -251,3 +237,9 @@ cert:
 		-days 365 -nodes -subj '/CN=$(DOMAIN)'
 
 .PHONY: check clean dist distcheck docs install
+
+Makefile: Makefile.in config.status
+	./config.status $@
+
+config.status: configure
+	./config.status --recheck
