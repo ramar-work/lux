@@ -1,0 +1,187 @@
+/* ------------------------------------------- * 
+ * config.h
+ * ========
+ * 
+ * Summary 
+ * -------
+ * General configuration at compile time
+ * Under construction.
+ *
+ * LICENSE
+ * -------
+ * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
+ * 
+ * See LICENSE in the top-level directory for more information.
+ *
+ * CHANGELOG
+ * ---------
+ * - 
+ * ------------------------------------------- */
+/* Define to the address where bug reports for this package should be sent. */
+#define PACKAGE_BUGREPORT "ramar@ramar.work"
+
+/* Define to the full name of this package. */
+#define PACKAGE_NAME "hypno"
+
+/* Define to the full name and version of this package. */
+#define PACKAGE_STRING "hypno 0.3.1"
+
+/* Define to the one symbol short name of this package. */
+#define PACKAGE_TARNAME "hypno"
+
+/* Define to the home page for this package. */
+#define PACKAGE_URL "http://ramar.work/ironhead"
+
+/* Define to the version of this package. */
+#define PACKAGE_VERSION "0.3.1"
+
+/* How long should each client be allowed to persist? */
+#ifndef CLIENT_REQUEST_TIMEOUT
+ #define CLIENT_REQUEST_TIMEOUT 5
+#endif
+
+/* Default status for too many connections */
+#ifndef LOAD_TOO_HIGH_STATUS
+ #define LOAD_TOO_HIGH_STATUS 503
+#endif
+
+/* How many clients until the main thread cleans up */
+#ifndef CLIENT_MAX_SIMULTANEOUS
+ #define CLIENT_MAX_SIMULTANEOUS @max_simultaneous_connections@
+#endif
+
+/* Where are the default htdocs? */
+#ifndef HTDOCS_DIR
+ #define HTDOCS_DIR "@wwwroot@"
+#endif
+
+/* How often should a process poll for new data? */
+#ifndef POLL_INTERVAL
+ #define POLL_INTERVAL @poll_interval@
+#endif
+
+/* Default read buffer size */
+#ifndef ZHTTP_PREAMBLE_SIZE
+ #define ZHTTP_PREAMBLE_SIZE @preamble_size@
+#endif
+
+/* Default read buffer size */
+#ifndef CTX_READ_SIZE
+ #define CTX_READ_SIZE @read_size@
+#endif
+
+/* Default file receive size (8MB) */
+#ifndef CTX_READ_MAX
+ #define CTX_READ_MAX @read_max@
+#endif
+
+/* Default write sink size (1MB) */
+#ifndef CTX_WRITE_SIZE
+ /* #define CTX_WRITE_SIZE 1048576 */
+ #define CTX_WRITE_SIZE @write_size@
+#endif
+
+/* Default stack size of each new thread  */
+#ifndef STACK_SIZE
+ #define STACK_SIZE @stack_size@
+#endif
+
+/* Default thread limit */
+#ifndef MAX_THREADS
+ #define MAX_THREADS @max_threads@
+#endif
+
+/* Default listener backlog */
+#ifndef BACKLOG
+ #define BACKLOG @socket_backlog@
+#endif
+
+/* Default logging directory */
+#ifndef ERROR_LOGDIR
+ #define ERROR_LOGDIR "@logdir@"
+#endif
+
+/* Default error log file location */
+#ifndef ERROR_LOGFILE
+ #define ERROR_LOGFILE ERROR_LOGDIR "@default_error_file_name@"
+#endif
+
+/* Default access log file location */
+#ifndef ACCESS_LOGFILE
+ #define ACCESS_LOGFILE ERROR_LOGDIR "@default_access_file_name@"
+#endif
+
+/* Enable XML support */
+#if @with_xml@
+ #define INCLUDE_XML_SUPPORT
+#endif
+
+/* Enable JSON support */
+#if @with_json@
+ #define INCLUDE_JSON_SUPPORT
+#endif
+
+/* Enable msgpack support */
+#if @with_msgpack@
+ #define INCLUDE_MSGPACK_SUPPORT
+#endif
+
+/* Deactivate TLS support */
+#if @disable_tls@
+ #define DISABLE_TLS
+#endif
+
+/* Deactivate SQLite3 interface */
+#if @disable_sqlite3@
+ #define NOSQLITE_H
+#endif
+
+/* Deactivate MySQL interface */
+#if @disable_mysql@
+ #define NOMYSQL_H
+#endif
+
+/* Deactivate PostgreSQL interface */
+#if @disable_pgsql@
+ #define NOPGSQL_H
+#endif
+
+/* Deactivate SQL Server interface */
+#if @disable_sqlserver@
+ #define NOSQLSVR_H
+#endif
+
+/* Deactivate Oracle interface */
+#if @disable_oracle@
+ #define NOORACLE_H
+#endif
+
+/* Enable C filter */
+#if @include_filter_c@
+ #define USEFILTER_C
+#endif
+
+/* Enable static filter */
+#if @include_filter_static@
+ #define USEFILTER_STATIC
+#endif
+
+/* Enable echo filter */
+#if @include_filter_echo@
+ #define USEFILTER_ECHO
+#endif
+
+/* Enable Lua filter */
+#if @include_filter_lua@
+ #define USEFILTER_LUA
+#endif
+
+/* Default model */
+#if 0
+#undef HBLOCK_H
+#undef HFORK_H
+#undef HTHREAD_H
+#endif
+
+/* Define to 1 if you have the `dl' library (-ldl). */
+/* #define HAVE_LIBDL 1 */

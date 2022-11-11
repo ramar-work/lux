@@ -53,7 +53,7 @@
 #include "../filters/filter-lua.h"
 #include "../ctx/ctx-http.h"
 
-#ifndef NO_HTTPS_SUPPORT
+#ifndef DISABLE_TLS
  #include "../ctx/ctx-https.h"
 #endif
 #ifndef NO_DNS_SUPPORT

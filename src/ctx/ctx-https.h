@@ -20,7 +20,6 @@
  * ---------
  * - 
  * ------------------------------------------- */
-#ifndef NO_HTTPS_SUPPORT
 #include <sys/stat.h>
 #include <stddef.h>
 #include <zwalker.h>
@@ -28,15 +27,19 @@
 #include "../socket.h"
 #include "../server.h"
 #include "../util.h"
-
 #include "../config.h"
 
-#ifdef INCLUDE_GNUTLS 
- #include <gnutls/gnutls.h>
+#if 0
+#ifndef DISABLE_TLS 
+	#ifndef CTXHTTPS_H
+		#define CTXHTTPS_H
+	#endif
+#endif
 #endif
 
-#ifndef CTXHTTPS_H
-#define CTXHTTPS_H
+#if !defined(DISABLE_TLS) && !defined(CTXHTTPS_H)
+ #include <gnutls/gnutls.h>
+ #define CTXHTTPS_H
 
 #if 0
 #if 1
@@ -55,7 +58,6 @@
 #endif
 #endif
 
-#ifdef INCLUDE_GNUTLS
 struct gnutls_abstr {
 	gnutls_certificate_credentials_t x509_cred;
   gnutls_priority_t priority_cache;
@@ -68,7 +70,6 @@ struct gnutls_abstr {
 	const char *key_file;
 #endif
 };
-#endif
 
 const int pre_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
 
@@ -81,5 +82,5 @@ const int write_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata
 void create_gnutls( void ** );
 
 void free_gnults( void **p );
-#endif
+//#endif
 #endif

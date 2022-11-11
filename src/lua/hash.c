@@ -16,9 +16,11 @@
  * ---------
  * -
  * ------------------------------------------- */
-#ifndef NO_HTTPS_SUPPORT
+#if 0
 
 #include "hash.h"
+
+#ifndef DISABLE_TLS
 
 #define HYPNO_MAX_ALG_HASH_LENGTH SHA512_DIGEST_LENGTH 
 
@@ -106,5 +108,7 @@ struct luaL_Reg hash_set[] = {
 ,{ "sha512", generate_sha512 }
 ,{ NULL }
 };
+
+#endif
 
 #endif

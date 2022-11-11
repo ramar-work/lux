@@ -25,7 +25,7 @@
 #include "db.h"
 #include "json.h"
 #include "encdec.h"
-#ifndef NO_HTTPS_SUPPORT
+#ifndef DISABLE_TLS
  #include "hash.h"
 #endif
 
@@ -39,8 +39,10 @@ struct lua_fset functions[] = {
 , { "json", json_set }
 , { "enc", enc_set }
 , { "dec", dec_set }
-#ifndef NO_HTTPS_SUPPORT
+#ifndef DISABLE_TLS
+ #if 0
 , { "hash", hash_set }
+ #endif
 #endif
 ,	{ NULL }
 };

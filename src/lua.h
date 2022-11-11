@@ -27,6 +27,8 @@
 #include <sys/stat.h>
 #include <stdarg.h>
 #include <router.h>
+#include "util.h"
+#include "config.h"
 
 #ifndef LUA_BASE_H
 #define LUA_BASE_H 

@@ -539,7 +539,7 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 }
 
 
-#ifndef NO_HTTPS_SUPPORT
+#ifndef DISABLE_TLS
 int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char *errmsg, int errlen ) {
 #if 1
 	//Define
@@ -1566,7 +1566,7 @@ int http_request ( lua_State *L ) {
 		}
 	}
 	else {
-#ifndef NO_HTTPS_SUPPORT
+#ifndef DISABLE_TLS
 		if ( !make_https_request( addr, port, &qhttp, &rhttp, err, sizeof(err) ) ) {
 			return luaL_error( L, err ); 
 		}

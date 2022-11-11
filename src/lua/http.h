@@ -38,7 +38,7 @@
 #include <zhttp.h>
 #include "../lua.h"
 
-#ifndef NO_HTTPS_SUPPORT
+#ifndef DISABLE_TLS
  #include <gnutls/gnutls.h>
 #endif
 

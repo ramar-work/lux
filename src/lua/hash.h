@@ -16,23 +16,23 @@
  * ---------
  * -
  * ------------------------------------------- */
-#ifndef NO_HTTPS_SUPPORT
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
-#include <openssl/sha.h>
 #include "../lua.h"
-#include "../util.h"
 
-#ifndef LHASH_H
-#define LHASH_H
+//Need to replace with GnuTLS primitives and test again...
+//Making C test programs might actually make your life easier...
+//You can use embedded strings...
+//#include <openssl/sha.h>
 
+#if 0
+
+#if !defined(DISABLE_TLS) && !defined(LHASH_H)
+ #define LHASH_H
 int generate_sha1( lua_State * );
 int generate_sha224( lua_State * );
 int generate_sha256( lua_State * );
 int generate_sha384( lua_State * );
 int generate_sha512( lua_State * );
 extern struct luaL_Reg hash_set[];
-
 #endif
+
 #endif

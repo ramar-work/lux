@@ -12,6 +12,7 @@ config.status
 *.a
 *.swp
 Makefile.copy
+src/config.h
 
 autom4te.cache/
 artwork/

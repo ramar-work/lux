@@ -14,21 +14,17 @@ VERSION = @PACKAGE_VERSION@
 PREFIX = @prefix@
 EXEC_PREFIX = @exec_prefix@
 BINDIR = @bindir@
-#LOGDIR = /var/log/hypno
 LOGDIR = @logdir@
-#WWWROOT = /var/www
 WWWROOT = @wwwroot@
-#WWWPORT = 80
 WWWPORT = @wwwport@
-#SVCPATH = `pkg-config systemd --variable=systemduserunitdir 2>/dev/null`
 SVCPATH = @svcpath@
 srcdir = @srcdir@
 VPATH = @srcdir@
 SRVUSER = @srvuser@
 SRVGROUP = @srvgroup@
 IFLAGS = -Ivendor -Ivendor/lua-5.4.3/src
-LDFLAGS = -ldl -lpthread -lm
-DEBUGFLAGS = -DDEBUG_H
+LDFLAGS = @ld_flags@
+DEBUGFLAGS = @debug_flags@
 MODEL = HTHREAD_H
 ASAN_OPTIONS = log_path=asan.log
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing -Wno-format-truncation -Wno-return-local-addr -D$(MODEL) -O2 $(IFLAGS)
@@ -77,7 +73,6 @@ DISTDIR = $(BINNAME)-$(VERSION)
 FILES = configure configure.ac install-sh LICENSE Makefile.in README.md
 
 # main - Compiles all code needed to get hypno running
-main: CFLAGS += -DNO_HTTPS_SUPPORT
 main: $(OBJ) vendor/liblua.a
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	$(CC) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
@@ -213,6 +208,10 @@ distcheck:
 	cd $(DISTDIR) && $(MAKE) clean
 	rm -rf $(DISTDIR)
 	@echo "*** package $(DISTDIR).tar.gz is ready for distribution."
+
+# tests - Build some common tests
+tests:
+	cd src/lua/tests && $(MAKE) -f Makefile
 	
 # check - Run common tests
 # Test:
@@ -236,10 +235,10 @@ cert:
 		-out tmp/$(CERTNAME).crt \
 		-days 365 -nodes -subj '/CN=$(DOMAIN)'
 
-.PHONY: check clean dist distcheck docs install
-
 Makefile: Makefile.in config.status
 	./config.status $@
 
 config.status: configure
 	./config.status --recheck
+
+.PHONY: check clean dist distcheck docs install tests

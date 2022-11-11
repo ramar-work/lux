@@ -18,8 +18,9 @@
  * - Added interval for fake polling.
  *  
  * ------------------------------------------- */
-#ifndef NO_HTTPS_SUPPORT
 #include "ctx-https.h"
+
+#ifndef DISABLE_TLS
 
 //Interval for fake polling here...
 static const struct timespec __interval__ = { 0, 100000000 };
