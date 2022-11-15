@@ -16,19 +16,13 @@
  * ---------
  * -
  * ------------------------------------------- */
-#if 0
-
 #include "hash.h"
 
 #ifndef DISABLE_TLS
 
-#define HYPNO_MAX_ALG_HASH_LENGTH SHA512_DIGEST_LENGTH 
-
 static int calc( lua_State *L, int alg ) {
-	unsigned char *src = NULL, *final = NULL; 
-	unsigned char buf[ HYPNO_MAX_ALG_HASH_LENGTH ];
-	int srclen = 0, buflen, type = lua_type( L, 1 );
-	struct algorithm *c = NULL;
+	uint8_t *src = NULL, buf[64] = {0}, fbuf[ sizeof( buf ) + 1 ] = {0};
+	int status = -1, srclen = 0, buflen = 0, type = lua_type( L, 1 );
 
 	if ( type != LUA_TSTRING && type != LUA_TTABLE ) {
 		luaL_error( L, "Argument to hash.sha%d() was neither a string or table." );
@@ -45,39 +39,43 @@ static int calc( lua_State *L, int alg ) {
 		lua_pop( L, 1 );
 	}
 
-	memset( buf, 0, HYPNO_MAX_ALG_HASH_LENGTH );
+	memset( buf, 0, sizeof( buf ) );
 
-	if ( alg == 1 )
-		final = SHA1( src, srclen, buf ), buflen = SHA_DIGEST_LENGTH;
-	else if ( alg == 224 )	
-		final = SHA224( src, srclen, buf ), buflen = SHA224_DIGEST_LENGTH;
-	else if ( alg == 256 )	
-		final = SHA256( src, srclen, buf ), buflen = SHA256_DIGEST_LENGTH;
-	else if ( alg == 384 )	
-		final = SHA384( src, srclen, buf ), buflen = SHA384_DIGEST_LENGTH;
+	if ( alg == 1 ) {
+		buflen = gnutls_hash_get_len( GNUTLS_MAC_SHA1 );
+		status = gnutls_hash_fast( GNUTLS_MAC_SHA1, src, srclen, &buf );
+	}
+	else if ( alg == 224 ) {
+		buflen = gnutls_hash_get_len( GNUTLS_MAC_SHA224 );
+		status = gnutls_hash_fast( GNUTLS_MAC_SHA224, src, srclen, &buf );
+	}
+	else if ( alg == 256 ){
+		buflen = gnutls_hash_get_len( GNUTLS_MAC_SHA256 );
+		status = gnutls_hash_fast( GNUTLS_MAC_SHA256, src, srclen, &buf );
+	}
+	else if ( alg == 384 ) {
+		buflen = gnutls_hash_get_len( GNUTLS_MAC_SHA384 );
+		status = gnutls_hash_fast( GNUTLS_MAC_SHA384, src, srclen, &buf );
+	}
 	else if ( alg == 512 ) {
-		final = SHA512( src, srclen, buf ), buflen = SHA512_DIGEST_LENGTH;
+		buflen = gnutls_hash_get_len( GNUTLS_MAC_SHA512 );
+		status = gnutls_hash_fast( GNUTLS_MAC_SHA512, src, srclen, &buf );
 	}
 
-	//TODO: OpenSSL must give us some kind of error should one ever occur
-	if ( !final ) {
-		luaL_error( L, "OpenSSL error at hash.sha%d()", alg );
+	//TODO: Let's be more specific about errors here.
+	if ( status != 0 ) {
+		luaL_error( L, "GnuTLS error at hash.sha%d()", alg );
 		return 0;
 	}
 
-	char fbuf[ ( buflen * 2 ) + 1 ], *sha;
-	memset( fbuf, 0, ( buflen * 2 ) + 1 );
-	sha = fbuf;
-
 	//Save the printable data to a new buffer and return to user
-	for ( int i = 0; i < buflen; i++, final++, sha += 2 ) {
-		sprintf( sha, "%02x", *final );
+	for ( uint8_t *shasrc = buf, *shadest = fbuf; buflen; buflen-- ) {
+		sprintf( (char *)shadest, "%02x", *(shasrc++) ), shadest += 2;
 	}
 
-	lua_pushstring( L, fbuf );
+	lua_pushstring( L, (char *)fbuf );
 	return 1;
 }
-
 
 int generate_sha1( lua_State *L ) {
 	return calc( L, 1 );
@@ -99,7 +97,6 @@ int generate_sha512( lua_State *L ) {
 	return calc( L, 512 );
 }
 
-
 struct luaL_Reg hash_set[] = {
  { "sha1", generate_sha1 }
 ,{ "sha224", generate_sha224 }
@@ -108,7 +105,4 @@ struct luaL_Reg hash_set[] = {
 ,{ "sha512", generate_sha512 }
 ,{ NULL }
 };
-
-#endif
-
 #endif

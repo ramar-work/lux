@@ -1,7 +1,7 @@
-#                                               -*- Autoconf -*-
+# -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ([2.69])
-AC_INIT([hypno], [0.3.1], [ramar@ramar.work])
+AC_INIT([hypno], [0.3.2a], [ramar@ramar.work])
 AC_CONFIG_SRCDIR([example/c/dylib.c])
 
 # Define files to perform substitutions on

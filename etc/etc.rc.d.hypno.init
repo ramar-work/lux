@@ -1,0 +1,28 @@
+# A base init file
+start() {
+
+}
+
+
+stop() {
+
+}
+
+
+case "$1" in
+	start)
+		start
+	;;
+	stop)
+		stop
+	;;
+	status)
+#stop
+	;;
+	status)
+#stop
+	;;
+	*)
+	echo "Usage: xxx"
+	exit 1	
+esac

@@ -1,0 +1,23 @@
+## --------------------------------------------------------- ##
+## Makefile
+## 
+## @summary
+## Generate Lua tests
+##
+## @author
+## Copyright 2022 Ironhead, Inc.
+## --------------------------------------------------------- ##
+PREFIX = @prefix@
+EXEC_PREFIX = @exec_prefix@
+srcdir = @srcdir@
+VPATH = @srcdir@
+TOPDIR=../../../
+IFLAGS = -I$(TOPDIR)vendor -I$(TOPDIR)vendor/lua-5.4.3/src
+LDFLAGS = @ld_flags@
+DEBUGFLAGS = @debug_flags@ 
+GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing -Wno-format-truncation -Wno-return-local-addr -O2 $(IFLAGS) $(DEBUGFLAGS)
+CFLAGS = $(GCCFLAGS)
+CC = gcc
+
+hash:
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(TOPDIR)tests/bin/hash-test hash.c	

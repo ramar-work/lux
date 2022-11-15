@@ -23,9 +23,10 @@
 //You can use embedded strings...
 //#include <openssl/sha.h>
 
-#if 0
+#if 1
 
 #if !defined(DISABLE_TLS) && !defined(LHASH_H)
+ #include <gnutls/crypto.h>
  #define LHASH_H
 int generate_sha1( lua_State * );
 int generate_sha224( lua_State * );

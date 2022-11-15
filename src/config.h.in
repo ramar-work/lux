@@ -21,19 +21,19 @@
 #define PACKAGE_BUGREPORT "ramar@ramar.work"
 
 /* Define to the full name of this package. */
-#define PACKAGE_NAME "hypno"
-
-/* Define to the full name and version of this package. */
-#define PACKAGE_STRING "hypno 0.3.1"
-
-/* Define to the one symbol short name of this package. */
-#define PACKAGE_TARNAME "hypno"
-
-/* Define to the home page for this package. */
-#define PACKAGE_URL "http://ramar.work/ironhead"
+#define PACKAGE_NAME "@PACKAGE_NAME@"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "0.3.1"
+#define PACKAGE_VERSION "@PACKAGE_VERSION@"
+
+/* Define to the full name and version of this package. */
+#define PACKAGE_STRING "@PACKAGE_NAME@ @PACKAGE_VERSION@"
+
+/* Define to the one symbol short name of this package. */
+#define PACKAGE_TARNAME "@PACKAGE_NAME@"
+
+/* Define to the home page for this package. */
+#define PACKAGE_URL "http://ramar.work"
 
 /* How long should each client be allowed to persist? */
 #ifndef CLIENT_REQUEST_TIMEOUT
