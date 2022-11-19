@@ -57,6 +57,19 @@ include_filter_echo=1
 ld_flags="-ldl -lpthread -lm"
 debug_flags=
 
+# CLI stuff
+confdir="/etc/hypno"
+sharedir="/usr/local/share/hypno"
+
+# Certtool/certificate stuff
+default_organization="Ironhead, Inc."
+default_certificate_state="NC"
+default_certificate_country="US"
+default_common_name="Antonio R. Collins II"
+default_expiration_days=365
+default_server_name="localhost"
+default_server_ip="127.0.0.1"
+
 AC_ARG_WITH([www-root], AC_HELP_STRING([--with-www-root=DIR],[Set default web directory for applications]), [wwwroot=${withval}])
 AC_SUBST(wwwroot)
 

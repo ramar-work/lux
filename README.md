@@ -3,33 +3,39 @@
 A low maintenance library and tools for web development.
 
 
-## Building
+## Building from Source
 
 hypno depends on the following:
 
-- Lua v5.3 or greater
+- Lua v5.4 or greater
 - GnuTLS 2.0 or greater
 
 
 ### Linux
 
-Hypno is slowly moving over to GNU autoconf for a consistent build process.
-Even in its current state, it still needs no exotic flags to build on
-different platforms.
+Hypno can be built from source like other common Linux software via the following steps.
+<pre>
+./configure && make && sudo make install
+</pre>
+
+Running `./configure --help` will display all of the different ways that the build can be customized for your system.   Your most important options are most likely going to be:
+
+- `--with-server-user` - To define the user that owns the server process
+- `--with-server-group` - To define the group that owns the server process
 
 
 #### Debian 
 
-Instructions for Debian ought to translate to other apt-based distributions.
+Instructions for Debian will also be sufficient for other apt-based distributions.
 
 <pre>
 # Install the following dependencies
-$ apt install liblua5.3-dev gnutls-dev make
+$ apt install liblua5.4-dev gnutls-dev make
 
 # Get hypno via Git
-$ git clone https://github.com/zaiah-dj/hypno.git
+$ git clone https://github.com/ramar-work/hypno.git
 
-# Make and install
+# Make and install (remember to use `sudo` when installing)
 $ cd hypno && make && make install
 
 # Run the examples at port 2222
@@ -46,9 +52,9 @@ Instructions for Debian ought to translate to other yum-based distributions.
 $ yum install lua-devel gnutls-devel make
 
 # Get hypno via Git
-$ git clone https://github.com/zaiah-dj/hypno.git
+$ git clone https://github.com/ramar-work/hypno.git
 
-# Make and install
+# Make and install (remember to use `sudo` when installing)
 $ cd hypno && make && make install
 
 # Run the examples to see the code in action.
@@ -65,7 +71,7 @@ it is a fairly straightforward process to build there.
 $ pacman -Sy lua gnutls
 
 # Get hypno via Git
-$ git clone https://github.com/zaiah-dj/hypno.git
+$ git clone https://github.com/ramar-work/hypno.git
 
 # Make and install
 $ cd hypno && make && make install
@@ -73,9 +79,6 @@ $ cd hypno && make && make install
 # Run the examples to see the code in action.
 $ make examples
 </pre>
-
-SuSE, Slackware, Gentoo and others have not been tested yet, but the 
-steps boil down roughly to the same thing.
 
 
 
@@ -105,7 +108,7 @@ system.
 
 <pre>
 # Get hypno via Git
-$ git clone https://github.com/zaiah-dj/hypno.git
+$ git clone https://github.com/ramar-work/hypno.git
 
 # Make and install
 $ cd hypno && make && make install
@@ -161,7 +164,7 @@ Building Hypno now will be simliar to other Linux based builds.
 
 <pre>
 # Get hypno via Git
-$ git clone https://github.com/zaiah-dj/hypno.git
+$ git clone https://github.com/ramar-work/hypno.git
 
 # Make and install
 $ cd hypno && make && make install
@@ -531,4 +534,3 @@ No options received:
 </pre>
 
 <link rel="stylesheet" href="main.css">
-

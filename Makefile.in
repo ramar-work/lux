@@ -214,26 +214,44 @@ tests:
 	cd src/lua/tests && $(MAKE) -f Makefile
 	
 # check - Run common tests
-# Test:
-# server
-# harness
-# cli
-# database / db
 check: main
 	@echo "*** all tests passed"	
+
 
 # copyright-update - Update copyright info across all source code
 copyright-update:
 	@find src -type f -name "*.[ch]" | \
 		xargs sed -i "s/Copyright 2020-$$(( `date +%Y` - 1 ))/Copyright 2020-`date +%Y`/"
-# cert - Generate a certificate for use with example sites
-cert: CERTNAME=cert
+
+# key - Generate a private key for use SSL/TLS certificates
+key:
+	-mkdir $(DIR)/
+	certtool \
+		--generate-privkey \
+		--sec-param High \
+		--outfile $(DIR)/$(DOMAIN).pem && \
+	chmod 600 $(DIR)/$(DOMAIN).pem && \
+	chown $(SRVUSER):$(SRVGROUP) $(DIR)/$(DOMAIN).pem
+
+# csr - Generate a certificate signing request
+csr:
+	-mkdir $(DIR)/
+	certtool --generate-request --load-privkey $(DIR)/$(DOMAIN).pem --outfile $(DIR)/$(DOMAIN).csr
+
+# cert - Generate a self-signed certificate for use with example sites
 cert:
-	-mkdir tmp/
-	openssl req -x509 -newkey rsa:4096 \
-		-keyout tmp/$(CERTNAME).pem \
-		-out tmp/$(CERTNAME).crt \
-		-days 365 -nodes -subj '/CN=$(DOMAIN)'
+	-mkdir $(DIR)/
+	certtool \
+		--generate-self-signed \
+		--load-privkey $(DIR)/$(DOMAIN).pem \
+		--template etc/cert.template \
+		--outfile $(DIR)/$(DOMAIN)-cert.pem
+
+# cert-bundle - Generate private key, certificate signing reqeust and self-signed certificate all at once 
+cert-bundle: CERTNAME=cert
+cert-bundle: DIR=/mnt/c/Users/ramar/certs
+cert-bundle: DOMAIN=thatname.com
+cert-bundle: key csr cert
 
 Makefile: Makefile.in config.status
 	./config.status $@

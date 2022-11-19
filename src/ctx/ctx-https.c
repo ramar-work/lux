@@ -19,6 +19,7 @@
  *  
  * ------------------------------------------- */
 #include "ctx-https.h"
+#include <sys/sendfile.h>
 
 #ifndef DISABLE_TLS
 

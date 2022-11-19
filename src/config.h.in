@@ -176,6 +176,16 @@
  #define USEFILTER_LUA
 #endif
 
+/* Define an alternative configuration directory */
+#ifndef CONFDIR
+ #define CONFDIR "@confdir@"
+#endif
+
+/* Define an alternative share directory */
+#ifndef SHAREDIR
+ #define SHAREDIR "@sharedir@"
+#endif
+
 /* Default model */
 #if 0
 #undef HBLOCK_H
