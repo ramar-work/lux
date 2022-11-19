@@ -97,7 +97,7 @@ void lua_istack ( lua_State * );
 int lua_retglobal( lua_State *, const char *, int );
 const char *lua_getv ( lua_State *, const char *, int );
 
-//int http_error( struct HTTPBody *, int, char *, ... );
+//int http_error( zhttp_t *, int, char *, ... );
 //unsigned char *read_file ( const char *, int *, char *, int );
 //void * add_item_to_list( void ***, void *, int, int *);
 

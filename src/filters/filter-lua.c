@@ -70,7 +70,7 @@ static const char *ctype_tags[] = {
 
 
 //HTTP error
-static int http_error( struct HTTPBody *res, int status, char *fmt, ... ) { 
+static int http_error( zhttp_t *res, int status, char *fmt, ... ) { 
 	va_list ap;
 	char err[ 2048 ];
 	memset( err, 0, sizeof( err ) );
@@ -768,7 +768,7 @@ static int init_lua_config ( struct luadata_t *l ) {
 static struct lua_readonly_t {
 	const char *name;
 	int (*exec)( struct luadata_t * );
-	//int (*exec)( lua_State *, struct HTTPBody *, const char *, const char * );	
+	//int (*exec)( lua_State *, zhttp_t *, const char *, const char * );	
 } lua_readonly[] = {
   { "config", init_lua_config }
 , { "request", init_lua_request }
@@ -1316,7 +1316,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 #ifdef RUN_MAIN
 int main ( int argc, char *argv[] ) {
-	struct HTTPBody req = {0}, res = {0};
+	zhttp_t req = {0}, res = {0};
 	char err[ 2048 ] = { 0 };
 
 	//Populate the request structure.  Normally, one will never populate this from scratch

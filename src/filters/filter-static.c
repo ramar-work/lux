@@ -77,7 +77,7 @@ unsigned char * getdoc ( const char *path ) {
 
 
 //...
-const int filter_static ( int dd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
+const int filter_static ( int dd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	(void)dd;
 	struct stat sb;
 	int fd = 0, size = 0;

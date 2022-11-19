@@ -24,7 +24,7 @@
 #include <sys/sendfile.h>
 
 //Size of \r\n\r\n
-#define BHSIZE 4	
+#define BHSIZE 4
 
 #if CTX_READ_SIZE < 4096
 	#error "Context read size is too small."
@@ -84,8 +84,10 @@ const int read_notls ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	//Get the time at the start
 	int total = 0, nsize, mult = 1, size = CTX_READ_SIZE; 
 	int hlen = -1, mlen = 0, bsize = ZHTTP_PREAMBLE_SIZE;
-	struct timespec timer = {0};
 	unsigned char *x = NULL, *xp = NULL;
+
+	//Get the time
+	struct timespec timer = {0};
 	clock_gettime( CLOCK_REALTIME, &timer );	
 
 	//Set another pointer for just the headers

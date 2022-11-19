@@ -198,8 +198,8 @@ int main ( int argc, char * argv[] ) {
 	struct test test = {0};
 	int blen = 0;
 	void *app = NULL;
-	const int (*filter)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
-	struct HTTPBody req = {0}, res = {0};
+	const int (*filter)( int, zhttp_t *, zhttp_t *, struct cdata * );
+	zhttp_t req = {0}, res = {0};
 	char *fname = NULL, err[ 2048 ] = { 0 };
 	struct cdata conn;
 	struct lconfig sconf;

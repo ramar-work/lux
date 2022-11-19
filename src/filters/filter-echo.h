@@ -31,6 +31,6 @@
 #ifndef FILTER_ECHO_H
 #define FILTER_ECHO_H
 
-const int filter_echo ( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
+const int filter_echo ( int, zhttp_t *, zhttp_t *, struct cdata * );
 
 #endif

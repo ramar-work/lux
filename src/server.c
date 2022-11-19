@@ -82,7 +82,7 @@ static int srv_check_dir ( struct cdata *conn, char *err, int errlen ) {
 
 
 //Build server configuration
-static const int srv_start( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
+static const int srv_start( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	FPRINTF( "Initial server allocation started...\n" );
 	char err[ 2048 ] = {0};
 	
@@ -98,7 +98,7 @@ static const int srv_start( int fd, struct HTTPBody *rq, struct HTTPBody *rs, st
 
 
 //Find the chosen host and generate a response via one of the selected filters
-static const int srv_proc( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata *conn) {
+static const int srv_proc( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn) {
 	FPRINTF( "Proc started...\n" );
 	char err[2048] = {0};
 	zTable *t = NULL;
@@ -144,7 +144,7 @@ static const int srv_proc( int fd, struct HTTPBody *req, struct HTTPBody *res, s
 
 
 //Generate a message in common log format: ip - - [date] "method path protocol" status clen
-static const int srv_log( int fd, struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn) {
+static const int srv_log( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn) {
 #if 0
 	const char fmt[] = "%s %s %s [%s] \"%s %s %s\" %d %d";
 	const char datefmt[] = "%d/%b/%Y:%H:%M:%S %z";
@@ -169,7 +169,7 @@ static const int srv_log( int fd, struct HTTPBody *rq, struct HTTPBody *rs, stru
 
 
 //End the request by deallocating all of the things
-static int srv_end( struct HTTPBody *rq, struct HTTPBody *rs, struct cdata *conn ) {
+static int srv_end( zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	FPRINTF( "Deallocation started...\n" );
 
 	//Free HTTP request 

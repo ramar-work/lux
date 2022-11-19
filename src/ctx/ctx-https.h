@@ -71,13 +71,13 @@ struct gnutls_abstr {
 #endif
 };
 
-const int pre_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
+const int pre_gnutls ( int, zhttp_t *, zhttp_t *, struct cdata *);
 
-const int post_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
+const int post_gnutls ( int, zhttp_t *, zhttp_t *, struct cdata *);
 
-const int read_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
+const int read_gnutls ( int, zhttp_t *, zhttp_t *, struct cdata *);
 
-const int write_gnutls ( int, struct HTTPBody *, struct HTTPBody *, struct cdata *);
+const int write_gnutls ( int, zhttp_t *, zhttp_t *, struct cdata *);
 
 void create_gnutls( void ** );
 

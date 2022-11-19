@@ -31,7 +31,7 @@
 #ifndef FILTER_STATIC_H
 #define FILTER_STATIC_H
 
-const int filter_static( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
+const int filter_static( int, zhttp_t *, zhttp_t *, struct cdata * );
 int check_static_prefix( const char *, const char * );
 
 #endif

@@ -93,5 +93,5 @@ struct luadata_t {
 };
 
 const int filter_lua
-( int , struct HTTPBody *, struct HTTPBody *, struct cdata * );
+( int , zhttp_t *, zhttp_t *, struct cdata * );
 #endif

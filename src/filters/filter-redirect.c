@@ -19,7 +19,7 @@
 #include "filter-redirect.h"
 
 const int 
-filter_redirect ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata *conn ) {
+filter_redirect ( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	char err[2048] = {0};
 
 	//Generate a message

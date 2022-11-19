@@ -34,6 +34,6 @@
 #ifndef FILTER_DIR_H
 #define FILTER_DIR_H
 
-const int filter_dirent ( int fd, struct HTTPBody *, struct HTTPBody *, struct cdata * );
+const int filter_dirent ( int fd, zhttp_t *, zhttp_t *, struct cdata * );
 
 #endif

@@ -47,18 +47,18 @@ struct cdata {
 //Filter for each request interpreter 
 struct filter {
 	const char *name;
-	const int (*filter)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
+	const int (*filter)( int, zhttp_t *, zhttp_t *, struct cdata * );
 };
 
 
 //Each new request works in its own environment.
 struct senderrecvr { 
-	const int (*read)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
-	const int (*write)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * ); 
+	const int (*read)( int, zhttp_t *, zhttp_t *, struct cdata * );
+	const int (*write)( int, zhttp_t *, zhttp_t *, struct cdata * ); 
 	void (*init)( void ** );
 	void (*free)( void ** );
-	const int (*pre)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
-	const int (*post)( int, struct HTTPBody *, struct HTTPBody *, struct cdata * );
+	const int (*pre)( int, zhttp_t *, zhttp_t *, struct cdata * );
+	const int (*post)( int, zhttp_t *, zhttp_t *, struct cdata * );
 	const struct filter *filters;
 	const char *config;
 	void *data;

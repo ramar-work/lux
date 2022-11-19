@@ -49,7 +49,7 @@ static const unsigned char templ[] = " \
 ";
 
 const int 
-filter_dirent ( int fd, struct HTTPBody *req, struct HTTPBody *res, struct cdata *conn ) {
+filter_dirent ( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	const int pathlen = 2048;
 	char err[ 2048 ], path[ pathlen ]; //= { 0 }, path[ (const int)pathlen ] = {0};
 	struct dirent *dir = NULL;
