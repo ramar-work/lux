@@ -804,6 +804,7 @@ int cmd_libs( struct values *v, char *err, int errlen ) {
 
 //dump
 int cmd_dump( struct values *v, char *err, int errlen ) {
+	int isLuaEnabled = 0;
 	fprintf( stderr, "Hypno is running with the following settings.\n" );
 	fprintf( stderr, "===============\n" );
 	fprintf( stderr, "Port:                %d\n", v->port );
@@ -831,6 +832,21 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 	fprintf( stderr, "Filters enabled:\n" );
 	for ( struct filter *f = http_filters; f->name; f++ ) {
 		fprintf( stderr, "[ %-16s ] %p\n", f->name, f->filter ); 
+	}
+
+	//TODO: Check if Lua is enabled first
+	for ( struct filter *f = http_filters; f->name; f++ ) {
+		if ( strcmp( f->name, "lua" ) == 0 ) {
+			isLuaEnabled = 1;
+			break;
+		}
+	}
+
+	if ( isLuaEnabled ) {
+		fprintf( stderr, "Lua modules enabled:\n" );
+		for ( struct lua_fset *f = functions; f->namespace; f++ ) {
+			fprintf( stderr, "[ %-16s ] %p\n", f->namespace, f->functions ); 
+		} 
 	}
 	return 1;
 }

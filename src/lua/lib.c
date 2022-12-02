@@ -40,9 +40,7 @@ struct lua_fset functions[] = {
 , { "enc", enc_set }
 , { "dec", dec_set }
 #ifndef DISABLE_TLS
- #if 0
 , { "hash", hash_set }
- #endif
 #endif
 ,	{ NULL }
 };

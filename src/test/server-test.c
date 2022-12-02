@@ -7,10 +7,10 @@
 #define CTX 0 
 #define TESTDIR "tests/server/"
 
-int filter_test( struct HTTPBody *rq, struct HTTPBody *rs, struct config *config, struct lconfig *host );
+int filter_test( zhttp_t *rq, zhttp_t *rs, struct config *config, struct lconfig *host );
 
 
-int read_test( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
+int read_test( int fd, zhttp_t *rq, zhttp_t *rs, void *p ) {
 	const uint8_t body[] =
 	 "GET /etc/2001-06-07?index=full&get=all HTTP/1.1\r\n"
 	 "Content-Type:"" text/html\r\n"
@@ -21,7 +21,7 @@ int read_test( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 	return 1;
 }
 
-int write_test( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
+int write_test( int fd, zhttp_t *rq, zhttp_t *rs, void *p ) {
 	const uint8_t body[] =
 		"HTTP/1.1 200 OK\r\n"
 		"Content-Type: text/html\r\n"
@@ -34,7 +34,7 @@ int write_test( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 void create_test( void **p ) {
 }
 
-int filter_test( struct HTTPBody *rq, struct HTTPBody *rs, struct config *config, struct lconfig *host ) {
+int filter_test( zhttp_t *rq, zhttp_t *rs, struct config *config, struct lconfig *host ) {
 	char err[2048] = {0};
 	char message[] = ""
 		"HTTP/1.1 200 OK\r\n"

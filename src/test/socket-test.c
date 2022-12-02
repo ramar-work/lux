@@ -2,7 +2,7 @@
 #include "../http.h"
 
 //Sends a message over HTTP
-int write_static ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
+int write_static ( int fd, zhttp_t *rq, zhttp_t *rs, void *p ) {
 	//write (write all the data in one call if you fork like this) 
 	const char http_200[] = ""
 		"HTTP/1.1 200 OK\r\n"
@@ -20,7 +20,7 @@ int write_static ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
 
 
 //Read a message (that we just discard)
-int read_static ( int fd, struct HTTPBody *rq, struct HTTPBody *rs, void *p ) {
+int read_static ( int fd, zhttp_t *rq, zhttp_t *rs, void *p ) {
 	//read (read all the data in one call if you fork like this)
 	const int size = 100000;
 	unsigned char *rqb = malloc( size );

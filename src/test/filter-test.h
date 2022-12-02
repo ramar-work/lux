@@ -30,11 +30,11 @@ char HTTP_11[] = "HTTP/1.1";
 
 struct Test {
 	const char *name;
-	struct HTTPBody request;
+	zhttp_t request;
 }; 
 
 
-typedef int (*Filter)(struct HTTPBody *, struct HTTPBody *, struct config *, struct lconfig *);
+typedef int (*Filter)(zhttp_t *, zhttp_t *, struct config *, struct lconfig *);
 
 
 int filter_test ( const char *fname, Filter filter, struct config *c, struct Test *tt ) {
@@ -44,7 +44,7 @@ int filter_test ( const char *fname, Filter filter, struct config *c, struct Tes
 		while ( t->name ) {
 			const char fmt[] = "[ Test: %-13s, path: %s, URL: %s ]: ";
 			char err[2048] = { 0 };
-			struct HTTPBody response = { 0 };
+			zhttp_t response = { 0 };
 			int f = filter( &t->request, &response, c, NULL );
 			//TODO: Compare against expected response for a good test
 			TPRINTF( fmt, t->name, c->path, t->request.path );

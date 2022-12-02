@@ -51,7 +51,7 @@ struct HTTPRecord *bodies[] = {
 
 struct Test {
 	const char *name;
-	struct HTTPBody request;
+	zhttp_t request;
 }; 
 
 
@@ -87,8 +87,8 @@ struct Test cases[] = {
 
 struct filter_test {
 	int (*filter)( 
-		struct HTTPBody *, 
-		struct HTTPBody *, 
+		zhttp_t *, 
+		zhttp_t *, 
 		struct config *, 
 		struct lconfig * 
 	); 
@@ -144,7 +144,7 @@ struct filter_test filter_tests[] = {
 
 
 //Write a formatted message to some kind of buffer
-void log_buf ( struct HTTPBody *res, char *log, int loglen ) {
+void log_buf ( zhttp_t *res, char *log, int loglen ) {
 	const char logfmt[] = 
 		"%d, %d, "; 
 	memset( log, 0, loglen );
@@ -164,7 +164,7 @@ int main ( int argc, char *argv[] ) {
 		struct Test *test = cases;
 		while ( test->name ) {
 			char err[2048] = { 0 };
-			struct HTTPBody response = { 0 };
+			zhttp_t response = { 0 };
 			struct config config = { .root_default = f->root };
 			struct lconfig host = { .dir = (char *)f->path, .root_default = (char *)f->root };
 
