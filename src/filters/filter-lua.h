@@ -43,7 +43,10 @@
 #define FILTER_LUA_H
 
 #define LD_LEN 128
-
+#define LD_PATH_LEN 1024
+#define LD_ROUTE_LEN LD_LEN 
+#define LD_DBNAME_LEN LD_LEN 
+#define LD_FQDN_LEN 256 
 #define LD_ERRBUF_LEN 1024
 
 struct route_t { 
@@ -77,10 +80,10 @@ struct luadata_t {
 	lua_State *state;
 	//TODO: This might be able to be pointers again...
 	const char aroute[ LD_LEN ];
-	const char rroute[ LD_LEN ];
-	const char apath[ LD_LEN ];
-	const char db[ LD_LEN ];
-	const char fqdn[ LD_LEN ];
+	const char rroute[ LD_ROUTE_LEN ];
+	const char apath[ LD_PATH_LEN ];
+	const char db[ LD_DBNAME_LEN ];
+	const char fqdn[ LD_FQDN_LEN ];
 	const char root[ LD_LEN ];
 	int status; //can return a different status
 	ztable_t *zconfig;

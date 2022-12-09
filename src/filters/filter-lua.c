@@ -555,14 +555,30 @@ static void dump_records( struct HTTPRecord **r ) {
 }
 
 
-static char * getpath( char *rpath, char *apath, int plen ) {
-	if ( plen < strlen( rpath ) )
-		return NULL;
-	
-	for ( char *p = apath, *path = rpath; *path && *path != '?'; ) 
-		*(p++) = *(path++);
+static char * getpath( char *rp, char *ap, int destlen ) {
+	int pos = 0, len = strlen( rp );
+#if 0
+	if ( ( pos = memchrat( rp , '?', strlen( rp ) ) ) > -1 ) 
+		len = pos;
+	else {
+		len = strlen( path ); 
+	}
+#else
+	if ( ( pos = memchrat( rp , '?', strlen( rp ) ) ) > -1 ) {
+		len = pos;
+	}
+#endif
 
-	return apath;
+	if ( destlen <= pos ) {
+fprintf( stderr, "plen: %d, strlen( rp ): %ld, path: %s\n", destlen, strlen( rp ), rp );
+		return NULL;
+	}
+	
+	for ( char *p = ap, *path = rp; *path && *path != '?'; ) {
+		*(p++) = *(path++);
+	}
+
+	return ap;
 }
 
 
@@ -1070,7 +1086,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//req->path needs to be modified to return just the path without the ?
 	if ( !getpath( req->path, (char *)ld.apath, LD_LEN ) ) {
 		free_ld( &ld );
-		return http_error( res, 500, "%s", "Failed to extract path." );
+		return http_error( res, 500, "%s", "Failed to extract path info into Lua userspace - Path too long, try increasing LD_LEN to fix this." );
 	}
 
 	if ( !find_matching_route( &ld ) ) {
