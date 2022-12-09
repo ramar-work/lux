@@ -557,20 +557,12 @@ static void dump_records( struct HTTPRecord **r ) {
 
 static char * getpath( char *rp, char *ap, int destlen ) {
 	int pos = 0, len = strlen( rp );
-#if 0
-	if ( ( pos = memchrat( rp , '?', strlen( rp ) ) ) > -1 ) 
-		len = pos;
-	else {
-		len = strlen( path ); 
-	}
-#else
+
 	if ( ( pos = memchrat( rp , '?', strlen( rp ) ) ) > -1 ) {
 		len = pos;
 	}
-#endif
 
 	if ( destlen <= pos ) {
-fprintf( stderr, "plen: %d, strlen( rp ): %ld, path: %s\n", destlen, strlen( rp ), rp );
 		return NULL;
 	}
 	
