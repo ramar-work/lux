@@ -685,12 +685,12 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 		//Populate any other thread data
 	#ifndef REAPING_THREADS 
-		fprintf( stderr, "IP addr is: %s\n", ip );
-		fprintf( accessfd, "IP addr is: %s\n", ip );
+		FPRINTF( "IP addr is: %s\n", ip );
+		FPRINTF( "IP addr is: %s\n", ip );
 	#else
 		memcpy( f->ipaddr, ip, sizeof( ip ) );
-		fprintf( stderr, "IP addr is: %s\n", ip );
-		fprintf( accessfd, "IP addr is: %s\n", ip );
+		FPRINTF( "IP addr is: %s\n", ip );
+		FPRINTF( "IP addr is: %s\n", ip );
 	#endif
 
 		//Start a new thread

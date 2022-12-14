@@ -256,13 +256,9 @@ int ztable_to_lua ( lua_State *L, ztable_t *t ) {
 	//Loop through all values and copy
 	for ( zKeyval *kv ; ( kv = lt_next( t ) ); ) {
 		zhValue k = kv->key, v = kv->value;
-#if 1
-		if ( k.type == ZTABLE_NON ) { 
-fprintf( stderr, "AT END OF TABLE\n" );
+		if ( k.type == ZTABLE_NON )
 			return 1;	
-		}
-#endif
-		if ( k.type == ZTABLE_INT ) //Arrays start at 1 in Lua, so increment by 1
+		else if ( k.type == ZTABLE_INT ) //Arrays start at 1 in Lua, so increment by 1
 			lua_pushnumber( L, k.v.vint + 1 );				
 		else if ( k.type == ZTABLE_FLT )
 			lua_pushnumber( L, k.v.vfloat );				
@@ -309,6 +305,7 @@ fprintf( stderr, "AT END OF TABLE\n" );
 }
 
 
+#if 0
 //Count the elements in a table.
 int lua_xcount ( lua_State *L, int i ) {
 	int count = 0;
@@ -326,19 +323,19 @@ int lua_xcount ( lua_State *L, int i ) {
 		}
 
 		if ( lua_type( L, -2 ) == LUA_TSTRING )
-			fprintf( stderr, "KEY IS %s => ", lua_tostring( L, -2 ) );	
+			FPRINTF( "KEY IS %s => ", lua_tostring( L, -2 ) );	
 		else {
-			fprintf( stderr, "KEY IS %s => ", lua_typename( L, lua_type( L, -2 ) ) );	
+			FPRINTF( "KEY IS %s => ", lua_typename( L, lua_type( L, -2 ) ) );	
 		}
 
-		fprintf( stderr, "(points to type %s)\n", lua_typename( L, lua_type( L, -1 ) ) );	
+		FPRINTF( "(points to type %s)\n", lua_typename( L, lua_type( L, -1 ) ) );	
 		lua_pop( L, 1 );
-getchar();
 		count++;
 	}
 
 	return count;
 }
+#endif
 
 
 
