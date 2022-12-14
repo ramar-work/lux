@@ -558,7 +558,7 @@ static void dump_records( struct HTTPRecord **r ) {
 static char * getpath( char *rp, char *ap, int destlen ) {
 	int pos = 0, len = strlen( rp );
 
-	if ( ( pos = memchrat( rp , '?', strlen( rp ) ) ) > -1 ) {
+	if ( ( pos = memchrat( rp , '?', len ) ) > -1 ) {
 		len = pos;
 	}
 
