@@ -27,10 +27,10 @@ LDFLAGS = @ld_flags@
 DEBUGFLAGS = @debug_flags@
 MODEL = HTHREAD_H
 ASAN_OPTIONS = log_path=asan.log
-GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing -Wno-format-truncation -Wno-return-local-addr -D$(MODEL) -O2 $(IFLAGS)
+GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing -Wno-format-truncation -Wno-return-local-addr -D$(MODEL) $(DEBUGFLAGS) -O2 $(IFLAGS) 
 INITMETHOD = @initsys@
 CFLAGS = $(GCCFLAGS)
-CC = gcc
+CC = @cc@ 
 SRC = \
 	@srcdir@/vendor/zrender.c \
 	@srcdir@/vendor/ztable.c \

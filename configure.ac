@@ -55,7 +55,9 @@ include_filter_lua=1
 include_filter_static=1
 include_filter_echo=1
 ld_flags="-ldl -lpthread -lm"
+cc="gcc"
 debug_flags=
+use_asan=
 
 # CLI stuff
 confdir="/etc/hypno"
@@ -69,6 +71,9 @@ default_common_name="Antonio R. Collins II"
 default_expiration_days=365
 default_server_name="localhost"
 default_server_ip="127.0.0.1"
+
+AC_ARG_WITH([cc], AC_HELP_STRING([--with-cc=CC],[Set a different C compiler as the default]), [cc=${withval}])
+AC_SUBST(cc)
 
 AC_ARG_WITH([www-root], AC_HELP_STRING([--with-www-root=DIR],[Set default web directory for applications]), [wwwroot=${withval}])
 AC_SUBST(wwwroot)
@@ -90,7 +95,9 @@ AC_ARG_ENABLE([systemd], AC_HELP_STRING([--enable-systemd],[Use systemd units fo
 
 AC_ARG_ENABLE([sysv], AC_HELP_STRING([--enable-sysv],[Use sysv-style init scripts for daemon management]), [sysv=yes], [systemd=no])
 
-AC_ARG_ENABLE([debugging], AC_HELP_STRING([--enable-debugging],[Compile with debugging flags enabled]), [debug_flags='-DDEBUG_H'])
+AC_ARG_ENABLE([debugging], AC_HELP_STRING([--enable-debugging],[Compile with debugging flags enabled]), [debug_flags='-g -DDEBUG_H'])
+
+AC_ARG_ENABLE([address-sanitization], AC_HELP_STRING([--enable-address-sanitization],[Compile with address sanitization support. (Requires LibAsan)]),[use_asan=yes])
 
 # If systemd is enabled, make sure that we actually found something...
 #AS_IF([test "x$systemd" == xyes],
@@ -100,6 +107,12 @@ AC_ARG_ENABLE([debugging], AC_HELP_STRING([--enable-debugging],[Compile with deb
 #	[svcpath=${withval}])
 #	]
 #)
+
+# Check for Asan support and enable flags if so
+if test "x${use_asan}" == xyes; then
+	# Turn on debugging automatically...
+	debug_flags+=" -O0 -fsanitize=address -fsanitize-undefined-trap-on-error"
+fi
 
 if test "x${systemd}" == xyes; then
 	AC_ARG_WITH([systemd-unit-path], 
@@ -214,6 +227,7 @@ Chosen threading model: $modelflags
 Default domain: $default_domain
 TLS included: `test ${disable_tls} -eq 0 && echo "yes" || echo "no"`
 Selected LD_FLAGS: $ld_flags
+Debugging flags: $debug_flags
 
 EOF
 
