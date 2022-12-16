@@ -16,6 +16,11 @@
  * ---------
  * No entries yet.
  *
+ * TESTING
+ * -------
+ * TBD, but the tests will be shipping with
+ * the code in the very near future.
+ *
  * ------------------------------------------- */
 #include "zjson.h"
 
@@ -512,7 +517,9 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 		return NULL;
 	}
 
-	json[ jp - 1 ] = ' ', json[ jp ] = '}', json[ jp + 1 ] = '\0';
+	json[ jp - 1 ] = ' '; 
+	json[ jp     ] = ( *json == '[' ) ? ']' : '}'; 
+	json[ jp + 1 ] = '\0';
 	free( br );
 	return json;
 }
