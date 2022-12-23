@@ -61,6 +61,7 @@ SRC = \
 	@srcdir@/src/lua/filesystem.c \
 	@srcdir@/src/lua/http.c \
 	@srcdir@/src/lua/hash.c \
+	@srcdir@/src/lua/session.c \
 	@srcdir@/src/filters/filter-static.c \
 	@srcdir@/src/filters/filter-echo.c \
 	@srcdir@/src/filters/filter-dirent.c \

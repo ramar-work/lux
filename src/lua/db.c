@@ -252,8 +252,19 @@ int db_exec ( lua_State *L ) {
 	return 1;
 }
 
+#if 0
+//Checks for the existence of a table
+int db_check ( lua_State *L ) {
+	//
+	return 1;
+}
+#endif
+
 struct luaL_Reg db_set[] = {
  	{ "exec", db_exec }
+#if 0
+,	{ "check", db_check }
+#endif
 ,	{ NULL }
 };
 

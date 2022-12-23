@@ -90,9 +90,18 @@ AC_SUBST(srvgroup)
 AC_ARG_WITH([log-dir], AC_HELP_STRING([--with-log-dir],[Set access and error log directory]), [logdir=${withval}])
 AC_SUBST(logdir)
 
-# Use enable systemd or enable sysv here
+# Figure out the configuration directory
+AC_ARG_WITH([conf-dir], AC_HELP_STRING([--with-conf-dir],[Set a different configuration directory]), [confdir={$withval}])
+AC_SUBST(confdir)
+
+# Figure out the dependency directory
+AC_ARG_WITH([share-dir], AC_HELP_STRING([--with-share-dir],[Set a different configuration directory]), [sharedir={$withval}])
+AC_SUBST(sharedir)
+
+# Enable systemd...
 AC_ARG_ENABLE([systemd], AC_HELP_STRING([--enable-systemd],[Use systemd units for daemon management (default)]), [systemd=${enableval}])
 
+# or enable sysv here.
 AC_ARG_ENABLE([sysv], AC_HELP_STRING([--enable-sysv],[Use sysv-style init scripts for daemon management]), [sysv=yes], [systemd=no])
 
 AC_ARG_ENABLE([debugging], AC_HELP_STRING([--enable-debugging],[Compile with debugging flags enabled]), [debug_flags='-g -DDEBUG_H'])
@@ -221,6 +230,8 @@ Default port: $wwwport
 Default server user: $srvuser
 Default server group: $srvgroup
 Default logging directory: $logdir
+Default configuration directory: $confdir
+Default share directory: $sharedir
 Init system: $initsys
 Daemon service file path: $svcpath
 Chosen threading model: $modelflags

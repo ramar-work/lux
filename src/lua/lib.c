@@ -25,6 +25,7 @@
 #include "db.h"
 #include "json.h"
 #include "encdec.h"
+#include "session.h"
 #ifndef DISABLE_TLS
  #include "hash.h"
 #endif
@@ -39,6 +40,7 @@ struct lua_fset functions[] = {
 , { "json", json_set }
 , { "enc", enc_set }
 , { "dec", dec_set }
+, { "session", session_set }
 #ifndef DISABLE_TLS
 , { "hash", hash_set }
 #endif

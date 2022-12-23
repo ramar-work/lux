@@ -17,22 +17,22 @@
  * ---------
  * - 
  * ------------------------------------------- */
-/* Define to the address where bug reports for this package should be sent. */
+/* Define the address where bug reports for this package should be sent. */
 #define PACKAGE_BUGREPORT "ramar@ramar.work"
 
-/* Define to the full name of this package. */
+/* Define the full name of this package. */
 #define PACKAGE_NAME "@PACKAGE_NAME@"
 
-/* Define to the version of this package. */
+/* Define the version of this package. */
 #define PACKAGE_VERSION "@PACKAGE_VERSION@"
 
-/* Define to the full name and version of this package. */
+/* Define the full name and version of this package. */
 #define PACKAGE_STRING "@PACKAGE_NAME@ @PACKAGE_VERSION@"
 
-/* Define to the one symbol short name of this package. */
+/* Define the symbol short name of this package. */
 #define PACKAGE_TARNAME "@PACKAGE_NAME@"
 
-/* Define to the home page for this package. */
+/* Define the home page for this package. */
 #define PACKAGE_URL "http://ramar.work"
 
 /* How long should each client be allowed to persist? */
@@ -178,12 +178,17 @@
 
 /* Define an alternative configuration directory */
 #ifndef CONFDIR
- #define CONFDIR "@confdir@"
+ #define CONFDIR "@confdir@/"
 #endif
 
 /* Define an alternative share directory */
 #ifndef SHAREDIR
- #define SHAREDIR "@sharedir@"
+ #define SHAREDIR "@sharedir@/"
+#endif
+
+/* Define the path to the session database. */
+#ifndef SESSION_DB_PATH
+ #define SESSION_DB_PATH CONFDIR "hypno.db"
 #endif
 
 /* Default model */
