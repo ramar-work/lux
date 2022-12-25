@@ -23,8 +23,7 @@
 #include "../config.h"
 #include "rand.h"
 
-#if !defined(DISABLE_TLS) && !defined(LSESSION_H)
- #include <gnutls/crypto.h>
+#ifndef LSESSION_H
  #define LSESSION_H
 extern struct luaL_Reg session_set[];
 #endif
