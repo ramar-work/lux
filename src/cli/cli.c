@@ -28,12 +28,9 @@
 #include <zwalker.h>
 #include <ztable.h>
 #include "../util.h"
+#include "../config.h"
 
 #define NAME "hypno-cli"
-
-#define CONFDIR "/etc/hypno/"
-
-#define SHAREDIR "/usr/local/share/hypno/"
 
 #define ERRPRINTF(...) \
 	fprintf( stderr, "%s: ", NAME ); \
