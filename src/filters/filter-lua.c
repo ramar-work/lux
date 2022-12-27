@@ -524,6 +524,7 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 
 	//Prepare the message
 #if 1 
+	//TODO: Enable non sendfile capable systems to be able to send a file the old crappy way.
 	res->atype = ZHTTP_MESSAGE_SENDFILE;
 	res->clen = sb.st_size;
 	res->fd = fd;
@@ -664,8 +665,8 @@ static int init_lua_request ( struct luadata_t *l ) {
 		lua_setstrint( l->state, "clength", l->req->clen, 1 );
 
 	//Add simple keys for headers and URL
-	for ( int pos=3, i = 0; i < 2; i++ ) {
-		struct HTTPRecord **r = ii[i];
+	for ( int pos = 3, i = 0; i < 2; i++ ) {
+		struct HTTPRecord **r = ii[ i ];
 		if ( r && *r ) {
 			lua_pushstring( l->state, str[i] ), lua_newtable( l->state );
 			for ( ; r && *r; r++ ) {
@@ -791,13 +792,9 @@ static struct lua_readonly_t {
 
 static int free_ld ( struct luadata_t *l ) {
 	lua_close( l->state );
-
 	lt_free( l->zconfig ), free( l->zconfig );
-
 	lt_free( l->zroute ), free( l->zroute );
-
 	lt_free( l->zmodel ), free( l->zmodel );
-
 	free_mvc_list( (void ***)&(l->pp.imvc_tlist) );
 	return 1;
 }
@@ -849,11 +846,26 @@ fprintf( stderr, "%s:%d -> %p\n", __FILE__, __LINE__, content );
 
 
 
+
+//Check if the user asked to delay the response...
+static int delay_response ( struct luadata_t *l ) {
+	return 1;
+}
+
+
+
 //...
 static int return_as_response ( struct luadata_t *l ) {
 
 	ztable_t *rt = NULL;
 	int count = 0, status = 200, clen = 0;
+	int header_i = 0;
+	int status_i = 0;
+	int ctype_i = 0;
+	int clen_i = 0;
+	int file_i = 0;
+	int content_i = 0;
+	int delayed = 0;
 	char ctype[ 128 ] = { 0 }; //'t','e','x','t','/','h','t','m','l','\0', 0 };
 	unsigned char *content = NULL;
 
@@ -863,7 +875,7 @@ static int return_as_response ( struct luadata_t *l ) {
 	//Get the count to approximate size of conversion needed (and to handle blanks)
 	count = lua_count( l->state, 1 );
 #endif
-
+	
 	if ( !lua_istable( l->state, 1 ) ) {
 		snprintf( l->err, LD_ERRBUF_LEN, "Response is not a table." );
 		return 0;
@@ -883,32 +895,32 @@ static int return_as_response ( struct luadata_t *l ) {
 
 	//Lock the ztable to enable proper hashing and collision mgmt
 	if ( !lt_lock( rt ) ) {
-		//This can fail...
 		snprintf( l->err, LD_ERRBUF_LEN, "%s", lt_strerror( rt ) );
 		return 0;
 	}
 
+	//Check if the user wants to delay the response.
+	if ( lt_geti( rt, "delay" ) > -1 ) {
+		delayed = 1;
+	}
+
 	//Get the status
-	int status_i = 0;
 	if ( ( status_i = lt_geti( rt, "status" ) ) > -1 ) {
 		status = lt_int_at( rt, status_i );
 	}
 	
 	//Get the content-type (if there is one)
-	int ctype_i = 0;
 	if ( ( ctype_i = lt_geti( rt, "ctype" ) ) > -1 ) {
 		snprintf( ctype, sizeof( ctype ) - 1, "%s", lt_text_at( rt, ctype_i ) ); 
 	}
 
 	//Get the content-length (if there is one)
-	int clen_i = 0;
 	if ( ( clen_i = lt_geti( rt, "clen" ) ) > -1 ) {
 		clen = lt_int_at( rt, clen_i ); 
 	}
 
 	//Get the content
-	int content_i = 0;
-	if ( ( content_i = lt_geti( rt, "content" ) ) > -1 ) {
+	if ( !delayed && ( content_i = lt_geti( rt, "content" ) ) > -1 ) {
 		content = (unsigned char *)lt_text_at( rt, content_i );
 		if ( clen_i == -1 ) {
 			clen = strlen( (char *)content );
@@ -916,8 +928,7 @@ static int return_as_response ( struct luadata_t *l ) {
 	}
 
 	//In this case, set clen with the file
-	int file_i = 0;
-	if ( ( file_i = lt_geti( rt, "file" ) ) > -1 ) {
+	if ( !delayed && ( file_i = lt_geti( rt, "file" ) ) > -1 ) {
 		const char * fname = lt_text_at( rt, file_i );
 		char fbuf[ PATH_MAX ];
 		int len = 0;
@@ -949,12 +960,11 @@ static int return_as_response ( struct luadata_t *l ) {
 		snprintf( l->err, LD_ERRBUF_LEN, "Status specified with no content." );
 		return 0;
 	}
+
 	//Finally, get any headers if there are any
-	int header_i = 0;
 	if ( ( header_i = lt_geti( rt, "headers" ) ) > -1 ) {
 		//You can use get keys or loop through the thing...
-		zKeyval *kv = lt_items( rt, "headers" );
-		for ( ; ( kv = lt_items( rt, "headers" ) ); ) {
+		for ( zKeyval *kv = lt_items( rt, "headers" ); ( kv = lt_items( rt, "headers" ) ); ) {
 			if ( kv->key.type == ZTABLE_TRM )
 				break;
 			if ( kv->key.type	!= ZTABLE_TXT && (  kv->value.type	!= ZTABLE_TXT && kv->value.type != ZTABLE_INT ) ) { 
@@ -972,19 +982,22 @@ static int return_as_response ( struct luadata_t *l ) {
 		}
 	}
 
-	//Set structures
-	l->res->clen = clen;
-	http_set_status( l->res, status ); 
-	http_set_ctype( l->res, ctype );
-	http_set_content( l->res, content, clen ); 
+	if ( !delayed ) {
+		//Set structures
+		l->res->clen = clen;
+		http_set_status( l->res, status ); 
+		http_set_ctype( l->res, ctype );
+		http_set_content( l->res, content, clen ); 
 
-	//Return finalized content
-	zhttp_t *rr = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ); 
-	lt_free( rt ), free( rt );
-	if ( file_i > -1 ) {
-		free( content );
+		//Return finalized content
+		zhttp_t *rr = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ); 
+		lt_free( rt ), free( rt );
+		if ( file_i > -1 ) {
+			free( content );
+		}
 	}
-	return 1;
+
+	return ( !delayed ) ? 1: 2;
 }
 
 
@@ -1166,15 +1179,23 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 	//Stop if the user specifies a 'response' table that's not empty...
 	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
-		FPRINTF( "Attempting alternate content return.\n" );
-		if ( !return_as_response( &ld ) ) {
+		FPRINTF( "Evaluating response table.\n" );
+		int eres = return_as_response( &ld );
+
+		if ( !eres ) {
 			free_ld( &ld );
+			FPRINTF( "Error when evaluating response table\n" );
 			return http_error( res, 500, ld.err );
 		}
+		else if ( eres == 1 ) {
+			lua_pop( ld.state, 1 );
+			free_ld( &ld );
+			FPRINTF( "Content return completed\n" );
+			return 1;
+		}
+
 		lua_pop( ld.state, 1 );
-		free_ld( &ld );
-		FPRINTF( "Content return completed?\n" );
-		return 1;
+		FPRINTF( "Finished evaluating delayed response table...\n" );
 	}
 
 	//Can we simply check if config exists in _G?

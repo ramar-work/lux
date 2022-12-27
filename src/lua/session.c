@@ -1,4 +1,12 @@
-/* session.c */
+/**
+ * session.c
+ * =========
+ *
+ * See session.h for documentation.
+ *
+ * See LICENSE for licensing information.
+ *
+ */
 #include "session.h"
 
 static const char sdbpath[] = 
@@ -53,12 +61,13 @@ int start ( lua_State *L ) {
 	int zdb_arglen = 0, pos = -1;
 	zdbv_t **zdbbind = NULL;
 	char *token = NULL;
+	char *path = NULL;
 	char err[ 1024 ] = { 0 };
 	char conn[ PATH_MAX ] = {0}; 
-	int expiry = 300; // Hardcoded for 5 min for now...
+	char randid[32] = {0};
 	char start[ 128 ] = {0}, end[ 128 ] = {0};
+	int expiry = 0; // Hardcoded for 5 min for now...
 	struct timespec tm = { 0 };
-	char rid[32] = {0};
 	const unsigned char word[] = 
 		"ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
 		"abcdefghijklmnopqrstuvwxyz"
@@ -76,9 +85,17 @@ int start ( lua_State *L ) {
 		return luaL_error( L, "Failed to convert to zTable" );
 	}
 
+	//Get rid of the table on the stack
+	lua_pop( L, 1 ); 
+
 	//Check for expiry and token
 	if ( ( pos = lt_geti( t, "expiry" ) ) > -1 ) {
 		expiry = lt_int_at( t, pos );
+	}
+
+	//Check for a path variable
+	if ( ( pos = lt_geti( t, "path" ) ) > -1 ) {
+		path = lt_text_at( t, pos );
 	}
 
 	if ( ( pos = lt_geti( t, "token" ) ) > -1 )
@@ -87,6 +104,11 @@ int start ( lua_State *L ) {
 		lt_free( t );
 		return luaL_error( L, "session - no token specified." );
 	}
+
+	//Get the sid name (if the user has specified one)
+	lua_getglobal( L, "sid" ); 
+	const char *sid = ( lua_isnil( L, -1 ) ) ? "sid" : lua_tostring( L, -1 );
+	lua_pop( L, 1 ); 
 
 	//Get the shadow path if there is one & create a database connection string
 	lua_getglobal( L, "shadow" ); 
@@ -106,8 +128,8 @@ int start ( lua_State *L ) {
 	}
 
 	srand( tm.tv_nsec );
-	for ( int i = 0; i < sizeof( rid ) - 1; i++ ) {
-		rid[ i ] = word[ rand() % ( sizeof( word ) - 1 ) ]; 
+	for ( int i = 0; i < sizeof( randid ) - 1; i++ ) {
+		randid[ i ] = word[ rand() % ( sizeof( word ) - 1 ) ]; 
 	}
 
 	//Open a database handle
@@ -140,8 +162,8 @@ int start ( lua_State *L ) {
 	zdbv_t * sid_v = malloc( sizeof( zdbv_t ) );
 	memset( sid_v, 0, sizeof( zdbv_t ) );
 	sid_v->field = zhttp_dupstr( ":sid" );
-	sid_v->value = zhttp_dupstr( rid );
-	sid_v->len = strlen( rid );
+	sid_v->value = zhttp_dupstr( randid );
+	sid_v->len = strlen( randid );
 	add_item( &zdbbind, sid_v, zdbv_t *, &zdb_arglen );
 
 	//Bind the start date
@@ -176,31 +198,104 @@ int start ( lua_State *L ) {
 		return luaL_error( L, "Session value creation failed - error: %s", zdb.err );
 	}
 
+	//Always make a token string
+	char sidvalue[2048] = {0}, *sidv = sidvalue;
+	int svlen = sizeof( sidvalue );
+	svlen -= snprintf( sidv, svlen, "%s=%s;", sid, randid );
+
+	if ( expiry ) {
+		svlen -= snprintf( &sidv[ svlen ], svlen, "max-age=%d;", expiry );
+	}
+
+	if ( path ) {
+		svlen -= snprintf( &sidv[ svlen ], svlen, "path=%s;", path );
+	}
+
 	//Use set cookie to send a session identifier (name can be changed from config)
-#if 0
-	zhttp_add_header
-	or
-	lua_getglobal( L, "response" );
-	lua_?( ... );	
-#endif	 
+	lua_getglobal( L, "response" ); 
+	if ( lua_isnil( L, -1 ) ) {
+		lua_pop( L, 1 ); 
+		lua_newtable( L );
+		lua_setstrbool( L, "delay", 1, 1 );
+		lua_pushstring( L, "headers" ), lua_newtable( L );
+		lua_setstrstr( L, "Set-Cookie", sidv, 3 );
+		lua_settable( L, 1 );
+		lua_setglobal( L, "response" );
+	}
+	else {
+		//Converting with Lua takes more memory, but is so much easier to do
+		zTable tx, *ttx;
+		ttx = &tx;
+		lt_init( ttx, NULL, 32 ); 
+
+		if ( !lua_to_ztable( L, 1, ttx ) || !lt_lock( ttx ) ) {
+			lt_free( ttx );
+			return luaL_error( L, "Failed to convert to zTable" );
+		}
+
+		if ( lt_geti( ttx, "headers" ) == -1 ) {
+			lua_pushstring( L, "headers" ), lua_newtable( L );
+			lua_setstrstr( L, "Set-Cookie", sidvalue, 3 );
+		}
+		else {
+			zTable *t1p = lt_copy_by_index( ttx, lt_geti( ttx, "headers" ) );
+			lua_pushstring( L, "headers" );
+			lua_newtable( L ); // index 3
+			lua_setstrstr( L, "Set-Cookie", sidvalue, 3 );
+			lt_reset( t1p );
+			zKeyval *x = lt_next( t1p );  // Skip the first one
+			for ( ; ( x = lt_next( t1p ) ) && x->key.type != ZTABLE_TRM ;  ) {	
+				zhValue k = x->key, v = x->value;
+				if ( k.type == ZTABLE_TXT ) 
+					lua_pushstring( L, k.v.vchar );
+				else if ( k.type == ZTABLE_INT )
+					lua_pushnumber( L, k.v.vint );
+				else {
+					FPRINTF( "Got useless key in response.headers\n" );
+					continue;
+				}
+
+				if ( v.type == ZTABLE_INT )
+					lua_pushnumber( L, v.v.vint );				
+				else if ( v.type == ZTABLE_FLT )
+					lua_pushnumber( L, v.v.vfloat );				
+				else if ( v.type == ZTABLE_TXT )
+					lua_pushstring( L, v.v.vchar );
+				else /* ZTABLE_TRM || ZTABLE_NON || ZTABLE_USR */ {
+					// I don't care about any of these...
+					FPRINTF( "Got useless value in response.headers\n" );
+					continue;
+				}
+				lua_settable( L, 3 );
+			}
+			lt_free( t1p );
+		}
+		lua_settable( L, 1 );
+	}
+
+	//We also return the key
+	lua_pushstring( L, randid );
 
 	//Close the connection
 	zdbv_free( zdbbind );
 	zdb_free( &zdb );	
 	zdb_close( &zdb );	
 	lt_free( t );
-	return 0;
+	return 1;
 }
 
 int stop ( lua_State *L ) {
+	//Find the right key (using the sid that we chose)
 	return 0;
 }
 
 int get ( lua_State *L ) {
+	//Get any data associated with the key
 	return 0;
 }
 
 int set ( lua_State *L ) {
+	//Set any data with key
 	return 0;
 }
 
