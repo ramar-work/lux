@@ -1,22 +1,23 @@
-/* ------------------------------------------- * 
- * json.c 
- * =========
- * 
- * Summary 
- * -------
- * JSON deserialization / serialization 
- *
- * LICENSE
- * -------
- * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
- * See LICENSE in the top-level directory for more information.
- *
- * CHANGELOG 
- * ---------
- * No entries yet.
- *
- * ------------------------------------------- */
+/* -------------------------------------------- * 
+json.c 
+=========
+
+JSON deserialization / serialization 
+
+
+LICENSE
+-------
+Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
+See LICENSE in the top-level directory for more information.
+
+
+### send ###
+
+### failure ###
+
+### success ###
+
+ * -------------------------------------------- */
 #include "json.h"
 
 //You can do this similarly to before...

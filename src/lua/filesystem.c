@@ -1,27 +1,43 @@
-/* ------------------------------------------- * 
- * filesystem.c 
- * ============
- * 
- * Summary 
- * -------
- * Database primitives for Lua
- *
- * LICENSE
- * -------
- * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- *
- * See LICENSE in the top-level directory for more information.
- *
- * CHANGELOG 
- * ---------
- * - added shadow primitives
- * - added fs{read, write, stat & pwd}
- * 
- * TODO
- * ----
- * - add mkdir, rmdir, rm -rf, and ls
- * 
- * ------------------------------------------- */
+/* -------------------------------------------- * 
+filesystem.c 
+============
+
+Database primitives for Lua
+
+
+LICENSE
+-------
+Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
+See LICENSE in the top-level directory for more information.
+
+
+USAGE 
+-----
+### read ###
+
+Read a file in its entirety.
+
+
+### write ###
+
+Write out a file.
+
+
+### stat ###
+
+Get file info.
+
+
+### exists ###
+
+Simply check if a file exists on a system.
+
+
+TODO
+----
+add mkdir, rmdir, rm -rf, and ls
+ 
+ * -------------------------------------------- */
 #include "filesystem.h"
 
 static char *sw_path( lua_State *L, const char *path, char *spath, int splen ) {
@@ -450,9 +466,6 @@ int fs_open ( lua_State *L ) {
 	return 0;
 }
 
-
-
-
 int fs_remove ( lua_State *L ) {
 	luaL_checktype( L, 1, LUA_TSTRING );
 	return 0;
@@ -471,12 +484,6 @@ struct luaL_Reg fs_set[] = {
 #if 0
 ,	{ "rmdir", fs_rmdir }
 ,	{ "delete", fs_remove }
-#endif
-#if 0
-	//The standard library already handles these pretty well...
-	//Why repeat it here?
-,	{ "open", fs_open }
-,	{ "close", fs_close }
 #endif
 ,	{ NULL }
 };

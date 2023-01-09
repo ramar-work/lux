@@ -1,21 +1,32 @@
-/* ------------------------------------------- * 
- * db.c 
- * ====
- * 
- * Summary 
- * -------
- * Database primitives for Lua
- *
- * LICENSE
- * -------
- * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- *
- * See LICENSE in the top-level directory for more information.
- *
- * CHANGELOG 
- * ---------
- * -
- * ------------------------------------------- */
+/* -------------------------------------------- * 
+db
+==
+
+Database primitives for Lua
+
+
+LICENSE
+-------
+See LICENSE in the top-level directory for more information.
+
+
+Usage
+-----
+Database does something weird.
+
+
+### exec ###
+
+How to use db.exec.
+
+It's very complicated.
+
+A bunch of notes on how to use this thing.
+
+```
+Yeah
+```
+ * -------------------------------------------- */
 #include "db.h"
 
 static const char *engines[] = {

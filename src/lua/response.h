@@ -1,14 +1,10 @@
 /* ------------------------------------------- * 
- * encdec.h 
- * ========
+ * response.h
+ * ==========
  * 
  * Summary 
  * -------
- * Popular encoding routines
- * 
- * Usage
- * -----
- * 
+ * -
  *
  * LICENSE
  * -------
@@ -20,21 +16,12 @@
  * ---------
  * -
  * ------------------------------------------- */
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
+#include <zhttp.h>
+#include <ztable.h>
 #include "../lua.h"
-#include "../util.h"
+#include "../config.h"
 
-#ifndef LENCDEC_H
-#define LENCDEC_H
-
-int base64_encode ( lua_State * );
-
-int base64_decode ( lua_State * );
-
-extern struct luaL_Reg dec_set[]; 
-
-extern struct luaL_Reg enc_set[];
-
+#ifndef LRESPONSE_H
+ #define LRESPONSE_H
+extern struct luaL_Reg response_set[];
 #endif

@@ -1,12 +1,31 @@
-/**
- * session.c
- * =========
- *
- * See session.h for documentation.
- *
- * See LICENSE for licensing information.
- *
- */
+/* -------------------------------------------- * 
+session
+=======
+
+Session primitives.
+ 
+Usage
+-----
+Session...
+
+### start ###
+
+### check ###
+
+### stop ###
+
+### set ###
+
+### get ###
+
+
+LICENSE
+-------
+Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
+See LICENSE in the top-level directory for more information.
+
+See LICENSE for licensing information.
+ * -------------------------------------------- */
 #include "session.h"
 
 static const char sdbpath[] = 
