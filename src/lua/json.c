@@ -45,7 +45,8 @@ int json_decode ( lua_State *L ) {
 		return luaL_error( L, "Failed to convert to Lua." );
 	}
 
-	lt_kfdump( t, 2 );
+	//lt_kfdump( t, 2 );
+	lua_stackdump( L );
 	lt_free( t ), free( t );
 	return 1;
 }
@@ -75,11 +76,11 @@ int json_encode ( lua_State *L ) {
 	}
 
 	//Pop the value and encode the above ztable if that did not fail
-	lua_pop( L, 1 );
 	if ( !( src = zjson_encode( zt, err, sizeof( err ) ) ) ) {
 		return luaL_error( L, "Encoding failed: %s", err );
 	}
 
+	lua_pop( L, 1 );
 	lua_pushstring( L, src );
 	lt_free( zt ), free( zt );
 	free( src );
@@ -91,6 +92,27 @@ int json_check ( lua_State *L ) {
 	luaL_checktype( L, 1, LUA_TTABLE );
 	return 0;
 }
+
+
+#ifdef LUA_LOPEN
+int luaopen_json (lua_State *L) {
+	//Clear all values from the stack...
+	//TODO: Why is anything on there in the first place?
+	int count = lua_gettop( L );
+	lua_pop( L, count );
+	lua_newtable( L );
+	lua_pushstring( L, "encode" );
+	lua_pushcfunction( L, json_encode );
+	lua_settable( L, 1 );
+	lua_pushstring( L, "decode" );
+	lua_pushcfunction( L, json_decode );
+	lua_settable( L, 1 );
+#if 0
+	lua_setglobal( L, "json" );
+#endif
+	return 1;
+}
+#endif
 
 
 struct luaL_Reg json_set[] = {
