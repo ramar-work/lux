@@ -75,17 +75,17 @@
 #define REAPING_THREADS
 
 #define HELP \
-	"-s, --start              Start the server\n" \
-	"-k, --kill               Kill a running server\n" \
-	"-c, --config <arg>       Use this Lua file for configuration\n" \
-	"-p, --port <arg>         Start using a different port \n" \
-	"    --pid-file <arg>     Define a PID file\n" \
-	"-u, --user <arg>         Choose an alternate user to run as\n" \
-	"-g, --group <arg>        Choose an alternate group to run as\n" \
-	"-x, --dump               Dump configuration at startup\n" \
-	"-l, --log-file <arg>     Define an alternate log file location\n" \
-	"-a, --access-file <arg>  Define an alternate access file location\n" \
-	"-h, --help               Show the help menu.\n"
+	"-s, --start               Start the server\n" \
+	"-k, --kill                Kill a running server\n" \
+	"-c, --configuration <arg> Use this Lua file for configuration\n" \
+	"-p, --port <arg>          Start using a different port \n" \
+	"    --pid-file <arg>      Define a PID file\n" \
+	"-u, --user <arg>          Choose an alternate user to run as\n" \
+	"-g, --group <arg>         Choose an alternate group to run as\n" \
+	"-x, --dump                Dump configuration at startup\n" \
+	"-l, --log-file <arg>      Define an alternate log file location\n" \
+	"-a, --access-file <arg>   Define an alternate access file location\n" \
+	"-h, --help                Show the help menu.\n"
 
 #if 0
 	"-d, --dir <arg>          Define where to create a new application.\n"\
@@ -907,8 +907,8 @@ int main (int argc, char *argv[]) {
 			v.dump = 1;
 		else if ( !strcmp( *argv, "--use-ssl" ) ) 
 			v.ssl = 1;
-		else if ( OPTEVAL( *argv, "-c", "--config" ) ) {
-			OPTARG( *argv, "--config" );
+		else if ( OPTEVAL( *argv, "-c", "--configuration" ) ) {
+			OPTARG( *argv, "--configuration" );
 			snprintf( v.config, sizeof( v.config ) - 1, "%s", *argv );	
 		}
 		else if ( !strcmp( *argv, "--pid-file" ) ) {
