@@ -11,6 +11,13 @@
  * ztable can be built with: 
  * 	`gcc -Wall -Werror -std=c99 ztable.c main.c`
  * 
+ * Usage
+ * =====
+ * 
+ * 
+ * API Details
+ * ===========
+ * 
  * 
  * LICENSE
  * -------
@@ -361,13 +368,13 @@ zhType lt_add ( zTable *t, int side, zhType lt, int vi, float vf,
 		r->vnull = NULL;
 #endif
 	else if ( lt == ZTABLE_TXT ) {
-		if ( !( r->vchar = malloc( vblen + 1 ) ) )
+		if ( !( r->vchar = malloc( vblen + 1 ) ) ) {
 			return 0;
-		else {
-			memset( r->vchar, 0, vblen + 1 );
-			memcpy( r->vchar, vb, vblen );
-			r->vchar[ vblen ] = '\0';
 		}
+
+		memset( r->vchar, 0, vblen + 1 );
+		memcpy( r->vchar, vb, vblen );
+		r->vchar[ vblen ] = '\0';
 	}
 	else {
 		return 0;

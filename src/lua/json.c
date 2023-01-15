@@ -29,7 +29,8 @@ See LICENSE in the top-level directory for more information.
 int json_decode ( lua_State *L ) {
 	luaL_checkstring( L, 1 );
 
-	char *json, err[ 1024 ] = {0};
+	char *json, *cjson, err[ 1024 ] = {0};
+	int cjson_len = 0;
 	zTable *t = NULL;
 
 	if ( !( json = ( char * )lua_tostring( L, 1 ) ) ) {
@@ -37,10 +38,21 @@ int json_decode ( lua_State *L ) {
 	}
 
 	lua_pop( L, 1 );
+
+#if 0
 	if ( !( t = zjson_decode( json, strlen( json ), err, sizeof( err ) ) ) ) {
 		return luaL_error( L, "Failed to deserialize JSON at json_decode(): %s", err );
 	}
+#else
+	if ( !( cjson = zjson_compress( json, strlen( json ), &cjson_len ) ) ) {
+		fprintf( stderr, "Failed to compress JSON at zjson_compress(): %s", err );
+		return 0;
+	}
 
+	write( 2, cjson, cjson_len );
+
+#endif
+#if 0
 	if ( !ztable_to_lua( L, t ) ) {
 		return luaL_error( L, "Failed to convert to Lua." );
 	}
@@ -48,7 +60,8 @@ int json_decode ( lua_State *L ) {
 	//lt_kfdump( t, 2 );
 	lua_stackdump( L );
 	lt_free( t ), free( t );
-	return 1;
+#endif
+	return 0;
 }
 
 
@@ -94,6 +107,64 @@ int json_check ( lua_State *L ) {
 }
 
 
+int json_load ( lua_State *L ) {
+	//Get a filename 
+	luaL_checkstring( L, 1 );
+
+	//Find a file and load it and dump it
+	char * file = NULL;
+	if ( !( file = ( char * )lua_tostring( L, 1 ) ) ) {
+		return luaL_error( L, "No string specified at json_load()" );
+	}
+
+	lua_pop(L , 1);
+	struct stat sb = {0};
+	if ( stat( file, &sb ) == -1 ) {
+		return luaL_error( L, "stat failed at json_load(): %s", strerror( errno ) );
+	}
+
+	int fd = 0;
+	if ( ( fd = open( file, O_RDWR ) ) == -1 ) {
+		return luaL_error( L, "open failed at json_load(): %s", strerror( errno ) );
+	} 
+
+	char * content = malloc( sb.st_size + 1 );
+	memset( content, 0, sb.st_size + 1 );
+	if ( read( fd, content, sb.st_size ) == -1 )	{
+		return luaL_error( L, "read failed at json_load(): %s", strerror( errno ) );
+	} 
+
+	//Then do the decoding dance and (try) to turn it into a table
+	char * cmp = NULL;
+	int cmplen = 0;
+	if ( !( cmp = zjson_compress( content, sb.st_size, &cmplen ) ) ) {
+		return luaL_error( L, "compression failed at json_load()" );
+	}
+
+	//write( 2, cmp, cmplen );
+	struct mjson ** mjson = NULL;
+	char err[ 1024 ] = {0};
+	if ( !( mjson = zjson_decode2( cmp, cmplen, err, sizeof( err )) ) ) {
+		return luaL_error( L, "decoding failed at json_load()" );
+	}
+
+	zTable * jt = NULL;
+	if ( !( jt = zjson_to_ztable( mjson, NULL, err, sizeof( err ) ) ) ) {
+		return luaL_error( L, "zjson to ztable failed at json_load()" );
+	}
+
+	//lt_reset( jt );
+	lt_kfdump( jt, 2 );
+
+
+	if ( !ztable_to_lua( L, jt ) ) {
+		return luaL_error( L, "ztable to Lua failed at json_load()" );
+	}
+
+	return 1;
+}
+
+
 #ifdef LUA_LOPEN
 int luaopen_json (lua_State *L) {
 	//Clear all values from the stack...
@@ -106,6 +177,9 @@ int luaopen_json (lua_State *L) {
 	lua_settable( L, 1 );
 	lua_pushstring( L, "decode" );
 	lua_pushcfunction( L, json_decode );
+	lua_settable( L, 1 );
+	lua_pushstring( L, "load" );
+	lua_pushcfunction( L, json_load );
 	lua_settable( L, 1 );
 #if 0
 	lua_setglobal( L, "json" );

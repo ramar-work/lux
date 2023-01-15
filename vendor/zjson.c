@@ -38,8 +38,7 @@
 struct zjd { int inText, isObject, isVal, index; }; 
 
 //Trim any characters 
-unsigned char *zjson_trim 
-	( unsigned char *msg, char *trim, int msglen, int *nlen ) {
+unsigned char *zjson_trim ( unsigned char *msg, char *trim, int msglen, int *nlen ) {
 	//Define stuff
 	unsigned char *m = msg, *u = &msg[ msglen ];
 	int nl = msglen, sl = strlen( trim );
@@ -123,9 +122,25 @@ static int zjson_count ( unsigned char *src, int len ) {
 }
 
 
+/**
+ * int zjson_validate ( const char *str )a
+ *
+ * Simply check if a JSON string is a valid object.
+ * (Notice, that we are handling this in a very
+ * dogmatic way.  This library expects to deal with
+ * JSON *objects* strictly.)
+ *
+ */
+int zjson_validate ( const char *str ) {
+	return ( *str == '{' || *str == '['	);
+}
 
-
-//Check and make sure it's "balanced"
+/**
+ * int zjson_check ( const char *str )
+ *
+ * Check and make sure it's "balanced"
+ *
+ */
 int zjson_check ( const char *str, int len, char *err, int errlen ) {
 	int os=0, oe=0, as=0, ae=0;
 	for ( int a=0; len; str++, len-- ) {
@@ -156,281 +171,18 @@ int zjson_check ( const char *str, int len, char *err, int errlen ) {
 }
 
 
-
-struct mjson {
-	unsigned char *value;
-	int size;
-	char type;
-	int index; // For debugging, so you can see where things are...
-};
-
-char * zjson_compress ( const char *str, int len, int *newlen ) {
-	//Loop through the entire thing and "compress" it.
-	char *cmp = NULL;
-	int marked = 0;
-	int cmplen = 0;
-	if ( !( cmp = malloc( len ) ) ) {
-		return NULL;
-	}
-
-	memset( cmp, 0, len );
-	for ( char *s = (char *)str, *x = cmp; len; s++, len-- ) {
-		//If there is any text, mark it.
-		if ( memchr( "'\"", *s, 2 ) ) {
-			marked = !marked;
-		}
-		//If the character is whitespace, skip it
-		if ( !marked && memchr( " \r\t\n", *s, 4 ) ) {
-			continue;
-		}
-		*x = *s, x++, cmplen++;
-	}
-
-	cmp = realloc( cmp, cmplen + 1 );
-	write( 2, cmp, cmplen );
-	*newlen = cmplen + 1;
-	return cmp;
-}
-
-void * mjson_add_item_to_list( void ***, void *, int, int * );
-
-void * mjson_add_item_to_list( void ***list, void *element, int size, int * len ) {
-	//Reallocate
-	if (( (*list) = realloc( (*list), size * ( (*len) + 2 ) )) == NULL ) {
-		return NULL;
-	}
-
-	(*list)[ *len ] = element; 
-	(*list)[ (*len) + 1 ] = NULL; 
-	(*len) += 1; 
-	return list;
-}
-
-struct mjson * create_mjson () {
-	struct mjson *m = malloc( sizeof ( struct mjson ) );
-	memset( m, 0, sizeof( struct mjson ) );
-	return m;
-}
-
-void zjson_dump ( struct mjson **mjson ) {
-	//Dump out the list of what we found
-	for ( struct mjson **v = mjson; v && *v; v++ ) {
-		fprintf( stderr, "\n[ '%c', %d, ", (*v)->type, (*v)->index );
-		if ( (*v)->value && (*v)->size ) {
-			fprintf( stderr, "size: %d, ", (*v)->size );
-			write( 2, (*v)->value, (*v)->size );
-		}
-		write( 2, " ]", 3 );
-	}
-}
-
-#define mjson_add_item(LIST,ELEMENT,SIZE,LEN) \
-	mjson_add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
-
-/**
- * zjson_decode2( const char *str, int len, char *err, int errlen )
- *
- * Decodes JSON strings and turns them into something different.
- *
- * 
- */
-struct mjson ** zjson_decode2 ( const char *str, int len, char *err, int errlen ) {
-	//const char tokens[] = "\"{[}]:, \t\r\n\\"; // this should catch the backslash
-	const char tokens[] = "\"{[}]:,\\"; // this should catch the backslash
-	int mjson_len = 0;
-	int cmplen = 0;
-	zWalker w = {0};
-	struct mjson **mjson = NULL;
-	struct mjson *c = NULL, *d = NULL;
-
-	//"Compress" the JSON string
-	char * cmp = zjson_compress( str, len, &cmplen );	
-
-	//Walk through it and deserialize
-	for ( int i = 0, text = 0, ind = 0, size = 0; 
-		memwalk( &w, (unsigned char *)cmp, (unsigned char *)tokens, cmplen, strlen( tokens ) ); 
-	) {
-		char *srcbuf, *copybuf, statbuf[ ZJSON_MAX_STATIC_LENGTH ] = { 0 };
-		int blen = 0;
-
-	#if 0
-		//Show me the characters we're dealing with...
-		fprintf( stderr, "'%c' - %d\n", w.chr, w.size );
-	#endif
-
-		if ( text && w.chr != '"' ) {
-			//fprintf( stderr, "got text, skipping\n" );
-			size += w.size;
-			continue;
-		}
-		else if ( text && w.chr == '"' ) {
-			//fprintf( stderr, "got end of text, finalizing\n" );
-			text = 0;
-			size += w.size;
-			c->size = size; //Need to add the total size of whatever it may be.
-		#if 0
-			//Set the thing.
-			fprintf( stderr, "type: %c, tab: %d, size: %d, text: ", c->type, c->index, c->size );
-			write( 2, "'", 1 );
-			write( 2, c->value, c->size );
-			write( 2, "'", 1 );
-			write( 2, "\n", 1 );
-//fprintf( stderr, "got text, continue\n" );getchar();
-		#endif
-			continue;
-		}
-
-		if ( w.chr == '"' ) {
-			text = 1;
-			size = -1;
-			//fprintf( stderr, "type: %c, tab: %d, size: %d\n", 'S', ind, size );
-		#if 1
-			struct mjson *m = create_mjson();
-			m->index = ind;
-			m->type = 'S';
-			m->value = w.ptr;
-			c = m;
-		#endif
-		}
-		else if ( w.chr == '{' || w.chr == '[' ) {
-			//fprintf( stderr, "type: %c, tab: %d\n", '{', ++ind );
-		#if 1
-			struct mjson *m = create_mjson();
-			m->type = w.chr;
-			m->value = NULL;	
-			mjson_add_item( &mjson, m, struct mjson, &mjson_len );	
-		#endif
-		}
-		else {
-			// }, ], :, ,
-#if 0
-			fprintf( stderr, "CHR: Got '%c' ", w.chr );
-		fprintf( stderr, "Sequence looks like: " );
-		write( 2, "'", 1 ),	write( 2, w.ptr - 128, w.size + 128 ), write( 2, "'\n", 2 );
-#endif
-			if ( c ) {
-			#if 0
-				fprintf( stderr, "Got saved word." );
-				write( 2, "'", 1 ),	write( 2, c->value, c->size ), write( 2, "'\n", 2 );
-			#endif
-				mjson_add_item( &mjson, c, struct mjson, &mjson_len );	
-				c = NULL;
-			}
-
-			//We may not need this after all	
-		#if 1
-			//Instead of readahead, read backward	& see if we find text
-			int len = 0;
-			//int numeric = 1;
-			unsigned char *p = w.ptr - 2;
-			for ( ; ; p-- ) {
-				if ( memchr( "{}[]:,'\"", *p, 8 ) ) {
-					//fprintf( stderr, "Got a significant character. %c\n", *p );
-					break;
-				}
-				else {
-				#if 0
-					int a = memchr( "0123456789", *p, 10 ) ? 1 : 0;
-					numeric += a;
-				#endif
-					len += 1;
-				}
-			}
-		#endif
-
-			if ( len ) {
-			#if 0
-				fprintf( stderr, "NUM: %d vs LEN: %d\n", numeric, len );
-			#endif
-			#if 0
-				write( 2, "'", 1 ), write( 2, p + 1, len ), write( 2, "'", 1 );
-				getchar();
-			#endif
-				//Make a new struct mjson and mark the pointer top
-				struct mjson *m = create_mjson();
-				m->value = p + 1;
-				m->size = len;
-				m->type = 'V';
-				mjson_add_item( &mjson, m, struct mjson, &mjson_len );	
-			}
-
-			//Always save whatever character it might be
-			if ( w.chr != ':' && w.chr != ',' ) {
-				struct mjson *m = create_mjson();
-				m->value = NULL;
-				m->type = w.chr; 
-				m->size = 0;
-				mjson_add_item( &mjson, m, struct mjson, &mjson_len );	
-			}
-
-		}
-	}
-	return mjson;
-}
-
-
-zTable * zjson_to_ztable ( struct mjson **mjson ) {
-	//Dump out the list of what we found
-	int count = 0;
-	for ( struct mjson **v = mjson; v && *v; v++ ) {
-		count++;
-	}
-
-	fprintf( stderr, "%d\n", count );
-	zTable *t = lt_make( count * 2 );
-
-	for ( struct mjson **v = mjson; v && *v; v++ ) {
-		struct mjson *m = *v;
-		fprintf( stderr, "\n[ '%c', %d, ", (*v)->type, (*v)->index );
-		if ( (*v)->value && (*v)->size ) {
-			fprintf( stderr, "size: %d, ", (*v)->size );
-			write( 2, (*v)->value, (*v)->size );
-		}
-		write( 2, " ]", 3 );
-#if 0
-		if ( m->type == '{' ) {
-			// make an alpha table
-		}
-		else if ( m->type == '[' ) {
-			// make an num table
-		}
-		else if ( m->type == '}' ) {
-			// end an alpha table
-
-		}
-		else if ( m->type == ']' ) {
-			// end a num table
-
-		}
-		else if ( m->type == 'S' ) {
-			// add a string
-
-		}
-		else if ( m->type == 'V' ) {
-			// add another type of value
-			// these can be any type, so check if it's 'true', 'false' or numeric 
-			// and respond accordingly
-
-		}
-#endif
-	}
-	return NULL;
-}
-
-
-
+#if 1
 /**
  * zjson_decode( const char *str, int len, char *err, int errlen )
  *
  * Decodes JSON strings and turns them into a "table".
  *
- * 
  */
-zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
+ztable_t * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 	const char tokens[] = "\"{[}]:,\\"; // this should catch the backslash
 	unsigned char *b = NULL;
 	zWalker w = {0};
-	zTable *t = NULL;
+	ztable_t *t = NULL;
 	struct zjd zjdset[ ZJSON_MAX_DEPTH ], *d = zjdset;
 	memset( zjdset, 0, ZJSON_MAX_DEPTH * sizeof( struct zjd ) );
 	struct bot { char *key; unsigned char *val; int size; } bot;
@@ -443,7 +195,7 @@ zTable * zjson_decode ( const char *str, int len, char *err, int errlen ) {
 
 	ZJSON_PRINTF( "Got JSON block consisting of roughly %d values\n", size );
 
-	//Return zTable
+	//Return ztable_t
 	if ( !( t = lt_make( size * 2 ) ) ) {
 		snprintf( err, errlen, "%s", "Create table failed." );
 		return NULL;
@@ -595,11 +347,672 @@ getchar();
 	lt_lock( t );
 	return t;
 }
+#endif
 
 
+/**
+ * zjson_check_syntax( const char *str, int len, int *newlen )
+ *
+ * Checks for syntax errors. 
+ * 
+ */
+int zjson_check_syntax( const char *str, int len, char *err, int errlen ) { 
+	//
+	char tk;
 
-//Allow deep copying or not...
-char * zjson_encode ( zTable *t, char *err, int errlen ) {
+	//Die if the first non-whitespace character is not a valid JSON object token
+	for ( char *s = (char *)str; len; s++ ) {
+		if ( memchr( " \r\t\n", *s, 4 ) ) {
+			continue;
+		}
+	
+		if ( ( tk = *s ) == '{' || tk == '[' )
+			break;
+		else {	
+			snprintf( err, errlen, "%s: %c\n", "Got invalid JSON object token at start", tk );
+			return 0;	
+		}
+	}
+
+	//We will also need to backtrack and make sure that we have properly closing pairs
+	for ( char *s = (char *)&str[ len - 1 ]; ; s-- ) {
+		if ( memchr( " \r\t\n", *s, 4 ) ) {
+			continue;
+		}
+
+		if ( ( tk == '{' && *s == '}' ) || ( tk == '[' && *s == ']' ) )
+			break;
+		else {	
+			snprintf( err, errlen, "%s: %c\n", "Got invalid JSON object token at end", *s );
+			return 0;	
+		}
+	}
+
+#if 0
+	//TODO: Check to see that the string is fully balanced otherwise.
+	int os=0, oe=0, as=0, ae=0;
+	for ( int a=0; len; str++, len-- ) {
+		//In a string
+#if 1
+		if ( *str == '"' ) {
+			a = !a;
+			continue;
+		}
+
+		if ( !a ) {
+#else
+		if ( *str != '"' && ( a = !a ) ) {
+#endif
+			if ( *str == '{' )
+				os++;
+			else if ( *str == '[' )
+				as++;
+			else if ( *str == '}' )
+				oe++;
+			else if ( *str == ']' ) {
+				ae++;
+			}
+		}
+	}
+
+	return ( os == oe && as == ae );
+#endif
+	return 1;	
+}	
+
+
+/**
+ * zjson_compress( const char *str, int len, int *newlen )
+ *
+ * Creates a copy of JSON string with no spaces for easier 
+ * parsing and less memory usage.  
+ * 
+ */
+char * zjson_compress ( const char *str, int len, int *newlen ) {
+	//Loop through the entire thing and "compress" it.
+	char *cmp = NULL;
+	int marked = 0;
+	int cmplen = 0;
+
+	//TODO: Replace with calloc() for brevity
+	if ( !( cmp = malloc( len ) ) ) {
+		return NULL;
+	}
+
+	memset( cmp, 0, len );
+
+	//Move through, check for any other syntactical errors as well as removing whitespace
+	for ( char *s = (char *)str, *x = cmp; *s && len; s++, len-- ) {
+		//If there are any backslashes, we need to get the character immediately after
+		if ( marked && ( *s == '\\' ) ) {
+			fprintf( stderr, "Got a backslash\n" );
+			//If the next character is any of these, copy it and move on
+			if ( len > 1 ) {
+				if ( memchr( "\"\\/bfnqt", *(s + 1), 8 ) ) {
+					*x = *s, x++, cmplen++, s++;
+					*x = *s, x++, cmplen++;
+				}
+			#if 0
+				//TODO: Would really like Unicode point support, but it has to wait
+				else if ( len > 4 && *(s + 1) == 'u' || *(s + 1) == 'U' ) {
+					memcpy(  
+					x += 5;
+				} 
+			#endif
+			}
+			//If there is a 3rd backslash with no character behind it, then just skip it.
+			continue;
+		}
+		//If there is any text, mark it.
+		else if ( *s == '"' ) { 
+fprintf( stderr, "Got a quote\n" );
+			marked = !marked;
+		}
+	#if 0
+		//TODO: I want to reject single quotes
+		else if ( *s == '\'' ) {
+fprintf( stderr, "Got a quote\n" );
+		}
+	#endif
+		//If the character is whitespace, skip it
+		if ( !marked && memchr( " \r\t\n", *s, 4 ) ) {
+			continue;
+		}
+		*x = *s, x++, cmplen++;
+	}
+
+	cmp = realloc( cmp, cmplen + 1 );
+	*newlen = cmplen + 1;
+	return cmp;
+}
+
+
+/**
+ * void *mjson_add_item_to_list
+ * 	( void ***list, void *element, int size, int * len )
+ *
+ * Adds a struct mjson to a dynamically sized list.
+ * 
+ */
+void * mjson_add_item_to_list( void ***list, void *element, int size, int * len ) {
+	//Reallocate
+	if (( (*list) = realloc( (*list), size * ( (*len) + 2 ) )) == NULL ) {
+		return NULL;
+	}
+
+	(*list)[ *len ] = element; 
+	(*list)[ (*len) + 1 ] = NULL; 
+	(*len) += 1; 
+	return list;
+}
+
+
+/**
+ * create_mjson ( const char *str, int len, char *err, int errlen )
+ *
+ * Creates and initializes a 'struct mjson'
+ *
+ * 
+ */
+struct mjson * create_mjson () {
+	struct mjson *m = malloc( sizeof ( struct mjson ) );
+	memset( m, 0, sizeof( struct mjson ) );
+	return m;
+}
+
+
+/**
+ * void zjson_dump_item ( struct mjson *mjson )
+ *
+ * Converts serialized JSON into a ztable_t
+ * 
+ */
+void zjson_dump_item ( struct mjson *m ) {
+	fprintf( stderr, "[ '%c', %d, ", m->type, m->index );
+	if ( m->value && m->size ) {
+		fprintf( stderr, "size: %d, ", m->size );
+		write( 2, m->value, m->size );
+	}
+	write( 2, " ]\n", 3 );
+}
+
+
+/**
+ * void zjson_dump( struct mjson ** )
+ *
+ * Dumps a list of 'struct mjson' structures
+ *
+ */
+void zjson_dump ( struct mjson **mjson ) {
+	//Dump out the list of what we found
+	for ( struct mjson **v = mjson; v && *v; v++ ) {
+	#if 1
+		zjson_dump_item( *v );
+	#else
+		fprintf( stderr, "\n[ '%c', ", (*v)->type ); 
+		if ( (*v)->value && (*v)->size ) {
+			fprintf( stderr, "size: %d, ", (*v)->size );
+			write( 2, (*v)->value, (*v)->size );
+		}
+		write( 2, " ]", 3 );
+	#endif
+	}
+}
+
+#if 0
+/**
+ * zjson_ptr_play( struct mjson **mjson )
+ *
+ * Demonstrates how to move pointers around, should I forget.
+ *
+ */
+void zjson_ptr_play ( struct mjson **mjson ) {
+	//Should you forget how to increment/decrement pointers...
+	*p = mjson[ 0 ];
+	fprintf( stderr, "%c %p\n", (*p)->type, (*p)->value );
+
+	p++;
+	*p = mjson[ 2 ];
+
+	fprintf( stderr, "%c %p\n", (*p)->type, (*p)->value );
+	p--;
+
+	fprintf( stderr, "%c %p\n", (*p)->type, (*p)->value );
+	return NULL;
+}
+#endif
+
+
+/**
+ * zjson_stringify( struct mjson **mjson, char *err, int errlen )
+ *
+ * Create a "compressed" JSON string out of a list of 'struct mjson'.
+ *
+ */
+char * zjson_stringify( struct mjson **mjson, char *err, int errlen ) {
+	return NULL;
+}
+
+
+/**
+ * zjson_decode2( const char *str, int len, char *err, int errlen )
+ *
+ * Decodes JSON strings and turns them into something different.
+ *
+ */
+struct mjson ** zjson_decode2 ( const char *str, int len, char *err, int errlen ) {
+	const char tokens[] = "\"{[}]:,\\"; // this should catch the backslash
+	struct mjson **mjson = NULL, *c = NULL, *d = NULL;
+	int mjson_len = 0;
+	zWalker w = {0};
+
+	//Walk through it and deserialize
+	for ( int text = 0, size = 0; strwalk( &w, str, tokens ); ) {
+		fprintf( stderr, "CHR: Got '%c' ", w.chr ); getchar();
+		if ( text && w.chr != '"' ) {
+			//fprintf( stderr, "got text, skipping\n" );
+			size += w.size;
+			continue;
+		}
+		else if ( text && w.chr == '"' ) {
+			//fprintf( stderr, "got end of text, finalizing\n" );
+			text = 0;
+			size += w.size;
+			c->size = size; //Need to add the total size of whatever it may be.
+			continue;
+		}
+
+		if ( w.chr == '"' ) {
+			text = 1;
+			size = -1;
+			//fprintf( stderr, "type: %c, tab: %d, size: %d\n", 'S', ind, size );
+		#if 1
+			struct mjson *m = create_mjson();
+			m->type = 'S', m->value = w.ptr, m->size = 0;
+		#else
+			struct mjson *m = create_mjson( 'S', w.ptr, 0 );
+		#endif
+			c = m;
+		}
+		else if ( w.chr == '{' || w.chr == '[' ) {
+			//fprintf( stderr, "type: %c, tab: %d\n", '{', ++ind );
+		#if 1
+			struct mjson *m = create_mjson();
+			m->type = w.chr, m->value = NULL, m->size = 0;
+		#else
+			struct mjson *m = create_mjson( w.chr, NULL, 0 );
+		#endif
+			mjson_add_item( &mjson, m, struct mjson, &mjson_len );	
+		}
+		else {
+			// }, ], :, ,
+	#if 0
+		fprintf( stderr, "CHR: Got '%c' ", w.chr );
+		fprintf( stderr, "Sequence looks like: " );
+		write( 2, "'", 1 ),	write( 2, w.ptr - 128, w.size + 128 ), write( 2, "'\n", 2 );
+	#endif
+			if ( c ) {
+			#if 0
+				fprintf( stderr, "Got saved word." );
+				write( 2, "'", 1 ),	write( 2, c->value, c->size ), write( 2, "'\n", 2 );
+			#endif
+				mjson_add_item( &mjson, c, struct mjson, &mjson_len );	
+				c = NULL;
+			}
+
+			//We may not need this after all	
+		#if 1
+			//Instead of readahead, read backward	& see if we find text
+			int len = 0;
+			unsigned char *p = w.ptr - 2;
+			for ( ; ; p-- ) {
+				if ( memchr( "{}[]:,'\"", *p, 8 ) ) {
+					break;
+				}
+				else {
+					len += 1;
+				}
+			}
+		#endif
+
+			if ( len ) {
+			#if 0
+				fprintf( stderr, "NUM: %d vs LEN: %d\n", numeric, len );
+			#endif
+			#if 0
+				write( 2, "'", 1 ), write( 2, p + 1, len ), write( 2, "'", 1 );
+				getchar();
+			#endif
+				//Make a new struct mjson and mark the pointer top
+			#if 1
+				struct mjson *m = create_mjson();
+				m->value = p + 1, m->size = len, m->type = 'V';
+			#else
+				struct mjson *m = create_mjson( 'V', p + 1, len );
+			#endif
+				mjson_add_item( &mjson, m, struct mjson, &mjson_len );	
+			}
+
+			//Always save whatever character it might be
+			if ( w.chr != ':' && w.chr != ',' ) {
+			#if 1
+				struct mjson *m = create_mjson();
+				m->value = NULL, m->size = 0, m->type = w.chr; 
+			#else
+				struct mjson *m = create_mjson( w.chr, NULL, 0 );
+			#endif
+				mjson_add_item( &mjson, m, struct mjson, &mjson_len );	
+			}
+		}
+	}
+
+	//Terminate the last entry
+	( mjson[ mjson_len - 1 ] )->index = -1;
+	return mjson;
+}
+
+
+/**
+ * zjson_get_count( struct mjson **mjson )
+ *
+ * Get a count of entries in an 'struct mjson' list.
+ * 
+ */
+static int zjson_get_count ( struct mjson **mjson ) {
+	int count = 0;
+	for ( struct mjson **v = mjson; v && *v; v++ ) {
+		count++;
+	}
+	return count;
+}
+
+
+/**
+ * zjson_to_ztable( struct mjson **mjson, void *null, char *err, int errlen )
+ *
+ * Converts serialized JSON into a ztable_t
+ * 
+ */
+ztable_t * zjson_to_ztable ( struct mjson **mjson, void *null, char *err, int errlen ) {
+	ztable_t *t = NULL;
+	struct mjson *ptr[100] = { NULL }, **p = ptr;
+
+	if ( !( t = lt_make( zjson_get_count( mjson ) * 2 ) ) ) {
+		snprintf( err, errlen, "Failed to allocate space for ztable_t.\n" );
+		return NULL;
+	}
+
+	//Use a static list of mjsons to keep track of which objects we're in
+	*p = *mjson;
+
+	for ( struct mjson **v = ++mjson; v && *v && ((*v)->index > -1 ); v++ ) {
+		zjson_dump_item( *v );
+		if ( (*v)->type == '{' || (*v)->type == '[' ) {
+fprintf( stderr, "%s - %c - ", "DESCENDING", (*v)->type == '{' ? 'A' : 'N' );
+			//If the immediate member before is a [, then you need to add a key before descending
+			if ( (*p)->type == '[' ) {
+fprintf( stderr, "Current (*p) is: %c - ", (*p)->type );
+fprintf( stderr, "adding key (%d)\n", (*p)->index );
+				lt_addintkey( t, (*p)->index );
+				(*p)->index++;
+			}
+fprintf( stderr, "\n" );
+			lt_descend( t ), ++p, *p = *v;
+		}
+		else if ( (*v)->type == '}' || (*v)->type == ']' ) {
+fprintf( stderr, "%s - %c - ", "ASCENDING", (*v)->type == '{' ? 'A' : 'N' );
+fprintf( stderr, "\n" );
+			lt_ascend( t ), --p;
+			//If the parent is 1, you need to reset it here, since this is most likely the value
+			if ( ( (*p)->type == '{' ) && ( (*p)->index == 1 ) ) {
+				(*p)->index = 0;
+			}
+		}
+		else if ( (*v)->type == 'S' || (*v)->type == 'V' ) {
+			// Put the value in a temporary buffer
+			char *val = malloc( (*v)->size + 1 );
+			memset( val, 0, (*v)->size + 1 );
+			memcpy( val, (*v)->value, (*v)->size );
+fprintf( stderr, "Current (*p) is: %c - ", (*p)->type );
+			if ( (*p)->type == '[' ) {
+fprintf( stderr, "adding key value pair (%d => '%s')\n", (*p)->index, val );
+				lt_addintkey( t, (*p)->index );
+				lt_addtextvalue( t, val );
+				lt_finalize( t );
+				(*p)->index++;
+			}
+			else if ( (*p)->type == '{' ) {
+				if ( ( (*p)->index = !(*p)->index ) ) {
+fprintf( stderr, "adding key ('%s')\n", val );
+					lt_addtextkey( t, val );
+				}
+				else {
+fprintf( stderr, "adding value ('%s') and finalizing\n", val );
+					lt_addtextvalue( t, val );
+					lt_finalize( t );
+				}
+			}
+			free( val );
+		}
+	}
+	return t;
+}
+
+
+/**
+ * ztable_to_zjson ( ztable_t *t, char *err, int errlen )
+ *
+ * Converts from ztable_t to regular JSON structure.
+ * 
+ */
+struct mjson ** ztable_to_zjson ( ztable_t *t, char *err, int errlen ) {
+#if 0
+	//Define more
+	struct ww {
+		struct ww *ptr;
+		int type, keysize, valsize;
+		char *comma, *key, *val, vint[ 64 ];
+	} **ptr, *ff, *rr, *br = NULL, *sr[ 1024 ] = { NULL };
+	unsigned int tcount = 0, size = 0, jl = 0, jp = 0;
+	char * json = NULL;
+	const char emptystring[] = "''";
+
+	if ( !t ) {
+		snprintf( err, errlen, "Table for JSON conversion not initialized" );
+		return NULL;
+	}
+
+	if ( !( tcount = lt_countall( t ) ) ) {
+		snprintf( err, errlen, "Could not get table count" );
+		return NULL;
+	}
+
+	//Always allocate tcount + 1, b/c we start processing ahead of time.
+	if ( ( size = ( tcount + 1 ) * sizeof( struct ww ) ) < 0 ) {
+		snprintf( err, errlen, "Could not allocate source JSON" );
+		return NULL;
+	}
+
+	//?
+	if ( !( br = malloc( size ) ) || !memset( br, 0, size ) ) { 
+		snprintf( err, errlen, "Could not allocate source JSON" );
+		return NULL;
+	}
+
+	//Initialize the first element
+	br->type = ZTABLE_TBL, br->val = "{", br->valsize = 1, br->comma = " ";
+
+	//Then initialize our other pointers
+	ff = br + 1, rr = br, ptr = sr;
+
+	//Initialize JSON string
+	if ( !( json = malloc( 16 ) ) || !memset( json, 0, 16 ) ) {
+		snprintf( err, errlen, "Could not allocate source JSON" );
+		free( br );
+		return NULL;
+	}
+
+	//Initialize things
+	lt_reset( t );
+
+	//Loop through all values and copy
+	for ( zKeyval *kv ; ( kv = lt_next( t ) ); ) {
+		zhValue k = kv->key, v = kv->value;
+		char kbuf[ 256 ] = { 0 }, vbuf[ 2048 ] = { 0 }, *vv = NULL;
+		int lk = 0, lv = 0;
+		ff->comma = " ", ff->type = v.type;
+
+		if ( k.type == ZTABLE_NON ) 
+			ff->key = NULL, ff->keysize = 0;
+		else if ( k.type == ZTABLE_TXT )
+			ff->key = k.v.vchar, ff->keysize = strlen( k.v.vchar );
+		else if ( k.type == ZTABLE_BLB )
+			ff->key = (char *)k.v.vblob.blob, ff->keysize = k.v.vblob.size;
+		else if ( k.type == ZTABLE_INT ) {
+			ff->key = NULL, ff->keysize = 0;
+			if ( rr->type == ZTABLE_TBL && *rr->val == '{' ) {
+				rr->val = "[", rr->valsize = 1;
+			}
+		}
+		else if ( k.type == ZTABLE_TRM ) {
+			ff->key = NULL, ff->keysize = 0;
+			ff->val = ( *(*ptr)->val == '{' ) ? "}" : "]", ff->valsize = 1;
+			rr->comma = " ", ff->comma = ",", ff->type = ZTABLE_TRM; 
+			ff++, rr++;
+			ptr--;
+			continue;	
+		}
+		else {
+			snprintf( err, errlen, "Got invalid key type: %s", lt_typename( k.type ) );
+			free( br ), free( json );
+			return NULL;	
+		}
+
+		//TODO: Add rules to replace " in blobs and text
+		if ( v.type == ZTABLE_NUL )
+			0;
+		else if ( v.type == ZTABLE_NON )
+			break; 
+		else if ( v.type == ZTABLE_INT )
+			ff->valsize = snprintf( ff->vint, 64, "%d", v.v.vint ), ff->val = ff->vint, ff->comma = ",";
+		else if ( v.type == ZTABLE_FLT )
+			ff->valsize = snprintf( ff->vint, 64, "%f", v.v.vfloat ), ff->val = ff->vint, ff->comma = ",";
+		else if ( v.type == ZTABLE_TXT ) {
+			if ( v.v.vchar ) 	
+				ff->val = v.v.vchar, ff->valsize = strlen( v.v.vchar );
+			else {
+				ff->val = (char *)emptystring; 
+				ff->valsize = 2; 
+			}
+			ff->comma = ",";
+		}
+		else if ( v.type == ZTABLE_BLB )
+			ff->val = (char *)v.v.vblob.blob, ff->valsize = v.v.vblob.size, ff->comma = ",";
+		else if ( v.type == ZTABLE_TBL ) {
+			ff->val = "{", ff->valsize = 1, ++ptr, *ptr = ff;	
+		}
+		else { /* ZTABLE_TRM || ZTABLE_NON || ZTABLE_USR */
+			snprintf( err, errlen, "Got invalid value type: %s", lt_typename( v.type ) );
+			free( br ), free( json );
+			return NULL;
+		}
+		ff++, rr++;
+	}
+
+	//No longer null, b/c it exists...
+	ff->keysize = -1;
+
+	//TODO: There is a way to do this that DOES NOT need a second loop...
+	for ( struct ww *yy = br; yy->keysize > -1; yy++ ) {
+		char kbuf[ ZJSON_MAX_STATIC_LENGTH ] = {0}, vbuf[ 2048 ] = {0}, *v = vbuf, vmallocd = 0;
+		int lk = 0, lv = 0;
+
+		if ( yy->keysize ) {
+			char *k = kbuf;
+			// Stop on keys that are just too big...
+			if ( yy->keysize >= ZJSON_MAX_STATIC_LENGTH ) {
+				snprintf( err, errlen, "Key too large" );
+				free( br ), free( json );
+				return NULL;
+			}
+
+			if ( yy->type != ZTABLE_TRM ) {
+				memcpy( k, "\"", 1 ), k++, lk++;
+				memcpy( k, yy->key, yy->keysize ), k += yy->keysize, lk += yy->keysize;
+				memcpy( k, "\": ", 3 ), k += 3, lk += 3;
+			}
+		}
+
+		if ( yy->valsize ) {
+			char *p = v; 
+
+			// Values can be quite long when encoding
+			if ( yy->valsize > ZJSON_MAX_STATIC_LENGTH ) {
+				if ( !( p = v = malloc( yy->valsize + 3 ) ) ) {
+					snprintf( err, errlen, "Could not claim memory for JSON value." );
+					free( br ), free( json );
+					return NULL;
+				}
+				vmallocd = 1;
+			}
+
+			memset( p, 0, yy->valsize );
+			if ( yy->type == ZTABLE_TBL )
+				memcpy( p, yy->val, yy->valsize ), p += yy->valsize, lv += yy->valsize;
+			else if ( yy->type == ZTABLE_INT || yy->type == ZTABLE_FLT ) {
+				memcpy( p, yy->vint, yy->valsize ), p += yy->valsize, lv += yy->valsize;
+				memcpy( p, yy->comma, 1 ), p += 1, lv += 1;
+			}
+			else if ( yy->type == ZTABLE_TRM ) {
+				memcpy( p, yy->val, yy->valsize ), p += yy->valsize, lv += yy->valsize;
+				memcpy( p, yy->comma, 1 ), p += 1, lv += 1;
+			}
+			else {
+				memcpy( p, "\"", 1 ), p++, lv++;
+				memcpy( p, yy->val, yy->valsize ), p += yy->valsize, lv += yy->valsize;
+				memcpy( p, "\"", 1 ), p += 1, lv += 1;
+				memcpy( p, yy->comma, 1 ), p += 1, lv += 1;
+			}
+		}
+
+		//Allocate and re-copy, starting with upping the total size
+		jl += ( lk + lv );
+		if ( !( json = realloc( json, jl ) ) ) {
+			snprintf( err, errlen, "Could not re-allocate source JSON" );
+			free( br ), free( json );
+			return NULL;
+		}
+
+		//Copy stuff (don't try to initialize)
+		memcpy( &json[ jp ], kbuf, lk ), jp += lk;
+		memcpy( &json[ jp ], v, lv ), jp += lv;
+		( vmallocd ) ? free( v ) : 0;
+	}
+
+	//This is kind of ugly
+	if ( !( json = realloc ( json, jp + 3 ) ) ) {
+		snprintf( err, errlen, "Could not re-allocate source JSON" );
+		free( br ), free( json );
+		return NULL;
+	}
+
+	json[ jp - 1 ] = ' '; 
+	json[ jp     ] = ( *json == '[' ) ? ']' : '}'; 
+	json[ jp + 1 ] = '\0';
+	free( br );
+	return json;
+#endif
+	return NULL;
+}
+
+
+/**
+ * zjson_encode( ztable_t *t, char *err, int errlen )
+ *
+ * Converts from ztable_t to JSON string.
+ * 
+ */
+char * zjson_encode ( ztable_t *t, char *err, int errlen ) {
 	//Define more
 	struct ww {
 		struct ww *ptr;
@@ -806,6 +1219,279 @@ char * zjson_encode ( zTable *t, char *err, int errlen ) {
 #include <ztable.h>
 #include <zwalker.h>
 
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+#include <math.h>
+
+//TODO: Reject keys that aren't a certain type
+void lua_dumpstack ( lua_State *L ) {
+	const char spaces[] = /*"\t\t\t\t\t\t\t\t\t\t"*/"          ";
+	const int top = lua_gettop( L );
+	struct data { unsigned short count, index; } data[64], *dd = data;
+	memset( data, 0, sizeof( data ) );
+	dd->count = 1;
+
+	//Return early if no values
+	if ( ( dd->index = top ) == 0 ) {
+		fprintf( stderr, "%s\n", "No values on stack." );
+		return;
+	}
+
+	//Loop through all values on the stack
+	for ( int it, depth=0, ix=0, index=top; index >= 1; ix++ ) {
+		fprintf( stderr, "%s[%d:%d] ", &spaces[ 10 - depth ], index, ix );
+
+		for ( int t = 0, count = dd->count; count > 0; count-- ) {
+			if ( ( it = lua_type( L, index ) ) == LUA_TSTRING )
+				fprintf( stderr, "(%s) %s", lua_typename( L, it ), lua_tostring( L, index ) );
+			else if ( it == LUA_TFUNCTION )
+				fprintf( stderr, "(%s) %d", lua_typename( L, it ), index );
+			else if ( it == LUA_TNUMBER )
+				fprintf( stderr, "(%s) %lld", lua_typename( L, it ), (long long)lua_tointeger( L, index ) );
+			else if ( it == LUA_TBOOLEAN)
+				fprintf( stderr, "(%s) %s", lua_typename( L, it ), lua_toboolean( L, index ) ? "T" : "F" );
+			else if ( it == LUA_TTHREAD )
+				fprintf( stderr, "(%s) %p", lua_typename( L, it ), lua_tothread( L, index ) );
+			else if ( it == LUA_TLIGHTUSERDATA || it == LUA_TUSERDATA )
+				fprintf( stderr, "(%s) %p", lua_typename( L, it ), lua_touserdata( L, index ) );
+			else if ( it == LUA_TNIL || it == LUA_TNONE )
+				fprintf( stderr, "(%s) %p", lua_typename( L, it ), lua_topointer( L, index ) );
+			else if ( it == LUA_TTABLE ) {
+				fprintf( stderr, "(%s) %p", lua_typename( L, it ), lua_topointer( L, index ) );
+			}
+
+			//Handle keys
+			if ( count > 1 )
+				index++, t = 1, dd->count -= 2, fprintf( stderr, " -> " );
+			//Handle new tables
+			else if ( it == LUA_TTABLE ) {
+				lua_pushnil( L );
+				if ( lua_next( L, index ) != 0 ) {
+					++dd, ++depth; 
+					dd->index = index, dd->count = 2, index = lua_gettop( L );
+				}
+			}
+			//Handle situations in which a table is on the "other side"
+			else if ( t ) {
+				lua_pop( L, 1 );
+				//TODO: This is quite gnarly... Maybe clarify a bit? 
+				while ( depth && !lua_next( L, dd->index ) ) {
+					( ( index = dd->index ) > top ) ? lua_pop( L, 1 ) : 0;
+					--dd, --depth, fprintf( stderr, "\n%s}", &spaces[ 10 - depth ] );
+				}
+				( depth ) ? dd->count = 2, index = lua_gettop( L ) : 0;
+			}
+		}
+		fprintf( stderr, "\n" );
+		index--;
+	}
+}
+
+
+/**
+ * zjson_to_lua( struct mjson **mjson, void *null, char *err, int errlen )
+ *
+ * Converts serialized JSON into a ztable_t
+ *
+ * In any case, the first entry will ALWAYS be a table (or its not vaild JSON)
+ * 
+ */
+int zjson_to_lua ( lua_State *L, struct mjson **mjson ) {
+	int count = 0;
+	struct mjson *ptr[100] = { NULL };
+	struct mjson **p = ptr;
+
+	for ( struct mjson **v = mjson; v && *v; v++ ) {
+		count++;
+	}
+
+
+	int i = 0, ecount = 0;
+	for ( struct mjson **x = NULL, **v = mjson; v && *v; v++ ) {
+		struct mjson *m = *v;
+	#if 1
+		fprintf( stderr, "\n[ '%c', ", (*v)->type );
+		if ( (*v)->value && (*v)->size ) {
+			fprintf( stderr, "size: %d, ", (*v)->size );
+			write( 2, (*v)->value, (*v)->size );
+		}
+		write( 2, " ]", 3 );
+	#endif
+	#if 1
+		// Make a new table
+		if ( m->type == '{' || m->type == '[' ) {
+			fprintf( stderr, "ptr = %p\n", p );
+			// make an alpha table
+			lua_newtable( L ), i++;
+#if 1
+			//fprintf( stderr, "\"parent\" element is: %c\n", (*( v - 1 ))->type );
+			++p, *p = m;
+			(*p)->ref = !ecount ? 0 : (*( v - 1 ))->type;
+#endif
+			//++p, *p = m;
+		}
+
+		// End a table
+		else if ( m->type == ']' || m->type == '}' ) {
+			fprintf( stderr, "ptr = %p\n", p );
+			//fprintf( stderr, "wtf...%p, %p, '%c'\n", p, *p, (*p)->ref );
+			if ( *p ) {
+#if 1
+				if ( (*p)->ref == 'S' || (*p)->ref == 'V' ) {
+					i -= 2;
+					lua_settable( L, i );
+				}
+#endif
+			}
+				--p;
+		}
+
+		// Add some kind of value
+		else if ( m->type == 'S' || m->type == 'V' ) {
+
+			// Put the value in a temporary buffer
+			char *val = malloc( m->size + 1 );
+			memset( val, 0, m->size + 1 );
+			memcpy( val, m->value, m->size );
+		
+			// Check the value's type (is it a number, boolean, null or string)	
+			#if 0
+			#endif
+
+		#if 1
+			// Add values to a table.
+			struct mjson *x = (*p);
+			// For debugging
+			fprintf( stderr, " - DEBUG (*p): %c %p\n", x->type, x->value );
+
+			if ( x->type == '[' ) {
+				//Add the number first, then add something else
+				lua_pushnumber( L, ++x->index ), i++;
+				lua_pushstring( L, val ), i++;
+				i -= 2;
+				lua_settable( L, i );
+			}
+			else if ( x->type == '{' ) {
+				lua_pushstring( L, val ), i++;
+				if ( ++x->index == 2 ) {
+					i -= 2;
+					lua_settable( L, i );
+					x->index = 0;
+				}
+			}
+		#endif
+			// I think this is legal, b/c the library makes a copy
+			free( val );
+		}
+		fprintf( stderr, "Current index is: %d, level index is: %d\n", i, (*p) ? (*p)->index : -1 );
+		lua_dumpstack( L );
+	#endif
+	}
+	return 0;
+}
+
+//Copy all records from a ztable_t to a Lua table at any point in the stack.
+int ztable_to_lua ( lua_State *L, ztable_t *t ) {
+	short ti[ 128 ] = { 0 }, *xi = ti; 
+
+	//lt_kfdump( t, 1 );
+
+	//Push a table and increase Lua's "save table" index
+	lua_newtable( L );
+	*ti = 1;
+
+	//Reset table's index
+	lt_reset( t );
+
+	//Loop through all values and copy
+	for ( zKeyval *kv ; ( kv = lt_next( t ) ); ) {
+		zhValue k = kv->key, v = kv->value;
+		if ( k.type == ZTABLE_NON )
+			return 1;	
+		//Arrays start at 1 in Lua, so increment by 1
+		else if ( k.type == ZTABLE_INT ) {
+			// FPRINTF( "Got integer key: %d - ", k.v.vint );
+			lua_pushnumber( L, k.v.vint + 1 );				
+		}
+		else if ( k.type == ZTABLE_FLT ) {
+			// FPRINTF( "Got double key: %f - ", k.v.vfloat );
+			lua_pushnumber( L, k.v.vfloat );
+		}				
+		else if ( k.type == ZTABLE_TXT ) {
+			// FPRINTF( "Got text key: %s - ", k.v.vchar );
+			lua_pushstring( L, k.v.vchar );
+		}
+		else if ( k.type == ZTABLE_BLB) {
+			// FPRINTF( "Got blob key: %d bytes long - ", k.v.vblob.size );
+			lua_pushlstring( L, (char *)k.v.vblob.blob, k.v.vblob.size );
+		}
+		else if ( k.type == ZTABLE_TRM ) {
+			lua_settable( L, *( --xi ) );
+		}
+
+		if ( v.type == ZTABLE_NUL )
+			;
+		else if ( v.type == ZTABLE_INT ) {
+	//		FPRINTF( "Got integer value: %d\n", v.v.vint );
+			lua_pushnumber( L, v.v.vint );	
+		}			
+		else if ( v.type == ZTABLE_FLT ) {
+	//		FPRINTF( "Got double value: %f\n", v.v.vfloat );
+			lua_pushnumber( L, v.v.vfloat );
+		}				
+		else if ( v.type == ZTABLE_TXT ) {
+	//		FPRINTF( "Got text value: '%s'\n", v.v.vchar );
+			lua_pushstring( L, v.v.vchar );
+		}
+		else if ( v.type == ZTABLE_BLB ) {
+	//		FPRINTF( "Got blob value of size: %d\n", v.v.vblob.size );
+			lua_pushlstring( L, (char *)v.v.vblob.blob, v.v.vblob.size );
+		}
+		else if ( v.type == ZTABLE_TBL ) {
+			lua_newtable( L );
+			*( ++xi ) = lua_gettop( L );
+		}
+		else /* ZTABLE_TRM || ZTABLE_NON || ZTABLE_USR */ {
+		#if 1
+			if ( v.type == ZTABLE_TRM )
+				fprintf( stderr, "Got value of type: %s\n", "ZTABLE_TRM" );
+			else if ( v.type == ZTABLE_NON )
+				fprintf( stderr, "Got value of type: %s\n", "ZTABLE_NON" );
+			else if ( v.type == ZTABLE_USR ) {
+				fprintf( stderr, "Got value of type: %s\n", "ZTABLE_USR" );
+			}
+		#endif
+			return 0;
+		}
+
+		if ( v.type != ZTABLE_NON && v.type != ZTABLE_TBL && v.type != ZTABLE_NUL ) {
+		#if 0
+			FPRINTF( "Setting table value to key => " );
+			if ( k.type == ZTABLE_INT )
+				FPRINTF( "%d\n", k.v.vint );
+			else if ( k.type == ZTABLE_FLT )
+				FPRINTF( "%f\n", k.v.vfloat );
+			else if ( k.type == ZTABLE_TXT )
+				FPRINTF( "'%s'\n", k.v.vchar );
+			else if ( k.type == ZTABLE_BLB ) {
+				FPRINTF( "(blob - %d bytes long)", k.v.vblob.size );
+			}
+		#endif
+			lua_settable( L, *xi );
+		}
+	}
+	return 1;
+}
+
+
+/**
+ * int main(...)
+ *
+ * Simple command-line program using -decode and -encode flags to 
+ * select a file and test decoding/encoding JSON.
+ *
+ */
 int main (int argc, char *argv[]) {
 	int encode = 0;
 	int decode = 0;
@@ -860,26 +1546,78 @@ int main (int argc, char *argv[]) {
 	char err[ 1024 ] = {0};
 	struct mjson **mjson = NULL; 
 
-	#if 0 
-	if ( !zjson_compress( con, sb.st_size, &conlen ) ) {
+#if 0
+	if ( !zjson_decode_oneshot( con, sb.st_size ) ) {
+		fprintf( stderr, "Failed to decode JSON at zjson_decode_oneshot(): %s", err );
+		return 0;
+	}
+#else
+	// In lieu of a "oneshot" function, we'll need to define some more variables
+	char *cmp = NULL;
+	int cmplen = 0;
+
+	// Check if the string is valid
+	if ( !zjson_check_syntax( con, sb.st_size, err, sizeof( err ) ) ) {
+		fprintf( stderr, "JSON string failed syntax check: %s\n", err );
+		return 0;
+	}
+
+	// Compress the string first
+	if ( !( cmp = zjson_compress( con, sb.st_size, &cmplen ) ) ) {
 		fprintf( stderr, "Failed to compress JSON at zjson_compress(): %s", err );
 		return 0;
 	}
-	#endif
 
-	//if ( !( t = zjson_decode( con, sb.st_size, err, sizeof( err ) ) ) ) {
-	if ( !( mjson = zjson_decode2( con, sb.st_size, err, sizeof( err ) ) ) ) {
+	// Dump the new string
+	write( 2, "'", 1 ), write( 2, cmp, cmplen ), write( 2, "'", 1 );
+
+	// Free the original string
+	free( con );
+
+//While debugging
+//free( cmp ); return 0;
+
+	// Then decode the new string 
+	if ( !( mjson = zjson_decode2( cmp, cmplen - 1, err, sizeof( err ) ) ) ) {
 		fprintf( stderr, "Failed to deserialize JSON at json_decode(): %s", err );
 		return 0;
 	}
 
-	zjson_to_ztable( mjson );
+	// Dump the serialized JSON
+	// zjson_dump( mjson );
 
+ #if 0
+	// Trying using Lua directly to test...
+	// Create an environment 
+	lua_State *L = luaL_newstate();
+
+	// Convert to a Lua table
+	zjson_to_lua( L, mjson );
+
+	// Use Lua dump stack to see what it looks like?
+ #else
+	// Make a ztable out of it
+	ztable_t *t = NULL;
+	if ( !( t = zjson_to_ztable( mjson, NULL, err, sizeof( err ) ) ) ) {
+		fprintf( stderr, "Failed to make table out of JSON at zjson_to_ztable(): %s", err );
+		return 0;
+	}
+
+	// May need to do all of this goofy shit
 	//lt_reset( t );
-	//lt_kfdump( t, 2 );
-	free( con );
+	lt_kfdump( t, 2 );
+	lt_free( t );
+	free( cmp );
+#if 0
+	// Create an environment 
+	lua_State *L = luaL_newstate();
+	ztable_to_lua( L, t );	
+#endif	
+ #endif
+#endif
 	return 0;
 }
+
 #endif
 
 
