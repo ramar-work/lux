@@ -23,10 +23,9 @@
  */
 struct mjson {
 	unsigned char *value;
-	char ref;
 	int size;
 	char type;
-	int index; // For debugging, so you can see where things are...
+	short index;
 };
 
 char * zjson_compress ( const char *, int, int * );
