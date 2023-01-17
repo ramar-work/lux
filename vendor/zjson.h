@@ -32,12 +32,12 @@ char * zjson_compress ( const char *, int, int * );
 
 struct mjson ** zjson_decode2 ( const char *, int, char *, int );
 
-void * mjson_add_item_to_list( void ***, void *, int, int * );
+//static void * mjson_add_item_to_list( void ***, void *, int, int * );
 
 #define mjson_add_item(LIST,ELEMENT,SIZE,LEN) \
 	mjson_add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 
-struct mjson * create_mjson ();
+//struct mjson * create_mjson ();
 zTable * zjson_to_ztable ( struct mjson **, void *, char *, int) ;
 zTable * zjson_decode ( const char *, int, char *, int );
 char * zjson_encode ( zTable *, char *, int ) ;
