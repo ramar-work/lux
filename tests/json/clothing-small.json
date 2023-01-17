@@ -1,0 +1,68 @@
+{
+    "clothing": [
+        0
+    ],
+    "option": [
+        "pre-existing"
+    ],
+    "design": [
+        {
+            "cost": 2099,
+            "baseWeight": 5,
+            "minQty": 1,
+            "defaultProfile": "front",
+            "type": "short",
+            "index": 0,
+            "profiles": {
+                "front": {
+                    "layers": [
+                        {
+                            "strokeWidth": 0,
+                            "color": [
+                                255,
+                                255,
+                                255
+                            ],
+                            "element": "path"
+                        },
+                        {
+                            "strokeWidth": 0,
+                            "color": [
+                                179,
+                                179,
+                                179
+                            ],
+                            "element": "path"
+                        }
+                    ],
+                    "items": {
+                        "9812/image/png/iVBORw0KGgoAAAANSUhEUgAAAfIAAAErCAYAAAAloAE3AAAACXBIWXMAAA6zAAAO": {
+                            "bsize": 7359,
+                            "mimetype": "image/png",
+                            "name": "59.png",
+                            "size": 9812,
+                            "ref": {},
+                            "fgColor": [
+                                255,
+                                255,
+                                255
+                            ],
+                            "x": 346,
+                            "y": 280,
+                            "w": 154,
+                            "h": 92
+                        }
+                    }
+                },
+                "back": {}
+            },
+            "bulkQty": 5,
+            "description": "short t-shirt",
+            "costBulk": 999,
+            "maxQty": 99,
+            "height": 256,
+            "name": "T-Shirt",
+            "width": 256
+        }
+    ]
+}
