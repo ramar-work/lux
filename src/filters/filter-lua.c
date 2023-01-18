@@ -814,13 +814,25 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 	zhttp_t *p = NULL;
 	
 	if ( 0 ) { ; }
-	else if ( t->ctype == CTYPE_JSON ) {
-		content = zjson_encode( l->zmodel, l->err, 1024 );
+	else if ( t->ctype == CTYPE_XML ) {
+		content = xml_encode( l->zmodel, "model" );
 		clen = strlen( content );
 		ctype = t->ctypename;
 	}
-	else if ( t->ctype == CTYPE_XML ) {
-		content = xml_encode( l->zmodel, "model" );
+	else if ( t->ctype == CTYPE_JSON ) {
+	#if 0
+		content = zjson_encode( l->zmodel, l->err, 1024 );
+	#else
+		struct mjson **zjson = NULL;
+		if ( !( zjson = ztable_to_zjson( l->zmodel, l->err, 1024 ) ) ) {
+			return NULL;
+		}
+		if ( !( content = zjson_stringify( zjson, l->err, 1024 ) ) ) {
+			zjson_free( zjson );
+			return NULL;
+		}
+		zjson_free( zjson );
+	#endif
 		clen = strlen( content );
 		ctype = t->ctypename;
 	}

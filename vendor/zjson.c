@@ -109,7 +109,7 @@ return 0;
 
 
 
-#if 1
+#if 0
 //Get an approximation of the number of keys needed
 static int zjson_count ( unsigned char *src, int len ) {
 	int sz = 0;
@@ -512,7 +512,7 @@ char * zjson_encode ( ztable_t *t, char *err, int errlen ) {
  */
 int zjson_check_syntax( const char *str, int len, char *err, int errlen ) { 
 	//
-	char tk, *start = NULL;
+	char tk = 0, *start = NULL;
 	int nlen = len, arr = 0, text = 0,  p = 0;
 
 	//Die if the first non-whitespace character is not a valid JSON object token
@@ -729,12 +729,12 @@ void zjson_dump ( struct mjson **mjson ) {
 
 
 /**
- * zjson_decode2( const char *str, int len, char *err, int errlen )
+ * zjson_decode( const char *str, int len, char *err, int errlen )
  *
  * Decodes JSON strings and turns them into something different.
  *
  */
-struct mjson ** zjson_decode2 ( const char *str, int len, char *err, int errlen ) {
+struct mjson ** zjson_decode ( const char *str, int len, char *err, int errlen ) {
 	const char tokens[] = "\"{[}]:,"; // this should catch the backslash
 	struct mjson **mjson = NULL, *c = NULL, *d = NULL;
 	int mjson_len = 0;
@@ -940,7 +940,7 @@ int zjson_has_real_values ( struct mjson **mjson ) {
  * Converts serialized JSON into a ztable_t
  * 
  */
-ztable_t * zjson_to_ztable ( struct mjson **mjson, void *null, char *err, int errlen ) {
+ztable_t * zjson_to_ztable ( struct mjson **mjson, char *err, int errlen ) {
 	ztable_t *t = NULL;
 	struct mjson *ptr[100] = { NULL }, **p = ptr;
 
@@ -1344,7 +1344,7 @@ int main (int argc, char *argv[]) {
 	free( con );
 
 	// Then decode the new string 
-	if ( !( mjson = zjson_decode2( cmpstr, cmplen - 1, err, sizeof( err ) ) ) ) {
+	if ( !( mjson = zjson_decode( cmpstr, cmplen - 1, err, sizeof( err ) ) ) ) {
 		fprintf( stderr, "Failed to deserialize JSON at json_decode(): %s", err );
 		return 1;
 	}
@@ -1357,7 +1357,7 @@ int main (int argc, char *argv[]) {
 	if ( zjson_has_real_values( mjson ) ) {
 		// Make a ztable out of it
 		ztable_t *t = NULL;
-		if ( !( t = zjson_to_ztable( mjson, NULL, err, sizeof( err ) ) ) ) {
+		if ( !( t = zjson_to_ztable( mjson, err, sizeof( err ) ) ) ) {
 			fprintf( stderr, "Failed to make table out of JSON at zjson_to_ztable(): %s", err );
 			return 1;
 		}
