@@ -191,6 +191,13 @@
  #define SESSION_DB_PATH CONFDIR "hypno.db"
 #endif
 
+/* Include sendfile */
+#if @disable_sendfile@
+ #error "Sendfile is disabled..."
+ #define SENDFILE_H 
+#endif
+
+
 /* Default model */
 #if 0
 #undef HBLOCK_H

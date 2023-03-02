@@ -112,10 +112,7 @@ void free_hosts ( struct lconfig ** hlist ) {
 		free( (*hosts)->ca_bundle );
 		free( (*hosts)->cert_file );
 		free( (*hosts)->key_file );
-
-
 		free( (*hosts) );
-
 		hosts++;
 	}
 	free( hlist );
@@ -140,7 +137,7 @@ void dump_hosts ( struct lconfig **hosts ) {
 //...
 static int check_server_root( char **item, char *err, int errlen ) {
 	struct stat sb;
-	char *rp = NULL;
+	char *rp = NULL, fdir[2048] = {0};
 
 	//If null item
 	if ( !*item ) {
@@ -150,6 +147,7 @@ static int check_server_root( char **item, char *err, int errlen ) {
 
 	//If it starts with a '/', assume its absolute
 	if ( **item == '/' ) { 
+		//TODO: This can be replaced by a call that needs less.
 		if ( stat( *item, &sb ) > -1 )
 			return 1;
 		else {
@@ -158,10 +156,9 @@ static int check_server_root( char **item, char *err, int errlen ) {
 		}
 	}
 
-	//If it doesn't, then get the realpath
-	if ( ( rp = realpath( *item, NULL ) ) ) {
+	if ( !getcwd( fdir, sizeof( fdir ) ) ) { 
 		free( *item );
-		*item = rp;
+		//*item = strdup( fdir );
 	}
 	else {
 		//Make a filename

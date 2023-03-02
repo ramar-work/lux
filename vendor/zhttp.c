@@ -1944,24 +1944,18 @@ void print_httprecords ( zhttpr_t **r ) {
 //list out everything in an HTTPBody
 void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 	FILE *fb = NULL;
-	int fd = 0;
 
 	if ( r == NULL || !path ) {
 		return;
 	}
 
-	if ( strcmp( path, "/dev/stdout" ) )
-		fb = stdout, fd = 1;
-	else if ( strcmp( path, "/dev/stderr" ) )
-		fb = stderr, fd = 2;
+	if ( strcmp( path, "/dev/stdout" ) == 0 )
+		fb = stdout;
+	else if ( strcmp( path, "/dev/stderr" ) == 0 )
+		fb = stderr;
 #ifndef _WIN32
 	else {
-		if ( ( fd = open( path, O_RDWR | O_CREAT | O_TRUNC, 0655 ) ) == -1 ) {
-			fprintf( stderr, "[%s:%d] %s\n", __func__, __LINE__, strerror( errno ) );
-			return;
-		}
-
-		if ( ( fb = fdopen( fd, "w" ) ) == NULL ) {
+		if ( ( fb = fopen( path, "w" ) ) == NULL ) {
 			fprintf( stderr, "[%s:%d] %s\n", __func__, __LINE__, strerror( errno ) );
 			return;
 		}
@@ -1969,7 +1963,7 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 #else
 	else {
 		//TODO: Handle Windows properly
-		fb = stdout, fd = 1;
+		fb = stdout;
 	}
 #endif
 
@@ -2030,11 +2024,11 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 		if ( rr[i] ) {
 			zhttpr_t **w = rr[i];
 			while ( *w ) {
-				ZHTTP_WRITE( fd, " '", 2 ); 
-				ZHTTP_WRITE( fd, (*w)->field, strlen( (*w)->field ) );
-				ZHTTP_WRITE( fd, "' -> '", 6 );
-				ZHTTP_WRITE( fd, (*w)->value, (*w)->size );
-				ZHTTP_WRITE( fd, "'\n", 2 );
+				fwrite( " '", 1, 2, fb );
+				fwrite( (*w)->field, 1, strlen( (*w)->field ), fb );
+				fwrite( "' -> '", 1, 6, fb );
+				fwrite( (*w)->value, 1, (*w)->size, fb );
+				fwrite( "\n", 1, 2, fb );
 				if ( (*w)->type == ZHTTP_MULTIPART ) {
 					ZHTTP_PRINTF( fb, "  Content-Type: %s\n", (*w)->ctype );
 					ZHTTP_PRINTF( fb, "  Filename: %s\n", (*w)->filename );
@@ -2046,11 +2040,9 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 	}
 
 #ifndef _WIN32
-	if ( fd > 2 ) {
+	if ( fb != stderr && fb != stdout ) {
 		fclose( fb );
-		close( fd );
 	}
 #endif
 }
-
 #endif

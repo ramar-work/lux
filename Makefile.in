@@ -27,7 +27,7 @@ LDFLAGS = @ld_flags@
 DEBUGFLAGS = @debug_flags@
 MODEL = HTHREAD_H
 ASAN_OPTIONS = log_path=asan.log
-GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing -Wno-format-truncation -Wno-return-local-addr -D$(MODEL) $(DEBUGFLAGS) -O2 $(IFLAGS) 
+GCCFLAGS = -std=c99 -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing -Wno-format-truncation -Wno-return-local-addr -D$(MODEL) $(DEBUGFLAGS) -O2 $(IFLAGS) 
 INITMETHOD = @initsys@
 CFLAGS = $(GCCFLAGS)
 CC = @cc@ 
@@ -53,8 +53,8 @@ SRC = \
 	@srcdir@/src/ctx/ctx-https.c \
 	@srcdir@/src/lua/lib.c \
 	@srcdir@/src/lua/db.c \
-	@srcdir@/src/lua/echo.c \
-	@srcdir@/src/lua/encdec.c \
+	@srcdir@/src/lua/enc.c \
+	@srcdir@/src/lua/dec.c \
 	@srcdir@/src/lua/lua.c \
 	@srcdir@/src/lua/json.c \
 	@srcdir@/src/lua/rand.c \
@@ -62,16 +62,17 @@ SRC = \
 	@srcdir@/src/lua/http.c \
 	@srcdir@/src/lua/hash.c \
 	@srcdir@/src/lua/session.c \
+	@srcdir@/src/filters/filter-lua.c
+EXTRA = \
 	@srcdir@/src/filters/filter-static.c \
 	@srcdir@/src/filters/filter-echo.c \
 	@srcdir@/src/filters/filter-dirent.c \
-	@srcdir@/src/filters/filter-redirect.c \
-	@srcdir@/src/filters/filter-lua.c
+	@srcdir@/src/filters/filter-redirect.c
 OBJ = ${SRC:.c=.o}
 UNAME = $(shell uname)
 DOMAIN = @default_domain@
 DISTDIR = $(BINNAME)-$(VERSION)
-FILES = configure configure.ac install-sh LICENSE Makefile.in README.md
+FILES = configure install-sh LICENSE Makefile.in README.md
 
 # main - Compiles all code needed to get hypno running
 main: $(OBJ) vendor/liblua.a
@@ -173,6 +174,7 @@ clean:
 	-@find $(srcdir)/src/ -maxdepth 2 -type f -name "*.o" | xargs rm
 	-@find $(srcdir)/bin/ -maxdepth 1 -type f | xargs rm
 	-@find $(srcdir)/vendor/ -maxdepth 1 -type f -name "*.o" | xargs rm
+	-@cd $(srcdir)/vendor/lua-5.4.3/ && make clean
 
 # list - List all the targets and what they do
 list:
@@ -204,8 +206,8 @@ $(DISTDIR):
 # Check that packaging worked (super useful for other distributions...) 
 distcheck:
 	gzip -cd $(DISTDIR).tar.gz | tar xvf -
-	cd $(DISTDIR) && ./configure
-	cd $(DISTDIR) && $(MAKE)
+	cd $(DISTDIR) && ./configure --disable-tls-support
+	cd $(DISTDIR) && $(MAKE) -j2
 	cd $(DISTDIR) && $(MAKE) clean
 	rm -rf $(DISTDIR)
 	@echo "*** package $(DISTDIR).tar.gz is ready for distribution."

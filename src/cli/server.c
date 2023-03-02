@@ -43,16 +43,18 @@
 #include <sys/ioctl.h>
 #include <pwd.h>
 #include <pthread.h>
+#include "cliutils.h"
 #include "../config.h"
 #include "../log.h"
 #include "../server.h"
+#if 0
 #include "../filters/filter-static.h"
 #include "../filters/filter-echo.h"
 #include "../filters/filter-dirent.h"
 #include "../filters/filter-redirect.h"
+#endif
 #include "../filters/filter-lua.h"
 #include "../ctx/ctx-http.h"
-#include "cliutils.h"
 
 #ifndef DISABLE_TLS
  #include "../ctx/ctx-https.h"
@@ -178,11 +180,13 @@ struct values {
 
 //Define a list of filters
 struct filter http_filters[16] = { 
+#if 0
 	{ "static", filter_static }
 ,	{ "echo", filter_echo }
 ,	{ "dirent", filter_dirent }
 ,	{ "redirect", filter_redirect }
-,	{ "lua", filter_lua }
+#endif
+ 	{ "lua", filter_lua }
 , { NULL }
 , { NULL }
 , { NULL }

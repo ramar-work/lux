@@ -25,8 +25,13 @@
 #include <zhttp.h>
 #include "../socket.h"
 #include "../server.h"
-
 #include "../config.h"
+
+#ifndef _WIN32
+ #ifdef SENDFILE_H
+  #include <sys/sendfile.h>
+ #endif
+#endif
 
 #ifndef CTXHTTP_H
 #define CTXHTTP_H

@@ -19,6 +19,7 @@
  * ------------------------------------------- */
 #include <limits.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <ztable.h>
 #include "lua.h"
 #include "loader.h"

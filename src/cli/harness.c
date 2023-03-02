@@ -32,10 +32,12 @@
 #include <lauxlib.h>
 #include "../util.h"
 #include "../server.h"
+#if 0
 #include "../filters/filter-static.h"
 #include "../filters/filter-echo.h"
 #include "../filters/filter-dirent.h"
 #include "../filters/filter-redirect.h"
+#endif
 #include "../filters/filter-lua.h"
 #include "../lua.h"
 #include "../lua.h"
@@ -79,11 +81,13 @@
 
 //Define a list of filters
 struct filter filters[16] = { 
+#if 0
 	{ "static", filter_static }
 ,	{ "echo", filter_echo }
 ,	{ "dirent", filter_dirent }
 ,	{ "redirect", filter_redirect }
-,	{ "lua", filter_lua }
+#endif
+ 	{ "lua", filter_lua }
 , { NULL }
 , { NULL }
 , { NULL }

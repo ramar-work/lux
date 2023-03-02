@@ -1,8 +1,8 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ([2.69])
-AC_INIT([hypno], [0.3.2a], [ramar@ramar.work])
-AC_CONFIG_SRCDIR([example/c/dylib.c])
+AC_INIT([hypno], [0.3.3a], [ramar@ramar.work])
+AC_CONFIG_SRCDIR([src/ctx.c])
 
 # Define files to perform substitutions on
 #AC_CONFIG_HEADERS([config.h])
@@ -50,11 +50,12 @@ with_xml=0
 with_json=1
 with_msgpack=0
 disable_tls=0
-include_filter_c=1
+include_filter_c=0
 include_filter_lua=1
-include_filter_static=1
-include_filter_echo=1
+include_filter_static=0
+include_filter_echo=0
 ld_flags="-ldl -lpthread -lm"
+disable_sendfile=0
 cc="gcc"
 debug_flags=
 use_asan=
@@ -144,7 +145,12 @@ if test -z "${svcpath}"; then
 fi
 
 # Add a check for TLS
-AC_ARG_ENABLE([tls-support], AC_HELP_STRING([--disable-tls-support],[Disable TLS support]), [disable_tls=1])
+AC_ARG_ENABLE([tls], AC_HELP_STRING([--disable-tls],[Disable TLS support]), [disable_tls=1])
+
+# Add a check for sendfile support
+AC_ARG_ENABLE([sendfile], AC_HELP_STRING([--disable-sendfile],[Disable sendfile support]), [disable_sendfile=1])
+
+
 
 # Checks for programs.
 AC_PROG_AWK

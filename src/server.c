@@ -68,7 +68,7 @@ static int srv_check_dir ( struct cdata *conn, char *err, int errlen ) {
 
 		//If we get this far, replace the original directory with this new one
 		free( conn->hconfig->dir );
-		conn->hconfig->dir = adir = strdup( dir );
+		conn->hconfig->dir = adir = zhttp_dupstr( dir );
 	}
 
 	if ( access( adir, W_OK ) == -1 ) {
