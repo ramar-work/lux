@@ -10,6 +10,13 @@ hypno depends on the following:
 - Lua v5.4 or greater
 - GnuTLS 2.0 or greater
 
+If cloning from Git, use the following command to create a configure script and Makefile:
+```
+autoupdate && autoreconf --install
+```
+
+
+
 
 ### Linux
 

@@ -1,7 +1,7 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
-AC_PREREQ([2.69])
-AC_INIT([hypno], [0.3.2a], [ramar@ramar.work])
+AC_PREREQ([2.71])
+AC_INIT([hypno],[0.3.2a],[ramar@ramar.work])
 AC_CONFIG_SRCDIR([example/c/dylib.c])
 
 # Define files to perform substitutions on
@@ -70,40 +70,40 @@ default_expiration_days=365
 default_server_name="localhost"
 default_server_ip="127.0.0.1"
 
-AC_ARG_WITH([www-root], AC_HELP_STRING([--with-www-root=DIR],[Set default web directory for applications]), [wwwroot=${withval}])
+AC_ARG_WITH([www-root], AS_HELP_STRING([--with-www-root=DIR],[Set default web directory for applications]), [wwwroot=${withval}])
 AC_SUBST(wwwroot)
 
-AC_ARG_WITH([www-port], AC_HELP_STRING([--with-www-port=PORT],[Set default server port for listening]), [wwwport=${withval}])
+AC_ARG_WITH([www-port], AS_HELP_STRING([--with-www-port=PORT],[Set default server port for listening]), [wwwport=${withval}])
 AC_SUBST(wwwport)
 
-AC_ARG_WITH([server-user], AC_HELP_STRING([--with-server-user],[Set default user for managing the web server]), [srvuser=${withval}])
+AC_ARG_WITH([server-user], AS_HELP_STRING([--with-server-user],[Set default user for managing the web server]), [srvuser=${withval}])
 AC_SUBST(srvuser)
 
-AC_ARG_WITH([server-group], AC_HELP_STRING([--with-server-group],[Set default group for managing the web server]),[srvgroup=${withval}])
+AC_ARG_WITH([server-group], AS_HELP_STRING([--with-server-group],[Set default group for managing the web server]),[srvgroup=${withval}])
 AC_SUBST(srvgroup)
 
-AC_ARG_WITH([log-dir], AC_HELP_STRING([--with-log-dir],[Set access and error log directory]), [logdir=${withval}])
+AC_ARG_WITH([log-dir], AS_HELP_STRING([--with-log-dir],[Set access and error log directory]), [logdir=${withval}])
 AC_SUBST(logdir)
 
 # Use enable systemd or enable sysv here
-AC_ARG_ENABLE([systemd], AC_HELP_STRING([--enable-systemd],[Use systemd units for daemon management (default)]), [systemd=${enableval}])
+AC_ARG_ENABLE([systemd], AS_HELP_STRING([--enable-systemd],[Use systemd units for daemon management (default)]), [systemd=${enableval}])
 
-AC_ARG_ENABLE([sysv], AC_HELP_STRING([--enable-sysv],[Use sysv-style init scripts for daemon management]), [sysv=yes], [systemd=no])
+AC_ARG_ENABLE([sysv], AS_HELP_STRING([--enable-sysv],[Use sysv-style init scripts for daemon management]), [sysv=yes], [systemd=no])
 
-AC_ARG_ENABLE([debugging], AC_HELP_STRING([--enable-debugging],[Compile with debugging flags enabled]), [debug_flags='-DDEBUG_H'])
+AC_ARG_ENABLE([debugging], AS_HELP_STRING([--enable-debugging],[Compile with debugging flags enabled]), [debug_flags='-DDEBUG_H'])
 
 # If systemd is enabled, make sure that we actually found something...
 #AS_IF([test "x$systemd" == xyes],
 #	[
 #	AC_ARG_WITH([systemd-unit-path], 
-#	AC_HELP_STRING([--with-systemd-unit-path],[Use an alternate systemd unit file path for installation]), 
+#	AS_HELP_STRING([--with-systemd-unit-path],[Use an alternate systemd unit file path for installation]), 
 #	[svcpath=${withval}])
 #	]
 #)
 
 if test "x${systemd}" == xyes; then
 	AC_ARG_WITH([systemd-unit-path], 
-		AC_HELP_STRING([--with-systemd-unit-path],[Use an alternate systemd unit file path for installation]), 
+		AS_HELP_STRING([--with-systemd-unit-path],[Use an alternate systemd unit file path for installation]), 
 		[svcpath=${withval}]
 	)
 fi
@@ -122,7 +122,7 @@ if test -z "${svcpath}"; then
 fi
 
 # Add a check for TLS
-AC_ARG_ENABLE([tls-support], AC_HELP_STRING([--disable-tls-support],[Disable TLS support]), [disable_tls=1])
+AC_ARG_ENABLE([tls-support], AS_HELP_STRING([--disable-tls-support],[Disable TLS support]), [disable_tls=1])
 
 # Checks for programs.
 AC_PROG_AWK

@@ -22,7 +22,8 @@ srcdir = @srcdir@
 VPATH = @srcdir@
 SRVUSER = @srvuser@
 SRVGROUP = @srvgroup@
-IFLAGS = -Ivendor -Ivendor/lua-5.4.3/src
+LUAVER = 5.4.4
+IFLAGS = -Ivendor -Ivendor/lua-$(LUAVER)/src
 LDFLAGS = @ld_flags@
 DEBUGFLAGS = @debug_flags@
 MODEL = HTHREAD_H
@@ -165,13 +166,18 @@ vendor/libssl.a vendor/libcrypto.a &:
 
 # vendor/liblua.a - Build Lua 5.4.3 statically
 vendor/liblua.a: 
-	-@cd vendor/ && cd lua-5.4.3 && make MYCFLAGS="-fPIC" && mv src/liblua.a ../
+	-@cd vendor/ && cd lua-$(LUAVER) && make MYCFLAGS="-fPIC" && mv src/liblua.a ../
 
 # clean - Get rid of object files and tests 
 clean:
 	-@find $(srcdir)/src/ -maxdepth 2 -type f -name "*.o" | xargs rm
 	-@find $(srcdir)/bin/ -maxdepth 1 -type f | xargs rm
-	-@find $(srcdir)/vendor/ -maxdepth 1 -type f -name "*.o" | xargs rm
+	-@find $(srcdir)/vendor/ -type f -name "*.o" | xargs rm
+
+# veryclean - Run `clean` and get rid of autoconf files as well
+veryclean: clean
+	-@rm -rf autom4te.cache config.guess config.log config.status config.sub configure Makefile
+
 
 # list - List all the targets and what they do
 list:
@@ -198,7 +204,7 @@ $(DISTDIR):
 		$(DISTDIR)/lib
 	cp $(FILES) $(DISTDIR)/
 	cp -r src/* $(DISTDIR)/src/
-	cp -r vendor/*.[ch] vendor/lua-5.4.3 $(DISTDIR)/vendor/
+	cp -r vendor/*.[ch] vendor/lua-$(LUAVER) $(DISTDIR)/vendor/
 
 # Check that packaging worked (super useful for other distributions...) 
 distcheck:
