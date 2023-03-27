@@ -78,12 +78,12 @@
 	"-k, --kill               Kill a running server\n" \
 	"-c, --config <arg>       Use this Lua file for configuration\n" \
 	"-p, --port <arg>         Start using a different port \n" \
-	"    --pidfile <arg>      Define a PID file\n" \
+	"    --pid-file <arg>     Define a PID file\n" \
 	"-u, --user <arg>         Choose an alternate user to run as\n" \
 	"-g, --group <arg>        Choose an alternate group to run as\n" \
 	"-x, --dump               Dump configuration at startup\n" \
-	"-l, --logfile <arg>      Define an alternate log file location\n" \
-	"-a, --accessfile <arg>   Define an alternate access file location\n" \
+	"-l, --log-file <arg>     Define an alternate log file location\n" \
+	"-a, --access-file <arg>  Define an alternate access file location\n" \
 	"-h, --help               Show the help menu.\n"
 
 #if 0
@@ -685,11 +685,11 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 		//Populate any other thread data
 	#ifndef REAPING_THREADS 
-		fprintf( stderr, "IP addr is: %s\n", ip );
+		//fprintf( stderr, "IP addr is: %s\n", ip );
 		fprintf( accessfd, "IP addr is: %s\n", ip );
 	#else
 		memcpy( f->ipaddr, ip, sizeof( ip ) );
-		fprintf( stderr, "IP addr is: %s\n", ip );
+		//fprintf( stderr, "IP addr is: %s\n", ip );
 		fprintf( accessfd, "IP addr is: %s\n", ip );
 	#endif
 
@@ -923,7 +923,7 @@ int main (int argc, char *argv[]) {
 			}
 			snprintf( v.config, sizeof( v.config ) - 1, "%s", *argv );	
 		}
-		else if ( !strcmp( *argv, "--pidfile" ) ) {
+		else if ( !strcmp( *argv, "--pid-file" ) ) {
 			argv++;
 			if ( !*argv ) {
 				eprintf( "Expected argument for --port!" );
@@ -956,19 +956,19 @@ int main (int argc, char *argv[]) {
 			} 
 			snprintf( v.user, sizeof( v.user ) - 1, "%s", *argv );	
 		}
-		else if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--logfile" ) ) {
+		else if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--log-file" ) ) {
 			argv++;
 			if ( !*argv ) {
-				eprintf( "Expected argument for --logfile!" );
+				eprintf( "Expected argument for --log-file!" );
 				return 0;
 			}
 			memset( v.logfile, 0, sizeof( v.logfile ) );
 			snprintf( v.logfile, sizeof( v.logfile) - 1, "%s", *argv );	
 		}
-		else if ( !strcmp( *argv, "-a" ) || !strcmp( *argv, "--accessfile" ) ) {
+		else if ( !strcmp( *argv, "-a" ) || !strcmp( *argv, "--access-file" ) ) {
 			argv++;
 			if ( !*argv ) {
-				eprintf( "Expected argument for --accessfile!" );
+				eprintf( "Expected argument for --access-file!" );
 				return 0;
 			}
 			memset( v.accessfile, 0, sizeof( v.accessfile ) );

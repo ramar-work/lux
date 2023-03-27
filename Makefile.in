@@ -7,7 +7,7 @@
 ## Hypno on most machines. 
 ##
 ## @author
-## Copyright 2022 Ironhead, Inc.
+## Copyright 2022-2023 Ironhead, Inc.
 ## --------------------------------------------------------- ##
 BINNAME = @PACKAGE_NAME@
 VERSION = @PACKAGE_VERSION@
@@ -23,7 +23,8 @@ VPATH = @srcdir@
 SRVUSER = @srvuser@
 SRVGROUP = @srvgroup@
 LUAVER = 5.4.4
-IFLAGS = -Ivendor -Ivendor/lua-$(LUAVER)/src
+GNUTLSVER = 3.6.16
+IFLAGS = -Ivendor -Iinclude
 LDFLAGS = @ld_flags@
 DEBUGFLAGS = @debug_flags@
 MODEL = HTHREAD_H
@@ -35,7 +36,6 @@ CC = gcc
 SRC = \
 	@srcdir@/vendor/zrender.c \
 	@srcdir@/vendor/ztable.c \
-	@srcdir@/vendor/sqlite3.c \
 	@srcdir@/vendor/zdb.c \
 	@srcdir@/vendor/zwalker.c \
 	@srcdir@/vendor/zhttp.c \
@@ -62,32 +62,32 @@ SRC = \
 	@srcdir@/src/lua/filesystem.c \
 	@srcdir@/src/lua/http.c \
 	@srcdir@/src/lua/hash.c \
+	@srcdir@/src/filters/filter-lua.c \
 	@srcdir@/src/filters/filter-static.c \
 	@srcdir@/src/filters/filter-echo.c \
 	@srcdir@/src/filters/filter-dirent.c \
-	@srcdir@/src/filters/filter-redirect.c \
-	@srcdir@/src/filters/filter-lua.c
+	@srcdir@/src/filters/filter-redirect.c 
 OBJ = ${SRC:.c=.o}
+DEPS = @objdeps@
 UNAME = $(shell uname)
 DOMAIN = @default_domain@
 DISTDIR = $(BINNAME)-$(VERSION)
-FILES = configure configure.ac install-sh LICENSE Makefile.in README.md
+FILES = \
+	configure \
+	config.guess \
+	config.sub \
+	install-sh \
+	LICENSE \
+	Makefile.in \
+	README.md
 
+# FIXME: $(DEPS) will result in wasted space on cli target, since it uses neither TLS nor SQLite3
 # main - Compiles all code needed to get hypno running
-main: $(OBJ) vendor/liblua.a
+main: $(DEPS) $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
-	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
-	$(CC) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(LDFLAGS)
-
-# with-ssl: Identical to main except with inclusion of SSL targets.
-with-ssl: LDFLAGS += -lgnutls
-with-ssl: CFLAGS += -DINCLUDE_GNUTLS
-with-ssl: $(OBJ) vendor/liblua.a vendor/libssl.a vendor/libcrypto.a
-	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
-	$(CC) $(LDFLAGS) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(srcdir)/vendor/liblua.a $(srcdir)/vendor/libcrypto.a $(srcdir)/vendor/libssl.a
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(DEPS) $(LDFLAGS)
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(DEPS) $(LDFLAGS)
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(DEPS) $(LDFLAGS)
 
 # debug - Builds code with debugging flags on (need logic for if CC == clang)
 debug: CFLAGS += -g -O0 -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
@@ -100,24 +100,32 @@ install: filesystem-install $(INITMETHOD)-install
 
 # filesystem-install - Installs targets to $PREFIX/{bin,share} and /var/lib
 filesystem-install:
+	echo 'Running filesystem-install...'
 	install -d $(PREFIX)/bin
 	install -m 0755 $(srcdir)/bin/hypno-cli $(PREFIX)/bin/
 	install -m 0755 $(srcdir)/bin/hypno-harness $(PREFIX)/bin/
 	install -m 0755 $(srcdir)/bin/hypno-server $(PREFIX)/bin/
 	install -d $(PREFIX)/share/$(BINNAME)
-	install -m 644 $(srcdir)/share/* $(PREFIX)/share/$(BINNAME)/
+	find $(srcdir)/share/ -maxdepth 1 -type f | \
+		xargs -IFF sh -c 'install -m 644 FF $(PREFIX)/share/$(BINNAME)/'
 	install -d /etc/$(BINNAME)
 	install -m 644 $(srcdir)/etc/etc.hypno.hypno.lua /etc/$(BINNAME)/hypno.lua
-	-mkdir -p $(WWWROOT)/ && chown $(SRVUSER):$(SRVGROUP) $(WWWROOT)/
+	install -d $(LOGDIR)/ && chown $(SRVUSER):$(SRVGROUP) $(LOGDIR)/
+	-install -d $(WWWROOT)/ && chown $(SRVUSER):$(SRVGROUP) $(WWWROOT)/
+	-test ! -f $(WWWROOT)/config.lua && \
+		cp -r $(srcdir)/example/* $(WWWROOT)/ && \
+		sed -i 's;wwwroot = "example";wwwroot = "$(WWWROOT)";' $(WWWROOT)/config.lua
 
 # lib-install - Create and install library directory for extensions
 lib-install:
+	echo 'Running lib-install...'
 	install -d /var/lib/$(BINNAME)
 	install -m 0755 $(srcdir)/lib/* /var/lib/$(BINNAME)/
 	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(BINNAME)/
 
 # systemd-install - Installs systemd on Linux systems
 systemd-install:
+	echo 'Running systemd-install...'
 	sed "{ \
 		s#__PREFIX__#$(PREFIX)#; \
 		s#__SRVUSER__#$(SRVUSER)#; \
@@ -153,20 +161,51 @@ examples: main
 		print( 'Hosts at example/config.lua are:\n' .. table.concat( hosts, '\n' ) );"
 	@printf "Starting hypno-server, and listening for requests at port 2222...\n"
 	@$(srcdir)/bin/$(BINNAME)-server \
-		--start --port $(PORT) --config $(srcdir)/example/config.lua --user $$USER
+		--start \
+		--log-file /dev/stderr \
+		--access-file /dev/stderr \
+		--port $(PORT) \
+		--user $$USER \
+		--group $$USER \
+		--config $(srcdir)/example/config.lua
+
+# a quick server test would look like
+# kill <pid>
+test: PORT=2222
+test: ADDR=http://localhost:$(PORT)
+test: CONFIG=$(srcdir)/example/config.lua
+test: OPTIONS=--start -l /dev/null -a /dev/null -p $(PORT) -u $$USER -g $$USER -c $(CONFIG)
+test:
+	@$(srcdir)/bin/$(BINNAME)-server $(OPTIONS) & echo $$! > ./test
+	@wget -qSO- $(ADDR) 2>&1 | grep '200 OK' >/dev/null && echo "Test OK" || echo "Test failed!"
+	-@kill -9 `cat $(srcdir)/test`
+	-@rm -f $(srcdir)/test
 
 # vendor/sqlite3.o - Build SQLite from our local copy
 vendor/sqlite3.o: CFLAGS+=-Wno-misleading-indentation -Wno-deprecated-declarations
 vendor/sqlite3.o:
 	$(CC) $(CFLAGS) -lpthread -c -o vendor/sqlite3.o vendor/sqlite3.c
 
-# vendor/libssl.a - Build OpenSSL libs statically
-vendor/libssl.a vendor/libcrypto.a &:
-	-@cd vendor/ && tar xzf openssl-1.1.1l.tar.gz && cd openssl-1.1.1l && ./config && make && mv libssl.a libcrypto.a ../
+# vendor/liblua.a - Build Lua 5.4.4 statically
+lib/liblua.a: 
+	-@mkdir $(srcdir)/lib/ $(srcdir)/include/
+	-@cd vendor/ && \
+		cd lua-$(LUAVER) && \
+		make MYCFLAGS="-fPIC" && \
+		mv src/liblua.a ../../lib/ && \
+		cp include/lauxlib.h include/luaconf.h include/lua.h include/lualib.h ../../include/
 
-# vendor/liblua.a - Build Lua 5.4.3 statically
-vendor/liblua.a: 
-	-@cd vendor/ && cd lua-$(LUAVER) && make MYCFLAGS="-fPIC" && mv src/liblua.a ../
+#	-@cd vendor/ && cd lua-$(LUAVER) && make MYCFLAGS="-fPIC" && mv src/liblua.a ../
+
+# vendor/gnutls.a - Build GnuTLS 3.6.x statically
+lib/libgnutls.a: 
+	-@mkdir $(srcdir)/lib/ $(srcdir)/include/
+	-@cd vendor/ && \
+		cd gnutls-$(GNUTLSVER) && \
+		./configure --prefix=`readlink -f ../../` --disable-guile --enable-static && \
+		make && \
+		make install
+
 
 # clean - Get rid of object files and tests 
 clean:
@@ -176,8 +215,29 @@ clean:
 
 # veryclean - Run `clean` and get rid of autoconf files as well
 veryclean: clean
+	-@rm -rf $(srcdir)/lib/ $(srcdir)/include/
 	-@rm -rf autom4te.cache config.guess config.log config.status config.sub configure Makefile
 
+# distclean - Run `clean` in prep for a clean package
+distclean: clean
+	-@rm -rf $(srcdir)/lib/ $(srcdir)/include/
+	-@rm -rf autom4te.cache config.guess config.log config.status config.sub configure Makefile
+
+# distboot - Run a bootstrapping procedure to initialize autoconf
+distboot:
+	autoupdate && autoreconf --install
+
+# disttest - RUn an automated build against a different OS
+disttest:
+	test ! -z $(REMOTE)
+	test -f $(DISTDIR).tar.gz
+	scp $(DISTDIR).tar.gz $(REMOTE):~/
+	ssh $(REMOTE) ' \
+		rm -rf $(DISTDIR); \
+		tar xzf $(DISTDIR).tar.gz && \
+		cd $(DISTDIR)/ && \
+		./configure --enable-local-lua --enable-local-sqlite3 && \
+		make -j2'	
 
 # list - List all the targets and what they do
 list:
@@ -200,11 +260,13 @@ $(DISTDIR):
 		$(DISTDIR)/vendor \
 		$(DISTDIR)/include \
 		$(DISTDIR)/etc \
+		$(DISTDIR)/example \
 		$(DISTDIR)/bin \
 		$(DISTDIR)/lib
 	cp $(FILES) $(DISTDIR)/
 	cp -r src/* $(DISTDIR)/src/
-	cp -r vendor/*.[ch] vendor/lua-$(LUAVER) $(DISTDIR)/vendor/
+	cp -r example/* $(DISTDIR)/example/
+	cp -r vendor/*.[ch] vendor/lua-$(LUAVER)/ $(DISTDIR)/vendor/
 
 # Check that packaging worked (super useful for other distributions...) 
 distcheck:

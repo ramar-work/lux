@@ -1,8 +1,8 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ([2.71])
-AC_INIT([hypno],[0.3.2a],[ramar@ramar.work])
-AC_CONFIG_SRCDIR([example/c/dylib.c])
+AC_INIT([hypno],[0.3.4a],[ramar@ramar.work])
+AC_CONFIG_SRCDIR([example/config.lua])
 
 # Define files to perform substitutions on
 #AC_CONFIG_HEADERS([config.h])
@@ -22,8 +22,9 @@ wwwport=80
 srvuser="http"
 srvgroup="http"
 logdir="/var/log/hypno"
-svcpath=`pkg-config systemd --variable=systemduserunitdir 2>/dev/null`
-default_svcpath="/usr/lib/systemd/user"
+#svcpath=`pkg-config systemd --variable=systemduserunitdir 2>/dev/null`
+svcpath=
+default_svcpath="/usr/lib/systemd/system"
 initsys="systemd"
 systemd="yes"
 sysv="no"
@@ -56,6 +57,10 @@ include_filter_static=1
 include_filter_echo=1
 ld_flags="-ldl -lpthread -lm"
 debug_flags=
+local_sqlite3=0
+local_lua=0
+local_tls=0
+objdeps=
 
 # CLI stuff
 confdir="/etc/hypno"
@@ -121,9 +126,6 @@ if test -z "${svcpath}"; then
 	svcpath=${default_svcpath}
 fi
 
-# Add a check for TLS
-AC_ARG_ENABLE([tls-support], AS_HELP_STRING([--disable-tls-support],[Disable TLS support]), [disable_tls=1])
-
 # Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
@@ -151,25 +153,50 @@ AC_CHECK_LIB([ubsan], [main])
 # Checks for header files.
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h float.h inttypes.h limits.h locale.h malloc.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h strings.h sys/file.h sys/ioctl.h sys/mount.h sys/param.h sys/socket.h sys/statvfs.h sys/time.h unistd.h utime.h])
 
-# Check for GnuTLS (and die if its not there because you'll need it)
-#AS_IF([test "x${disable_tls}" == xyes],[AC_CHECK_HEADER([gnutls.h], AC_MSG_NOTICE(["Found GnuTLS"]), AC_MSG_FAILURE(["GnuTLS was not found and Hypno needs this library to support TLS"]))])
-if test ${disable_tls} != 1; then
-	# Find GnuTLS header
-	AC_CHECK_HEADER([gnutls/gnutls.h], 
-		[],	
-		AC_MSG_FAILURE(["GnuTLS headers were not found and Hypno needs them to support TLS"])
-	)
+# Find SQLite3 headers or use the local version
+AC_ARG_ENABLE([local-sqlite3], AS_HELP_STRING([--enable-local-sqlite3],[Use the provided SQLite3 library]), [local_sqlite3=1])
+if test ${local_sqlite3} == 1; then
+	objdeps+="vendor/sqlite3.o"
+else
+	# Find SQLite3 header
+	SQLITE3_HEADER_ERRMSG="SQLite3 headers were not found"
+	AC_CHECK_HEADER([sqlite3.h], [], AC_MSG_FAILURE([${SQLITE3_HEADER_ERRMSG}]))
+	SQLITE3_LIB_ERRMSG="SQLite3 library not found"
+	# FIXME: Replace `main' with a function in `-lsqlite3':
+	AC_CHECK_LIB([sqlite3], [main], [], AC_MSG_FAILURE(${SQLITE3_LIB_ERRMSG}))
+	ld_flags+=" -lsqlite3"
+fi
 
-	# Find GnuTLS lib 
+# Find Lua headers or use the local version 
+# FIXME: Add option for static vs dynamic
+AC_ARG_ENABLE([local-lua], AS_HELP_STRING([--enable-local-lua],[Use the provided Lua libraries]), [local_lua=1])
+if test ${local_lua} == 1; then
+	objdeps+="lib/liblua.a"
+else
+	# Find Lua header and library
+	LUA_HEADER_ERRMSG="Lua headers were not found and Hypno needs them to support TLS"
+	AC_CHECK_HEADER([lua.h], [], AC_MSG_FAILURE([${LUA_HEADER_ERRMSG}]))
+	LUA_LIB_ERRMSG="Lua library not found and Hypno needs this library for Lua support"
 	# FIXME: Replace `main' with a function in `-lgnutls':
-	AC_CHECK_LIB([gnutls], 
-		[main], 
-		[],
-		AC_MSG_FAILURE("GnuTLS library not found and Hypno needs this library to support TLS")
-	)
+	AC_CHECK_LIB([lua], [main], [], AC_MSG_FAILURE(${LUA_LIB_ERRMSG}))
+	ld_flags+=" -llua"
+fi
 
-	# Add flags to LD_FLAGS
-	ld_flags+=" -lgnutls"
+# Check for TLS support and find GnuTLS header and libs if present; and add flags
+AC_ARG_ENABLE([tls-support], AS_HELP_STRING([--disable-tls-support],[Disable TLS support]), [disable_tls=1])
+AC_ARG_ENABLE([local-tls], AS_HELP_STRING([--enable-local-tls],[Use the provided GnuTLS libraries]), [local_tls=1])
+if test ${disable_tls} == 0; then 
+	if test ${local_tls} == 1; then
+		#build the local one
+		objdeps+="lib/libgnutls.a"
+	else
+		GNUTLS_HEADER_ERRMSG="GnuTLS headers were not found and Hypno needs them to support TLS"
+		AC_CHECK_HEADER([gnutls/gnutls.h], [], AC_MSG_FAILURE([${GNUTLS_HEADER_ERRMSG}]))
+		GNUTLS_LIB_ERRMSG="GnuTLS library not found and Hypno needs this library to support TLS"
+		# FIXME: Replace `main' with a function in `-lgnutls':
+		AC_CHECK_LIB([gnutls], [main], [], AC_MSG_FAILURE(${GNUTLS_LIB_ERRMSG}))
+		ld_flags+=" -lgnutls"
+	fi
 fi
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -214,6 +241,9 @@ Chosen threading model: $modelflags
 Default domain: $default_domain
 TLS included: `test ${disable_tls} -eq 0 && echo "yes" || echo "no"`
 Selected LD_FLAGS: $ld_flags
+Using local SQLite3: `test ${local_sqlite3} -eq 1 && echo "yes" || echo "no"`
+Using local Lua: `test ${local_lua} -eq 1 && echo "yes" || echo "no"`
+Using local GnuTLS: `test ${local_tls} -eq 1 && echo "yes" || echo "no"`
 
 EOF
 
@@ -257,5 +287,6 @@ AC_SUBST(include_filter_static)
 AC_SUBST(include_filter_echo)
 AC_SUBST(ld_flags)
 AC_SUBST(debug_flags)
+AC_SUBST(objdeps)
 
 AC_OUTPUT
