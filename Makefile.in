@@ -31,8 +31,8 @@ MODEL = HTHREAD_H
 ASAN_OPTIONS = log_path=asan.log
 GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing -Wno-format-truncation -Wno-return-local-addr -D$(MODEL) -O2 $(IFLAGS)
 INITMETHOD = @initsys@
-CFLAGS = $(GCCFLAGS)
-CC = gcc
+CFLAGS = $(GCCFLAGS) $(DEBUGFLAGS)
+CC = @cc@ 
 SRC = \
 	@srcdir@/vendor/zrender.c \
 	@srcdir@/vendor/ztable.c \
@@ -54,14 +54,14 @@ SRC = \
 	@srcdir@/src/ctx/ctx-https.c \
 	@srcdir@/src/lua/lib.c \
 	@srcdir@/src/lua/db.c \
-	@srcdir@/src/lua/echo.c \
-	@srcdir@/src/lua/encdec.c \
 	@srcdir@/src/lua/lua.c \
 	@srcdir@/src/lua/json.c \
 	@srcdir@/src/lua/rand.c \
 	@srcdir@/src/lua/filesystem.c \
 	@srcdir@/src/lua/http.c \
 	@srcdir@/src/lua/hash.c \
+	@srcdir@/src/lua/enc.c \
+	@srcdir@/src/lua/dec.c \
 	@srcdir@/src/filters/filter-lua.c \
 	@srcdir@/src/filters/filter-static.c \
 	@srcdir@/src/filters/filter-echo.c \
@@ -90,7 +90,8 @@ main: $(DEPS) $(OBJ)
 	$(CC) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(DEPS) $(LDFLAGS)
 
 # debug - Builds code with debugging flags on (need logic for if CC == clang)
-debug: CFLAGS += -g -O0 -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
+# NOTE this only works with Clang atm: -g -O0 -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
+debug: CFLAGS += -g -O0 $(DEBUGFLAGS)
 debug: main
 	@printf '' > /dev/null
 

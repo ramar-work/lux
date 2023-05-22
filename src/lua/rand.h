@@ -11,6 +11,7 @@
 int rand_str ( lua_State * ) ;
 int rand_seq ( lua_State * ) ;
 int rand_nums ( lua_State * ) ;
+unsigned char * generate ( unsigned char *str, unsigned int len, unsigned int size ) ;
 extern struct luaL_Reg rand_set[];
 
 #endif

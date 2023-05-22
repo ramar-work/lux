@@ -13,7 +13,7 @@
  *   --debug            Set debug rules               
  *   --kill             Test killing a server         
  *   --fork             Daemonize the server          
- *   --config <arg>     Use this file for configuration
+ *   --configuration <arg>     Use this file for configuration
  *   --port <arg>       Set a differnt port           
  *   --ssl              Use ssl or not..              
  *   --user <arg>       Choose a user to start as     
@@ -52,6 +52,7 @@
 #include "../filters/filter-redirect.h"
 #include "../filters/filter-lua.h"
 #include "../ctx/ctx-http.h"
+#include "cliutils.h"
 
 #ifndef DISABLE_TLS
  #include "../ctx/ctx-https.h"
@@ -74,17 +75,17 @@
 #define REAPING_THREADS
 
 #define HELP \
-	"-s, --start              Start the server\n" \
-	"-k, --kill               Kill a running server\n" \
-	"-c, --config <arg>       Use this Lua file for configuration\n" \
-	"-p, --port <arg>         Start using a different port \n" \
-	"    --pid-file <arg>     Define a PID file\n" \
-	"-u, --user <arg>         Choose an alternate user to run as\n" \
-	"-g, --group <arg>        Choose an alternate group to run as\n" \
-	"-x, --dump               Dump configuration at startup\n" \
-	"-l, --log-file <arg>     Define an alternate log file location\n" \
-	"-a, --access-file <arg>  Define an alternate access file location\n" \
-	"-h, --help               Show the help menu.\n"
+	"-s, --start               Start the server\n" \
+	"-k, --kill                Kill a running server\n" \
+	"-c, --configuration <arg> Use this Lua file for configuration\n" \
+	"-p, --port <arg>          Start using a different port \n" \
+	"    --pid-file <arg>      Define a PID file\n" \
+	"-u, --user <arg>          Choose an alternate user to run as\n" \
+	"-g, --group <arg>         Choose an alternate group to run as\n" \
+	"-x, --dump                Dump configuration at startup\n" \
+	"-l, --log-file <arg>      Define an alternate log file location\n" \
+	"-a, --access-file <arg>   Define an alternate access file location\n" \
+	"-h, --help                Show the help menu.\n"
 
 #if 0
 	"-d, --dir <arg>          Define where to create a new application.\n"\
@@ -100,9 +101,12 @@
 #endif
 
 #define eprintf(...) \
+	( \
 	fprintf( stderr, "%s: ", NAME "-server" ) && \
 	fprintf( stderr, __VA_ARGS__ ) && \
-	fprintf( stderr, "\n" )
+	fprintf( stderr, "\n" ) \
+	) ? 0 : 0
+
 
 #ifdef LEAKTEST_H
  #ifndef LEAKLIMIT
@@ -496,14 +500,12 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 	//Open a log file here
 	if ( !( logfd = fopen( v->logfile, "a" ) ) ) {
-		eprintf( "Couldn't open error log file at: %s...\n", logfile );
-		return 0;
+		return eprintf( "Couldn't open error log file at: %s...\n", logfile );
 	}
 
 	//Open an access file too 
 	if ( !( accessfd = fopen( v->accessfile, "a" ) ) ) {
-		eprintf( "Couldn't open access log file at: %s...\n", accessfile );
-		return 0;
+		return eprintf( "Couldn't open access log file at: %s...\n", accessfile );
 	}
 
 	//Setup and open a TCP socket
@@ -685,12 +687,12 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 		//Populate any other thread data
 	#ifndef REAPING_THREADS 
-		//fprintf( stderr, "IP addr is: %s\n", ip );
-		fprintf( accessfd, "IP addr is: %s\n", ip );
+		FPRINTF( "IP addr is: %s\n", ip );
+		FPRINTF( "IP addr is: %s\n", ip );
 	#else
 		memcpy( f->ipaddr, ip, sizeof( ip ) );
-		//fprintf( stderr, "IP addr is: %s\n", ip );
-		fprintf( accessfd, "IP addr is: %s\n", ip );
+		FPRINTF( "IP addr is: %s\n", ip );
+		FPRINTF( "IP addr is: %s\n", ip );
 	#endif
 
 		//Start a new thread
@@ -812,9 +814,12 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 	fprintf( stderr, "Daemonized:          %s\n", v->fork ? "T" : "F" );
 	fprintf( stderr, "User:                %s (%d)\n", v->user, v->uid );
 	fprintf( stderr, "Group:               %s (%d)\n", v->group, v->gid );
-	fprintf( stderr, "Config:              %s\n", v->config );
+	fprintf( stderr, "Config File:         %s\n", v->config );
 	fprintf( stderr, "PID file:            %s\n", v->pidfile );
 	fprintf( stderr, "Library Directory:   %s\n", v->libdir );
+	fprintf( stderr, "Config Directory:    %s\n", CONFDIR );
+	fprintf( stderr, "Share Directory:     %s\n", SHAREDIR );
+	fprintf( stderr, "Session DB:          %s\n", SESSION_DB_PATH );
 #ifdef HFORK_H
 	fprintf( stderr, "Running in fork mode.\n" );
 #endif
@@ -892,21 +897,54 @@ int main (int argc, char *argv[]) {
 		return 1;	
 	}
 	
-	while ( *argv ) {
-		if ( !strcmp( *argv, "-s" ) || !strcmp( *argv, "--start" ) ) 
+	//while ( *argv ) {
+	for ( int ac = argc; *argv; argv++, argc-- ) {
+		if ( OPTEVAL( *argv, "-s", "--start" ) ) 
 			v.start = 1;
-		else if ( !strcmp( *argv, "-k" ) || !strcmp( *argv, "--kill" ) ) 
+		else if ( OPTEVAL( *argv, "-k", "--kill" ) ) 
 			v.kill = 1;
-		else if ( !strcmp( *argv, "-x" ) || !strcmp( *argv, "--dump" ) ) 
+		else if ( OPTEVAL( *argv, "-x", "--dump" ) ) 
 			v.dump = 1;
-	#if 0
-		else if ( !strcmp( *argv, "-d" ) || !strcmp( *argv, "--daemonize" ) ) 
-			v.fork = 1;
-	#endif
 		else if ( !strcmp( *argv, "--use-ssl" ) ) 
 			v.ssl = 1;
+		else if ( OPTEVAL( *argv, "-c", "--configuration" ) ) {
+			OPTARG( *argv, "--configuration" );
+			snprintf( v.config, sizeof( v.config ) - 1, "%s", *argv );	
+		}
+		else if ( !strcmp( *argv, "--pid-file" ) ) {
+			OPTARG( *argv, "--pid-file" );
+			snprintf( v.pidfile, sizeof( v.pidfile ) - 1, "%s", *argv );	
+		}
+		else if ( OPTEVAL( *argv, "-p", "--port" ) ) {
+			OPTARG( *argv, "--port" );
+			//TODO: This should be safeatoi 
+			v.port = atoi( *argv );
+		}
+		else if ( OPTEVAL( *argv, "-g", "--group" ) ) {
+			OPTARG( *argv, "--group" );
+			snprintf( v.group, sizeof( v.group ) - 1, "%s", *argv );	
+		}
+		else if ( OPTEVAL( *argv, "-u", "--user" ) ) {
+			OPTARG( *argv, "--user" );
+			snprintf( v.user, sizeof( v.user ) - 1, "%s", *argv );	
+		}
+		else if ( OPTEVAL( *argv, "-l", "--log-file" ) ) {
+			OPTARG( *argv, "--log-file" );
+			memset( v.logfile, 0, sizeof( v.logfile ) );
+			snprintf( v.logfile, sizeof( v.logfile) - 1, "%s", *argv );	
+		}
+		else if ( OPTEVAL( *argv, "-a", "--access-file" ) ) {
+			OPTARG( *argv, "--access-file" );
+			memset( v.accessfile, 0, sizeof( v.accessfile ) );
+			snprintf( v.accessfile, sizeof( v.accessfile) - 1, "%s", *argv );
+		}
+		else if ( ac > argc ) {
+			return eprintf( "Got unexpected argument: '%s'\n", *argv );
+		}
 	#if 0
-		else if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--libs" ) ) {
+		else if ( OPTEVAL( *argv, "-d", "--daemonize" ) ) 
+			v.fork = 1;
+		else if ( OPTEVAL( *argv, "-l", "--libs" ) ) {
 			argv++;
 			if ( !*argv ) {
 				eprintf( "Expected argument for --libs!" );
@@ -915,66 +953,6 @@ int main (int argc, char *argv[]) {
 			snprintf( v.libdir, sizeof( v.libdir ) - 1, "%s", *argv );	
 		}
 	#endif
-		else if ( !strcmp( *argv, "-c" ) || !strcmp( *argv, "--config" ) ) {
-			argv++;
-			if ( !*argv ) {
-				eprintf( "Expected argument for --config!" );
-				return 0;
-			}
-			snprintf( v.config, sizeof( v.config ) - 1, "%s", *argv );	
-		}
-		else if ( !strcmp( *argv, "--pid-file" ) ) {
-			argv++;
-			if ( !*argv ) {
-				eprintf( "Expected argument for --port!" );
-				return 0;
-			}
-			snprintf( v.pidfile, sizeof( v.pidfile ) - 1, "%s", *argv );	
-		}
-		else if ( !strcmp( *argv, "-p" ) || !strcmp( *argv, "--port" ) ) {
-			argv++;
-			if ( !*argv ) {
-				eprintf( "Expected argument for --port!" );
-				return 0;
-			}
-			//TODO: This should be safeatoi 
-			v.port = atoi( *argv );
-		}
-		else if ( !strcmp( *argv, "-g" ) || !strcmp( *argv, "--group" ) ) {
-			argv++;
-			if ( !*argv ) {
-				eprintf( "Expected argument for --group!" );
-				return 0;
-			} 
-			snprintf( v.group, sizeof( v.group ) - 1, "%s", *argv );	
-		}
-		else if ( !strcmp( *argv, "-u" ) || !strcmp( *argv, "--user" ) ) {
-			argv++;
-			if ( !*argv ) {
-				eprintf( "Expected argument for --user!" );
-				return 0;
-			} 
-			snprintf( v.user, sizeof( v.user ) - 1, "%s", *argv );	
-		}
-		else if ( !strcmp( *argv, "-l" ) || !strcmp( *argv, "--log-file" ) ) {
-			argv++;
-			if ( !*argv ) {
-				eprintf( "Expected argument for --log-file!" );
-				return 0;
-			}
-			memset( v.logfile, 0, sizeof( v.logfile ) );
-			snprintf( v.logfile, sizeof( v.logfile) - 1, "%s", *argv );	
-		}
-		else if ( !strcmp( *argv, "-a" ) || !strcmp( *argv, "--access-file" ) ) {
-			argv++;
-			if ( !*argv ) {
-				eprintf( "Expected argument for --access-file!" );
-				return 0;
-			}
-			memset( v.accessfile, 0, sizeof( v.accessfile ) );
-			snprintf( v.accessfile, sizeof( v.accessfile) - 1, "%s", *argv );	
-		}
-		argv++;
 	}
 
 	//Register SIGINT
@@ -1045,7 +1023,7 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
-	FPRINTF( "I am (hopefully) a child that reached the end...\n" );
+	FPRINTF( "I am a child that reached the end...\n" );
 	return 0;
 }
 

@@ -9,3 +9,7 @@
 #define JSON_H
 extern struct luaL_Reg json_set[];
 #endif
+
+#ifdef LUA_LOPEN
+int luaopen_json (lua_State *);
+#endif

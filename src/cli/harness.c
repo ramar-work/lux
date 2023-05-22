@@ -365,7 +365,7 @@ int main ( int argc, char * argv[] ) {
 				lt_reset( vt );
 				
 				if ( !strcmp( test.ctype, CTYPE_JSON ) )
-					str = zjson_encode( vt, err, sizeof( err ) ); 
+					0; //str = zjson_encode( vt, err, sizeof( err ) ); 
 				else {
 					fprintf( stderr, PP ": Serialzation with %s is not enabled yet.\n", test.ctype );
 					return 1;

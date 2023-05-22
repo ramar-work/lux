@@ -1,6 +1,6 @@
 /* ------------------------------------------- * 
- * echo.h 
- * ====
+ * session.h
+ * =========
  * 
  * Summary 
  * -------
@@ -16,18 +16,14 @@
  * ---------
  * -
  * ------------------------------------------- */
-#include <lua.h>
-#include <lauxlib.h>
-#include <lualib.h>
+#include <zdb.h>
+#include <zhttp.h>
+#include <ztable.h>
+#include "../lua.h"
+#include "../config.h"
+#include "rand.h"
 
-#ifndef ECHO_H
-#define ECHO_H
-
-int echo_string_arg ( lua_State *L );
-
-int echo_numeric_arg ( lua_State *L );
-
-int echo_table_arg ( lua_State *L );
-
-extern struct luaL_Reg echo_set[]; 
+#ifndef LSESSION_H
+ #define LSESSION_H
+extern struct luaL_Reg session_set[];
 #endif

@@ -1,7 +1,7 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ([2.71])
-AC_INIT([hypno],[0.3.4a],[ramar@ramar.work])
+AC_INIT([hypno],[0.3.5a],[ramar@ramar.work])
 AC_CONFIG_SRCDIR([example/config.lua])
 
 # Define files to perform substitutions on
@@ -22,7 +22,6 @@ wwwport=80
 srvuser="http"
 srvgroup="http"
 logdir="/var/log/hypno"
-#svcpath=`pkg-config systemd --variable=systemduserunitdir 2>/dev/null`
 svcpath=
 default_svcpath="/usr/lib/systemd/system"
 initsys="systemd"
@@ -56,6 +55,7 @@ include_filter_lua=1
 include_filter_static=1
 include_filter_echo=1
 ld_flags="-ldl -lpthread -lm"
+cc="gcc"
 debug_flags=
 local_sqlite3=0
 local_lua=0
@@ -75,6 +75,7 @@ default_expiration_days=365
 default_server_name="localhost"
 default_server_ip="127.0.0.1"
 
+# Handle common easy options
 AC_ARG_WITH([www-root], AS_HELP_STRING([--with-www-root=DIR],[Set default web directory for applications]), [wwwroot=${withval}])
 AC_SUBST(wwwroot)
 
@@ -90,12 +91,25 @@ AC_SUBST(srvgroup)
 AC_ARG_WITH([log-dir], AS_HELP_STRING([--with-log-dir],[Set access and error log directory]), [logdir=${withval}])
 AC_SUBST(logdir)
 
+# Figure out the configuration directory
+AC_ARG_WITH([conf-dir], AS_HELP_STRING([--with-conf-dir],[Set a different configuration directory]), [confdir={$withval}])
+AC_SUBST(confdir)
+
+# Figure out the dependency directory
+AC_ARG_WITH([share-dir], AS_HELP_STRING([--with-share-dir],[Set a different configuration directory]), [sharedir={$withval}])
+AC_SUBST(sharedir)
+
+AC_ARG_WITH([cc], AS_HELP_STRING([--with-cc=CC],[Set a different C compiler as the default]), [cc=${withval}])
+AC_SUBST(cc)
+
 # Use enable systemd or enable sysv here
 AC_ARG_ENABLE([systemd], AS_HELP_STRING([--enable-systemd],[Use systemd units for daemon management (default)]), [systemd=${enableval}])
 
 AC_ARG_ENABLE([sysv], AS_HELP_STRING([--enable-sysv],[Use sysv-style init scripts for daemon management]), [sysv=yes], [systemd=no])
 
-AC_ARG_ENABLE([debugging], AS_HELP_STRING([--enable-debugging],[Compile with debugging flags enabled]), [debug_flags='-DDEBUG_H'])
+
+# Enable debugging
+AC_ARG_ENABLE([debugging], AS_HELP_STRING([--enable-debugging],[Compile with debugging flags enabled]), [debug_flags='-g -DDEBUG_H'])
 
 # If systemd is enabled, make sure that we actually found something...
 #AS_IF([test "x$systemd" == xyes],
@@ -105,6 +119,12 @@ AC_ARG_ENABLE([debugging], AS_HELP_STRING([--enable-debugging],[Compile with deb
 #	[svcpath=${withval}])
 #	]
 #)
+
+# Check for Asan support and enable flags if so
+if test "x${use_asan}" == xyes; then
+	# Turn on debugging automatically...
+	debug_flags+=" -O0 -fsanitize=address -fsanitize-undefined-trap-on-error"
+fi
 
 if test "x${systemd}" == xyes; then
 	AC_ARG_WITH([systemd-unit-path], 
@@ -136,19 +156,19 @@ AC_PROG_CPP
 
 # Checks for libraries.
 # FIXME: Replace `main' with a function in `-lcrypto':
-AC_CHECK_LIB([crypto], [main])
+#AC_CHECK_LIB([crypto], [main])
 # FIXME: Replace `main' with a function in `-ldl':
 AC_CHECK_LIB([dl], [main])
 # FIXME: Replace `main' with a function in `-lgcov':
-AC_CHECK_LIB([gcov], [main])
+#AC_CHECK_LIB([gcov], [main])
 # FIXME: Replace `main' with a function in `-lm':
 AC_CHECK_LIB([m], [main])
 # FIXME: Replace `main' with a function in `-lpthread':
 AC_CHECK_LIB([pthread], [main])
 # FIXME: Replace `main' with a function in `-lssl':
-AC_CHECK_LIB([ssl], [main])
+#AC_CHECK_LIB([ssl], [main])
 # FIXME: Replace `main' with a function in `-lubsan':
-AC_CHECK_LIB([ubsan], [main])
+#AC_CHECK_LIB([ubsan], [main])
 
 # Checks for header files.
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h float.h inttypes.h limits.h locale.h malloc.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h strings.h sys/file.h sys/ioctl.h sys/mount.h sys/param.h sys/socket.h sys/statvfs.h sys/time.h unistd.h utime.h])
@@ -235,6 +255,8 @@ Default port: $wwwport
 Default server user: $srvuser
 Default server group: $srvgroup
 Default logging directory: $logdir
+Default configuration directory: $confdir
+Default share directory: $sharedir
 Init system: $initsys
 Daemon service file path: $svcpath
 Chosen threading model: $modelflags
@@ -244,6 +266,7 @@ Selected LD_FLAGS: $ld_flags
 Using local SQLite3: `test ${local_sqlite3} -eq 1 && echo "yes" || echo "no"`
 Using local Lua: `test ${local_lua} -eq 1 && echo "yes" || echo "no"`
 Using local GnuTLS: `test ${local_tls} -eq 1 && echo "yes" || echo "no"`
+Debugging flags: $debug_flags
 
 EOF
 

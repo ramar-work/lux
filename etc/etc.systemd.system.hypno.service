@@ -5,7 +5,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=__PREFIX__/bin/hypno-server --start --port __WWWPORT__ --user __SRVUSER__ --group __SRVGROUP__ --config __WWWROOT__/config.lua --access-file __LOGDIR__/hypno.access.log --log-file __LOGDIR__/hypno.error.log
+ExecStart=__PREFIX__/bin/hypno-server --start --port __WWWPORT__ --user __SRVUSER__ --group __SRVGROUP__ --configuration __WWWROOT__/config.lua --access-file __LOGDIR__/hypno.access.log --log-file __LOGDIR__/hypno.error.log
 Restart=on-failure
 RestartSec=20s
 

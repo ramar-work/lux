@@ -1,8 +1,18 @@
+/* -------------------------------------------- * 
+rand
+====
+ * -------------------------------------------- */
 #include "rand.h"
 
 static char alpha[] = 
 	"abcdefghijklmnopqrstuvwxyz"
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+;
+
+static char alnum[] = 
+	"abcdefghijklmnopqrstuvwxyz"
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	"0123456789"
 ;
 
 static char ascii[] = 
@@ -17,7 +27,7 @@ static char numerics[] =
 	"0123456789"
 ;
 
-static unsigned char * generate ( unsigned char *str, unsigned int len, unsigned int size ) {
+unsigned char * generate ( unsigned char *str, unsigned int len, unsigned int size ) {
 	unsigned char * buf = NULL;
 	struct timespec t = { 0 };
 	if ( clock_gettime( CLOCK_REALTIME, &t ) == -1 ) {
@@ -35,7 +45,7 @@ static unsigned char * generate ( unsigned char *str, unsigned int len, unsigned
 	//Use the current timestamp as a random seed for now...
 	srand( t.tv_nsec );
 	for ( int i = 0; i < size - 1; i++ ) {
-		buf[ i ] = str[ rand() % len ];
+		buf[ i ] = str[ rand() % (len - 1) ];
 	}
 
 	return buf;
@@ -60,10 +70,25 @@ int rand_str ( lua_State *L ) {
 	luaL_checknumber( L, 1 );
 	unsigned char *buf = NULL;
 	int bfsize = lua_tonumber( L, 1 );
-	if ( !( buf = generate( (unsigned char *)ascii, sizeof( ascii ) / sizeof( char ), bfsize + 1 ) )  ) {
+	unsigned int ac = sizeof( alnum ) / sizeof( char );
+	if ( !( buf = generate( (unsigned char *)alnum, ac, bfsize + 1 ) )  ) {
 		return luaL_error( L, "rand.str failed." );
 	}
 
+	lua_pushstring( L, ( char * )buf );
+	free( buf );
+	return 1;
+}
+
+
+int rand_ascii ( lua_State *L ) {
+	luaL_checknumber( L, 1 );
+	unsigned char *buf = NULL;
+	int bfsize = lua_tonumber( L, 1 );
+	unsigned int ac = sizeof( ascii ) / sizeof( char );
+	if ( !( buf = generate( (unsigned char *)ascii, ac, bfsize + 1 ) )  ) {
+		return luaL_error( L, "rand.str failed." );
+	}
 	lua_pushstring( L, ( char * )buf );
 	free( buf );
 	return 1;
@@ -108,5 +133,7 @@ struct luaL_Reg rand_set[] = {
 ,	{ "str", rand_str }
 ,	{ "seq", rand_seq }
 ,	{ "alpha", rand_alpha }
+,	{ "ascii", rand_ascii }
+,	{ "chars", rand_alpha }
 ,	{ NULL }
 };

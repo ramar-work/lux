@@ -17,21 +17,21 @@
  * -
  * ------------------------------------------- */
 #include "lib.h"
-#include "echo.h"
 #include "lua.h"
 #include "rand.h"
 #include "http.h"
 #include "filesystem.h"
 #include "db.h"
 #include "json.h"
-#include "encdec.h"
+#include "enc.h"
+#include "dec.h"
+#include "session.h"
 #ifndef DISABLE_TLS
  #include "hash.h"
 #endif
 
 struct lua_fset functions[] = {
-	{ "echo", echo_set }
-, { "lua", lua_set }
+  { "lua", lua_set }
 , { "rand", rand_set }
 , { "http", http_set }
 , { "fs", fs_set }
@@ -39,6 +39,9 @@ struct lua_fset functions[] = {
 , { "json", json_set }
 , { "enc", enc_set }
 , { "dec", dec_set }
+#if 0
+, { "session", session_set }
+#endif
 #ifndef DISABLE_TLS
 , { "hash", hash_set }
 #endif

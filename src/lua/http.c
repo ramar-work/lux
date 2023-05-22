@@ -1,4 +1,4 @@
-/* ------------------------------------------- * 
+/* -------------------------------------------- * 
  * http.c 
  * ====
  * 
@@ -22,7 +22,7 @@
  * CHANGELOG 
  * ---------
  * -
- * ------------------------------------------- */
+ * -------------------------------------------- */
 #include "http.h"
 
 #define ERR(v,l,...) \
@@ -1636,15 +1636,17 @@ int http_post ( lua_State *L ) {
 }
 
 
-struct luaL_Reg http_set[] = {
- 	{ "send", http_request }
-,	{ NULL }
-};
-
-#ifndef HYPNO_H
+#if 0
 //Allow for testing on the command line
 int luaopen_http (lua_State *L) {
 	luaL_newlib( L, http_set );
 	return 1;
 }
 #endif
+
+
+struct luaL_Reg http_set[] = {
+ 	{ "send", http_request }
+,	{ NULL }
+};
+
