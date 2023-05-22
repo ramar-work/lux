@@ -524,6 +524,7 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 
 	//Prepare the message
 #if 1 
+	//TODO: Enable non sendfile capable systems to be able to send a file the old crappy way.
 	res->atype = ZHTTP_MESSAGE_SENDFILE;
 	res->clen = sb.st_size;
 	res->fd = fd;
@@ -558,7 +559,7 @@ static void dump_records( struct HTTPRecord **r ) {
 static char * getpath( char *rp, char *ap, int destlen ) {
 	int pos = 0, len = strlen( rp );
 
-	if ( ( pos = memchrat( rp , '?', strlen( rp ) ) ) > -1 ) {
+	if ( ( pos = memchrat( rp , '?', len ) ) > -1 ) {
 		len = pos;
 	}
 
@@ -586,35 +587,45 @@ static int init_lua_routes ( struct luadata_t *l ) {
 
 	//Handle root requests
 	if ( !*path ) {
-		lua_pushinteger( l->state, 1 ), lua_pushstring( l->state, def ); 
+		lua_pushinteger( l->state, 1 ); 
+		lua_pushstring( l->state, def ); 
 		lua_settable( l->state, pos );
-		lua_pushstring( l->state, "active" ), lua_pushstring( l->state, def ); 
+
+		lua_pushstring( l->state, "active" ); 
+		lua_pushstring( l->state, def ); 
 		lua_settable( l->state, pos );
+
 		memcpy( (void *)l->aroute, def, strlen (def) );
 		return 1;
 	} 
 	
-	//Loop twice to set up the map
-	for ( char stub[1024], id[1024]; strwalk( &w, path, "/" ); ) {
-		//write the length of the block between '/'
+	// Loop twice to set up the map
+	for ( ; strwalk( &w, path, "/" ); ) {
+		// ...
+		char stub[ 1024 ] = {0};
+		char id[ 1024 ] = {0};
+
+		// Write the length of the block between '/'
 		memset( stub, 0, sizeof(stub) );
 		memcpy( stub, w.src, ( w.chr == '/' ) ? w.size - 1 : w.size );
+
 		for ( ; strwalk( &w2, resolved, "/" ); ) {
 			int size = ( w2.chr == '/' ) ? w2.size - 1 : w2.size;
-			//if there is an equal, most likely it's an id
+			// If there is an equal, most likely it's an id
 			if ( *w2.src != ':' )
 				lua_pushinteger( l->state, ++index );	
 			else {
-				//Find the key/id name
+				// Find the key/id name
 				for ( char *p = (char *)w2.src, *b = id; *p && ( *p	!= '=' || *p != '/' ); ) {
 					*(b++) = *(p++);
 				}
-				//Check that id is not active, because that's a built-in
+
+				// Check that id is not active, because that's a built-in
 				if ( strcmp( id, "active" ) == 0 ) {
 					return 0;
 				}
 				
-				//Add a numeric key first, then a text key
+				// Add a numeric key first, then a text key
 				lua_pushinteger( l->state, ++index );
 				lua_pushstring( l->state, stub );
 				lua_settable( l->state, pos );
@@ -622,7 +633,8 @@ static int init_lua_routes ( struct luadata_t *l ) {
 			}
 			break;
 		}
-		//copy the value (stub) to value in table
+
+		//Copy the value (stub) to value in table
 		lua_pushstring( l->state, stub );
 		lua_settable( l->state, pos );
 		active = &path[ w.pos ];
@@ -664,8 +676,8 @@ static int init_lua_request ( struct luadata_t *l ) {
 		lua_setstrint( l->state, "clength", l->req->clen, 1 );
 
 	//Add simple keys for headers and URL
-	for ( int pos=3, i = 0; i < 2; i++ ) {
-		struct HTTPRecord **r = ii[i];
+	for ( int pos = 3, i = 0; i < 2; i++ ) {
+		struct HTTPRecord **r = ii[ i ];
 		if ( r && *r ) {
 			lua_pushstring( l->state, str[i] ), lua_newtable( l->state );
 			for ( ; r && *r; r++ ) {
@@ -791,13 +803,9 @@ static struct lua_readonly_t {
 
 static int free_ld ( struct luadata_t *l ) {
 	lua_close( l->state );
-
 	lt_free( l->zconfig ), free( l->zconfig );
-
 	lt_free( l->zroute ), free( l->zroute );
-
 	lt_free( l->zmodel ), free( l->zmodel );
-
 	free_mvc_list( (void ***)&(l->pp.imvc_tlist) );
 	return 1;
 }
@@ -817,13 +825,25 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 	zhttp_t *p = NULL;
 	
 	if ( 0 ) { ; }
-	else if ( t->ctype == CTYPE_JSON ) {
-		content = zjson_encode( l->zmodel, l->err, 1024 );
+	else if ( t->ctype == CTYPE_XML ) {
+		content = xml_encode( l->zmodel, "model" );
 		clen = strlen( content );
 		ctype = t->ctypename;
 	}
-	else if ( t->ctype == CTYPE_XML ) {
-		content = xml_encode( l->zmodel, "model" );
+	else if ( t->ctype == CTYPE_JSON ) {
+	#if 0
+		content = zjson_encode( l->zmodel, l->err, 1024 );
+	#else
+		struct mjson **zjson = NULL;
+		if ( !( zjson = ztable_to_zjson( l->zmodel, l->err, 1024 ) ) ) {
+			return NULL;
+		}
+		if ( !( content = zjson_stringify( zjson, l->err, 1024 ) ) ) {
+			zjson_free( zjson );
+			return NULL;
+		}
+		zjson_free( zjson );
+	#endif
 		clen = strlen( content );
 		ctype = t->ctypename;
 	}
@@ -849,11 +869,26 @@ fprintf( stderr, "%s:%d -> %p\n", __FILE__, __LINE__, content );
 
 
 
+
+//Check if the user asked to delay the response...
+static int delay_response ( struct luadata_t *l ) {
+	return 1;
+}
+
+
+
 //...
 static int return_as_response ( struct luadata_t *l ) {
 
 	ztable_t *rt = NULL;
 	int count = 0, status = 200, clen = 0;
+	int header_i = 0;
+	int status_i = 0;
+	int ctype_i = 0;
+	int clen_i = 0;
+	int file_i = 0;
+	int content_i = 0;
+	int delayed = 0;
 	char ctype[ 128 ] = { 0 }; //'t','e','x','t','/','h','t','m','l','\0', 0 };
 	unsigned char *content = NULL;
 
@@ -863,7 +898,7 @@ static int return_as_response ( struct luadata_t *l ) {
 	//Get the count to approximate size of conversion needed (and to handle blanks)
 	count = lua_count( l->state, 1 );
 #endif
-
+	
 	if ( !lua_istable( l->state, 1 ) ) {
 		snprintf( l->err, LD_ERRBUF_LEN, "Response is not a table." );
 		return 0;
@@ -883,32 +918,32 @@ static int return_as_response ( struct luadata_t *l ) {
 
 	//Lock the ztable to enable proper hashing and collision mgmt
 	if ( !lt_lock( rt ) ) {
-		//This can fail...
 		snprintf( l->err, LD_ERRBUF_LEN, "%s", lt_strerror( rt ) );
 		return 0;
 	}
 
+	//Check if the user wants to delay the response.
+	if ( lt_geti( rt, "delay" ) > -1 ) {
+		delayed = 1;
+	}
+
 	//Get the status
-	int status_i = 0;
 	if ( ( status_i = lt_geti( rt, "status" ) ) > -1 ) {
 		status = lt_int_at( rt, status_i );
 	}
 	
 	//Get the content-type (if there is one)
-	int ctype_i = 0;
 	if ( ( ctype_i = lt_geti( rt, "ctype" ) ) > -1 ) {
 		snprintf( ctype, sizeof( ctype ) - 1, "%s", lt_text_at( rt, ctype_i ) ); 
 	}
 
 	//Get the content-length (if there is one)
-	int clen_i = 0;
 	if ( ( clen_i = lt_geti( rt, "clen" ) ) > -1 ) {
 		clen = lt_int_at( rt, clen_i ); 
 	}
 
 	//Get the content
-	int content_i = 0;
-	if ( ( content_i = lt_geti( rt, "content" ) ) > -1 ) {
+	if ( !delayed && ( content_i = lt_geti( rt, "content" ) ) > -1 ) {
 		content = (unsigned char *)lt_text_at( rt, content_i );
 		if ( clen_i == -1 ) {
 			clen = strlen( (char *)content );
@@ -916,8 +951,7 @@ static int return_as_response ( struct luadata_t *l ) {
 	}
 
 	//In this case, set clen with the file
-	int file_i = 0;
-	if ( ( file_i = lt_geti( rt, "file" ) ) > -1 ) {
+	if ( !delayed && ( file_i = lt_geti( rt, "file" ) ) > -1 ) {
 		const char * fname = lt_text_at( rt, file_i );
 		char fbuf[ PATH_MAX ];
 		int len = 0;
@@ -949,12 +983,11 @@ static int return_as_response ( struct luadata_t *l ) {
 		snprintf( l->err, LD_ERRBUF_LEN, "Status specified with no content." );
 		return 0;
 	}
+
 	//Finally, get any headers if there are any
-	int header_i = 0;
 	if ( ( header_i = lt_geti( rt, "headers" ) ) > -1 ) {
 		//You can use get keys or loop through the thing...
-		zKeyval *kv = lt_items( rt, "headers" );
-		for ( ; ( kv = lt_items( rt, "headers" ) ); ) {
+		for ( zKeyval *kv = lt_items( rt, "headers" ); ( kv = lt_items( rt, "headers" ) ); ) {
 			if ( kv->key.type == ZTABLE_TRM )
 				break;
 			if ( kv->key.type	!= ZTABLE_TXT && (  kv->value.type	!= ZTABLE_TXT && kv->value.type != ZTABLE_INT ) ) { 
@@ -972,19 +1005,22 @@ static int return_as_response ( struct luadata_t *l ) {
 		}
 	}
 
-	//Set structures
-	l->res->clen = clen;
-	http_set_status( l->res, status ); 
-	http_set_ctype( l->res, ctype );
-	http_set_content( l->res, content, clen ); 
+	if ( !delayed ) {
+		//Set structures
+		l->res->clen = clen;
+		http_set_status( l->res, status ); 
+		http_set_ctype( l->res, ctype );
+		http_set_content( l->res, content, clen ); 
 
-	//Return finalized content
-	zhttp_t *rr = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ); 
-	lt_free( rt ), free( rt );
-	if ( file_i > -1 ) {
-		free( content );
+		//Return finalized content
+		zhttp_t *rr = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ); 
+		lt_free( rt ), free( rt );
+		if ( file_i > -1 ) {
+			free( content );
+		}
 	}
-	return 1;
+
+	return ( !delayed ) ? 1: 2;
 }
 
 
@@ -1166,15 +1202,23 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 
 	//Stop if the user specifies a 'response' table that's not empty...
 	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
-		FPRINTF( "Attempting alternate content return.\n" );
-		if ( !return_as_response( &ld ) ) {
+		FPRINTF( "Evaluating response table.\n" );
+		int eres = return_as_response( &ld );
+
+		if ( !eres ) {
 			free_ld( &ld );
+			FPRINTF( "Error when evaluating response table\n" );
 			return http_error( res, 500, ld.err );
 		}
+		else if ( eres == 1 ) {
+			lua_pop( ld.state, 1 );
+			free_ld( &ld );
+			FPRINTF( "Content return completed\n" );
+			return 1;
+		}
+
 		lua_pop( ld.state, 1 );
-		free_ld( &ld );
-		FPRINTF( "Content return completed?\n" );
-		return 1;
+		FPRINTF( "Finished evaluating delayed response table...\n" );
 	}
 
 	//Can we simply check if config exists in _G?
