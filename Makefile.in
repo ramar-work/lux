@@ -265,6 +265,7 @@ $(DISTDIR):
 		$(DISTDIR)/bin \
 		$(DISTDIR)/lib
 	cp $(FILES) $(DISTDIR)/
+	cp -r etc/* $(DISTDIR)/etc/
 	cp -r src/* $(DISTDIR)/src/
 	cp -r example/* $(DISTDIR)/example/
 	cp -r vendor/*.[ch] vendor/lua-$(LUAVER)/ $(DISTDIR)/vendor/

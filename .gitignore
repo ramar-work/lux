@@ -11,6 +11,7 @@ config.status
 *.o
 *.a
 *.swp
+*.patch
 Makefile.copy
 src/config.h
 

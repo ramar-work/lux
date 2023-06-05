@@ -23,7 +23,7 @@ srvuser="http"
 srvgroup="http"
 logdir="/var/log/hypno"
 svcpath=
-default_svcpath="/usr/lib/systemd/system"
+default_svcpath="/etc/systemd/system"
 initsys="systemd"
 systemd="yes"
 sysv="no"
@@ -176,7 +176,7 @@ AC_CHECK_HEADERS([arpa/inet.h fcntl.h float.h inttypes.h limits.h locale.h mallo
 # Find SQLite3 headers or use the local version
 AC_ARG_ENABLE([local-sqlite3], AS_HELP_STRING([--enable-local-sqlite3],[Use the provided SQLite3 library]), [local_sqlite3=1])
 if test ${local_sqlite3} == 1; then
-	objdeps+="vendor/sqlite3.o"
+	objdeps+="vendor/sqlite3.o "
 else
 	# Find SQLite3 header
 	SQLITE3_HEADER_ERRMSG="SQLite3 headers were not found"
@@ -191,7 +191,7 @@ fi
 # FIXME: Add option for static vs dynamic
 AC_ARG_ENABLE([local-lua], AS_HELP_STRING([--enable-local-lua],[Use the provided Lua libraries]), [local_lua=1])
 if test ${local_lua} == 1; then
-	objdeps+="lib/liblua.a"
+	objdeps+="lib/liblua.a "
 else
 	# Find Lua header and library
 	LUA_HEADER_ERRMSG="Lua headers were not found and Hypno needs them to support TLS"
@@ -208,7 +208,7 @@ AC_ARG_ENABLE([local-tls], AS_HELP_STRING([--enable-local-tls],[Use the provided
 if test ${disable_tls} == 0; then 
 	if test ${local_tls} == 1; then
 		#build the local one
-		objdeps+="lib/libgnutls.a"
+		objdeps+="lib/libgnutls.a "
 	else
 		GNUTLS_HEADER_ERRMSG="GnuTLS headers were not found and Hypno needs them to support TLS"
 		AC_CHECK_HEADER([gnutls/gnutls.h], [], AC_MSG_FAILURE([${GNUTLS_HEADER_ERRMSG}]))
