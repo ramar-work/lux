@@ -705,6 +705,10 @@ static int parse_http_header ( zhttp_t *en, char *err, int errlen ) {
 
 	//Get host requested (not always going to be there)
 	en->host = zhttp_msg_get_value( "Host: ", "\r", en->msg, en->hlen );	
+	if ( !en->host ) {
+		en->host = zhttp_msg_get_value( "host: ", "\r", en->msg, en->hlen );	
+	}	
+	
 	if ( en->host && ( port = strchr( en->host, ':' ) ) ) {
 		//Remove colon
 		en->port = atoi( port + 1 ); //TODO: zhttp_satoi( port + 1, en->port ); 

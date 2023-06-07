@@ -1,7 +1,7 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ([2.71])
-AC_INIT([hypno],[0.3.5a],[ramar@ramar.work])
+AC_INIT([hypno],[0.3.6a],[ramar@ramar.work])
 AC_CONFIG_SRCDIR([example/config.lua])
 
 # Define files to perform substitutions on
