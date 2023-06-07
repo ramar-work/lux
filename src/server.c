@@ -109,7 +109,7 @@ static const int srv_proc( int fd, zhttp_t *req, zhttp_t *res, struct cdata *con
 	//With no default host, throw this 
 	if ( !req->host ) {
 		snprintf( err, sizeof(err), "No host header specified." );
-		return http_set_error( res, 500, err ); 
+		return http_set_error( res, 400, err );
 	}
 
 	if ( !( conn->hconfig = find_host( conn->config->hosts, req->host ) ) ) {
