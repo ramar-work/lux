@@ -765,17 +765,12 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 			//Finalize chunked messages.
 			if ( chunked && ret == 5 ) {
 				if ( memcmp( xbuf, "0\r\n\r\n", 5 ) == 0 ) {
-					//fprintf(stderr, "the last one came in" );
-					//fprintf( stderr, "%s, %d: my code ran.... but why stop?", __FILE__, __LINE__ ); 
 					break;
 				}
 				else {
 					fprintf(stderr, "not sure what happened.." );
 				}
 			}
-
-//fprintf( stderr, "msg size: %d, add to msg: %d\n", res->mlen, ret + 1 );
-//write( 2, xbuf, ret );
 
 			//Read into a bigger buffer	
 			if ( !( res->msg = realloc( res->msg, res->mlen + ( ret + 1 ) ) ) ) {
@@ -1226,8 +1221,6 @@ write( 2, xbuf, ret );
 				//Finalize chunked messages.
 				if ( r->chunked && ret == 5 ) {
 					if ( memcmp( xbuf, "0\r\n\r\n", 5 ) == 0 ) {
-						//fprintf(stderr, "the last one came in" );
-						//fprintf( stderr, "%s, %d: my code ran.... but why stop?", __FILE__, __LINE__ ); 
 						break;
 					}
 					else {

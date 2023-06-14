@@ -344,6 +344,7 @@ int lua_count ( lua_State *L, int i ) {
 	int count = 0;
 
 	if ( !lua_istable( L, i ) ) {
+		//TODO: Needs to throw an exception instead
 		fprintf( stderr, "[%s, %d] Value at %i is not a table\n", __FILE__, __LINE__, i );
 		return 0;
 	}

@@ -862,7 +862,6 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 	//Return the finished message if we got this far
 	p = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN );
 
-fprintf( stderr, "%s:%d -> %p\n", __FILE__, __LINE__, content );	
 	free( content );
 	return p;
 }

@@ -1155,7 +1155,7 @@ char * zjson_stringify( struct mjson **mjson, char *err, int errlen ) {
 	for ( struct mjson *nx, **v = ++mjson; v && *v && ((*v)->index > ZJSON_TERMINATOR ); v++ ) {
 		int len = 0, encl = 0;
 		char *val = NULL;
-zjson_dump_item( *v );
+		//zjson_dump_item( *v );
 
 		//Add the object/array dividers first
 		if ( !(*v)->value && ( (*v)->type == '{' || (*v)->type == '[' ) )
@@ -1207,19 +1207,22 @@ zjson_dump_item( *v );
 			}
 		}
 
-		//Peek ahead at the next member
+		//Peek ahead at the next member to add a ':' or ','
 		if ( ( nx = *( v + 1 ) )->index != ZJSON_TERMINATOR ) {
 			len = 0;
 			if ( *p == '{' ) {
-				if ( (*v)->type == 'S' && memchr( "[{SE", nx->type, 4 ) ) {
+				if ( memchr( "SE", (*v)->type, 2 ) && memchr( "[{SE", nx->type, 4 ) )
 					len = 1, val = k == ':' ? "," : ":";
-				}
-				else if ( (*v)->type == ']' || ( (*v)->type == '}' && nx->type != '}' ) ) {
+				//else if ( ( (*v)->type == ']' || ( (*v)->type == '}' ) && nx->type != '}' ) ) {
+				//else if ( memchr( "]}", (*v)->type, 2 ) && nx->type != '}' ) {
+				else if ( memchr( "]}", (*v)->type, 2 ) && !memchr( "]}", nx->type, 2 ) ) {
 					len = 1, val = ",";
 				}
 			}
 			else /* ( *p == '[' ) */ {
-				if ( nx->type != ']' && (*v)->type != '[' ) {
+				//if ( nx->type != ']' && (*v)->type != '[' ) {
+				//if ( !memchr( "]}", nx->type, 2 ) && (*v)->type != '[' ) {
+				if ( (*v)->type != '[' && !memchr( "]}", nx->type, 2 ) ) {
 					len = 1, val = ",";
 				}
 			}
