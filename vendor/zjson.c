@@ -1073,8 +1073,6 @@ struct mjson ** ztable_to_zjson ( ztable_t *t, char *err, int errlen ) {
 				break;
 			else if ( x.type == ZTABLE_NUL || ( x.type == ZTABLE_INT && isValue == 0 ) )
 				0;//v = "Z", len = 1;
-			else if ( x.type == ZTABLE_TXT )
-				t = 'S', len = strlen( x.v.vchar ), v = x.v.vchar;
 			else if ( x.type == ZTABLE_BLB )
 				t = 'S', len = x.v.vblob.size, v = (char *)x.v.vblob.blob; 
 			else if ( x.type == ZTABLE_FLT )
@@ -1083,6 +1081,13 @@ struct mjson ** ztable_to_zjson ( ztable_t *t, char *err, int errlen ) {
 				t = 'S', len = snprintf( nb, sizeof( nb ), "%d", x.v.vint ), v = nb;
 			else if ( x.type == ZTABLE_TRM )
 				t = ( *p == '{' ) ? '}' : ']', p--;
+			else if ( x.type == ZTABLE_TXT ) {
+				if ( x.v.vchar )
+					t = 'S', len = strlen( x.v.vchar ), v = x.v.vchar;
+				else {
+					t = 'E';
+				}
+			}
 			else if ( x.type == ZTABLE_TBL ) {
 				if ( ( kv + 1 )->key.type == ZTABLE_TXT ) 
 					t = '{';
@@ -1157,6 +1162,8 @@ zjson_dump_item( *v );
 			len = 1, val = &(*v)->type, *(++p) = (*v)->type;
 		else if ( !(*v)->value && ( (*v)->type == '}' || (*v)->type == ']' ) )
 			len = 1, val = &(*v)->type, p--;
+		else if ( !(*v)->value && (*v)->type == 'E' )
+			len = 2, val = "\"\"";
 		else {
 			len = (*v)->size;
 			val = (char *)(*v)->value;
@@ -1178,7 +1185,7 @@ zjson_dump_item( *v );
 		char k = js[ jslen - 1 ];
 
 		//Add to the current buffer
-		if ( (*v)->index > -1 ) {
+		if ( (*v)->index > ZJSON_FREE_VALUE ) {
 			if ( !( js = realloc( js, jslen + len ) ) || !memcpy( &js[ jslen ], val, len ) ) {
 				snprintf( err, errlen, "Failed to allocate memory for JSON string\n" );
 				return NULL;
@@ -1204,7 +1211,7 @@ zjson_dump_item( *v );
 		if ( ( nx = *( v + 1 ) )->index != ZJSON_TERMINATOR ) {
 			len = 0;
 			if ( *p == '{' ) {
-				if ( (*v)->type == 'S' && memchr( "[S{", nx->type, 3 ) ) {
+				if ( (*v)->type == 'S' && memchr( "[{SE", nx->type, 4 ) ) {
 					len = 1, val = k == ':' ? "," : ":";
 				}
 				else if ( (*v)->type == ']' || ( (*v)->type == '}' && nx->type != '}' ) ) {
@@ -1216,6 +1223,7 @@ zjson_dump_item( *v );
 					len = 1, val = ",";
 				}
 			}
+
 			if ( len ) {
 				if ( !( js = realloc( js, jslen + len ) ) || !memcpy( &js[ jslen ], val, len ) ) {
 					snprintf( err, errlen, "Failed to allocate memory for JSON seperator\n" );
