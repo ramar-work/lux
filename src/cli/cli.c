@@ -29,6 +29,7 @@
 #include <ztable.h>
 #include "../util.h"
 #include "../config.h"
+#include "cliutils.h"
 
 #define NAME "hypno-cli"
 
@@ -44,8 +45,13 @@
 	"-s, --static <arg>       Define a static path. (Use multiple -s's to\n"\
 	"                         specify multiple paths).\n"\
 	"-b, --database <arg>     Define a specific database connection.\n"\
+	"-V, --version            Show version information and quit.\n" \
+	"-h, --help               Show the help menu.\n"
+
+#if 0
+	// NOTE: -x is still enabled
 	"-x, --dump-args          Dump passed arguments.\n"
-	//'t', "template-engine", "Define an alternate template engine" 
+#endif
 
 char *arg_srcdir = NULL;
 char *arg_domain = NULL;
@@ -216,7 +222,6 @@ int main ( int argc, char *argv[] ) {
 	char err[ 2048 ] = { 0 };
 	struct stat sb;
 
-	//Process all your options...
 	if ( argc < 2 ) {
 		fprintf( stderr, "No options received:\n" );
 		fprintf( stderr, "%s", HELP );
@@ -224,15 +229,15 @@ int main ( int argc, char *argv[] ) {
 	}
  
 	while ( *argv ) {
-		if ( strcmp( *argv, "-v" ) == 0 || strcmp( *argv, "--verbose" ) == 0 ) 
+		if ( OPTEVAL( *argv, "-v", "--verbose" ) )
 			arg_verbose = 1;
-		else if ( strcmp( *argv, "-x" ) == 0 || strcmp( *argv, "--dump-args" ) == 0 ) 
+		else if ( OPTEVAL( *argv, "-x", "--dump-args" ) )
 			arg_dump = 1;
-		else if ( strcmp( *argv, "-h" ) == 0 || strcmp( *argv, "--help" ) == 0 ) {
+		else if ( OPTEVAL( *argv, "-h", "--help" ) ) {
 			fprintf( stderr, "%s", HELP );
 			return 1;
 		}
-		else if ( strcmp( *argv, "-d" ) == 0 || strcmp( *argv, "--dir" ) == 0 ) {
+		else if ( OPTEVAL( *argv, "-d", "--dir" ) ) {
 			argv++;
 			if ( !*argv ) {
 				ERRPRINTF( "Expected argument for --dir!" );
@@ -240,7 +245,7 @@ int main ( int argc, char *argv[] ) {
 			} 
 			arg_srcdir = *argv;
 		}
-		else if ( strcmp( *argv, "-n" ) == 0 || strcmp( *argv, "--domain-name" ) == 0 ) {
+		else if ( OPTEVAL( *argv, "-n", "--domain-name" ) ) {
 			argv++;
 			if ( !*argv ) {
 				ERRPRINTF( "Expected argument for --domain-name!" );
@@ -256,7 +261,7 @@ int main ( int argc, char *argv[] ) {
 			} 
 			arg_title = *argv;
 		}
-		else if ( strcmp( *argv, "-b" ) == 0 || strcmp( *argv, "--database" ) == 0 ) {
+		else if ( OPTEVAL( *argv, "-b", "--database" ) ) {
 			argv++;
 			if ( !*argv ) {
 				ERRPRINTF( "Expected argument for --database!" );
@@ -264,7 +269,7 @@ int main ( int argc, char *argv[] ) {
 			} 
 			arg_database = *argv;
 		}
-		else if ( strcmp( *argv, "-s" ) == 0 || strcmp( *argv, "--static" ) == 0 ) {
+		else if ( OPTEVAL( *argv, "-s", "--static" ) ) {
 			static char **as = arg_static;
 			argv++;
 			if ( !*argv ) {
@@ -272,6 +277,10 @@ int main ( int argc, char *argv[] ) {
 				return 1;
 			} 
 			*(as++) = *argv;
+		}
+		else if ( OPTEVAL( *argv, "-V", "--version" ) ) {
+			fprintf( stdout, "%s\n", PACKAGE_VERSION );
+			return 0;
 		}
 		argv++;
 	}

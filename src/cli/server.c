@@ -85,6 +85,7 @@
 	"-x, --dump                Dump configuration at startup\n" \
 	"-l, --log-file <arg>      Define an alternate log file location\n" \
 	"-a, --access-file <arg>   Define an alternate access file location\n" \
+	"-V, --version             Show version information and quit.\n" \
 	"-h, --help                Show the help menu.\n"
 
 #if 0
@@ -899,6 +900,11 @@ int main (int argc, char *argv[]) {
 	
 	//while ( *argv ) {
 	for ( int ac = argc; *argv; argv++, argc-- ) {
+		if ( strcmp( *argv, "--version" ) == 0 ) {
+			fprintf( stdout, "%s\n", PACKAGE_VERSION );
+			return 0;
+		}
+
 		if ( OPTEVAL( *argv, "-s", "--start" ) ) 
 			v.start = 1;
 		else if ( OPTEVAL( *argv, "-k", "--kill" ) ) 
