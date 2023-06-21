@@ -337,6 +337,7 @@ unsigned char * zhttp_dupblk( const unsigned char *v, int vlen ) ;
 unsigned char *zhttp_append_to_uint8t ( unsigned char **, int *, unsigned char *, int );
 
 
+const char *http_get_status_text ( HTTP_Status status );
 zhttpr_t ** http_get_header_keyvalues ( unsigned char **, int *, short * );
 zhttpr_t ** http_get_query_strings ( char *, int, short * );
 //zhttpr_t ** http_get_query_strings ( char *, int );

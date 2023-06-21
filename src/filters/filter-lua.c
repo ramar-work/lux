@@ -886,6 +886,7 @@ static int return_as_response ( struct luadata_t *l ) {
 	int ctype_i = 0;
 	int clen_i = 0;
 	int file_i = 0;
+	int prepped_own_content = 0;
 	int content_i = 0;
 	int delayed = 0;
 	char ctype[ 128 ] = { 0 }; //'t','e','x','t','/','h','t','m','l','\0', 0 };
@@ -945,6 +946,14 @@ static int return_as_response ( struct luadata_t *l ) {
 	if ( !delayed && ( content_i = lt_geti( rt, "content" ) ) > -1 ) {
 		content = (unsigned char *)lt_text_at( rt, content_i );
 		if ( clen_i == -1 ) {
+			if ( !content ) {
+				// TODO: A stack trace showing where exactly the lack of content came from would be very helpful
+				prepped_own_content = 1;
+				char *c = malloc( 256 );
+				memset( c, 0, 256 );
+				snprintf( c, 255, "%d %s - No content specified\n", status, http_get_status_text( status ) );
+				content = (unsigned char *)c;
+			}
 			clen = strlen( (char *)content );
 		}
 	}
@@ -1014,7 +1023,7 @@ static int return_as_response ( struct luadata_t *l ) {
 		//Return finalized content
 		zhttp_t *rr = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ); 
 		lt_free( rt ), free( rt );
-		if ( file_i > -1 ) {
+		if ( file_i > -1 || prepped_own_content ) {
 			free( content );
 		}
 	}
@@ -1197,27 +1206,27 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			}
 			model = 1;
 		}
-	}
 
-	//Stop if the user specifies a 'response' table that's not empty...
-	if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
-		FPRINTF( "Evaluating response table.\n" );
-		int eres = return_as_response( &ld );
+		//Stop if the user specifies a 'response' table that's not empty...
+		if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
+			FPRINTF( "Evaluating response table.\n" );
+			int eres = return_as_response( &ld );
 
-		if ( !eres ) {
-			free_ld( &ld );
-			FPRINTF( "Error when evaluating response table\n" );
-			return http_error( res, 500, ld.err );
-		}
-		else if ( eres == 1 ) {
+			if ( !eres ) {
+				free_ld( &ld );
+				FPRINTF( "Error when evaluating response table\n" );
+				return http_error( res, 500, ld.err );
+			}
+			else if ( eres == 1 ) {
+				lua_pop( ld.state, 1 );
+				free_ld( &ld );
+				FPRINTF( "Content return completed\n" );
+				return 1;
+			}
+
 			lua_pop( ld.state, 1 );
-			free_ld( &ld );
-			FPRINTF( "Content return completed\n" );
-			return 1;
+			FPRINTF( "Finished evaluating delayed response table...\n" );
 		}
-
-		lua_pop( ld.state, 1 );
-		FPRINTF( "Finished evaluating delayed response table...\n" );
 	}
 
 	//Can we simply check if config exists in _G?
