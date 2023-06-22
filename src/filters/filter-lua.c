@@ -1185,7 +1185,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			FPRINTF( "Executing model %s\n", mpath );
 			if ( !lua_exec_file( ld.state, mpath, ld.err, sizeof( ld.err ) ) ) {
 				free_ld( &ld );
-				return http_error( res, 500, "%s", ld.err );
+				return http_error( res, 500, "Error occurred: %s", ld.err );
 			}
 
 			//Get name of model file in question 

@@ -218,6 +218,32 @@ const int fkctpost( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c) {
 	return 1;
 }
 
+int write_pid( int pid, char *pidfile ) {
+
+	char buf[ 64 ] = { 0 };
+	int fd = -1, len = snprintf( buf, 63, "%d", pid );
+
+	if ( !pidfile ) {
+		return eprintf( "No PID file specified." );
+	}
+
+	if ( ( fd = open( pidfile, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR ) ) == -1 ) {
+		return eprintf( "Failed to access PID file: %s.", strerror(errno));
+	}
+
+	//Write the pid down
+	if ( write( fd, buf, len ) == -1 ) {
+		return eprintf( "Failed to log PID: %s.", strerror(errno));
+	}
+
+	//The parent exited successfully.
+	if ( close(fd) == -1 ) {
+		return eprintf( "Could not close PID file: %s", strerror(errno));
+	}
+
+	return 1;
+}
+
 void sigkill( int signum ) {
 	fprintf( stderr, "Received SIGKILL - Killing the server...\n" );
 	char err[ 2048 ] = {0};
@@ -1001,18 +1027,28 @@ int main (int argc, char *argv[]) {
 
 	//Start a server
 	if ( v.start ) {
-		//Set pid file
+		//Pull in a configuration
+		if ( ! *v.config ) {
+			eprintf( "No configuration specified." );
+			return 1;
+		}
+
+		#if 0
+		//TODO: Set pid file if one is not set.  Will also need a --no-pid option.
 		if ( ! *v.pidfile ) {
 			struct timespec t;
 			clock_gettime( CLOCK_REALTIME, &t );
 			unsigned long time = t.tv_nsec % 3333;
 			snprintf( v.pidfile, sizeof( v.pidfile ) - 1, "%s/%s-%ld", PIDDIR, NAME, time );
 		}
+		#endif
 
-		//Pull in a configuration
-		if ( ! *v.config ) {
-			eprintf( "No configuration specified." );
-			return 1;
+		// Set the process ID
+		v.pid = getpid();
+
+		// Since daemonization is not enabled right now, just write the PID file (and exit if you can't)
+		if ( *v.pidfile && !write_pid( v.pid, v.pidfile ) ) {
+			return 0;
 		}
 
 		if ( !cmd_server( &v, err, sizeof(err) ) ) {
