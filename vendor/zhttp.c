@@ -423,6 +423,7 @@ static zhttpr_t * init_record() {
 		return NULL;
 	}
 	memset( record, 0, sizeof( zhttpr_t ) );
+	record->type = ZHTTP_NONE;
 	return record;
 }
 
@@ -529,9 +530,13 @@ static char * http_get_content_type ( zhttpr_t **list, HttpContentType *type ) {
 		for ( const char **id = zhttp_content_type_id; *id; id++ ) { 
 			const char *f = (*slist)->field;
 			if ( strcmp( (*slist)->field, *id ) == 0 ) {
-				//This is a long-winded way to nul-terminate a block 
-				for ( unsigned char *v = (*slist)->value; ( *v != '\r' && *v != ';' ) || ( *v = '\0' ); v++ );
+				int s = (*slist)->size;
 				char *ctype = (char *)(*slist)->value;
+
+				// Nul-terminate the content type header
+				// TODO: Works, but is a bit gnarly for most to look at...
+				for ( unsigned char *v = (*slist)->value; ( *v != '\r' ) || ( *v = '\0' ); v++ );
+
 				if ( strcmp( ctype, zhttp_multipart ) == 0 )
 					*type = ZHTTP_MULTIPART;
 				else if ( strcmp( ctype, zhttp_url_encoded ) == 0 )
@@ -800,8 +805,11 @@ zhttpr_t ** http_parse_standard_form ( unsigned char *p, int clen ) {
 	for ( zhttpr_t *b = NULL; memwalk( &z, p, (unsigned char *)"=&", clen, 2 ); ) {
 		unsigned char *m = &p[ z.pos ];  
 		//TODO: Should be checking that allocation was successful
-		if ( z.chr == '=' )
-			b = init_record(), b->field = zhttp_copystr( m, z.size - 1 );
+		if ( z.chr == '=' ) {
+			b = init_record();
+			b->field = zhttp_copystr( m, z.size - 1 );
+			b->type = ZHTTP_URL_ENCODED;
+		}
 	#if 0
 		else if ( z.chr == '+' )
 			*m = ' ';
@@ -811,9 +819,7 @@ zhttpr_t ** http_parse_standard_form ( unsigned char *p, int clen ) {
 		}
 	#endif
 		else { 
-			if ( !b )
-				break;
-			else {
+			if ( b ) {
 				//You'll have blank spaces, but this is probably ok...
 				unsigned char *c = m;
 				int osize, a, d; 
@@ -907,14 +913,15 @@ zhttpr_t ** http_parse_freeform_body ( unsigned char *p, int clen ) {
 	zhttpr_t *b, **list = NULL;
 	int len = 0;
 
-	if ( !( b = init_record() ) )
-		return NULL;
-	else {
+	if ( ( b = init_record() ) ) {
 		b->field = zhttp_dupstr( "body" );
 		b->value = p;
 		b->size = clen;
+		b->type = ZHTTP_OTHER;
 		zhttp_add_item( &list, b, zhttpr_t *, &len ); 
+		return list;
 	}
+
 	return list;
 }
 
@@ -1224,7 +1231,14 @@ void * http_set_record
 	//Set the members
 	int len = 0;
 	len = en->lengths[ type ];
-	r->field = zhttp_dupstr( k ), r->size = vlen, r->value = v, r->free = free;
+	r->field = zhttp_dupstr( k );
+	r->size = vlen;
+	r->value = v;
+	r->free = free;
+
+	// NOTE: By default, use this when setting up a response... it's really not a useful
+	// field outside of the context of a request.  Maybe come up with another way to do.
+	r->type = ZHTTP_NO_CONTENT;
 	zhttp_add_item( list, r, zhttpr_t *, &len );
 	en->lengths[ type ] = len; //en->size = vlen;
 	return r;
@@ -1253,6 +1267,7 @@ static void http_free_records( zhttpr_t **records ) {
 		free( *r );
 		r++;
 	}
+
 	free( records );
 }
 
@@ -1322,7 +1337,10 @@ static const char * print_formtype ( int x ) {
 
 //list out all rows in an HTTPRecord array
 void print_httprecords ( zhttpr_t **r ) {
-	if ( *r == NULL ) return;
+	if ( !r || !( *r ) ) {
+		return;
+	}
+
 	while ( *r ) {
 		ZHTTP_PRINTF( stderr, "'%s' -> ", (*r)->field );
 		//ZHTTP_PRINTF( "%s\n", (*r)->field );
@@ -1336,11 +1354,11 @@ void print_httprecords ( zhttpr_t **r ) {
 
 
 //list out everything in an HTTPBody
-void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
+void print_httpbody_to_file ( zhttp_t *rb, const char *path ) {
 	FILE *fb = NULL;
 	int fd = 0;
 
-	if ( r == NULL || !path ) {
+	if ( rb == NULL || !path ) {
 		return;
 	}
 
@@ -1367,24 +1385,24 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 	}
 #endif
 
-	ZHTTP_PRINTF( fb, "r->mlen: '%d'\n", r->mlen );
-	ZHTTP_PRINTF( fb, "r->clen: '%d'\n", r->clen );
-	ZHTTP_PRINTF( fb, "r->hlen: '%d'\n", r->hlen );
-	ZHTTP_PRINTF( fb, "r->status: '%d'\n", r->status );
-	ZHTTP_PRINTF( fb, "r->ctype: '%s'\n", r->ctype );
-	ZHTTP_PRINTF( fb, "r->method: '%s'\n", r->method );
-	ZHTTP_PRINTF( fb, "r->path: '%s'\n", r->path );
-	ZHTTP_PRINTF( fb, "r->protocol: '%s'\n", r->protocol );
-	ZHTTP_PRINTF( fb, "r->host: '%s'\n", r->host );
-	ZHTTP_PRINTF( fb, "r->boundary: '%s'\n", r->boundary );
-	ZHTTP_PRINTF( fb, "r->port: %d\n", r->port );
+	ZHTTP_PRINTF( fb, "rb->mlen: '%d'\n", rb->mlen );
+	ZHTTP_PRINTF( fb, "rb->clen: '%d'\n", rb->clen );
+	ZHTTP_PRINTF( fb, "rb->hlen: '%d'\n", rb->hlen );
+	ZHTTP_PRINTF( fb, "rb->status: '%d'\n", rb->status );
+	ZHTTP_PRINTF( fb, "rb->ctype: '%s'\n", rb->ctype );
+	ZHTTP_PRINTF( fb, "rb->method: '%s'\n", rb->method );
+	ZHTTP_PRINTF( fb, "rb->path: '%s'\n", rb->path );
+	ZHTTP_PRINTF( fb, "rb->protocol: '%s'\n", rb->protocol );
+	ZHTTP_PRINTF( fb, "rb->host: '%s'\n", rb->host );
+	ZHTTP_PRINTF( fb, "rb->boundary: '%s'\n", rb->boundary );
+	ZHTTP_PRINTF( fb, "rb->port: %d\n", rb->port );
 
-	ZHTTP_PRINTF( fb, "r->idempotent: '%d'\n", r->idempotent );
-	ZHTTP_PRINTF( fb, "r->chunked: '%d'\n", r->chunked );
-	ZHTTP_PRINTF( fb, "r->svctype: '%s'\n", !r->type ? "client" : "server" );
-	ZHTTP_PRINTF( fb, "r->formtype: '%s'\n", print_formtype( r->formtype ) );
+	ZHTTP_PRINTF( fb, "rb->idempotent: '%d'\n", rb->idempotent );
+	ZHTTP_PRINTF( fb, "rb->chunked: '%d'\n", rb->chunked );
+	ZHTTP_PRINTF( fb, "rb->svctype: '%s'\n", !rb->type ? "client" : "server" );
+	ZHTTP_PRINTF( fb, "rb->formtype: '%s'\n", print_formtype( rb->formtype ) );
 
-	switch ( r->atype ) {
+	switch ( rb->atype ) {
 		case ZHTTP_MESSAGE_STATIC:
 			ZHTTP_PRINTF( fb, "Message allocation type: '%s'\n", "static" );
 			break;	
@@ -1417,8 +1435,8 @@ void print_httpbody_to_file ( zhttp_t *r, const char *path ) {
 #endif
 
 	//Print out headers and more
-	const char *names[] = { "r->headers", "r->url", "r->body" };
-	zhttpr_t **rr[] = { r->headers, r->url, r->body };
+	const char *names[] = { "rb->headers", "rb->url", "rb->body" };
+	zhttpr_t **rr[] = { rb->headers, rb->url, rb->body };
 	for ( int i=0; i<sizeof(rr)/sizeof(zhttpr_t **); i++ ) {
 		ZHTTP_PRINTF( fb, "%s: %p\n", names[i], rr[i] );
 		if ( rr[i] ) {

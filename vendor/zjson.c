@@ -646,8 +646,10 @@ fprintf( stderr, "Got a quote\n" );
 		*x = *s, x++, cmplen++;
 	}
 
+	// Zero-terminate this
 	cmp = realloc( cmp, cmplen + 1 );
 	*newlen = cmplen + 1;
+	cmp[ *newlen - 1 ] = '\0';
 	return cmp;
 }
 
@@ -758,13 +760,6 @@ struct mjson ** zjson_decode ( const char *str, int len, char *err, int errlen )
 				//fprintf( stderr, "got end of text, finalizing\n" );
 				//Check the preceding char, and see if it's a backslash.
 				text = *( w.rptr - 1 ) == '\\';
-#if 0
-fprintf( stderr, "closing quote reached, got '%c', '%c', '%c' is escaped: %s\n", 
-*( w.ptr ),
-*( w.rptr - 1 ),
-( w.chr ),
-text ? "Y" : "N" );
-#endif
 				size += w.size;
 				c->size = size; //Need to add the total size of whatever it may be.
 				continue;
