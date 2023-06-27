@@ -232,6 +232,8 @@ static const char text_html[] = "text/html";
 
 static const char idem[] = "POST,PUT,PATCH,DELETE";
 
+
+
 //Set http errors
 static zhttp_t * set_error( zhttp_t *en, HTTP_Error code, HTTP_ErrorType type ) {
 	en->error = code;
@@ -239,6 +241,7 @@ static zhttp_t * set_error( zhttp_t *en, HTTP_Error code, HTTP_ErrorType type ) 
 	en->errmsg = errors[ code ];
 	return NULL;
 }
+
 
 
 //Copy a string from unsigned data
@@ -251,16 +254,49 @@ static char *zhttp_copystr ( unsigned char *src, int len ) {
 }
 
 
-#if 0 
-//Duplicate a string
-char * zhttp_dupstr ( const char *v ) {
-	int len = strlen( v );
-	char * vv = malloc( len + 1 );
-	memset( vv, 0, len + 1 );
-	memcpy( vv, v, len );
-	return vv;
-} 
-#endif
+
+//Generate random characters
+static char *zhttp_rand_chars ( int len ) {
+	const char chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+	char * a = malloc( len + 1 );
+	memset( a, 0, len + 1 );
+	for ( int i = 0; i < len; i ++ ) {
+		a[ i ] = chars[ rand() % sizeof(chars) ];
+	}
+	return a;	
+}
+
+
+
+//Add to series
+static void * zhttp_add_item_to_list
+	( void ***list, void *element, int size, int * len ) {
+	//Reallocate
+	if (( (*list) = realloc( (*list), size * ( (*len) + 2 ) )) == NULL ) {
+		ZHTTP_PRINTF( stderr, "Failed to reallocate block from %d to %d\n", size, size * ((*len) + 2) ); 
+		return NULL;
+	}
+
+	(*list)[ *len ] = element; 
+	(*list)[ (*len) + 1 ] = NULL; 
+	(*len) += 1; 
+	return list;
+}
+
+
+
+//Safely convert numeric buffers...
+static int * zhttp_satoi( const char *value, int *p ) {
+	//Make sure that content-length numeric
+	const char *v = value;
+	while ( *v ) {
+		if ( (int)*v < 48 || (int)*v > 57 ) return NULL;
+		v++;
+	}
+	*p = atoi( value );
+	return p; 
+}
+
 
 
 //Duplicate a block 
@@ -269,18 +305,6 @@ unsigned char * zhttp_dupblk( const unsigned char *v, int vlen ) {
 	memset( vv, 0, vlen );
 	memcpy( vv, v, vlen );
 	return vv;
-}
-
-
-//Generate random characters
-char *zhttp_rand_chars ( int len ) {
-	const char chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-	char * a = malloc( len + 1 );
-	memset( a, 0, len + 1 );
-	for ( int i = 0; i < len; i ++ ) {
-		a[ i ] = chars[ rand() % sizeof(chars) ];
-	}
-	return a;	
 }
 
 
@@ -307,33 +331,6 @@ char zhttp_url_decode ( unsigned char *p, int len ) {
 }
 
 
-//Add to series
-static void * zhttp_add_item_to_list( void ***list, void *element, int size, int * len ) {
-	//Reallocate
-	if (( (*list) = realloc( (*list), size * ( (*len) + 2 ) )) == NULL ) {
-		ZHTTP_PRINTF( stderr, "Failed to reallocate block from %d to %d\n", size, size * ((*len) + 2) ); 
-		return NULL;
-	}
-
-	(*list)[ *len ] = element; 
-	(*list)[ (*len) + 1 ] = NULL; 
-	(*len) += 1; 
-	return list;
-}
-
-
-//Safely convert numeric buffers...
-static int * zhttp_satoi( const char *value, int *p ) {
-	//Make sure that content-length numeric
-	const char *v = value;
-	while ( *v ) {
-		if ( (int)*v < 48 || (int)*v > 57 ) return NULL;
-		v++;
-	}
-	*p = atoi( value );
-	return p; 
-}
-
 
 //Add to a buffer
 unsigned char *zhttp_append_to_uint8t ( unsigned char **dest, int *len, unsigned char *src, int srclen ) {
@@ -348,6 +345,7 @@ unsigned char *zhttp_append_to_uint8t ( unsigned char **dest, int *len, unsigned
 	(*len) += srclen;
 	return *dest;
 }
+
 
 
 //Extract value (a simpler code that can be used to grab values)
@@ -389,7 +387,8 @@ static char * zhttp_msg_get_value ( const char *value, const char *chrs, unsigne
 }
 
 
-//...
+
+// Return the status text associated with a particular code.
 const char *http_get_status_text ( HTTP_Status status ) {
 	//TODO: This should error out if HTTP_Status is not received...
 	if ( status < 100 || status > sizeof( http_status ) / sizeof( char * ) ) {
@@ -399,33 +398,24 @@ const char *http_get_status_text ( HTTP_Status status ) {
 }
 
 
-//Trim whitespace
-unsigned char *httpvtrim (unsigned char *msg, int len, int *nlen) {
+ 
+// Trim characters in [trim] from both sides of a unsigned char array
+static unsigned char *httptrim (unsigned char *msg, const char *trim, int len, int *nlen) {
 	//Define stuff
 	unsigned char *m = msg;
-	int nl= len;
+	int nl = len;
+	int tl = strlen( trim );
+
 	//Move forwards and backwards to find whitespace...
-	while ( memchr("\r\n\t ", *(m + ( nl - 1 )), 4) && nl-- ) ; 
-	while ( memchr("\r\n\t ", *m, 4) && nl-- ) m++;
+	while ( memchr( trim, *(m + ( nl - 1 )), 4 ) && nl-- ) ; 
+	while ( memchr( trim, *m, 4) && nl-- ) m++;
 	*nlen = nl;
 	return m;
 }
 
 
-//Trim any characters 
-unsigned char *httptrim (unsigned char *msg, const char *trim, int len, int *nlen) {
-	//Define stuff
-	unsigned char *m = msg;
-	int nl= len;
-	//Move forwards and backwards to find whitespace...
-	while ( memchr(trim, *(m + ( nl - 1 )), 4) && nl-- ) ; 
-	while ( memchr(trim, *m, 4) && nl-- ) m++;
-	*nlen = nl;
-	return m;
-}
 
-
-//...
+// Initialize a new ZHTTP record
 static zhttpr_t * init_record() {
 	zhttpr_t *record = NULL;
 	record = malloc( sizeof( zhttpr_t ) );
@@ -437,19 +427,16 @@ static zhttpr_t * init_record() {
 }
 
 
-//Return if the header is fully received
+
+// Return true if the header is fully received
 int http_header_received ( unsigned char *p, int size ) {
 	return memblkat( p, "\r\n\r\n", size, 4  ); 
 }
 
-#if 0
-int http_header_xreceived ( zhttp_t *en ) {
-	return ( ( en->hlen = memblkat( en->msg, "\r\n\r\n", en->mlen, 4  ) ) > -1 );  
-}
-#endif
 
 
-char * http_get_method ( zhttp_t *en, unsigned char **p, int *plen ) {
+// Return the method in use by either the request or response
+static char * http_get_method ( zhttp_t *en, unsigned char **p, int *plen ) {
 	//unsigned char * word = memchr( *p, "H", len );s
 	char *m = (char *)*p;
 	unsigned char *w = *p;
@@ -475,7 +462,9 @@ char * http_get_method ( zhttp_t *en, unsigned char **p, int *plen ) {
 }
 
 
-char * http_get_path ( zhttp_t *en, unsigned char **p, int *plen ) {
+
+// Return the requested path
+static char * http_get_path ( zhttp_t *en, unsigned char **p, int *plen ) {
 	char *m = (char *)*p;
 	unsigned char *w = *p;
 	//Mark with a \0
@@ -488,7 +477,9 @@ char * http_get_path ( zhttp_t *en, unsigned char **p, int *plen ) {
 }
 
 
-char * http_get_protocol ( zhttp_t *en, unsigned char **p, int *plen ) {
+
+// Return the protocol in use
+static char * http_get_protocol ( zhttp_t *en, unsigned char **p, int *plen ) {
 	char *m = (char *)*p;
 	unsigned char *w = *p;
 	int supported = 0;
@@ -508,7 +499,9 @@ char * http_get_protocol ( zhttp_t *en, unsigned char **p, int *plen ) {
 }
 
 
-int http_get_content_length ( zhttpr_t **list ) {
+
+// Return the content length of the response or request
+static int http_get_content_length ( zhttpr_t **list ) {
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
 		for ( const char **id = zhttp_content_length_id; *id; id++ ) { 
 			if ( strcmp( (*slist)->field, *id ) == 0 ) {
@@ -529,7 +522,9 @@ int http_get_content_length ( zhttpr_t **list ) {
 }
 
 
-char * http_get_content_type ( zhttpr_t **list, HttpContentType *type ) {
+
+// Return the content type of the response or request
+static char * http_get_content_type ( zhttpr_t **list, HttpContentType *type ) {
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
 		for ( const char **id = zhttp_content_type_id; *id; id++ ) { 
 			const char *f = (*slist)->field;
@@ -555,21 +550,31 @@ char * http_get_content_type ( zhttpr_t **list, HttpContentType *type ) {
 
 
 
-char * http_get_boundary ( zhttpr_t **list ) {
+// Return the boundary string in use with a multipart body
+static char * http_get_boundary ( zhttpr_t **list ) {
+	
+	const char *bnd = "boundary=";
+	int blen = strlen( bnd );
+
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
 		const char *f = (*slist)->field;
+	
+		// TODO: Either make this a loop or use a helper to trim down on line length
+		// TODO: This is repetitive
 		if ( !strcmp( f, "Content-Type" ) || !strcmp( f, "content-type" ) || !strcmp( f, "Content-type" ) ) {
 			int s = (*slist)->size;
 			for ( unsigned char *v = (*slist)->value; ( *v != '\r' && s > 1 ) || ( *v = '\0' ); v++, s-- );
-			char *c = memstr( (*slist)->value, "boundary=", (*slist)->size );
-			return c += strlen( "boundary=" );
+			char *c = memstr( (*slist)->value, bnd, (*slist)->size );
+			return c += blen;
 		}
 	}
 	return NULL;
 }
 
 
-char * http_get_host ( zhttp_t *en, zhttpr_t **list, int *p ) {
+
+// Get the host specified in the request
+static char * http_get_host ( zhttp_t *en, zhttpr_t **list, int *p ) {
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
 		const char *f = (*slist)->field;
 		if ( strcmp( f, "Host" ) == 0 || strcmp( f, "host" ) == 0 ) {
@@ -599,7 +604,8 @@ char * http_get_host ( zhttp_t *en, zhttpr_t **list, int *p ) {
 
 
 
-zhttpr_t ** http_get_query_strings ( char *p, int plen, short *err ) {
+// Get and store all of the query strings
+static zhttpr_t ** http_get_query_strings ( char *p, int plen, short *err ) {
 	zhttpr_t **list = NULL;
 
 	//Process the query string if there is one...
@@ -634,7 +640,21 @@ zhttpr_t ** http_get_query_strings ( char *p, int plen, short *err ) {
 	return list;
 }
 
-//Store each of the headers
+
+
+// Set the chunked "bit" if this is that kind of message...
+static int http_check_for_chunked_encoding ( zhttp_t *en, zhttpr_t **list ) {
+	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
+		if ( strcmp( (*slist)->field, "Transfer-Encoding" ) == 0 ) {
+			return en->chunked = 1;
+		}
+	}
+	return 1;
+}
+
+
+
+// Get and store each of the headers
 zhttpr_t ** http_get_header_keyvalues ( unsigned char **p, int *plen, short *err ) {
 	int len = 0;
 	//int flen = strlen( en->path ) + strlen( en->method ) + strlen( en->protocol ) + 4;
@@ -667,7 +687,8 @@ zhttpr_t ** http_get_header_keyvalues ( unsigned char **p, int *plen, short *err
 			
 			//We need to trim the values on the other side
 		#if 1
-			t += ++pos;
+			pos++;
+			t += pos;
 			int plen = 0; 
 			//unsigned char *a = httptrim( t, "\r\t ", z.size - pos, &plen );  
 			b->value = httptrim( t, "\r\t ", z.size - pos, &plen );
@@ -685,24 +706,8 @@ zhttpr_t ** http_get_header_keyvalues ( unsigned char **p, int *plen, short *err
 }
 
 
-//Set the chunked "bit" if this is that kind of message...
-int http_check_for_chunked_encoding ( zhttp_t *en, zhttpr_t **list ) {
-	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
-		if ( strcmp( (*slist)->field, "Transfer-Encoding" ) == 0 ) {
-			return en->chunked = 1;
-		}
-	}
-	return 1;
-}
 
-
-#if 0
-int http_get_cookie ( zhttp_t *en, zhttpr_t **list ) {
-	return 0;
-}
-#endif
-
-//Just parse the headers
+// Parse the response or request headers
 zhttp_t * http_parse_header ( zhttp_t *en, int plen ) {
 #if 0
 	//Check if the full headers were received	
@@ -897,8 +902,7 @@ zhttpr_t ** http_parse_multipart_form ( unsigned char *p, int clen, char *bnd ) 
 
 
 
-//Parse (or at least, store) serializable bodies like XML, JSON and MsgPack
-//Can also just store a reference to a large file...
+// Store reference to a serializable bodies (e.g. XML, JSON and MsgPack)
 zhttpr_t ** http_parse_freeform_body ( unsigned char *p, int clen ) {
 	zhttpr_t *b, **list = NULL;
 	int len = 0;
@@ -916,30 +920,7 @@ zhttpr_t ** http_parse_freeform_body ( unsigned char *p, int clen ) {
 
 
 
-//This is intended to serialize chunked encodings as part of a body.
-int http_parse_chunked_encoding_part ( zhttp_t *en, unsigned char *p ) {
-	//NOTE: This is basically what we were doing before with realloc...
-	return 1;
-}
-
-
-const char * print_formtype ( int x ) {
-	const char *w[] = { "multipart", "url_enc", "other", "none" };
-  switch ( x ) {
-    case ZHTTP_MULTIPART:
-      return w[0];
-    case ZHTTP_URL_ENCODED:
-      return w[1];
-    case ZHTTP_OTHER:
-      return w[2];
-    default:
-      return w[3];
-  }
-  return NULL;
-}
-
-
-//Handle different types of content
+// Parses different types of content
 zhttp_t * http_parse_content( zhttp_t *en, unsigned char *p, int plen ) {
 	
 	//Block any blank entries	
@@ -967,130 +948,7 @@ zhttp_t * http_parse_content( zhttp_t *en, unsigned char *p, int plen ) {
 
 
 
-//Parse an HTTP request
-zhttp_t * http_parse_request ( zhttp_t *en, char *err, int errlen ) {
-
-	//Set error to none
-	en->error = ZHTTP_NONE;
-
-#if 1
-	#if 0
-	int len = 0;
-	//Need to know how big message is, but you'll need this
-	if ( ( len = http_header_received( NULL, 0 ) ) > -1 ) {
-		return NULL;
-	}
-
-	//Use an independent reference to the message
-	//http_parse_header( en, hp, plen );
-	if ( !http_parse_header( en, len ) ) {
-		return NULL;
-	}
-
-	//Same here
-	//http_parse_content( en, cp, plen );
-	if ( !http_parse_content( en ) ) {
-		return NULL;
-	}
-	#endif
-
-#else
-	//Parse the header
-	if ( !parse_http_header( en, err, errlen ) ) {
-		return en;
-	}
-
-	ZHTTP_PRINTF( stderr, "Calling parse_url( ... )\n" );
-	if ( !parse_url( en, err, errlen ) ) {
-		return en;
-	}
-
-	ZHTTP_PRINTF( stderr, "Calling parse_headers( ... )\n" );
-	if ( !parse_headers( en, err, errlen ) ) {
-		return en;
-	}
-
-	ZHTTP_PRINTF( stderr, "Calling parse_body( ... )\n" );
-	if ( !parse_body( en, err, errlen ) ) {
-		return en;
-	}
-#endif
-	//ZHTTP_PRINTF( "Dump http body." );
-	//print_httpbody_to_file( en, "/tmp/zhttp-01" );
-	return en;
-} 
-
-
-#if 0
-//Parse an HTTP response
-zhttp_t * http_parse_response ( zhttp_t *en, char *err, int errlen ) {
-	//Prepare the rest of the request
-	int hdLen = memstrat( en->msg, "\r\n\r\n", en->mlen );
-
-	//Initialize the remainder of variables 
-	en->headers = en->body = en->url = NULL;
-	en->hlen = hdLen; 
-	en->host = zhttp_msg_get_value( "Host: ", "\r", en->msg, hdLen );
-	return NULL;
-} 
-#endif
-
-#if 0
-static int http_get_expected_header_length ( zhttp_t *en ) {
-	return -1;
-}
-
-static int http_get_expected_content_length ( zhttp_t *en, HttpContentType rtype ) {
-	int length = 0;
-	zhttpr_t **body = en->body;
-
-	//Check for the proper method
-	for ( const char **method = zhttp_supported_methods2; *method; method++ ) {
-		if ( strcmp( *method, m ) == 0 ) {
-			for ( const char **imethod = zhttp_idempotent_methods2; *imethod; imethod++ ) {
-				if ( strcmp( *imethod, m ) == 0 ) {
-					en->idempotent = 1;	
-					break; 
-				}
-			}
-		}
-	}
-
-	//Return a negative content length in this case
-	if ( !en->idempotent ) {
-		return -1;
-	}
-
-	if ( !body || !( *body ) ) {
-		return -1;
-	}
-
-	//TODO: Catch each of these or use a static buffer and append ONE time per struct...
-	if ( rtype == ZHTTP_OTHER )
-		length = (*body)->size;
-	else if ( rtype == ZHTTP_URL_ENCODED ) {
-		for ( ; body && *body; body++ ) {
-			( *en->body != *body ) ? length ++ : 0;
-			length += strlen( (*body)->field ) + 1 + (*body)->size;
-		}
-	}
-	else {
-		//Handle multipart requests
-		int blen = strlen( en->boundary );
-		//Each block will contain a combination of the following characters
-		int clen = sizeof( "\r\n\"\r\n\r\n\r\n" ) + sizeof( cdisph ) + sizeof( cdispt ) + sizeof( nameh ) - 1;
-		for ( ; body && *body; body++ ) {
-			length += blen + clen + strlen( r->field ) + r->size;
-		}
-		//Account for the trailing final boundary which includes 2 dashes
-		length += blen + 2;
-	}
-	return length;
-}
-#endif
-
-
-//Finalize an HTTP request (really just returns a unsigned char, but this can handle it)
+// Finalize an HTTP request
 zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 	unsigned char *msg = NULL, *hmsg = NULL;
 	HttpContentType rtype = ZHTTP_OTHER;
@@ -1257,7 +1115,8 @@ zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 }
 
 
-//Finalize an HTTP response (really just returns a unsigned char, but this can handle it)
+
+// Finalize an HTTP response
 zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 	unsigned char *msg = NULL;
 	int msglen = 0;
@@ -1329,19 +1188,22 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 }
 
 
-//...
+
+// Set any integer value in a zhttp_t structure
 int http_set_int( int *k, int v ) {
 	return ( *k = v );
 }
 
 
-//...
+
+// Set any character value in a zhttp_t structure
 char * http_set_char( char **k, const char *v ) {
 	return ( *k = zhttp_dupstr( v ) );	
 }
 
 
-//...
+
+// Allocate and setup a new zhttp record
 void * http_set_record
  ( zhttp_t *en, zhttpr_t ***list, int type, const char *k, unsigned char *v, int vlen, int free ) {
 	zhttpr_t *r = NULL;
@@ -1369,7 +1231,8 @@ void * http_set_record
 }
 
 
-//...
+
+// Tear down list of records
 static void http_free_records( zhttpr_t **records ) {
 	zhttpr_t **r = records;
 	while ( r && *r ) {
@@ -1394,7 +1257,7 @@ static void http_free_records( zhttpr_t **records ) {
 }
 
 
-//...
+// Tear down fully received request or created response
 void http_free_body ( zhttp_t *en ) {
 	if ( en->type == ZHTTP_IS_SERVER ) {
 		en->path ? free( en->path ) : 0;
@@ -1418,7 +1281,8 @@ void http_free_body ( zhttp_t *en ) {
 }
 
 
-//...
+
+// Set the error code and message in an HTTP response
 int http_set_error ( zhttp_t *en, int status, char *message ) {
 	char err[ 2048 ];
 	memset( err, 0, sizeof( err ) );
@@ -1432,15 +1296,30 @@ int http_set_error ( zhttp_t *en, int status, char *message ) {
 		return 0;
 	}
 
-#if 0
-	fprintf(stderr, "msg: " );
-	ZHTTP_WRITE( 2, en->msg, en->mlen );
-#endif
 	return 0;
 }
 
 
+
 #ifdef DEBUG_H
+// Return the body form type 
+static const char * print_formtype ( int x ) {
+	const char *w[] = { "multipart", "url_enc", "other", "none" };
+  switch ( x ) {
+    case ZHTTP_MULTIPART:
+      return w[0];
+    case ZHTTP_URL_ENCODED:
+      return w[1];
+    case ZHTTP_OTHER:
+      return w[2];
+    default:
+      return w[3];
+  }
+  return NULL;
+}
+
+
+
 //list out all rows in an HTTPRecord array
 void print_httprecords ( zhttpr_t **r ) {
 	if ( *r == NULL ) return;
@@ -1453,6 +1332,7 @@ void print_httprecords ( zhttpr_t **r ) {
 		r++;
 	}
 }
+
 
 
 //list out everything in an HTTPBody

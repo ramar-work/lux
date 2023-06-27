@@ -310,17 +310,13 @@ typedef struct HTTPBody {
 #endif
 } zhttp_t;
 
-unsigned char *httpvtrim (unsigned char *, int , int *) ;
-
-unsigned char *httptrim (unsigned char *, const char *, int , int *) ;
+static unsigned char *httptrim (unsigned char *, const char *, int , int *) ;
 
 void http_free_body( zhttp_t * );
 
 zhttp_t * http_finalize_response (zhttp_t *, char *, int );
 
 zhttp_t * http_finalize_request (zhttp_t *, char *, int );
-
-zhttp_t * http_parse_request (zhttp_t *, char *, int );
 
 zhttp_t * http_parse_response (zhttp_t *, char *, int );
 
@@ -330,28 +326,22 @@ char *http_set_char( char **, const char * );
 
 void *http_set_record( zhttp_t *, zhttpr_t ***, int, const char *, unsigned char *, int, int );
 
-int http_set_error ( zhttp_t *entity, int status, char *message );
+int http_set_error ( zhttp_t *, int, char *);
 
-unsigned char * zhttp_dupblk( const unsigned char *v, int vlen ) ;
+unsigned char * zhttp_dupblk( const unsigned char *, int) ;
 
 unsigned char *zhttp_append_to_uint8t ( unsigned char **, int *, unsigned char *, int );
 
+const char *http_get_status_text ( HTTP_Status );
 
-const char *http_get_status_text ( HTTP_Status status );
-zhttpr_t ** http_get_header_keyvalues ( unsigned char **, int *, short * );
-zhttpr_t ** http_get_query_strings ( char *, int, short * );
-//zhttpr_t ** http_get_query_strings ( char *, int );
+zhttpr_t ** http_get_header_keyvalues ( unsigned char **, int *, short *);
 
-//zhttp_t * http_parse_header( zhttp_t * );
 zhttp_t * http_parse_header ( zhttp_t *, int );
 
 zhttp_t * http_parse_content( zhttp_t *, unsigned char *, int );
 
 int http_header_received ( unsigned char *, int );
 
-int http_header_xreceived ( zhttp_t * );
-
- const char * print_formtype ( int ) ;
 #ifdef DEBUG_H
  void print_httprecords ( zhttpr_t ** );
  void print_httpbody_to_file ( zhttp_t *, const char * );
