@@ -104,24 +104,7 @@ static const char *zhttp_content_length_id[] = {
 , NULL 
 };
 
-static const char base[] = { 
-	['0'] = 0
-,	['1'] = 1
-,	['2'] = 2
-,	['3'] = 3
-,	['4'] = 4
-,	['5'] = 5
-,	['6'] = 6
-,	['7'] = 7
-,	['8'] = 8
-,	['9'] = 9
-,	['a'] = 10 
-,	['b'] = 11
-,	['c'] = 12 
-,	['d'] = 13
-,	['e'] = 14
-,	['f'] = 15
-};
+
 
 static const char cdisph[] = "Content-Disposition: " ;
 
@@ -233,7 +216,6 @@ static const char text_html[] = "text/html";
 static const char idem[] = "POST,PUT,PATCH,DELETE";
 
 
-
 //Set http errors
 static zhttp_t * set_error( zhttp_t *en, HTTP_Error code, HTTP_ErrorType type ) {
 	en->error = code;
@@ -308,26 +290,119 @@ unsigned char * zhttp_dupblk( const unsigned char *v, int vlen ) {
 }
 
 
+static const char zhttp_safe[] =
+	"0123456789"
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	"abcdefghijklmnopqrstuvwxyz"
+	"-:_~"
+;
 
-//Return a single char based on code... 
-char zhttp_url_decode ( unsigned char *p, int len ) {
-	//const char reserved[] = ";/?:@=&";
-	if ( *p != '%' ) {
-		return 0;
+// Encode a string
+char *zhttp_url_encode ( unsigned char *p, int len ) {
+	int total = 0;
+	char *m = NULL;
+	static const char rbase[] = "0123456789ABCDEF";
+
+	// Return null if p is blank or len is 0
+	if ( !p || !len ) {
+		return NULL;
 	}
 
-	char k = 0;
-	for ( unsigned char *x = p; len; len--, x++ ) {
-		if ( len == 2 )
-			k += base[ (int)*x ] * 16;
-		else if ( len == 1 )
-			k += base[ (int)*x ];
-		else if ( len == 3 && *x == '%' )  {
-			continue;
+	// Get a count of how long the string SHOULD be
+	int i = len;
+	for ( unsigned char *d = p ; i; d++, i-- ) {
+		total += ( !memchr( zhttp_safe, *d, sizeof( zhttp_safe ) ) ) ? 3 : 1;
+	}
+
+	// TODO: Catch this cleanly.
+	if ( !( m = malloc( total + 1 ) ) || memset( m, 0, total + 1 ) ) {
+		// snprintf( err, "%s\n", strerror( errno ) );
+		return NULL;
+	}
+
+	// Copy to the new string buffer
+	for ( unsigned char *d = p, *x = (unsigned char *)m; len; d++, len-- ) {
+		// Only encode these characters
+		if ( !memchr( zhttp_safe, *d, sizeof( zhttp_safe ) ) ) {
+			char c = rbase[ ( *d - ( *d % 16 ) ) / 16 ];
+			char e = rbase[ *d % 16 ];
+			// can print to string buffer that makes sense...
+			*x = '%', *( x + 1 ) = c, *( x + 2 ) = e;
+			x += 3;
+		}
+		else {
+			*x = *d;
+			x++;
 		}
 	}
-	
-	return (char)k;
+
+	return m;
+}
+
+
+
+// Decode a string
+unsigned char *zhttp_url_decode ( char *p, int len, int *nlen ) {
+	int nl = 0;
+	unsigned char *m = NULL;
+	static const unsigned char base[] = {
+		['0'] = 0
+	,	['1'] = 1
+	,	['2'] = 2
+	,	['3'] = 3
+	,	['4'] = 4
+	,	['5'] = 5
+	,	['6'] = 6
+	,	['7'] = 7
+	,	['8'] = 8
+	,	['9'] = 9
+	,	['a'] = 10
+	,	['b'] = 11
+	,	['c'] = 12
+	,	['d'] = 13
+	,	['e'] = 14
+	,	['f'] = 15
+	,	['A'] = 10
+	,	['B'] = 11
+	,	['C'] = 12
+	,	['D'] = 13
+	,	['E'] = 14
+	,	['F'] = 15
+	};
+
+	// Catch failures
+	if ( !( m = malloc( len ) ) || !memset( m, 0, len ) ) {
+		// snprintf( err, "%s\n", strerror( errno ) );
+		return NULL;
+	}
+
+	for ( unsigned char *x = m; len ; ) {
+		if ( *p == '%' && len >= 3 ) {
+			unsigned char b = 0, c = *(p + 1), d = *(p + 2);
+
+			// Do some quick base16 encoding
+			if ( ( c == '0' || base[ (int)c ] ) && ( d == '0' || base[ (int)d ] ) ) {
+				b += base[ (int)c ] * 16;
+				b += base[ (int)d ];
+			}
+			*x = b;
+			p += 3, len -= 3;
+		}
+		else {
+			// Any other character (w/ the exception of '+')
+			*x = ( *p == '+' ) ? ' ' : *p;
+			p++, len--;
+		}
+
+		x++, nl++;
+	}
+
+	// TODO: Reallocate because the new string will likely be smaller
+	if ( nl < len ) {
+		m = realloc( m, nl );
+	}
+	*nlen = nl;
+	return m;
 }
 
 
@@ -537,9 +612,9 @@ static char * http_get_content_type ( zhttpr_t **list, HttpContentType *type ) {
 				// TODO: Works, but is a bit gnarly for most to look at...
 				for ( unsigned char *v = (*slist)->value; ( *v != '\r' ) || ( *v = '\0' ); v++ );
 
-				if ( strcmp( ctype, zhttp_multipart ) == 0 )
+				if ( memcmp( ctype, zhttp_multipart, strlen( zhttp_multipart ) ) == 0 )
 					*type = ZHTTP_MULTIPART;
-				else if ( strcmp( ctype, zhttp_url_encoded ) == 0 )
+				else if ( memcmp( ctype, zhttp_url_encoded, strlen( zhttp_url_encoded ) ) == 0 )
 					*type = ZHTTP_URL_ENCODED;
 				else {
 					*type = ZHTTP_OTHER;
@@ -561,6 +636,7 @@ static char * http_get_boundary ( zhttpr_t **list ) {
 	const char *bnd = "boundary=";
 	int blen = strlen( bnd );
 
+	// TODO: Theoretically, I can now use the content-type member...
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
 		const char *f = (*slist)->field;
 	
@@ -612,36 +688,47 @@ static char * http_get_host ( zhttp_t *en, zhttpr_t **list, int *p ) {
 // Get and store all of the query strings
 static zhttpr_t ** http_get_query_strings ( char *p, int plen, short *err ) {
 	zhttpr_t **list = NULL;
+	int len = 0;
+	int at = 0;
+	int start = 0;
+	zWalker z = {0};
 
 	//Process the query string if there is one...
-	if ( strlen( p ) == 1 || !memchr( p, '?', plen ) )
+	if ( strlen( p ) == 1 || ( at = memchrat( p, '?', plen ) ) == -1 ) {
 		return NULL;
-	else {
-		zhttpr_t *b = NULL; 
-		zWalker z = {0};
-		for ( int l, len = 0; strwalk( &z, p, "?&=" );  ) {
-			unsigned char *t = (unsigned char *)&p[ z.pos ];
-			if ( z.chr == '?' ) 
-				continue;
-			else if ( z.chr == '=' ) {
-				if ( !( b = init_record() ) ) {
-					*err = ZHTTP_OUT_OF_MEMORY;
-					return NULL;
-				}
-				b->field = zhttp_copystr( t, z.size - 1 ); 
+	}
+
+	// Move the string forward since I only expect one ?
+	p += ( at + 1 ), plen -= ( at + 1 );
+
+#if 0
+fprintf( stderr, "QUERY STRING RECVD: " );
+write( 2, "'", 1 );write( 2, p, plen );write( 2, "'\n", 2 );
+#endif
+
+	// Walk through and serialize
+	for ( zhttpr_t *b = NULL; memwalk( &z, (unsigned char *)p, (unsigned char *)"=&", plen, 2 ); ) {
+		unsigned char *m = (unsigned char *)&p[ z.pos ];
+
+		if ( z.chr == '=' ) {
+			// TODO: Add a memory check
+			b = init_record();
+			b->field = zhttp_copystr( m, z.size - 1 );
+			// TODO: I left this out for now.  Need to check if it automatically frees...
+			//b->type = ZHTTP_URL_ENCODED;
+		}
+		else {
+			if ( !b ) {
+				*err = ZHTTP_INCOMPLETE_QUERYSTRING;
+				return NULL;
 			}
-			else {
-				if ( !b ) {
-					*err = ZHTTP_INCOMPLETE_QUERYSTRING;
-					return NULL;
-				}
-				b->value = t; 
-				b->size = ( z.chr == '&' ) ? z.size - 1 : z.size; 
-				zhttp_add_item( &list, b, zhttpr_t *, &len );
-				b = NULL;
-			}
+			b->value = zhttp_url_decode( (char *)m, z.size - 1, &b->size );
+			b->free = 1;
+			zhttp_add_item( &list, b, zhttpr_t *, &len );
+			b = NULL;
 		}
 	}
+
 	return list;
 }
 
@@ -706,7 +793,6 @@ zhttpr_t ** http_get_header_keyvalues ( unsigned char **p, int *plen, short *err
 		}
 	}
 
-	//return en->headers = list;
 	return list;
 }
 
@@ -790,22 +876,22 @@ zhttp_t * http_parse_header ( zhttp_t *en, int plen ) {
 zhttpr_t ** http_parse_standard_form ( unsigned char *p, int clen ) {
 
 	zhttpr_t **list = NULL;
-	zWalker z;
+	zWalker z = {0};
 	int len = 0;
 	const char reject[] = "&=+[]{}*";
-	memset( &z, 0, sizeof( zWalker ) );
 
 	//Block messages that are not very likely to be actual forms...
 	if ( memchr( reject, *p, strlen( reject ) ) ) {
 		return NULL;
 	}
-	
+
 	//Walk through and serialize what you can
 	//TODO: Handle de-encoding from here?	
 	for ( zhttpr_t *b = NULL; memwalk( &z, p, (unsigned char *)"=&", clen, 2 ); ) {
-		unsigned char *m = &p[ z.pos ];  
+		unsigned char *m = &p[ z.pos ];
 		//TODO: Should be checking that allocation was successful
 		if ( z.chr == '=' ) {
+			// TODO: Add a memory check
 			b = init_record();
 			b->field = zhttp_copystr( m, z.size - 1 );
 			b->type = ZHTTP_URL_ENCODED;
@@ -821,24 +907,8 @@ zhttpr_t ** http_parse_standard_form ( unsigned char *p, int clen ) {
 		else { 
 			if ( b ) {
 				//You'll have blank spaces, but this is probably ok...
-				unsigned char *c = m;
-				int osize, a, d; 
-				osize = a = d = z.size - (( z.chr == '&' ) ? 1 : 2);
-
-				//Die when a hits 0, because we're done...
-				for ( unsigned char *n = m; a; d--, c++ ) {
-					if ( *n == '+' )
-						*n = ' ' ;
-					else if ( *n == '%' && d > 3 ) {
-						*c = *n = zhttp_url_decode( n, 3 ), n += 3, a -= 3;
-						continue;
-					}
-					*c = *n, n++, a--;
-				}
-		
-				//Wipe any excess buffer after translation
-				( d ) ? memset( c, 0, d ) : 0;
-				b->value = m, b->size = osize - d;
+				b->value = zhttp_url_decode( (char *)m, z.size - 1, &b->size );
+				b->free = 1;
 				zhttp_add_item( &list, b, zhttpr_t *, &len );
 				b = NULL;
 			}
@@ -1465,4 +1535,55 @@ void print_httpbody_to_file ( zhttp_t *rb, const char *path ) {
 #endif
 }
 
+#endif
+
+
+#if 0
+int main ( int argc, char *argv[] ) {
+	const char *encoded[] = {
+		"Ladies%20%2B%20Gentlemen",
+		"An%20encoded%20string%21",
+		"Dogs%2C%20Cats%20%26%20Mice",
+		"%E2%98%83",
+		NULL
+	};
+
+	const char *decoded[] = {
+		"Ladies + Gentlemen",
+		"An encoded string!",
+		"Dogs, Cats & Mice",
+		"☃" ,
+		NULL
+	};
+
+
+	//
+	struct test {
+		const char *enc, *dec;
+	} tests[] = {
+		{ "Ladies%20%2B%20Gentlemen", "Ladies + Gentlemen" },
+		{ "An%20encoded%20string%21", "An encoded string!" },
+		{ "Dogs%2C%20Cats%20%26%20Mice", "Dogs, Cats & Mice" },
+		{ "%E2%98%83", "☃" },
+		{ NULL, NULL }
+	};
+
+
+	// Check decoding
+	for ( struct test *t = tests; t->enc; t++ ) {
+		int xlen = 0;
+		unsigned char *x = zhttp_url_decode( (char *)t->enc, strlen( t->enc ), &xlen );
+		write( 2, "'", 1 ); write( 2, x, xlen ); write( 2, "' -> ", 5 );
+		fprintf( stderr, "%s\n", ( !memcmp( x, t->dec, xlen ) ) ? "PASS" : "FAIL" );
+	}
+
+	// Check encoding
+	for ( struct test *t = tests; t->dec; t++ ) {
+		char *x = zhttp_url_encode( (unsigned char *)t->dec, strlen( t->dec ) );
+		fprintf( stderr, "'%s' -> ", x );
+		fprintf( stderr, "%s\n", ( !memcmp( t->enc, x, strlen( t->enc ) ) ) ? "PASS" : "FAIL" );
+	}
+
+	return 0;
+}
 #endif

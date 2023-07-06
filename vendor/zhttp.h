@@ -268,6 +268,12 @@ typedef struct HTTPRecord {
 typedef struct HTTPBody {
 	char *path;
 	char *ctype; 
+#if 0
+	char *sctype;  // simplified content-type
+	const char *ctype_encoding;
+	const char *ctype_mimetype;
+	const char *ctype_boundary;
+#endif
 	char *host;
 	char *method;
 	char *protocol;
@@ -341,6 +347,11 @@ zhttp_t * http_parse_header ( zhttp_t *, int );
 zhttp_t * http_parse_content( zhttp_t *, unsigned char *, int );
 
 int http_header_received ( unsigned char *, int );
+
+unsigned char *zhttp_url_decode ( char *, int, int *);
+
+char *zhttp_url_encode ( unsigned char *, int );
+
 
 #ifdef DEBUG_H
  void print_httprecords ( zhttpr_t ** );

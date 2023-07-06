@@ -47,22 +47,6 @@
 #ifndef ZWALKER_H
 #define ZWALKER_H
 
-typedef struct zw_t {
-	int pos; //Current position within user's block 
-	int next; //Position of character found
-	int size; //Size of block between current position and character position
-	int rsize; 	//...
-	unsigned char chr; //Character found
-	//Internal pointers
-	unsigned char *ptr, *rptr;
-	//Current position in block
-	unsigned char *src;
-} zw_t ;
-
-//Keep me for backwards compat
-typedef zw_t zWalker;
-
-
 #define strwalk(a,b,c) \
 	memwalk(a, (unsigned char *)b, (unsigned char *)c, strlen(b), strlen((char *)c))
 
@@ -80,6 +64,23 @@ typedef zw_t zWalker;
 
 #define memstr(blk,str,blklen) \
 	memblk( blk, str, blklen, strlen( str ) )
+
+
+typedef struct zw_t {
+	int pos; //Current position within user's block 
+	int next; //Position of character found
+	int size; //Size of block between current position and character position
+	int rsize; 	//...
+	unsigned char chr; //Character found
+	//Internal pointers
+	unsigned char *ptr, *rptr;
+	//Current position in block
+	unsigned char *src;
+} zw_t ;
+
+
+//Keep me for backwards compat
+typedef zw_t zWalker;
 
 int memchrocc (const void *, const char, int);
 
