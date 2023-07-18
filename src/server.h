@@ -16,11 +16,11 @@
  * ----------
  * - 
  * -------------------------------------------------------- */
+#include <sys/socket.h>
 #include <zhttp.h>
 #include <zwalker.h>
 #include <ztable.h>
 #include "lua.h"
-#include "socket.h"
 #include "util.h"
 #include "configs.h"
 
@@ -60,6 +60,7 @@ struct senderrecvr {
 	const int (*pre)( int, zhttp_t *, zhttp_t *, struct cdata * );
 	const int (*post)( int, zhttp_t *, zhttp_t *, struct cdata * );
 	const struct filter *filters;
+	const char *name;
 	const char *config;
 	void *data;
 }; 

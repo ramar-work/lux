@@ -21,10 +21,11 @@
  * - 
  * ------------------------------------------- */
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/sendfile.h>
 #include <stddef.h>
 #include <zwalker.h>
 #include <ztable.h>
-#include "../socket.h"
 #include "../server.h"
 #include "../util.h"
 #include "../config.h"

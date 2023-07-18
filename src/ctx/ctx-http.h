@@ -23,9 +23,9 @@
  * ------------------------------------------- */
 #include <time.h>
 #include <zhttp.h>
-#include "../socket.h"
+#include <sys/socket.h>
+#include <sys/sendfile.h>
 #include "../server.h"
-
 #include "../config.h"
 
 #ifndef CTXHTTP_H

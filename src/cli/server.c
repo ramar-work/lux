@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <arpa/inet.h>
 #include <pwd.h>
 #include <pthread.h>
 #include "../config.h"
@@ -107,16 +108,6 @@
 	fprintf( stderr, __VA_ARGS__ ) && \
 	fprintf( stderr, "\n" ) \
 	) ? 0 : 0
-
-
-#ifdef LEAKTEST_H
- #ifndef LEAKLIMIT
-	#define LEAKLIMIT 64
- #endif
- #define CONN_CLOSE 1
-#else
- #define CONN_CLOSE 0 
-#endif
 
 const int defport = 2000;
 
@@ -308,7 +299,7 @@ struct filter dns_filters[] = {
 //Define a list of "context types"
 struct senderrecvr sr[] = {
 #if 1
-	{ read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost, http_filters  }
+	{ read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost, http_filters, "http"  }
 #endif
 #if 0
 , { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls }
@@ -475,7 +466,7 @@ void * run_srv_cycle( void *t ) {
 			//I don't what this means...
 		}
 
-		if ( CONN_CLOSE || conn.count < 0 || conn.count > 5 ) {
+		if ( conn.count < 0 || conn.count > 5 ) {
 			FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
 			if ( close( fd ) == -1 ) {
 				FPRINTF( "Error when closing child socket.\n" );
@@ -542,7 +533,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	int backlog = BACKLOG;
 	int on = 1;
 	pthread_attr_t attr;
-	
+
 	si->sin_family = PF_INET; 
 	si->sin_port = htons( *pport );
 	(&si->sin_addr)->s_addr = htonl( INADDR_ANY );
@@ -665,11 +656,9 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;	
 	}
 
-#ifdef LEAKTEST_H
-	for ( int fd, count = 0, i = 0; i < LEAKLIMIT; i++ ) { 
-#else
+
+	// Server loop
 	for ( int fd = 0, count = 0; ; ) {
-#endif
 		//Client address and length?
 		char ip[ 128 ] = { 0 };
 		struct threadinfo_t *f = &fds[ count ];
@@ -855,10 +844,6 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 #endif
 #ifdef HBLOCK_H
 	fprintf( stderr, "Running in blocking mode (NOTE: Performance will suffer, only use this for testing).\n" );
-#endif
-#ifdef LEAKTEST_H
- 	fprintf( stderr, "Leak testing is enabled, server will stop after %d requests.\n",
-		LEAKLIMIT ); 
 #endif
 
 	fprintf( stderr, "Filters enabled:\n" );

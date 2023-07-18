@@ -21,7 +21,6 @@
  * 
  * ------------------------------------------- */
 #include "ctx-http.h"
-#include <sys/sendfile.h>
 
 //Size of \r\n\r\n
 #define BHSIZE 4

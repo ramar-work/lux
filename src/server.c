@@ -30,7 +30,9 @@
  * -------------------------------------------------------- */
 #include "server.h"
 
-//Check the validity of a filter
+
+
+// Check the validity of a filter
 static struct filter * srv_check_filter ( const struct filter *filters, char *name ) {
 	while ( filters && filters->name ) {
 		struct filter *f = ( struct filter * )filters;
@@ -44,7 +46,7 @@ static struct filter * srv_check_filter ( const struct filter *filters, char *na
 
 
 
-//Check that the website's chosen directory is accessible and it's log directory is writeable.
+// Check that the website's chosen directory is accessible and it's log directory is writeable.
 static int srv_check_dir ( struct cdata *conn, char *err, int errlen ) {
 	FPRINTF( "Checking directory at %s\n", conn->hconfig->dir );
 
@@ -81,7 +83,8 @@ static int srv_check_dir ( struct cdata *conn, char *err, int errlen ) {
 }
 
 
-//Build server configuration
+
+// Build server configuration
 static const int srv_start( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	FPRINTF( "Initial server allocation started...\n" );
 	char err[ 2048 ] = {0};
@@ -97,7 +100,8 @@ static const int srv_start( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn
 }
 
 
-//Find the chosen host and generate a response via one of the selected filters
+
+// Find the chosen host and generate a response via one of the selected filters
 static const int srv_proc( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn) {
 	FPRINTF( "Proc started...\n" );
 	char err[2048] = {0};
@@ -143,7 +147,8 @@ static const int srv_proc( int fd, zhttp_t *req, zhttp_t *res, struct cdata *con
 }
 
 
-//Generate a message in common log format: ip - - [date] "method path protocol" status clen
+
+// Generate a message in common log format: ip - - [date] "method path protocol" status clen
 static const int srv_log( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn) {
 #if 0
 	const char fmt[] = "%s %s %s [%s] \"%s %s %s\" %d %d";
@@ -168,7 +173,7 @@ static const int srv_log( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn) 
 }
 
 
-//End the request by deallocating all of the things
+// End the request by deallocating all of the things
 static int srv_end( zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	FPRINTF( "Deallocation started...\n" );
 
@@ -186,7 +191,8 @@ static int srv_end( zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 }
 
 
-//Generate a response
+
+// Generate a response
 int srv_response ( int fd, struct cdata *conn ) {
 
 	zhttp_t rq = {0}, rs = {0};
@@ -208,6 +214,9 @@ int srv_response ( int fd, struct cdata *conn ) {
 
 	//A conn->count of -3 means stop and write the message immediately
 	for ( int i = 0; i < 7; i++ ) {
+	#ifdef DEBUG_H
+		print_response_stage( i );	
+	#endif
 		//if ( !status && conn->count == -3 && ( i = 3 ) )
 		if ( !( status = rc[i]( fd, &rq, &rs, conn ) ) && conn->count == -3 && ( i = 3 ) )
 			continue;
@@ -227,4 +236,22 @@ int srv_response ( int fd, struct cdata *conn ) {
 	return 1; 
 }
 
-
+#ifdef DEBUG_H
+static void print_response_stage( int st, const char *name ) {
+	if ( st == 0 )
+		FPRINTF( "ctx %s - opened, building server config", name );
+	else if ( st == 1 )
+		FPRINTF( "ctx %s - Pre ctx routines started", name );
+	else if ( st == 2 )
+		FPRINTF( "ctx %s - Message Reading started", name );
+	else if ( st == 3 )
+		FPRINTF( "ctx %s - Message Processing started", name );
+	else if ( st == 4 )
+		FPRINTF( "ctx %s - Message Write started", name );
+	else if ( st == 5 )
+		FPRINTF( "ctx %s - Post ctx routines started", name );
+	else if ( st == 6 ) {
+		FPRINTF( "ctx %s - Logging started", name );
+	}
+}
+#endif

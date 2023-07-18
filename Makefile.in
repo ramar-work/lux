@@ -44,11 +44,9 @@ SRC = \
 	@srcdir@/vendor/router.c \
 	@srcdir@/src/configs.c \
 	@srcdir@/src/lua.c \
-	@srcdir@/src/socket.c \
 	@srcdir@/src/util.c \
 	@srcdir@/src/server.c \
 	@srcdir@/src/loader.c \
-	@srcdir@/src/xml.c \
 	@srcdir@/src/log.c \
 	@srcdir@/src/ctx/ctx-http.c \
 	@srcdir@/src/ctx/ctx-https.c \
