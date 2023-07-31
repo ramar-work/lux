@@ -105,7 +105,7 @@ static const char read_only_block[] = " \
 
 
 
-// TODO: Modify me to accept a function pointer...
+//TODO: Change me to accept a function pointer...
 static struct mvcmeta_t { 
 	const char *dir; 
 	const char *ext;
@@ -119,6 +119,19 @@ static struct mvcmeta_t {
 //,	{ NULL, "inherit", NULL }
 };
 
+
+
+//....
+int run_lua_buffer( lua_State *L, const char *buffer ) {
+	//Load a buffer	
+	luaL_loadbuffer( L, buffer, strlen( buffer ), "make-read-only-function" );
+	if ( lua_pcall( L, 0, LUA_MULTRET, 0 ) != LUA_OK ) {
+		fprintf( stdout, "lua string exec failed: %s", (char *)lua_tostring( L, -1 ) );
+		//This shouldn't fail, but if it does you should stop...
+		return 0;
+	}
+	return 1;
+}
 
 
 #if 0
@@ -143,8 +156,9 @@ static int make_read_only ( lua_State *L, const char *table ) {
 
 
 
-// Loads each of the extension libraries
+//Should return an error b/c there are some situations where this does not work.
 int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
+	//Now load everything written elsewhere...
 	for ( ; set->namespace; set++ ) {
 		lua_newtable( L );
 		for ( struct luaL_Reg *f = set->functions; f->name; f++ ) {
@@ -155,36 +169,47 @@ int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
 		lua_setglobal( L, set->namespace );
 	}
 
+#if 0
+	//And finally, add some functions that we'll need later (if this fails, meh)
+	if ( !run_lua_buffer( L, read_only_block ) ) {
+		return 0;
+	}
+#endif
 	return 1;
 }
 
 
 
-// Check if there is a reserved keyword being requested
+//Check if there is a reserved keyword being requested
 static int is_reserved( const char *a ) {
 	for ( int i = 0; i < sizeof( mvcmeta ) / sizeof( struct mvcmeta_t ); i ++ ) {
-	#if 0
+#if 0
 		if ( memstrat( mvcmeta[i].reserved, a, strlen( mvcmeta[i].reserved ) ) > -1 ) {
 			return 1;
 		}
-	#else
+#else
 		zWalker w = {0};
 		for ( ; strwalk( &w, mvcmeta[i].reserved, "," ); ) {
+	//int sl = strlen( (char *)mvcmeta[ i ].reserved );
+		//for ( ; memwalk( &w, (unsigned char *)mvcmeta[i].reserved, (unsigned char *)",", sl, 1 ); ) {
+#if 0
+fprintf( stderr, 
+	"POS: %d Size: %d Len: %ld Next: %d\n",
+	w.pos, w.size, strlen(mvcmeta[i].reserved), w.next ); getchar();
+#endif
 			char buf[64];
 			memset( buf, 0, sizeof( buf ) );
 			memcpy( buf, w.src, ( w.chr == ',' ) ? w.size - 1 : w.size );
-			if ( strcmp( a, buf ) == 0 ) {
-				return 1;
-			}
+			if ( strcmp( a, buf ) == 0 ) return 1;
 		}
-	#endif
+#endif
 	}
 	return 0;
 }
 
 
 
-// Generate a list of routes from hashmap
+//Make a route list
 static int make_route_list ( zKeyval *kv, int i, void *p ) {
 	struct route_t *tt = (struct route_t *)p;
 	const int routes_wordlen = 6;
@@ -202,7 +227,7 @@ static int make_route_list ( zKeyval *kv, int i, void *p ) {
 
 
 
-// Create a list of resources mapped to models, views, etc
+//Create a list of resources (an alternate version of this will inherit everything) 
 static int make_mvc_list ( zKeyval *kv, int i, void *p ) {
 	struct mvc_t *tt = (struct mvc_t *)p;
 	char *key = NULL;
@@ -256,7 +281,7 @@ static int make_mvc_list ( zKeyval *kv, int i, void *p ) {
 
 
 
-// Destroy the above list
+//Free MVC list
 static void free_mvc_list ( void ***list ) {
 	for ( void **l = *list; l && *l; l++ ) {
 		free( *l );
@@ -266,7 +291,7 @@ static void free_mvc_list ( void ***list ) {
 
 
 
-// Destroy the route list
+//Free route list
 static void free_route_list ( struct iroute_t **list ) {
 	for ( struct iroute_t **l = list; *l; l++ ) {
 		free( (*l)->route ), free( *l );
@@ -276,7 +301,7 @@ static void free_route_list ( struct iroute_t **list ) {
 
 
 
-// Return NULL if there are no files
+//Return NULL if there are no files
 static struct dirent * dir_has_files ( DIR *dir ) {
 	int fcount = 0;
 	struct dirent *d = NULL;
@@ -292,7 +317,7 @@ static struct dirent * dir_has_files ( DIR *dir ) {
 
 
 
-// Load Lua configuration
+//Load Lua configuration
 static int load_lua_config( struct luadata_t *l ) {
 	char *db, *fqdn, cpath[ 2048 ] = { 0 };
 	DIR *dir = NULL;
@@ -425,7 +450,7 @@ static int load_lua_config( struct luadata_t *l ) {
 
 
 
-// Check the request path against entries in the "static" table of configuration file.
+//Checking for static paths is important, also need to check for disallowed paths
 static int path_is_static ( struct luadata_t *l ) {
 	int i, size, ulen = strlen( l->req->path );
 	if ( ( i = lt_geti( l->zconfig, "static" ) ) == -1 ) {
@@ -449,7 +474,7 @@ static int path_is_static ( struct luadata_t *l ) {
 
 
 
-// Send a file
+//Send a static file
 static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) {
 	//Read_file and return that...
 	struct stat sb;
@@ -461,14 +486,12 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 	snprintf( spath, sizeof( spath ) - 1, "%s/%s", dir, ++uri );
 
 	//Check if the path is there at all (read-file can't do this)
-	if ( stat( spath, &sb ) == -1 ) {
+	if ( stat( spath, &sb ) == -1 )
 		return http_error( res, 404, "File '%s' not found", spath );
-	}
 
 	//Get its mimetype
-	if ( !( mime = zmime_get_by_filename( spath ) ) ) {
+	if ( !( mime = zmime_get_by_filename( spath ) ) )
 		mime = zmime_get_default();
-	}
 #if 0
 	//write max should be checked.
 	//...
@@ -496,23 +519,22 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 	free( data );
 #else
 	//Open the file
-	if ( ( fd = open( spath, O_RDONLY ) ) == -1 ) {
+	if ( ( fd = open( spath, O_RDONLY ) ) == -1 ) 
 		return http_error( res, 404, strerror( errno ) );
-	}
 
 	//Prepare the message
-#if 1 
+	#if 1
 	//TODO: Enable non sendfile capable systems to be able to send a file the old crappy way.
 	res->atype = ZHTTP_MESSAGE_SENDFILE;
 	res->clen = sb.st_size;
 	res->fd = fd;
 	res->status = 200;
-#else
+	#else
 	http_set_fd( res, 200 ); 
 	http_set_content_length( res, sb.st_size ); 
 	http_set_message_type( res, ZHTTP_MESSAGE_SENDFILE ); 
 	http_set_status( res, 200 ); 
-#endif
+	#endif
 	http_set_ctype( res, mime->mimetype );
 
 	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
@@ -523,8 +545,17 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 }
 
 
+//...
+static void dump_records( struct HTTPRecord **r ) {
+	int b = 0;
+	for ( struct HTTPRecord **a = r; a && *a; a++ ) {
+		fprintf( stderr, "%p: %s -> ", *a, (*a)->field ); 
+		b = write( 2, (*a)->value, (*a)->size );
+		b = write( 2, "\n", 1 );
+	}
+}
 
-// Extract the path from an HTTP message
+
 static char * getpath( char *rp, char *ap, int destlen ) {
 	int pos = 0, len = strlen( rp );
 
@@ -544,8 +575,7 @@ static char * getpath( char *rp, char *ap, int destlen ) {
 }
 
 
-
-// Initialize routes in Lua
+//Initialize routes in Lua
 static int init_lua_routes ( struct luadata_t *l ) {
 	zWalker w = {0}, w2 = {0};
 	const char *active = NULL, *path = l->apath + 1, *resolved = l->rroute + 1;
@@ -619,7 +649,7 @@ static int init_lua_routes ( struct luadata_t *l ) {
 
 
 
-// Initialize HTTP in Lua
+//Initialize HTTP in Lua
 static int init_lua_request ( struct luadata_t *l ) {
 	//Loop through all things
 	const char *str[] = { "headers", "url" };
@@ -743,23 +773,18 @@ static int init_lua_request ( struct luadata_t *l ) {
 }
 
 
-
-// Add "shadowpath" to Lua context.
 static int init_lua_shadowpath ( struct luadata_t *l ) {
 	lua_pushstring( l->state, l->root );
 	return 1;	
 }
 
 
-
-// Turn configuration hash table into a Lua table. 
 static int init_lua_config ( struct luadata_t *l ) {
 	return ztable_to_lua( l->state, l->zconfig ); 
 }
 
 
-
-// Data to initialize global elements
+//Data to initialize global elements
 static struct lua_readonly_t {
 	const char *name;
 	int (*exec)( struct luadata_t * );
@@ -776,8 +801,6 @@ static struct lua_readonly_t {
 };
 
 
-
-// Free all of the Lua data within the current context
 static int free_ld ( struct luadata_t *l ) {
 	lua_close( l->state );
 	lt_free( l->zconfig ), free( l->zconfig );
@@ -788,15 +811,28 @@ static int free_ld ( struct luadata_t *l ) {
 }
 
 
+char * text_encode ( ztable_t *t ) {
+	char *c = malloc( 1 );
+	*c = '\0';
+	return c;
+}
 
-// Return a message in a serializable format
+
 static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 	char * content = NULL; 
 	const char *ctype = NULL;
 	int clen = 0;
 	zhttp_t *p = NULL;
 	
-	if ( t->ctype == CTYPE_JSON ) {
+	if ( 0 ) { ; }
+	#if 0
+	else if ( t->ctype == CTYPE_XML ) {
+		content = xml_encode( l->zmodel, "model" );
+		clen = strlen( content );
+		ctype = t->ctypename;
+	}
+	#endif
+	else if ( t->ctype == CTYPE_JSON ) {
 	#if 0
 		content = zjson_encode( l->zmodel, l->err, 1024 );
 	#else
@@ -813,26 +849,16 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 		clen = strlen( content );
 		ctype = t->ctypename;
 	}
-	#if 0
-	else if ( t->ctype == CTYPE_XML ) {
-		content = xml_encode( l->zmodel, "model" );
-		clen = strlen( content );
-		ctype = t->ctypename;
-	}
-	#endif
 	else {
-		// TODO: Come up with a better way to represent the model if neither JSON or 
-		// XML has been specified. 
-		content = malloc( 32 );
-		memset( content, 0, 32 );
-		snprintf( content, 31, "%p", l->zmodel );	
+		//TODO: This should handle the other types... 
+		content = text_encode( l->zmodel );
 		clen = strlen( content );
 		ctype = "text/plain";
 	}
 
 	l->res->clen = clen;
 	http_set_status( l->res, 200 ); 
-	http_set_ctype( l->res, ctype );
+	http_set_ctype( l->res, t->ctypename );
 	http_set_content( l->res, (unsigned char *)content, l->res->clen ); 
 
 	//Return the finished message if we got this far
@@ -844,7 +870,15 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 
 
 
-//
+
+//Check if the user asked to delay the response...
+static int delay_response ( struct luadata_t *l ) {
+	return 1;
+}
+
+
+
+//...
 static int return_as_response ( struct luadata_t *l ) {
 
 	ztable_t *rt = NULL;
@@ -1000,8 +1034,7 @@ static int return_as_response ( struct luadata_t *l ) {
 }
 
 
-
-// Compare the path against the instance routes
+//Compare the path against the instance routes
 int find_matching_route ( struct luadata_t *l ) {
 	ztable_t *t = NULL;
 	struct route_t p =  { 0 };
@@ -1037,9 +1070,7 @@ int find_matching_route ( struct luadata_t *l ) {
 }
 
 
-
-// Check if a particular route has any views
-static int has_views( struct imvc_t **list ) {
+int has_views( struct imvc_t **list ) {
 	for ( struct imvc_t **l = list; l && *l; l++ ) {
 		if ( *(*l)->file == 'v' ) return 1;
 	}
@@ -1047,9 +1078,9 @@ static int has_views( struct imvc_t **list ) {
 }
 
 
-
-// The entry point for a Lua application
-const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
+//The entry point for a Lua application
+//const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
+const int filter_lua( const server_t *serv, conn_t *conn ) {
 
 	FPRINTF( "Proc started\n" );
 
@@ -1059,15 +1090,18 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	int clen = 0, ccount = 0, tcount = 0, model = 0, view = 0;
 	unsigned char *content = NULL;
 
-	//Initialize the data structure
-	memset( res, 0, sizeof( zhttp_t ) );
-	ld.req = req, ld.res = res;
+	//Prepare the response
+	memset( conn->res, 0, sizeof( zhttp_t ) );
+
+	//Initialize Lua data structure
+	ld.req = conn->req; 
+	ld.res = conn->res;
 	ld.res->atype = ZHTTP_MESSAGE_MALLOC;
 	memcpy( (void *)ld.root, conn->hconfig->dir, strlen( conn->hconfig->dir ) );
 
 	//Then initialize the Lua state
 	if ( !( ld.state = luaL_newstate() ) ) {
-		return http_error( res, 500, "%s", "Failed to initialize Lua environment." );
+		return http_error( conn->res, 500, "%s", "Failed to initialize Lua environment." );
 	}
 
 	//Load the standard libraries first
@@ -1076,30 +1110,30 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	//Then load the Hypno extensions 
 	if ( !lua_loadlibs( ld.state, functions ) ) {
 		free_ld( &ld );
-		return http_error( res, 500, "Failed to initialize Lua standard libs." ); 
+		return http_error( conn->res, 500, "Failed to initialize Lua standard libs." ); 
 	}
 
 	//Then start loading our configuration
 	if ( !load_lua_config( &ld ) ) {
 		free_ld( &ld );
-		return http_error( res, 500, "%s\n", ld.err );
+		return http_error( conn->res, 500, "%s\n", ld.err );
 	}
 
 	//Need to delegate to static handler when request points to one of the static paths
 	if ( path_is_static( &ld ) ) {
 		free_ld( &ld );
-		return send_static( res, ld.root, req->path );
+		return send_static( conn->res, ld.root, conn->req->path );
 	}
 
 	//req->path needs to be modified to return just the path without the ?
-	if ( !getpath( req->path, (char *)ld.apath, LD_LEN ) ) {
+	if ( !getpath( conn->req->path, (char *)ld.apath, LD_LEN ) ) {
 		free_ld( &ld );
-		return http_error( res, 500, "%s", "Failed to extract path info into Lua userspace - Path too long, try increasing LD_LEN to fix this." );
+		return http_error( conn->res, 500, "%s", "Failed to extract path info into Lua userspace - Path too long, try increasing LD_LEN to fix this." );
 	}
 
 	if ( !find_matching_route( &ld ) ) {
 		free_ld( &ld );
-		return http_error( res, 404, "Couldn't find path at %s\n", ld.apath );
+		return http_error( conn->res, 404, "Couldn't find path at %s\n", ld.apath );
 	}
 
 	//Loop through the structure and add read-only structures to Lua, 
@@ -1107,7 +1141,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	for ( struct lua_readonly_t *t = lua_readonly; t->name; t++ ) {
 		if ( !t->exec( &ld ) ) {
 			free_ld( &ld );
-			return http_error( req, ld.status, ld.err );
+			return http_error( conn->req, ld.status, ld.err );
 		}
 		lua_setglobal( ld.state, t->name );
 	}
@@ -1157,7 +1191,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			FPRINTF( "Executing model %s\n", mpath );
 			if ( !lua_exec_file( ld.state, mpath, ld.err, sizeof( ld.err ) ) ) {
 				free_ld( &ld );
-				return http_error( res, 500, "Error occurred: %s", ld.err );
+				return http_error( conn->res, 500, "Error occurred: %s", ld.err );
 			}
 
 			//Get name of model file in question 
@@ -1187,7 +1221,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			if ( !eres ) {
 				free_ld( &ld );
 				FPRINTF( "Error when evaluating response table\n" );
-				return http_error( res, 500, ld.err );
+				return http_error( conn->res, 500, ld.err );
 			}
 			else if ( eres == 1 ) {
 				lua_pop( ld.state, 1 );
@@ -1236,13 +1270,13 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 		//Initialize a table
 		if ( !( ld.zmodel = lt_make( ( count = ( count < 1 ) ? 16 : count ) * 2 ) ) ) {
 			free_ld( &ld );
-			return http_error( res, 500, "Couldn't allocate table." );
+			return http_error( conn->res, 500, "Couldn't allocate table." );
 		}
 		
 		//Convert the model
 		if ( !lua_to_ztable( ld.state, 1, ld.zmodel ) ) {
 			free_ld( &ld );
-			return http_error( res, 500, "Error in model conversion." );
+			return http_error( conn->res, 500, "Error in model conversion." );
 		}
 
 		//TODO: Check for an inherited content-type then a default content-type
@@ -1258,7 +1292,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 							char err[ LD_ERRBUF_LEN ] = { 0 };
 							memcpy( err, ld.err, strlen( ld.err ) );
 							free_ld( &ld );
-							return http_error( res, 500, "%s", err );
+							return http_error( conn->res, 500, "%s", err );
 						}
 						free_ld( &ld );
 						return 1;
@@ -1274,7 +1308,7 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 				char err[ LD_ERRBUF_LEN ] = { 0 };
 				memcpy( err, ld.err, strlen( ld.err ) );
 				free_ld( &ld );
-				return http_error( res, 500, "%s", err );
+				return http_error( conn->res, 500, "%s", err );
 			}
 			free_ld( &ld );
 			return 1;
@@ -1304,14 +1338,14 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 			FPRINTF( "Loading view at: %s\n", vpath );
 			if ( !( src = read_file( vpath, &len, ld.err, LD_ERRBUF_LEN )	) || !len ) {
 				zrender_free( rz ), free( src ), free_ld( &ld );
-				return http_error( res, 500, "Error opening view '%s': %s", vpath, ld.err );
+				return http_error( conn->res, 500, "Error opening view '%s': %s", vpath, ld.err );
 			}
 
 			if ( !( render = zrender_render( rz, src, strlen((char *)src), &renlen ) ) ) {
 				char errbuf[ 2048 ] = { 0 };
 				snprintf( errbuf, sizeof( errbuf ), "%s", rz->errmsg );
 				zrender_free( rz ), free( src ), free_ld( &ld );
-				return http_error( res, 500, "%s", errbuf );
+				return http_error( conn->res, 500, "%s", errbuf );
 			}
 
 			zhttp_append_to_uint8t( &content, &clen, render, renlen ); 
@@ -1324,39 +1358,33 @@ const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 	if ( !model && !view ) {
 		//free( content );
 		free_ld( &ld );
-		return http_error( res, 500, "Neither model nor view was specified for '/%s'.", ld.aroute );
+		return http_error( conn->res, 500, "Neither model nor view was specified for '/%s'.", ld.aroute );
 	}
 
 	//Set needed info for the response structure
-	res->clen = clen;
-	http_set_status( res, 200 ); 
+	conn->res->clen = clen;
+	http_set_status( conn->res, 200 );
+	#if 0
+	// TODO: Something wonky lurks here.
 	http_set_ctype( res, ctype_def );
-	http_set_content( res, content, clen ); 
+	#else
+	char *ctype = zhttp_dupstr( ctype_def );
+	conn->res->ctype = ctype;
+	#endif
+	http_set_content( conn->res, content, clen ); 
 
 	//Return the finished message if we got this far
-	if ( !http_finalize_response( res, ld.err, LD_ERRBUF_LEN ) ) {
+	if ( !http_finalize_response( conn->res, ld.err, LD_ERRBUF_LEN ) ) {
 		free_ld( &ld );
-		return http_error( res, 500, "%s", ld.err );
+		return http_error( conn->res, 500, "%s", ld.err );
 	}
 
 	//Destroy model & Lua
-	free_ld( &ld ), free( content );
+	free( ctype );
+	free_ld( &ld );
+	free( content );
 	return 1;
 }
-
-
-
-#ifdef DEBUG_H
-//...
-static void dump_records( struct HTTPRecord **r ) {
-	int b = 0;
-	for ( struct HTTPRecord **a = r; a && *a; a++ ) {
-		fprintf( stderr, "%p: %s -> ", *a, (*a)->field ); 
-		b = write( 2, (*a)->value, (*a)->size );
-		b = write( 2, "\n", 1 );
-	}
-}
-#endif
 
 
 

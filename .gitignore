@@ -6,6 +6,8 @@ src.vim
 .src.vim
 configure.scan
 configure
+config.guess
+config.sub
 config.status
 *.log
 *.o
@@ -14,6 +16,7 @@ config.status
 *.patch
 Makefile.copy
 src/config.h
+etc.systemd.system.hypnotls.service
 
 autom4te.cache/
 artwork/

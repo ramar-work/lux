@@ -23,18 +23,25 @@
  * ------------------------------------------- */
 #include <time.h>
 #include <zhttp.h>
-#include <sys/socket.h>
-#include <sys/sendfile.h>
-#include "../server.h"
+#include "../server/server.h"
 #include "../config.h"
 
 #ifndef CTXHTTP_H
 #define CTXHTTP_H
-void create_notls ( void **p ); 
+
+#if 0
+int create_notls ( void **, char *, int ); 
 
 const int pre_notls ( int, zhttp_t *, zhttp_t *, struct cdata *);
 
 const int read_notls ( int, zhttp_t *, zhttp_t *, struct cdata *);
 
 const int write_notls ( int, zhttp_t *, zhttp_t *, struct cdata *);
+#else
+int create_notls ( server_t * );
+const int pre_notls ( server_t *, conn_t *);
+const int read_notls ( server_t *, conn_t *);
+const int write_notls ( server_t *, conn_t *);
+#endif
+
 #endif

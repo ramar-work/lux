@@ -41,9 +41,11 @@ struct lconfig {
 	char *dir;	
 	char *filter;	
 	char *root_default;	
-	char *ca_bundle;
+	//char *ca_bundle;
 	char *cert_file;
 	char *key_file;
+	int *tlserror;
+	int tlsready;
 };
 
 
@@ -61,11 +63,14 @@ int host_table_iterator ( zKeyval *, int, void * );
 
 void free_hosts ( struct lconfig ** );
 
-void dump_hosts ( struct lconfig ** );
-
-void dump_sconfig ( struct sconfig * );
-
 struct sconfig * build_server_config ( const char *, char *, int );
 
 void free_server_config( struct sconfig * );
+
+#ifdef DEBUG_H
+void dump_hosts ( struct lconfig ** );
+
+void dump_server_config( struct sconfig *sc );
+#endif
+
 #endif

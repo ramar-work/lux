@@ -45,11 +45,8 @@ SRC = \
 	@srcdir@/src/configs.c \
 	@srcdir@/src/lua.c \
 	@srcdir@/src/util.c \
-	@srcdir@/src/server.c \
 	@srcdir@/src/loader.c \
 	@srcdir@/src/log.c \
-	@srcdir@/src/ctx/ctx-http.c \
-	@srcdir@/src/ctx/ctx-https.c \
 	@srcdir@/src/lua/lib.c \
 	@srcdir@/src/lua/db.c \
 	@srcdir@/src/lua/lua.c \
@@ -60,11 +57,19 @@ SRC = \
 	@srcdir@/src/lua/hash.c \
 	@srcdir@/src/lua/enc.c \
 	@srcdir@/src/lua/dec.c \
-	@srcdir@/src/filters/filter-lua.c \
-	@srcdir@/src/filters/filter-static.c \
-	@srcdir@/src/filters/filter-echo.c \
-	@srcdir@/src/filters/filter-dirent.c \
-	@srcdir@/src/filters/filter-redirect.c 
+	@srcdir@/src/ctx/ctx-http.c \
+	@srcdir@/src/ctx/ctx-https.c \
+	@srcdir@/src/server/server.c \
+ 	@srcdir@/src/server/single.c \
+ 	@srcdir@/src/server/multithread.c \
+ 	@srcdir@/src/filters/filter-echo.c \
+	@srcdir@/src/filters/filter-lua.c
+
+#	@srcdir@/src/xml.c
+#	@srcdir@/src/filters/filter-static.c 
+#	@srcdir@/src/filters/filter-dirent.c 
+#	@srcdir@/src/filters/filter-redirect.c 
+
 OBJ = ${SRC:.c=.o}
 DEPS = @objdeps@
 UNAME = $(shell uname)
@@ -84,8 +89,11 @@ FILES = \
 main: $(DEPS) $(OBJ)
 	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
 	$(CC) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(DEPS) $(LDFLAGS)
-	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(DEPS) $(LDFLAGS)
 	$(CC) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(DEPS) $(LDFLAGS)
+
+# FIXME: Harness is totally broken right now...
+#testharness:
+#	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(DEPS) $(LDFLAGS)
 
 # debug - Builds code with debugging flags on (need logic for if CC == clang)
 # NOTE this only works with Clang atm: -g -O0 -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
@@ -102,7 +110,6 @@ filesystem-install:
 	echo 'Running filesystem-install...'
 	install -d $(PREFIX)/bin
 	install -m 0755 $(srcdir)/bin/hypno-cli $(PREFIX)/bin/
-	install -m 0755 $(srcdir)/bin/hypno-harness $(PREFIX)/bin/
 	install -m 0755 $(srcdir)/bin/hypno-server $(PREFIX)/bin/
 	install -d $(PREFIX)/share/$(BINNAME)
 	find $(srcdir)/share/ -maxdepth 1 -type f | \
@@ -132,7 +139,7 @@ systemd-install:
 		s#__LOGDIR__#$(LOGDIR)#g; \
 		s#__WWWROOT__#$(WWWROOT)#; \
 		s/__WWWPORT__/$(WWWPORT)/; \
-	}" $(srcdir)/etc/etc.systemd.system.hypno.service > $(SVCPATH)/$(BINNAME).service
+	}" $(srcdir)/etc/etc.systemd.system.hypnotls.service > $(SVCPATH)/$(BINNAME)tls.service
 
 # cygwin-install - Installs hypno as a service suitable for use with Cygwin 
 cygwin-install:
@@ -141,7 +148,6 @@ cygwin-install:
 # uninstall - Uninstalls hypno
 uninstall:
 	rm -f $(PREFIX)/bin/$(BINNAME)-cli
-	rm -f $(PREFIX)/bin/$(BINNAME)-harness
 	rm -f $(PREFIX)/bin/$(BINNAME)-server
 	rm -f $(SVCPATH)/$(BINNAME).service
 	rm -f /etc/$(BINNAME)/*

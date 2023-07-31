@@ -26,12 +26,6 @@ static void free_t( zTable *t ) {
 	}
 }
 
-void dump_sconfig ( struct sconfig *c ) {
-	//fprintf( stderr, "path: %s\n", c->path );
-	fprintf( stderr, "wwwroot: %s\n", c->wwwroot );
-	fprintf( stderr, "hosts: %p\n", c->hosts );
-	fprintf( stderr, "src: %p\n", c->src );
-}
 
 //A hosts handler
 static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
@@ -51,7 +45,7 @@ static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
 			{ "dir", "s", .v.s = &w->dir },
 			{ "filter", "s", .v.s = &w->filter },
 			{ "root_default", "s", .v.s = &w->root_default },
-			{ "ca_bundle", "s", .v.s = &w->ca_bundle },
+			//{ "ca_bundle", "s", .v.s = &w->ca_bundle },
 			{ "cert_file", "s", .v.s = &w->cert_file },
 			{ "key_file", "s", .v.s = &w->key_file },
 			{ NULL }
@@ -109,7 +103,7 @@ void free_hosts ( struct lconfig ** hlist ) {
 		free( (*hosts)->dir );
 		free( (*hosts)->filter );
 		free( (*hosts)->root_default );
-		free( (*hosts)->ca_bundle );
+		//free( (*hosts)->ca_bundle );
 		free( (*hosts)->cert_file );
 		free( (*hosts)->key_file );
 
@@ -121,20 +115,6 @@ void free_hosts ( struct lconfig ** hlist ) {
 	free( hlist );
 }
 
-
-//Dump the host list
-void dump_hosts ( struct lconfig **hosts ) {
-	struct lconfig **r = hosts;
-	fprintf( stderr, "Hosts:\n" );
-	while ( r && *r ) {
-		fprintf( stderr, "\t%p => ", *r );
-		fprintf( stderr, "%s =>\n", (*r)->name );
-		fprintf( stderr, "\t\tdir = %s\n", (*r)->dir );
-		fprintf( stderr, "\t\talias = %s\n", (*r)->alias );
-		fprintf( stderr, "\t\tfilter = %s\n", (*r)->filter );
-		r++;
-	}
-}
 
 
 //...
@@ -258,7 +238,8 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 	return config;
 }
 
-//build_site_config or get_site_config
+
+
 
 //Destroy the server oonfig file.
 void free_server_config( struct sconfig *config ) {
@@ -283,3 +264,42 @@ void free_server_config( struct sconfig *config ) {
 	free( config->src );
 	free( config );
 }
+
+
+
+#ifdef DEBUG_H
+// Dump the entire server configuration 
+void dump_server_config( struct sconfig *sc ) {
+	if ( !sc ) {
+		return;
+	}
+
+	fprintf( stderr, "server->wwwroot: (%p) %s\n", sc->wwwroot, sc->wwwroot );
+	fprintf( stderr, "server->src: (%p)\n", sc->src );
+	fprintf( stderr, "server->hosts: (%p)\n", sc->hosts );
+
+	if ( sc->hosts ) { 
+		dump_hosts( sc->hosts );
+	}
+
+	return;
+}
+
+
+
+// Dump the host list
+void dump_hosts ( struct lconfig **hosts ) {
+	struct lconfig **r = hosts;
+	fprintf( stderr, "Hosts:\n" );
+	while ( r && *r ) {
+		fprintf( stderr, "\t%p => ", *r );
+		fprintf( stderr, "%s =>\n", (*r)->name );
+		fprintf( stderr, "\t\tdir = %s\n", (*r)->dir );
+		fprintf( stderr, "\t\talias = %s\n", (*r)->alias );
+		fprintf( stderr, "\t\tfilter = %s\n", (*r)->filter );
+		r++;
+	}
+}
+
+
+#endif

@@ -38,29 +38,36 @@
 #include <signal.h>
 #include <strings.h>
 #include <string.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <arpa/inet.h>
 #include <pwd.h>
 #include <pthread.h>
 #include "../config.h"
 #include "../log.h"
-#include "../server.h"
+#include "../server/server.h"
+#if 0
 #include "../filters/filter-static.h"
-#include "../filters/filter-echo.h"
 #include "../filters/filter-dirent.h"
 #include "../filters/filter-redirect.h"
+#endif
+#include "../filters/filter-echo.h"
 #include "../filters/filter-lua.h"
 #include "../ctx/ctx-http.h"
 #include "cliutils.h"
+
+// New server types
+#include "../server/multithread.h"
+#include "../server/single.h"
+
 
 #ifndef DISABLE_TLS
  #include "../ctx/ctx-https.h"
 #endif
 
 #ifndef NO_DNS_SUPPORT
- #include "../ctx/ctx-dns.h"
+ //#include "../ctx/ctx-dns.h"
 #endif
 
 #ifndef PIDDIR
@@ -109,6 +116,16 @@
 	fprintf( stderr, "\n" ) \
 	) ? 0 : 0
 
+
+#ifdef LEAKTEST_H
+ #ifndef LEAKLIMIT
+	#define LEAKLIMIT 64
+ #endif
+ #define CONN_CLOSE 1
+#else
+ #define CONN_CLOSE 0 
+#endif
+
 const int defport = 2000;
 
 char * logfile = "/var/log/hypno-error.log";
@@ -125,6 +142,7 @@ FILE * logfd = NULL, * accessfd = NULL;
 
 struct senderrecvr *ctx = NULL;
 
+#if 0
 struct threadinfo_t {
 	int fd;
 	char running;	
@@ -135,6 +153,7 @@ struct threadinfo_t {
 	struct timespec end;
 #endif	
 } fds[ MAX_THREADS ] = { { -1, 0, -1, { 0 } } };
+#endif
 
 struct values {
 	int port;
@@ -169,12 +188,16 @@ struct values {
 
 
 //Define a list of filters
-struct filter http_filters[16] = { 
+struct filter http_filters[] = { 
+#if 0
 	{ "static", filter_static }
-,	{ "echo", filter_echo }
 ,	{ "dirent", filter_dirent }
 ,	{ "redirect", filter_redirect }
-,	{ "lua", filter_lua }
+#endif
+  { "lua", filter_lua }
+, { "echo", filter_echo }
+, { NULL }
+#if 0
 , { NULL }
 , { NULL }
 , { NULL }
@@ -186,6 +209,9 @@ struct filter http_filters[16] = {
 , { NULL }
 , { NULL }
 , { NULL }
+, { NULL }
+, { NULL }
+#endif
 };
 
 
@@ -200,12 +226,15 @@ int procpid = 0;
 
 int fdset[ 10 ] = { -1 };
 
+// TODO: Move me to src/ctx/mock.c
 //In lieu of an actual ctx object, we do this to mock pre & post which don't exist
-const int fkctpre( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c ) {
+const int fkctpre( server_t *, conn_t * ) {
 	return 1;
 }
 
-const int fkctpost( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c) {
+// TODO: Move me to src/ctx/mock.c
+//const int fkctpost( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c) {
+const int fkctpost( server_t *, conn_t * ) {
 	return 1;
 }
 
@@ -292,25 +321,25 @@ static int findex() {
 #endif
 
 struct filter dns_filters[] = {
-	{ "dns", NULL }
-, { NULL }
+	{ "dns", NULL },
+	{ NULL }
 };
 
 //Define a list of "context types"
 struct senderrecvr sr[] = {
+#if 0
+	{ "http", read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost },
+#endif
 #if 1
-	{ read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost, http_filters, "http"  }
+	{ "https", read_gnutls, write_gnutls, create_gnutls, free_gnutls, pre_gnutls, post_gnutls },
 #endif
 #if 0
-, { read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls }
+	{ "dns", read_dns, write_dns, create_dns, NULL, pre_dns, post_dns },
 #endif
 #if 0
-, { read_dns, write_dns, create_dns, NULL, pre_dns, post_dns }
+	{ "rtmp", read_rtmp, write_rtmp, create_rtmp, NULL, pre_rtmp, post_rtmp },
 #endif
-#if 0
-, { read_rtmp, write_rtmp, create_rtmp, NULL, pre_rtmp, post_rtmp }
-#endif
-,	{ NULL }
+	{ NULL }
 };
 
 
@@ -447,61 +476,65 @@ void see_runas_user ( struct values *v ) {
 #endif
 
 
-// This can be refactored to do something else...
-void * run_srv_cycle( void *t ) {
-	struct cdata conn = { .ctx = ctx, .flags = O_NONBLOCK };
-#ifndef REAPING_THREADS
-	int fd = *(int *)t;
-#else
-	struct threadinfo_t *tt = (struct threadinfo_t *)t; 
-	int fd = tt->fd;
-	tt->running = 1;
-#endif
 
-	for ( ;; ) {
-		//additionally, this one should block
-		if ( !srv_response( fd, &conn ) ) {
-			//TODO: What exactly causes this?
-			FPRINTF( "Error in TCP socket handling.\n" );
-			//I don't what this means...
-		}
-
-		if ( conn.count < 0 || conn.count > 5 ) {
-			FPRINTF( "Closing connection marked by descriptor %d to peer.\n", fd );
-			if ( close( fd ) == -1 ) {
-				FPRINTF( "Error when closing child socket.\n" );
-				//TODO: You need to handle this and retry closing to regain resources
-			}
-			FPRINTF( "Connection is done. count is %d\n", conn.count );
-			FPRINTF( "returning NULL.\n" );
-			tt->running = 0;
-			return 0;
-		}
-	}
-
-	FPRINTF( "Child process is exiting.\n" );
-	tt->running = 0;
-	return 0;
-}
-
-
-//Loop should be extracted out
+// Run a server
 int cmd_server ( struct values *v, char *err, int errlen ) {
+	
+	// Define all we need
+	struct sockaddr_in sa, *si = &sa;
+	//short unsigned int port = v->port, *pport = &port;
+	//short unsigned int *pport = NULL;
+	//int server.fd = 0;
+	//int backlog = BACKLOG;
+	int on = 1;
 
-	//Initialize server context
-	//struct senderrecvr *ctx = NULL;
-	ctx = &sr[ 0 ]; // v->ssl	
-	ctx->init( &ctx->data );
-	ctx->config = v->config;
-	//ctx->filters = http_filters;
+	// Prep this
+	server_t server; 
+	server.ctx = &sr[ 0 ];
+	server.fd = -1;
+	server.data = NULL;
+	server.fdset = NULL;
+	server.port = v->port; 
+	server.backlog = BACKLOG;
+	server.filters = http_filters;
+	short unsigned int port = server.port, *pport = &port;
+	//*pport = server.port;
+
+	// Logging functions are now a context of their own.
+	// But locking will most likely be needed, so either
+	// set those functions here, or only let the parent have
+	// control. 
+	// server.log = -1;
+	// server.access = -1;
+
+	// TODO: Come back to this...
+	// server.filters = -1;
+
+	// Prep the timers and mark the start time 
+	//memset( &server.start, 0, sizeof( struct timespec ) );
+	//memset( &server.end, 0, sizeof( struct timespec ) );
+	//clock_gettime( CLOCK_REALTIME, &server.start ); 
 
 	//Die if config is null or file not there 
-	if ( !ctx->config ) {
-		snprintf( err, errlen, "No config specified...\n" );
+	if ( !( server.conffile = v->config ) ) {
+		snprintf( err, errlen, "No server configuration file specified...\n" );
 		return 0;
 	}
 
-#if 0
+	//Build the server configuration if possible
+	//TODO: move 'build_server_config' to server.c
+	if ( !( server.config = build_server_config( server.conffile, err, errlen ) ) ) {
+		return 0;
+	}
+
+	//Initialize server protocol
+	if ( !server.ctx->init( &server ) ) {
+		free_server_config( server.config );
+		snprintf( err, errlen, "Initializing protocol '%s' failed: %s\n", server.ctx->name, server.err );
+		return 0;
+	}
+
+  #if 0
 	//Init logging and access structures too
 	struct log *al = &loggers[ 0 ], *el = &loggers[ 0 ];
 	
@@ -509,78 +542,73 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		snprintf( err, errlen, "Could not open error log handle at %s - %s\n", v->logfile, el->handler() );
 		return 0;
 	}
+  #else
+	// Open a log file here
+	if ( !( logfd = fopen( v->logfile, "a" ) ) ) {
+		return eprintf( "Couldn't open error log file at: %s...\n", logfile );
+	}
+  #endif
 
+  #if 0
 	if ( !al->open( v->accessfile, &al->data ) ) {
 		snprintf( err, errlen, "Could not open access log handle at %s - %s\n", v->accessfile, al->handler() );
 		return 0;
 	}
-#endif
-
-	//Open a log file here
-	if ( !( logfd = fopen( v->logfile, "a" ) ) ) {
-		return eprintf( "Couldn't open error log file at: %s...\n", logfile );
-	}
-
-	//Open an access file too 
+  #else
+	// Open an access file too 
 	if ( !( accessfd = fopen( v->accessfile, "a" ) ) ) {
 		return eprintf( "Couldn't open access log file at: %s...\n", accessfile );
 	}
+  #endif
 
-	//Setup and open a TCP socket
-	struct sockaddr_in sa, *si = &sa;
-	short unsigned int port = v->port, *pport = &port;
-	int listen_fd = 0;
-	int backlog = BACKLOG;
-	int on = 1;
-	pthread_attr_t attr;
-
+	// Setup and open a TCP socket
 	si->sin_family = PF_INET; 
 	si->sin_port = htons( *pport );
 	(&si->sin_addr)->s_addr = htonl( INADDR_ANY );
 
-	if (( fdset[0] = listen_fd = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1 ) {
+	if (( fdset[0] = server.fd = socket( PF_INET, SOCK_STREAM, IPPROTO_TCP )) == -1 ) {
 		snprintf( err, errlen, "Couldn't open socket! Error: %s\n", strerror( errno ) );
 		fprintf( logfd, "%s", err );
 		return 0;
 	}
 
-	if ( setsockopt( listen_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on) ) == -1 ) {
+	if ( setsockopt( server.fd, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on) ) == -1 ) {
 		snprintf( err, errlen, "Couldn't set socket to reusable! Error: %s\n", strerror( errno ) );
 		fprintf( logfd, "%s", err );
 		return 0;
 	}
 
-	#if 0
+  #if 0
 	//This may only be valid via BSD
-	if ( setsockopt( listen_fd, SOL_SOCKET, SO_NOSIGPIPE, (char *)&on, sizeof(on) ) == -1 ) {
+	if ( setsockopt( server.fd, SOL_SOCKET, SO_NOSIGPIPE, (char *)&on, sizeof(on) ) == -1 ) {
 		snprintf( err, errlen, "Couldn't set socket sigpipe behavior! Error: %s\n", strerror( errno ) );
 		fprintf( logfd, "%s", err );
 		return 0;
 	}
-	#endif
+  #endif
 
-	/*
-	if ( fcntl( listen_fd, F_SETFD, O_NONBLOCK ) == -1 ) {
+  #if 1
+	if ( fcntl( server.fd, F_SETFD, O_NONBLOCK ) == -1 ) {
 		snprintf( err, errlen, "fcntl error: %s\n", strerror(errno) ); 
 		fprintf( logfd, "%s", err );
 		return 0;
 	}
-	*/
-
-	//One of these two should set non blocking functionality
-	if ( ioctl( listen_fd, FIONBIO, (char *)&on ) == -1 ) {
+  #else
+	// One of these two should set non blocking functionality
+	if ( ioctl( server.fd, FIONBIO, (char *)&on ) == -1 ) {
 		snprintf( err, errlen, "fcntl error: %s\n", strerror(errno) ); 
 		fprintf( logfd, "%s", err );
 		return 0;
 	}
+  #endif
 
-	if ( bind( listen_fd, (struct sockaddr *)si, sizeof(struct sockaddr_in)) == -1 ) {
+	if ( bind( server.fd, (struct sockaddr *)si, sizeof(struct sockaddr_in)) == -1 ) {
 		snprintf( err, errlen, "Couldn't bind socket to address! Error: %s\n", strerror( errno ) );
 		fprintf( logfd, "%s", err );
 		return 0;
 	}
 
-	if ( listen( listen_fd, BACKLOG) == -1 ) {
+	if ( listen( server.fd, server.backlog ) == -1 ) {
 		snprintf( err, errlen, "Couldn't listen for connections! Error: %s\n", strerror( errno ) );
 		fprintf( logfd, "%s", err );
 		return 0;
@@ -638,11 +666,20 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 	#if 0
 	if ( signal( SIGSEGV, SIG_IGN ) == SIG_ERR ) {
-		snprintf( err, errlen, "Failed to set SIGCHLD\n" );
+		snprintf( err, errlen, "Failed to set SIGSEGV\n" );
 		fprintf( logfd, "%s", err );
 		return 0;
 	}
 	#endif
+
+#if 1
+   #if 0
+	srv_single( &server );
+   #endif
+   #if 1
+	srv_multithread( &server );
+   #endif
+#else
 
 	//Initialize thread attribute thing
 	if ( pthread_attr_init( &attr ) != 0 ) {
@@ -656,9 +693,11 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		return 0;	
 	}
 
-
-	// Server loop
+  #ifdef LEAKTEST_H
+	for ( int fd, count = 0, i = 0; i < LEAKLIMIT; i++ ) { 
+  #else
 	for ( int fd = 0, count = 0; ; ) {
+  #endif
 		//Client address and length?
 		char ip[ 128 ] = { 0 };
 		struct threadinfo_t *f = &fds[ count ];
@@ -666,7 +705,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		socklen_t addrlen = sizeof( addrinfo );
 
 		//Accept a new connection	
-		if ( ( f->fd = accept( listen_fd, (struct sockaddr *)&addrinfo, &addrlen ) ) == -1 ) {
+		if ( ( f->fd = accept( server.fd, (struct sockaddr *)&addrinfo, &addrlen ) ) == -1 ) {
 			//TODO: Need to check if the socket was non-blocking or not...
 			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				//This should just try to read again
@@ -704,10 +743,8 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		//Populate any other thread data
 	#ifndef REAPING_THREADS 
 		FPRINTF( "IP addr is: %s\n", ip );
-		FPRINTF( "IP addr is: %s\n", ip );
 	#else
 		memcpy( f->ipaddr, ip, sizeof( ip ) );
-		FPRINTF( "IP addr is: %s\n", ip );
 		FPRINTF( "IP addr is: %s\n", ip );
 	#endif
 
@@ -742,6 +779,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	#endif
 		FPRINTF( "Waiting for next connection.\n" );
 	}
+  #endif
 
 	if ( accessfd ) {
 		fclose( accessfd ); 
@@ -753,11 +791,15 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 		logfd = NULL;
 	}
 
-	if ( close( listen_fd ) == -1 ) {
+	if ( close( server.fd ) == -1 ) {
 		FPRINTF( "FAILURE: Couldn't close parent socket. Error: %s\n", err );
 		return 0;
 	}
 
+
+	//TODO: Free whatever was allocated at ctx->init()
+	server.ctx->free( &server );
+	free_server_config( server.config );
 	return 1;
 }
 
@@ -845,6 +887,10 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 #ifdef HBLOCK_H
 	fprintf( stderr, "Running in blocking mode (NOTE: Performance will suffer, only use this for testing).\n" );
 #endif
+#ifdef LEAKTEST_H
+ 	fprintf( stderr, "Leak testing is enabled, server will stop after %d requests.\n",
+		LEAKLIMIT ); 
+#endif
 
 	fprintf( stderr, "Filters enabled:\n" );
 	for ( struct filter *f = http_filters; f->name; f++ ) {
@@ -859,12 +905,29 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 		}
 	}
 
+#if 1
 	if ( isLuaEnabled ) {
 		fprintf( stderr, "Lua modules enabled:\n" );
 		for ( struct lua_fset *f = functions; f->namespace; f++ ) {
 			fprintf( stderr, "[ %-16s ] %p\n", f->namespace, f->functions ); 
 		} 
 	}
+#endif
+
+
+#if 0
+	// TODO: Should only be supported in debug mode.
+	// TODO: Also should be a bit shorter...
+	// TODO: Also should only display if TLS is enabled...
+	if ( 1 ) {
+		fprintf( stderr, "GnuTLS supported ciphersuites\n" );
+		fprintf( stderr, "=============================\n" );
+		for ( const gnutls_cipher_algorithm_t *cip = gnutls_cipher_list(); cip && *cip; cip++ ) {
+			const char *cname = gnutls_cipher_get_name( *cip );
+			fprintf( stderr, "%s\n", cname );
+		}
+	}
+#endif
 	return 1;
 }
 
@@ -884,7 +947,7 @@ void print_options ( struct values *v ) {
 
 
 
-int main (int argc, char *argv[]) {
+int main ( int argc, char *argv[] ) {
 	char err[ 2048 ] = { 0 };
 	int *port = NULL; 
 	struct values v = { 0 };

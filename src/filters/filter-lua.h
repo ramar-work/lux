@@ -31,11 +31,11 @@
 #include <stdarg.h>
 #include <router.h>
 #include <dirent.h>
+#include <zjson.h>
 #include "../util.h"
-#include "../server.h"
+#include "../server/server.h"
 #include "../lua.h"
 #include "../lua/lib.h"
-#include <zjson.h>
 #include "../mime.h"
 
 #ifndef FILTER_LUA_H
@@ -94,6 +94,6 @@ struct luadata_t {
 	char err[ LD_ERRBUF_LEN ];
 };
 
-const int filter_lua
-( int , zhttp_t *, zhttp_t *, struct cdata * );
+//const int filter_lua( int , zhttp_t *, zhttp_t *, struct cdata * );
+const int filter_lua( const server_t *, conn_t * );
 #endif

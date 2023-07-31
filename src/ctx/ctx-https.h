@@ -21,12 +21,10 @@
  * - 
  * ------------------------------------------- */
 #include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/sendfile.h>
 #include <stddef.h>
 #include <zwalker.h>
 #include <ztable.h>
-#include "../server.h"
+#include "../server/server.h"
 #include "../util.h"
 #include "../config.h"
 
@@ -41,6 +39,7 @@
 #if !defined(DISABLE_TLS) && !defined(CTXHTTPS_H)
  #include <gnutls/gnutls.h>
  #define CTXHTTPS_H
+ #define CTXHTTPS_SNI_LENGTH 256
 
 #if 0
 #if 1
@@ -59,29 +58,37 @@
 #endif
 #endif
 
+
+// NOTE: Current size is 280 bytes.
 struct gnutls_abstr {
-	gnutls_certificate_credentials_t x509_cred;
-  gnutls_priority_t priority_cache;
+	gnutls_certificate_credentials_t creds;
+	gnutls_certificate_credentials_t *cbob;
+	gnutls_priority_t pcache;
 	gnutls_session_t session;
-	char sniname[ 4096 ]; // The SNI name?
 #if 0
+	// Runs one host at a time, so it's ok if these map one to one
 	const char *cafile;
 	const char *crlfile; 
 	const char *cert_file;
 	const char *key_file;
 #endif
+	char sniname[ CTXHTTPS_SNI_LENGTH ]; // The SNI name?
 };
 
+#if 0
 const int pre_gnutls ( int, zhttp_t *, zhttp_t *, struct cdata *);
-
 const int post_gnutls ( int, zhttp_t *, zhttp_t *, struct cdata *);
-
 const int read_gnutls ( int, zhttp_t *, zhttp_t *, struct cdata *);
-
 const int write_gnutls ( int, zhttp_t *, zhttp_t *, struct cdata *);
+int create_gnutls( void **, char *, int );
+void free_gnutls( void **p );
+#endif
 
-void create_gnutls( void ** );
-
-void free_gnults( void **p );
+const int pre_gnutls ( server_t *, conn_t * );
+const int post_gnutls ( server_t *, conn_t * );
+const int read_gnutls ( server_t *, conn_t * );
+const int write_gnutls ( server_t *, conn_t * );
+int create_gnutls( server_t * );
+void free_gnutls( server_t * );
 //#endif
 #endif

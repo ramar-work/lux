@@ -26,11 +26,11 @@
 #include <zhttp.h>
 #include "../mime.h"
 #include "../util.h"
-#include "../server.h"
+#include "../server/server.h"
 
 #ifndef FILTER_ECHO_H
 #define FILTER_ECHO_H
 
-const int filter_echo ( int, zhttp_t *, zhttp_t *, struct cdata * );
+const int filter_echo ( const server_t *, conn_t * );
 
 #endif

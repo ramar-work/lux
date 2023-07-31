@@ -31,7 +31,7 @@
 #include <lualib.h>
 #include <lauxlib.h>
 #include "../util.h"
-#include "../server.h"
+#include "../server/server.h"
 #include "../filters/filter-static.h"
 #include "../filters/filter-echo.h"
 #include "../filters/filter-dirent.h"

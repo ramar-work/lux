@@ -28,31 +28,30 @@
 
 
 
-const int filter_echo ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
+const int filter_echo ( const server_t *p, conn_t *conn ) {
 
 	//Allocate a big buffer and do work
-	char err[ 2048 ] = { 0 };
 	const char urlfmt[] = "<h2>URL</h2>\n%s<br>\n";
 	uint8_t *buf = NULL;
 	int bl = 0, progress = 0;
 	struct n { const char *name; zhttpr_t **records; } **ttt = 
 	(struct n *[]){
-		&(struct n){ "Headers", rq->headers },
-		&(struct n){ "GET", rq->url },
-		&(struct n){ "POST", rq->body },
+		&(struct n){ "Headers", conn->req->headers },
+		&(struct n){ "GET", conn->req->url },
+		&(struct n){ "POST", conn->req->body },
 		NULL
 	};
 
 	//Sanity checks
-	if ( !rq->path || !( bl = ( sizeof(urlfmt) - 1 ) + strlen( rq->path ) ) )
-		return http_set_error( rs, 500, "Path cannot be zero..." );
+	if ( !conn->req->path || !( bl = ( sizeof(urlfmt) - 1 ) + strlen( conn->req->path ) ) )
+		return http_set_error( conn->res, 500, "Path cannot be zero..." );
 
 	//Reallocate a buffer
 	if ( !( buf = realloc( buf, bl ) ) || !memset( buf, 0, bl ) )
-		return http_set_error( rs, 500, strerror( errno ) );
+		return http_set_error( conn->res, 500, strerror( errno ) );
 
-	if ( ( bl = snprintf( (char *)buf, bl, urlfmt, rq->path )) == -1 )
-		return http_set_error( rs, 500, "Failed to zero memory..." );
+	if ( ( bl = snprintf( (char *)buf, bl, urlfmt, conn->req->path )) == -1 )
+		return http_set_error( conn->res, 500, "Failed to zero memory..." );
 
 	//Switch to whiles, b/c it's just easier to follow...
 	while ( ttt && *ttt ) {
@@ -75,13 +74,13 @@ const int filter_echo ( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 	}
 
 	//Package a message
-	http_set_status( rs, 200 );
-	http_set_ctype( rs, "text/html" );
-	http_set_content( rs, buf, bl );
+	http_set_status( conn->res, 200 );
+	http_set_ctype( conn->res, "text/html" );
+	http_set_content( conn->res, buf, bl );
 
-	if ( !http_finalize_response( rs, err, sizeof(err) ) ) {
+	if ( !http_finalize_response( conn->res, conn->err, sizeof( conn->err ) ) ) {
 		free( buf );
-		return http_set_error( rs, 500, err );
+		return http_set_error( conn->res, 500, conn->err );
 	}
 
 	return 1;

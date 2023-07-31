@@ -288,7 +288,7 @@ typedef struct HTTPBody {
 #endif
 	int clen;  //content length
 	int mlen;  //message length (length of the entire received message)
-	int	hlen;  //header length
+	int hlen;  //header length
 	int status; //what was this?
 	int port; //what was this?
 #if 0
