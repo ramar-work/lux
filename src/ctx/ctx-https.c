@@ -785,7 +785,7 @@ const int post_gnutls ( server_t *p, conn_t *conn ) {
 	// Close TLS sesssion
 	struct gnutls_abstr *g = (struct gnutls_abstr *)conn->data;
 	int stat = 0;
-	if ( ( stat = gnutls_bye( g->session, GNUTLS_SHUT_WR ) ) < 0 ) {
+	if ( ( stat = gnutls_bye( g->session, GNUTLS_SHUT_RDWR ) ) < 0 ) {
 		FPRINTF( "Could not shut down GnuTLS connection: %s.\n", gnutls_strerror( stat ) );
 	}
 

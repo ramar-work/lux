@@ -195,6 +195,9 @@ typedef struct server_t {
 
 	int errlen;
 
+	// Catch an interrupt
+	int interrupt;
+
 #ifdef DEBUG_H
 	int tapout;
 #endif

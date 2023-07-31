@@ -1,54 +1,20 @@
 #include "multithread.h"
 
-
-
+// TODO: Use conn_t instead of this
 struct threadinfo_t _fds[ MAX_THREADS ] = { { -1, 0, -1, { 0 } } };
 
-
-//
-static void timer_expired( union sigval td ) {
-	int status = 0;
-	struct threadinfo_t *tt = (struct threadinfo_t *)td.sival_ptr;	
-#if 1
-FPRINTF( "=================================\n" );
-FPRINTF( "\n" );
-FPRINTF( "TIMER EXPIRED....\n" );
-FPRINTF( "\n" );
-FPRINTF( "=================================\n" );
-#endif
-	tt->running = 0;
-
-#if 0
-	// Check if it's "busy" or just flush everything
-	if ( ( status = ioctl( tt->fd, I_FLUSH, FLUSHRW ) ) == -1 ) {
-FPRINTF( "=================================\n" );
-FPRINTF( "\n" );
-FPRINTF( "FAILED TO RUN IOCTL: %s....\n", strerror( status )  );
-FPRINTF( "\n" );
-FPRINTF( "=================================\n" );
-
-	}
-#endif
-	// You would need to do ctx->post
-
-	// and then close the file...
-	//close( tt->fd );	
-	//tt->fd = -1; 	
-}
-
-
+// Wait one second between
+static const struct timespec __interval__ = { 1, 0 };
 
 // A server as a function for pthread_create 
 static void * server_proc( void *t ) {
 	//struct cdata conn = { .ctx = ctx, .flags = O_NONBLOCK };
 	//struct cdata conn = { .ctx = f->ctx, .flags = O_NONBLOCK };
 	struct threadinfo_t *tt = (struct threadinfo_t *)t; 
-	fprintf( stderr, "THREAD DATA %p\n", tt );
-	tt->running = 1;
+	tt->running = THREAD_ACTIVE;
 	//struct threadinfo_t *f = (struct threadinfo_t *)t;	
 	//struct cdata conn = { .ctx = tt->ctx, .flags = O_NONBLOCK };
 	server_t *p = tt->server;
-	fprintf( stderr, "CTX DATA %p\n", p->ctx );
 
 	// Set up ocnnection data;
 	conn_t conn = {0};
@@ -61,37 +27,6 @@ static void * server_proc( void *t ) {
 
 	// TODO: Remove this, and use the conn structure directly
 	memcpy( conn.ipv4, tt->ipaddr, strlen( tt->ipaddr ) );
-
-#if 0
-	// Set a timer for 30 seconds (eventually, set from cli or config or something)
-	struct itimerspec tv = { 
-		.it_value.tv_sec = p->timeout,
-		.it_value.tv_nsec = 0,
-		.it_interval.tv_sec = 0,
-		.it_interval.tv_sec = 0,
-	};
-	
-	//You need to set a timer that will trigger and shut off when we reach a certain time
-	int timer, status;
-	timer_t timer_id = 0;
-	struct sigevent evt = { 0 };
-	evt.sigev_notify = SIGEV_THREAD;
-	evt.sigev_notify_function = timer_expired;
-	evt.sigev_value.sival_ptr = tt;
-
-	if ( ( timer = timer_create( CLOCK_REALTIME, &evt, &timer_id ) ) != 0 ) {
-		snprintf( conn.err, sizeof( conn.err ), "Error in timer_create: %s\n", strerror( errno ) );
-		//pthread_exit( 0 );
-		return 0;
-	}
-
-	// Start the timer
-	if ( ( status = timer_settime( timer_id, 0, &tv, NULL )	) != 0 ) {
-		snprintf( conn.err, sizeof( conn.err ), "Error in timer_settime: %s\n", strerror( errno ) );
-		//pthread_exit( 0 );
-		return 0;
-	}
-#endif
 
 	// Send a response
 	if ( !srv_response( p, &conn ) ) {
@@ -107,14 +42,7 @@ static void * server_proc( void *t ) {
 		FPRINTF( conn.err );
 	}
 
-  #if 0
-	//Delete the timer
-	if ( timer_delete( timer_id ) == -1 ) {
-		snprintf( conn.err, sizeof( conn.err ), "Error deleting timer: %s\n", strerror( errno ) );
-		FPRINTF( conn.err );
-		return 0;
-	}
-
+	#if 0
 	// Manage long running connections
 	if ( close( fd ) == -1 ) {
 		FPRINTF( "Error when closing child socket.\n" );
@@ -133,29 +61,50 @@ static void * server_proc( void *t ) {
 			}
 			FPRINTF( "Connection is done. count is %d\n", conn.count );
 			FPRINTF( "returning NULL.\n" );
-			tt->running = 0;
+			tt->running = THREAD_INACTIVE;
 			return 0;
 		}
 	}
-  #endif
+	#endif
 	FPRINTF( "Child process is exiting.\n" );
-	tt->running = 0;
+	tt->running = THREAD_INACTIVE;
 
 	// For right now, this will prevent high memory usage...
-	//pthread_exit( 0 );
 	return 0;
 }
 
 
 // EINTR will handle hangups
+#if 0
+	// Make a note of what the current count is
+	for ( int top = count, i = top; i > -1; i-- ) {
+		if ( _fds[ i ].running == THREAD_AVAILABLE )
+			connindex = i;
+		else if ( _fds[ i ].running == THREAD_INACTIVE ) {
+			// Minus one client
+			count--;
+			connindex = i;
+			_fds[ i ].running = THREAD_AVAILABLE;
+			pthread_join( _fds[ i ].id, NULL ); 
+		}
+		#if 0
+		else {
+		// This is where we may need force closure
+		int s = pthread_join( _fds[ count ].id, NULL ); 
+		}
+		#endif
+	}
+#endif
 
 
 
 // A multithreaded server
 //int srv_multithread( struct something_t *b, char *err, int errlen ) {
 int srv_multithread( server_t *p ) {
-	pthread_attr_t attr;
 
+	// Define
+	pthread_attr_t attr;
+	const short int client_max = 12; // CLIENT_MAX_SIMULTANEOUS
 
 	//Initialize thread attribute thing
 	if ( pthread_attr_init( &attr ) != 0 ) {
@@ -169,25 +118,67 @@ int srv_multithread( server_t *p ) {
 		return 0;	
 	}
 
-	for ( int fd = 0, count = 0; ; ) {
-		//Client address and length?
+	// Wait for connections
+	for ( int fd = 0, count = 0, connindex = 0; ; ) {
+		// Client address and length?
 		char ip[ 128 ] = { 0 };
-		struct threadinfo_t *f = &_fds[ count ];
 		struct sockaddr_storage addrinfo = { 0 };
+		struct threadinfo_t *f = NULL; 
 		socklen_t addrlen = sizeof( addrinfo );
 
-FPRINTF( "CONNECTION COUNT SO FAR: %d\n", count );
-		
-		//Set a reference to the server
-		f->server = p;
+		//FPRINTF( "CONNECTION COUNT SO FAR: %d out of %d\n", count, MAX_THREADS );
+		if ( count >= client_max ) {
+			int top = count;
+			do {
+				for ( int i = top; i > -1; i-- ) {
+					if ( _fds[ i ].running == THREAD_AVAILABLE )
+						connindex = i;
+					else if ( _fds[ i ].running == THREAD_INACTIVE ) {
+						count--;
+						connindex = i;
+						_fds[ i ].running = THREAD_AVAILABLE;
+						pthread_join( _fds[ i ].id, NULL ); 
+					}
+					#if 0
+					else {
+					// This is where we may need force closure
+					int s = pthread_join( _fds[ count ].id, NULL ); 
+					}
+					#endif
+				}
 
-		//Accept a new connection	
-		if ( ( f->fd = accept( p->fd, (struct sockaddr *)&addrinfo, &addrlen ) ) == -1 ) {
+				// We'll need to run the loop again
+				// nanosleep( &__interval__, NULL );
+			} while ( p->interrupt && count ); /// && !count );
+
+		#if 0
+			// TODO: Test for tapout or interrupt
+			if ( !count ) {
+				FPRINTF( "sick of waiting...\n" );
+				return 1;
+			}
+		#endif
+		}
+
+
+		// Find an availalbe slot, and move forward when we're ready
+		for ( ; connindex < client_max; connindex++ ) {	
+			f = &_fds[ connindex ];
+			FPRINTF( "Searching for available slot: %d\n", connindex );
+			if ( f->running == THREAD_AVAILABLE ) {
+				f->server = p;
+				FPRINTF( "Using available slot %d!\n", connindex );
+				break;
+			}
+		}
+
+		// Accept a new connection	
+		if ( f && ( f->fd = accept( p->fd, (struct sockaddr *)&addrinfo, &addrlen ) ) == -1 ) {
 			//TODO: Need to check if the socket was non-blocking or not...
 			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
 				//This should just try to read again
 				snprintf( p->err, sizeof( p->err ), "Try accept again: %s\n", strerror( errno ) );
-				continue;	
+				continue;
 			}
 			else if ( errno == EMFILE || errno == ENFILE ) { 
 				//These both refer to open file limits
@@ -208,61 +199,34 @@ FPRINTF( "CONNECTION COUNT SO FAR: %d\n", count );
 				fprintf( p->log_fd, "%s", p->err );
 				return 0;
 			}
-
 		}
 
-		// all of the checks were successful, so add the context to threadinfo
-		//f->ctx = p->ctx;
-
-		//Log an access message including the IP in either ipv6 or v4
-		if ( addrinfo.ss_family == AF_INET )
-			inet_ntop( AF_INET, &((struct sockaddr_in *)&addrinfo)->sin_addr, ip, sizeof( ip ) ); 
-		else {
-			inet_ntop( AF_INET6, &((struct sockaddr_in6 *)&addrinfo)->sin6_addr, ip, sizeof( ip ) ); 
-		}
-
-		//Populate any other thread data
-	#ifndef REAPING_THREADS 
-		memcpy( f->ipaddr, ip, sizeof( ip ) );
-		FPRINTF( "IP addr is: %s\n", ip );
-	#else
-		memcpy( f->ipaddr, ip, sizeof( ip ) );
-		FPRINTF( "IP addr is: %s\n", ip );
-	#endif
-
-		//Start a new thread
-		if ( pthread_create( &f->id, NULL, server_proc, f ) != 0 ) {
-			FPRINTF( "Pthread create unsuccessful.\n" );
-			continue;
-		}
-
-		FPRINTF( "Starting new thread.\n" );
-	#ifndef REAPING_THREADS 
-	#else
-	#endif
-
-	#if 0
-		//This SHOULD work, but doesn't because there is no way to track whether or not it finished
-		count++;
-		if ( pthread_detach( f->id ) != 0 ) {
-			FPRINTF( "Pthread detach unsuccessful.\n" );
-			continue;
-		}
-	#else
-		if ( ++count >= CLIENT_MAX_SIMULTANEOUS ) {
-			for ( count = 0; count >= CLIENT_MAX_SIMULTANEOUS; count++ ) {
-				if ( _fds[ count ].running ) {
-					int s = pthread_join( _fds[ count ].id, NULL ); 
-					FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
-					if ( s != 0 ) {
-						FPRINTF( "Pthread join at pos %d failed...\n", count );
-						continue;
-					}
-				}
+		// Only go here if we successfully accepted
+		if ( f && f->fd ) {
+			//Log an access message including the IP in either ipv6 or v4
+			if ( addrinfo.ss_family == AF_INET )
+				inet_ntop( AF_INET, &((struct sockaddr_in *)&addrinfo)->sin_addr, ip, sizeof( ip ) ); 
+			else {
+				inet_ntop( AF_INET6, &((struct sockaddr_in6 *)&addrinfo)->sin6_addr, ip, sizeof( ip ) ); 
 			}
-			count = 0;
+
+			//Populate any other thread data
+			memcpy( f->ipaddr, ip, sizeof( ip ) );
+			//FPRINTF( "IP addr is: %s\n", ip );
+
+			//Increment both the index and the count here
+			connindex++, count++;
+
+			//Start a new thread
+			FPRINTF( "Starting new thread...\n" );
+			if ( pthread_create( &f->id, NULL, server_proc, f ) != 0 ) {
+				snprintf( p->err, sizeof( p->err ), 
+					"pthread_create unsuccessful: %s\n", strerror( errno ) );
+				continue;
+			}
 		}
-	#endif
-		FPRINTF( "Waiting for next connection.\n" );
+		FPRINTF( "Waiting for next connection...\n" );
 	}
+
+	return 1;
 }

@@ -478,6 +478,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 	// Prep this
 	server_t server; 
+	server.interrupt = 0;
 	server.ctx = &sr[ 0 ];
 	server.timeout = 5;
 	server.fd = -1;
