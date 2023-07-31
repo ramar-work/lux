@@ -116,16 +116,6 @@
 	fprintf( stderr, "\n" ) \
 	) ? 0 : 0
 
-
-#ifdef LEAKTEST_H
- #ifndef LEAKLIMIT
-	#define LEAKLIMIT 64
- #endif
- #define CONN_CLOSE 1
-#else
- #define CONN_CLOSE 0 
-#endif
-
 const int defport = 2000;
 
 char * logfile = "/var/log/hypno-error.log";
@@ -142,18 +132,11 @@ FILE * logfd = NULL, * accessfd = NULL;
 
 protocol_t *ctx = NULL;
 
-#if 0
-struct threadinfo_t {
-	int fd;
-	char running;	
-	pthread_t id;
-	char ipaddr[ 128 ]; // Might be a little heavy..
-#if 0
-	struct timespec start;
-	struct timespec end;
-#endif	
-} fds[ MAX_THREADS ] = { { -1, 0, -1, { 0 } } };
-#endif
+typedef enum model_t {
+	SERVER_ONESHOT = 0,
+	SERVER_FORK,
+	SERVER_MULTITHREAD,
+} model_t;
 
 struct values {
 	int port;
@@ -171,10 +154,11 @@ struct values {
 	char accessfile[ PATH_MAX ];
 	char libdir[ PATH_MAX ];
 	char pidfile[ PATH_MAX ];
+	model_t model;
 #ifdef DEBUG_H
-	int pfork;
+	int tapout;
 #endif
-} values = {
+} v = {
 	.port = 80
 ,	.pid = 80 
 ,	.ssl = 0 
@@ -184,6 +168,10 @@ struct values {
 ,	.dump = 0 
 ,	.uid = -1 
 ,	.gid = -1 
+,	.model = SERVER_MULTITHREAD
+#ifdef DEBUG_H
+,	.tapout = 32
+#endif
 };
 
 
@@ -491,6 +479,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	// Prep this
 	server_t server; 
 	server.ctx = &sr[ 0 ];
+	server.timeout = 5;
 	server.fd = -1;
 	server.data = NULL;
 	server.fdset = NULL;
@@ -498,6 +487,9 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	server.backlog = BACKLOG;
 	server.filters = http_filters;
 	short unsigned int port = server.port, *pport = &port;
+	#ifdef DEBUG_H
+	server.tapout = v->tapout;
+	#endif
 	//*pport = server.port;
 
 	// Logging functions are now a context of their own.
@@ -650,7 +642,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	}
 #endif
 	
-	//TODO: Using threads may make this easier... https://www.geeksforgeeks.org/zombie-processes-prevention/
+	//todo: uSing threads may make this easier... https://www.geeksforgeeks.org/zombie-processes-prevention/
 	if ( signal( SIGCHLD, SIG_IGN ) == SIG_ERR ) {
 		snprintf( err, errlen, "Failed to set SIGCHLD\n" );
 		fprintf( logfd, "%s", err );
@@ -672,114 +664,13 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	}
 	#endif
 
-#if 1
-   #if 0
-	srv_single( &server );
-   #endif
-   #if 1
-	srv_multithread( &server );
-   #endif
-#else
-
-	//Initialize thread attribute thing
-	if ( pthread_attr_init( &attr ) != 0 ) {
-		FPRINTF( "Failed to initialize thread attributes: %s\n", strerror(errno) );
-		return 0;	
+	// Evaluate server mode
+	//fprintf( stderr, "server model: %d\n", SERVER_ONESHOT );
+	if ( v->model == SERVER_ONESHOT )
+		srv_single( &server );
+	else if ( v->model == SERVER_MULTITHREAD ) {
+		srv_multithread( &server );
 	}
-
-	//Set a minimum stack size (1kb?)
-	if ( pthread_attr_setstacksize( &attr, STACK_SIZE ) != 0 ) {
-		FPRINTF( "Failed to set new stack size: %s\n", strerror(errno) );
-		return 0;	
-	}
-
-  #ifdef LEAKTEST_H
-	for ( int fd, count = 0, i = 0; i < LEAKLIMIT; i++ ) { 
-  #else
-	for ( int fd = 0, count = 0; ; ) {
-  #endif
-		//Client address and length?
-		char ip[ 128 ] = { 0 };
-		struct threadinfo_t *f = &fds[ count ];
-		struct sockaddr_storage addrinfo = { 0 };
-		socklen_t addrlen = sizeof( addrinfo );
-
-		//Accept a new connection	
-		if ( ( f->fd = accept( server.fd, (struct sockaddr *)&addrinfo, &addrlen ) ) == -1 ) {
-			//TODO: Need to check if the socket was non-blocking or not...
-			if ( errno == EAGAIN || errno == EWOULDBLOCK ) {
-				//This should just try to read again
-				snprintf( err, errlen, "Try accept again: %s\n", strerror( errno ) );
-				continue;	
-			}
-			else if ( errno == EMFILE || errno == ENFILE ) { 
-				//These both refer to open file limits
-				snprintf( err, errlen, "Too many open files, try closing some requests.\n" );
-				//fprintf( stderr, "%s\n", err );
-				fprintf( logfd, "%s\n", err );
-				return 0;
-			}
-			else if ( errno == EINTR ) { 
-				//In this situation we'll handle signals
-				snprintf( err, errlen, "Signal received: %s\n", strerror( errno ) );
-				fprintf( logfd, "%s", err );
-				return 0;
-			}
-			else {
-				//All other codes really should just stop. 
-				snprintf( err, errlen, "accept() failed: %s\n", strerror( errno ) );
-				fprintf( logfd, "%s", err );
-				return 0;
-			}
-		}
-
-		//Log an access message including the IP in either ipv6 or v4
-		if ( addrinfo.ss_family == AF_INET )
-			inet_ntop( AF_INET, &((struct sockaddr_in *)&addrinfo)->sin_addr, ip, sizeof( ip ) ); 
-		else {
-			inet_ntop( AF_INET6, &((struct sockaddr_in6 *)&addrinfo)->sin6_addr, ip, sizeof( ip ) ); 
-		}
-
-		//Populate any other thread data
-	#ifndef REAPING_THREADS 
-		FPRINTF( "IP addr is: %s\n", ip );
-	#else
-		memcpy( f->ipaddr, ip, sizeof( ip ) );
-		FPRINTF( "IP addr is: %s\n", ip );
-	#endif
-
-		//Start a new thread
-		if ( pthread_create( &f->id, NULL, run_srv_cycle, f ) != 0 ) {
-			FPRINTF( "Pthread create unsuccessful.\n" );
-			continue;
-		}
-
-		FPRINTF( "Starting new thread.\n" );
-	#ifndef REAPING_THREADS 
-		//This SHOULD work, but doesn't because there is no way to track whether or not it finished
-		count++;
-		if ( pthread_detach( f->id ) != 0 ) {
-			FPRINTF( "Pthread detach unsuccessful.\n" );
-			continue;
-		}
-	#else
-		if ( ++count >= CLIENT_MAX_SIMULTANEOUS ) {
-			for ( count = 0; count >= CLIENT_MAX_SIMULTANEOUS; count++ ) {
-				if ( fds[ count ].running ) {
-					int s = pthread_join( fds[ count ].id, NULL ); 
-					FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
-					if ( s != 0 ) {
-						FPRINTF( "Pthread join at pos %d failed...\n", count );
-						continue;
-					}
-				}
-			}
-			count = 0;
-		}
-	#endif
-		FPRINTF( "Waiting for next connection.\n" );
-	}
-  #endif
 
 	if ( accessfd ) {
 		fclose( accessfd ); 
@@ -950,9 +841,9 @@ void print_options ( struct values *v ) {
 int main ( int argc, char *argv[] ) {
 	char err[ 2048 ] = { 0 };
 	int *port = NULL; 
+
+#if 0
 	struct values v = { 0 };
-	
-	//Set default v 
 	v.port = 80;
 	v.pid = 80;
 	v.ssl = 0 ;
@@ -962,6 +853,7 @@ int main ( int argc, char *argv[] ) {
 	v.dump = 0 ;
 	v.uid = -1 ;
 	v.gid = -1 ;
+#endif
 
 	//
 	snprintf( v.logfile, sizeof( v.logfile ), "%s", ERROR_LOGFILE );
@@ -985,6 +877,10 @@ int main ( int argc, char *argv[] ) {
 			v.kill = 1;
 		else if ( OPTEVAL( *argv, "-x", "--dump" ) ) 
 			v.dump = 1;
+		else if ( !strcmp( *argv, "--model=threaded" ) ) 
+			v.model = SERVER_MULTITHREAD;
+		else if ( !strcmp( *argv, "--model=oneshot" ) ) 
+			v.model = SERVER_ONESHOT;
 		else if ( !strcmp( *argv, "--use-ssl" ) ) 
 			v.ssl = 1;
 		else if ( OPTEVAL( *argv, "-c", "--configuration" ) ) {
@@ -1018,9 +914,13 @@ int main ( int argc, char *argv[] ) {
 			memset( v.accessfile, 0, sizeof( v.accessfile ) );
 			snprintf( v.accessfile, sizeof( v.accessfile) - 1, "%s", *argv );
 		}
-		else if ( ac > argc ) {
-			return eprintf( "Got unexpected argument: '%s'\n", *argv );
+	#ifdef DEBUG_H
+		else if ( !strcmp( *argv, "--tapout" ) ) {
+			OPTARG( *argv, "--tapout" );
+			//TODO: This should be safeatoi 
+			v.tapout = atoi( *argv );
 		}
+	#endif
 	#if 0
 		else if ( OPTEVAL( *argv, "-d", "--daemonize" ) ) 
 			v.fork = 1;
@@ -1033,6 +933,9 @@ int main ( int argc, char *argv[] ) {
 			snprintf( v.libdir, sizeof( v.libdir ) - 1, "%s", *argv );	
 		}
 	#endif
+		else if ( ac > argc ) {
+			return eprintf( "Got unexpected argument: '%s'\n", *argv );
+		}
 	}
 
 	//Register SIGINT

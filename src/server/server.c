@@ -48,8 +48,6 @@ static filter_t * srv_check_filter ( const filter_t *filters, char *name ) {
 // Check that the website's chosen directory is accessible and it's log directory is writeable.
 //static int srv_check_dir ( conn_t *conn, char *err, int errlen ) {
 static int srv_check_dir ( conn_t *conn ) {
-	FPRINTF( "Checking directory at %s\n", conn->hconfig->dir );
-
 	//Check that log dir is accessible and writeable (or exists) - send 500 if not 
 	struct stat sb;
 	char *adir = NULL;
@@ -88,11 +86,10 @@ static int srv_check_dir ( conn_t *conn ) {
 
 
 //Build server configuration
-//static const int srv_start( int fd, zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
 static const int srv_start( const server_t *p, conn_t *c ) {
 	FPRINTF( "Initial server allocation started...\n" );
-	
-	//c->config = build_server_config( p->conffile, c->err, c->errlen );
+
+	// Set reference to the server configuration	
 	if ( !( c->config = p->config ) ) {
 		c->count = -3;
 		// This is a connection problem, but it just depends on what's wrong 
@@ -101,6 +98,7 @@ static const int srv_start( const server_t *p, conn_t *c ) {
 		return 0;
 	}
 
+	c->stage = CONN_PRE;
 	FPRINTF( "Initial server allocation complete.\n" );
 	return 1;
 }
@@ -109,32 +107,38 @@ static const int srv_start( const server_t *p, conn_t *c ) {
 //Find the chosen host and generate a response via one of the selected filters
 //static const int srv_proc( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn) {
 static const int srv_proc( const server_t *p, conn_t *conn ) { 
-	FPRINTF( "Proc started...\n" );
 	//char err[2048] = {0};
 	zTable *t = NULL;
 	filter_t *filter = NULL;
 	int count = conn->count;	
-	conn->count = -3;
 
+	// Make it ready for write
+	conn->stage = CONN_WRITE;
 
 	//With no default host, throw this 
 	if ( !conn->req->host ) {
-		snprintf( conn->err, conn->errlen, "No host header specified." );
+		snprintf( conn->err, conn->errlen, 
+			"No host header specified." );
 		return http_set_error( conn->res, 400, conn->err );
 	}
 
 	if ( !( conn->hconfig = find_host( conn->config->hosts, conn->req->host ) ) ) {
-		snprintf( conn->err, conn->errlen, "Could not find host '%s'.", conn->req->host );
+		snprintf( conn->err, conn->errlen, 
+			"Could not find host '%s'.", conn->req->host );
 		return http_set_error( conn->res, 404, conn->err ); 
 	}
 
+	// TODO: Move this to pre or even better yet to server checks
 	if ( !conn->hconfig->filter ) {
-		snprintf( conn->err, conn->errlen, "No Filter specified for '%s'", conn->hconfig->name );
+		snprintf( conn->err, conn->errlen, 
+			"No Filter specified for '%s'", conn->hconfig->name );
 		return http_set_error( conn->res, 500, conn->err ); 
 	}
 
+	// TODO: Move this to pre or even better yet to server checks
 	if ( !( filter = srv_check_filter( p->filters, conn->hconfig->filter ) ) ) {
-		snprintf( conn->err, conn->errlen, "Filter '%s' not supported", conn->hconfig->filter );
+		snprintf( conn->err, conn->errlen, 
+			"Filter '%s' not supported", conn->hconfig->filter );
 		return http_set_error( conn->res, 500, conn->err ); 
 	}
 
@@ -144,18 +148,12 @@ static const int srv_proc( const server_t *p, conn_t *conn ) {
  
 	//Finally, now we can evalute the filter and the route.
 	if ( !filter->filter( p, conn ) ) {
+		// What kinds of fatal errors could happen here?
 		return 0;
 	}
 
 	//You can add a header to tell things to close
 	conn->count = count;
-
-#if 0
-	//Write out the message from here for fun
-	FPRINTF( "Preview message:\n" );
-	write( 2, conn->res->msg, conn->res->mlen );
-	FPRINTF( "Proc complete.\n" );
-#endif
 	return 1;
 }
 
@@ -186,22 +184,10 @@ static const int srv_log( const server_t *p, conn_t *conn ) {
 }
 
 
-//End the request by deallocating all of the things
-//static int srv_end( zhttp_t *rq, zhttp_t *rs, struct cdata *conn ) {
-static int srv_end( const server_t *p, conn_t *conn ) {
-	FPRINTF( "Deallocation started...\n" );
-
-	//Free HTTP request 
-	http_free_body( conn->req );
-
-	//Free HTTP response
-	http_free_body( conn->res );
-
-	//Free the server config too
-	//free_server_config( conn->config );
-
-	FPRINTF( "Deallocation complete.\n" );
-	return 1;
+// End the request by deallocating http bodies
+static void srv_end( const server_t *p, conn_t *conn ) {
+	http_free_body( conn->req ), http_free_body( conn->res );
+	return;
 }
 
 
@@ -212,61 +198,64 @@ int srv_response ( server_t *p, conn_t *c ) {
 	//Define
 	zhttp_t rq = {0}, rs = {0};
 	const protocol_t *sr = p->ctx;
-	char err[2048] = {0};
-	int status = 0;
+
+	// All of these are connection failures
+	FPRINTF( "Running srv_start\n" );
+	if ( !srv_start( p, c ) ) {
+		return 0;
+	}
+
+	// Set up the connection
+	c->stage = CONN_INIT;
+
+	// TODO: These need to be void pointers or some other kind of opaque
 	c->req = &rq;
 	c->res = &rs;
 	c->req->type = ZHTTP_IS_CLIENT;
 	c->res->type = ZHTTP_IS_SERVER;
 
-	// All of these are connection failures
-	FPRINTF( "Running srv_start\n" );
-	if ( !( status = srv_start( p, c ) ) ) {
-		return 0;
-	}
-
 	FPRINTF( "Setting any pre data for current protocol.\n" );
-	if ( !( status = sr->pre( p, c ) ) ) {
+	if ( !sr->pre( p, c ) ) {
+		FPRINTF( "(%s)->pre failure: %s\n", p->ctx->name, c->err );
 		return 0;
 	}
 
 	FPRINTF( "Got pre data: %p...\n", p->data );
 	FPRINTF( "Running c->ctx->read()\n" );
-	if ( !( status = sr->read( p, c ) ) ) {
-
+	if ( !sr->read( p, c ) ) {
+		FPRINTF( "(%s)->read failure: %s\n", p->ctx->name, c->err );
+		//Log what happened
+		sr->post( p, c );	
+		srv_end( p, c );
+		return 0;
 	}
 
 	FPRINTF( "Running srv_proc()\n" );
-	if ( !( status = srv_proc( p, c ) ) ) {
-
+	if ( c->stage == CONN_PROC && !srv_proc( p, c ) ) {
+		FPRINTF( "(%s)->proc failure: %s\n", p->ctx->name, c->err );
+		//Log what happened, but don't stop
 	}
 
 	FPRINTF( "Running c->ctx->write()\n" );
-	if ( !( status = sr->write( p, c ) ) ) {
-
+	if ( c->stage == CONN_WRITE && !sr->write( p, c ) ) {
+		FPRINTF( "(%s)->write failure: %s\n", p->ctx->name, c->err );
+		//Log what happened, but don't stop
 	}
 
 	FPRINTF( "Running c->ctx->post()\n" );
-	if ( !( status = sr->post( p, c ) ) ) {
-
+	if ( !sr->post( p, c ) ) {
+		FPRINTF( "(%s)->post failure: %s\n", p->ctx->name, c->err );
+		//Log what happened, but don't stop
 	}
 
 	FPRINTF( "Running srv_log\n" );
-	if ( !( status = srv_log( p, c ) ) ) {
-
+	if ( !srv_log( p, c ) ) {
+		//Log what happened, but don't stop
+		FPRINTF( "(%s)->log failure: %s\n", p->ctx->name, c->err );
 	}
 
-	FPRINTF( "Running srv_log\n" );
-	if ( !( status = srv_end( p, c ) ) ) {
-
-	}
-
-
-	//Request should finish before we count this as an attempt. 
-	if ( c->count >= 0 ) {
-		c->count ++;
-	}
-
+	FPRINTF( "Running srv_end\n" );
+	srv_end( p, c ); 
 	return 1;
 }
 

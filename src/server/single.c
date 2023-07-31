@@ -60,15 +60,10 @@ int srv_single ( server_t *p ) {
 			inet_ntop( AF_INET6, &((struct sockaddr_in6 *)&addrinfo)->sin6_addr, ip, sizeof( ip ) ); 
 		}
 
-		FPRINTF( "IP addr is: %s\n", ip );
-		FPRINTF( "Child fd: %d\n", conn.fd );
-
 		// Go ahead and service it
 		if ( !srv_response( p, &conn ) ) {
-
+			FPRINTF( "I'm so lost... \n" );
 		}
-
-		// ctx->post CAN run and do any additional write shutdown
 
 		// Close the file descriptor
 		if ( close( conn.fd ) == -1 ) {
@@ -76,32 +71,14 @@ int srv_single ( server_t *p ) {
 			FPRINTF( "Error when closing child socket.\n" );
 		}
 
-		// This is here for a reason
+		// Keep track of connections
 		count++;
-		#if 0
-		if ( ++count >= CLIENT_MAX_SIMULTANEOUS ) {
-			for ( count = 0; count >= CLIENT_MAX_SIMULTANEOUS; count++ ) {
-				if ( fds[ count ].running ) {
-					int s = pthread_join( fds[ count ].id, NULL ); 
-					FPRINTF( "Joining thread at pos %d, status = %d....\n", count, s );
-					if ( s != 0 ) {
-						FPRINTF( "Pthread join at pos %d failed...\n", count );
-						continue;
-					}
-				}
-			}
-			count = 0;
-		}
-		#endif
-
-	#if 1
 		FPRINTF( "Waiting for next connection.\n" );
-	#else
-		// If we're doing leak testing, you'll have to keep
-		// the connection count in mind here...
-		FPRINTF( "Breaking server loop, check for leaks\n" );
-		break;
-	#endif
+		#ifdef DEBUG_H
+		if ( count >= p->tapout ) { 
+			break;
+		}	
+		#endif
 	}
 #endif
 	return 1;

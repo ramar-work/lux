@@ -304,7 +304,7 @@ const int write_notls ( server_t *p, conn_t *c ) {
 	struct timespec timer = {0};
 	clock_gettime( CLOCK_REALTIME, &timer );
 
-	#if 1
+     #ifdef SENDFILE_ENABLED 
 	if ( c->res->atype == ZHTTP_MESSAGE_SENDFILE ) {
 		//Send the header first
 		int hlen = total;	
@@ -379,11 +379,9 @@ const int write_notls ( server_t *p, conn_t *c ) {
 			FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
 		}
 		FPRINTF( "Write complete (sent %d out of %d bytes)\n", pos, c->res->clen );
+		return 1;
 	}
-	else {
-
-	}
-	#endif
+     #endif
 
 	//Start writing data to socket
 	for ( ;; ) {

@@ -7,18 +7,31 @@ struct threadinfo_t _fds[ MAX_THREADS ] = { { -1, 0, -1, { 0 } } };
 
 //
 static void timer_expired( union sigval td ) {
+	int status = 0;
 	struct threadinfo_t *tt = (struct threadinfo_t *)td.sival_ptr;	
-#if 0
-FPRINTF( "=================================\n" );
+#if 1
 FPRINTF( "=================================\n" );
 FPRINTF( "\n" );
 FPRINTF( "TIMER EXPIRED....\n" );
 FPRINTF( "\n" );
 FPRINTF( "=================================\n" );
-FPRINTF( "=================================\n" );
 #endif
 	tt->running = 0;
-	// Force close the file?
+
+#if 0
+	// Check if it's "busy" or just flush everything
+	if ( ( status = ioctl( tt->fd, I_FLUSH, FLUSHRW ) ) == -1 ) {
+FPRINTF( "=================================\n" );
+FPRINTF( "\n" );
+FPRINTF( "FAILED TO RUN IOCTL: %s....\n", strerror( status )  );
+FPRINTF( "\n" );
+FPRINTF( "=================================\n" );
+
+	}
+#endif
+	// You would need to do ctx->post
+
+	// and then close the file...
 	//close( tt->fd );	
 	//tt->fd = -1; 	
 }
@@ -36,8 +49,9 @@ static void * server_proc( void *t ) {
 	//struct cdata conn = { .ctx = tt->ctx, .flags = O_NONBLOCK };
 	server_t *p = tt->server;
 	fprintf( stderr, "CTX DATA %p\n", p->ctx );
-	conn_t conn;
-	memset( &conn, 0, sizeof( conn_t ) );
+
+	// Set up ocnnection data;
+	conn_t conn = {0};
 	conn.count = 0;
 	conn.status = 0;
 	conn.data = NULL;
@@ -45,15 +59,18 @@ static void * server_proc( void *t ) {
 	//conn.end = 0;
 	conn.fd = tt->fd;
 
+	// TODO: Remove this, and use the conn structure directly
+	memcpy( conn.ipv4, tt->ipaddr, strlen( tt->ipaddr ) );
+
+#if 0
 	// Set a timer for 30 seconds (eventually, set from cli or config or something)
 	struct itimerspec tv = { 
-		.it_value.tv_sec = 30,
+		.it_value.tv_sec = p->timeout,
 		.it_value.tv_nsec = 0,
 		.it_interval.tv_sec = 0,
 		.it_interval.tv_sec = 0,
 	};
 	
-  #if 1
 	//You need to set a timer that will trigger and shut off when we reach a certain time
 	int timer, status;
 	timer_t timer_id = 0;
@@ -74,13 +91,14 @@ static void * server_proc( void *t ) {
 		//pthread_exit( 0 );
 		return 0;
 	}
-  #endif
+#endif
 
 	// Send a response
 	if ( !srv_response( p, &conn ) ) {
-		snprintf( conn.err, sizeof( conn.err ), "Error in TCP socket handling.\n" );
-		FPRINTF( conn.err );
+		//snprintf( conn.err, sizeof( conn.err ), "Error in TCP socket handling.\n" );
+		FPRINTF( "%s\n", conn.err );
 		//pthread_exit(0);
+		pthread_exit(0);
 	}
 
 	// Close a file
@@ -89,17 +107,14 @@ static void * server_proc( void *t ) {
 		FPRINTF( conn.err );
 	}
 
-  #if 1
+  #if 0
 	//Delete the timer
 	if ( timer_delete( timer_id ) == -1 ) {
 		snprintf( conn.err, sizeof( conn.err ), "Error deleting timer: %s\n", strerror( errno ) );
 		FPRINTF( conn.err );
 		return 0;
 	}
-  #endif
 
-
-  #if 0
 	// Manage long running connections
 	if ( close( fd ) == -1 ) {
 		FPRINTF( "Error when closing child socket.\n" );
@@ -132,6 +147,9 @@ static void * server_proc( void *t ) {
 }
 
 
+// EINTR will handle hangups
+
+
 
 // A multithreaded server
 //int srv_multithread( struct something_t *b, char *err, int errlen ) {
@@ -157,6 +175,8 @@ int srv_multithread( server_t *p ) {
 		struct threadinfo_t *f = &_fds[ count ];
 		struct sockaddr_storage addrinfo = { 0 };
 		socklen_t addrlen = sizeof( addrinfo );
+
+FPRINTF( "CONNECTION COUNT SO FAR: %d\n", count );
 		
 		//Set a reference to the server
 		f->server = p;
@@ -203,6 +223,7 @@ int srv_multithread( server_t *p ) {
 
 		//Populate any other thread data
 	#ifndef REAPING_THREADS 
+		memcpy( f->ipaddr, ip, sizeof( ip ) );
 		FPRINTF( "IP addr is: %s\n", ip );
 	#else
 		memcpy( f->ipaddr, ip, sizeof( ip ) );

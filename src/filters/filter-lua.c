@@ -486,12 +486,14 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 	snprintf( spath, sizeof( spath ) - 1, "%s/%s", dir, ++uri );
 
 	//Check if the path is there at all (read-file can't do this)
-	if ( stat( spath, &sb ) == -1 )
+	if ( stat( spath, &sb ) == -1 ) {
 		return http_error( res, 404, "File '%s' not found", spath );
+	}
 
 	//Get its mimetype
-	if ( !( mime = zmime_get_by_filename( spath ) ) )
+	if ( !( mime = zmime_get_by_filename( spath ) ) ) {
 		mime = zmime_get_default();
+	}
 #if 0
 	//write max should be checked.
 	//...
@@ -519,8 +521,9 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 	free( data );
 #else
 	//Open the file
-	if ( ( fd = open( spath, O_RDONLY ) ) == -1 ) 
+	if ( ( fd = open( spath, O_RDONLY ) ) == -1 ) {
 		return http_error( res, 404, strerror( errno ) );
+	}
 
 	//Prepare the message
 	#if 1
@@ -529,19 +532,20 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 	res->clen = sb.st_size;
 	res->fd = fd;
 	res->status = 200;
+	res->ctype = (char *)mime->mimetype;
 	#else
 	http_set_fd( res, 200 ); 
 	http_set_content_length( res, sb.st_size ); 
 	http_set_message_type( res, ZHTTP_MESSAGE_SENDFILE ); 
 	http_set_status( res, 200 ); 
-	#endif
 	http_set_ctype( res, mime->mimetype );
+	#endif
 
 	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
 		return http_error( res, 500, err );
 	}
 #endif
-	return 1;	
+	return 1;
 }
 
 
@@ -1079,10 +1083,7 @@ int has_views( struct imvc_t **list ) {
 
 
 //The entry point for a Lua application
-//const int filter_lua( int fd, zhttp_t *req, zhttp_t *res, struct cdata *conn ) {
 const int filter_lua( const server_t *serv, conn_t *conn ) {
-
-	FPRINTF( "Proc started\n" );
 
 	//Define variables and error positions...
 	ztable_t zc = {0}, zm = {0};
@@ -1375,8 +1376,11 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 
 	//Return the finished message if we got this far
 	if ( !http_finalize_response( conn->res, ld.err, LD_ERRBUF_LEN ) ) {
+		snprintf( conn->err, sizeof( conn->err ), 
+			"Failed to finalize HTTP response: %s", ld.err );
+		FPRINTF( "Failed to finalize HTTP response: %s", ld.err );
 		free_ld( &ld );
-		return http_error( conn->res, 500, "%s", ld.err );
+		return 0;
 	}
 
 	//Destroy model & Lua

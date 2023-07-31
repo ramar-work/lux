@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <time.h>
+#include <sys/ioctl.h>
 
 #include "server.h"
 #include "../config.h"

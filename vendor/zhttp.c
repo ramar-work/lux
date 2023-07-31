@@ -1201,7 +1201,12 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 	zhttpr_t **headers = en->headers;
 	zhttpr_t **body = en->body;
 	char http_header_buf[ 2048 ] = { 0 };
-	char http_header_fmt[] = "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n";
+	const char http1_1close[] = "Connection: close\r\n";
+	char http_header_fmt[] = 
+		"HTTP/1.1 %d %s\r\n"
+		"Content-Type: %s\r\n"
+		"Content-Length: %d\r\n";
+		"Connection: close\r\n";
 
 	if ( !en->headers && !en->body && !en->fd ) {
 		snprintf( err, errlen, "%s", "No headers or body specified with response." );
@@ -1226,7 +1231,7 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 	//This assumes (perhaps wrongly) that ctype is already set.
 	en->clen = !en->clen ? (*en->body)->size : en->clen;
 	//en->clen = (*en->body)->size;
-	http_header_len = snprintf( http_header_buf, sizeof(http_header_buf) - 1, http_header_fmt,
+	http_header_len = snprintf( http_header_buf, sizeof( http_header_buf ) - 1, http_header_fmt,
 		en->status, http_get_status_text( en->status ), en->ctype, en->clen ); //((*en->body)->size );
 
 	if ( !zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)http_header_buf, http_header_len ) ) {
@@ -1244,6 +1249,7 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 		headers++;
 	}
 
+#if 0
 	//TODO: As other protocols are supported, this will change.  
 	//For now, however, this has got to be it
 	const char http1_1close[] = "Connection: close\r\n";
@@ -1252,7 +1258,6 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 		return NULL;
 	}
 
-#if 0
 	if ( !msg ) {
 		snprintf( err, errlen, "Failed to append all headers" );
 		return NULL;
@@ -1269,7 +1274,8 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 		return NULL;
 	}
 
-	en->msg = msg, en->mlen = msglen;
+	en->msg = msg;
+	en->mlen = msglen;
 	return en;
 }
 
@@ -1369,8 +1375,8 @@ void http_free_body ( zhttp_t *en ) {
 	if ( en->atype == ZHTTP_MESSAGE_MALLOC )
 		free( en->msg );
 	else if ( en->atype == ZHTTP_MESSAGE_SENDFILE ) {
-		// TODO: Switching to a union for all of this...
 		( en->fd > 2 ) ? close( en->fd ) : 0;
+		free( en->msg );
 	}
 }
 

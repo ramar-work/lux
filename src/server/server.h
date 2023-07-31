@@ -53,6 +53,15 @@ struct cdata {
 #endif
 
 
+typedef enum status_t {
+	CONN_INIT = 0,
+	CONN_PRE,
+	CONN_READ,
+	CONN_PROC,
+	CONN_WRITE,
+	CONN_POST,
+	CONN_DESTROY,
+} status_t;
 
 
 // Individual connections need to pass their own stuff around.
@@ -71,17 +80,14 @@ typedef struct conn_t {
 	// Keep a reference to the host configuration
 	struct lconfig *hconfig;
 
-	// Global reference to make for less arguments
-	// protocol_t *ctx;	
-
 	// The inner data shuttled between actions per connection 
 	void *data;
 
-	// Connection start
-	struct timespec start;
+	// Are we reading, writing, etc (no more than 8 states)
+	status_t stage;
 
-	// Connection end
-	struct timespec end;
+	// Keep track of retries (128 is more than enough)
+	int retry;
 
 	// The file descriptor in use for the current connection
 	int fd;
@@ -103,6 +109,22 @@ typedef struct conn_t {
 	
 	// Keep buffer for ipv6 address
 	char ipv6[ 128 ];
+
+#ifdef DEBUG_H
+	// Advanced timing data really should be a debug feature
+	
+	// Connection start
+	struct timespec start;
+
+	// Connection end
+	struct timespec end;
+
+	// Request processing time
+	int request_time;
+
+	// Response processing time
+	int response_time;
+#endif
 
 } conn_t;
 
@@ -165,10 +187,17 @@ typedef struct server_t {
 	// This does make sense to be here...
 	struct protocol_t *ctx;
 
+	// A default timeout value for long-running connections
+	int timeout;
+
 	// 
 	char err[ 128 ];
 
 	int errlen;
+
+#ifdef DEBUG_H
+	int tapout;
+#endif
 
 } server_t;
 
@@ -176,7 +205,6 @@ typedef struct server_t {
 // "Filter" output messages with this
 typedef struct filter_t {
 	const char *name;
-	//const int (*filter)( int, zhttp_t *, zhttp_t *, struct cdata * );
 	const int (*filter)( const server_t *, conn_t * );
 } filter_t;
 
