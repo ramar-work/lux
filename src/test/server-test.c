@@ -71,14 +71,14 @@ void connect_and_send_msg ( const char *message ) {
 
 
 //Filters
-struct filter filters[] = {
+filter_t filters[] = {
 	{ "test", filter_test },
 	{ NULL }
 };
 
 
 //Contexts should be tested out most any way you can
-struct senderrecvr contexts[] = {
+protocol_t contexts[] = {
 	{ read_gnutls, write_gnutls, create_gnutls, NULL, pre_gnutls, post_gnutls },
 #if 0
 	{ read_notls, write_notls, create_notls },
@@ -91,7 +91,7 @@ struct senderrecvr contexts[] = {
 //Runs the server loop
 int server_loop ( int type ) {
 	struct sockAbstr su = {0};
-	struct senderrecvr *ctx = &contexts[ type ];
+	protocol_t *ctx = &contexts[ type ];
 	int fd, status, port = PORT;
 	char err[ 2048 ];
 	ctx->init( &ctx->data );

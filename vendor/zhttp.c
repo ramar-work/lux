@@ -1247,8 +1247,6 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 	//TODO: As other protocols are supported, this will change.  
 	//For now, however, this has got to be it
 	const char http1_1close[] = "Connection: close\r\n";
-fprintf( stderr, "close: %ld\n", sizeof( http1_1close ) );
-fprintf( stderr, "close: %ld\n", strlen( http1_1close ) );
 	if ( !zhttp_append_to_uint8t( &msg, &msglen, (unsigned char *)http1_1close, strlen( http1_1close ) ) ) {
 		snprintf( err, errlen, "%s", "Could not add 'Connection: close' to message." );
 		return NULL;

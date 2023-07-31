@@ -13,7 +13,7 @@ struct threadinfo_t {
 	char running;	
 	pthread_t id;
 	char ipaddr[ 128 ]; // Might be a little heavy..
-	//struct senderrecvr *ctx;
+	//protocol_t *ctx;
 	server_t *server;
 #if 0
 	struct timespec start;

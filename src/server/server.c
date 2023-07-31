@@ -32,9 +32,9 @@
 
 
 // Check the validity of a filter
-static struct filter * srv_check_filter ( const struct filter *filters, char *name ) {
+static filter_t * srv_check_filter ( const filter_t *filters, char *name ) {
 	while ( filters && filters->name ) {
-		struct filter *f = ( struct filter * )filters;
+		filter_t *f = ( filter_t * )filters;
 		if ( f->name && strcmp( f->name, name ) == 0 ) {
 			return f;
 		}
@@ -112,7 +112,7 @@ static const int srv_proc( const server_t *p, conn_t *conn ) {
 	FPRINTF( "Proc started...\n" );
 	//char err[2048] = {0};
 	zTable *t = NULL;
-	struct filter *filter = NULL;
+	filter_t *filter = NULL;
 	int count = conn->count;	
 	conn->count = -3;
 
@@ -211,7 +211,7 @@ int srv_response ( server_t *p, conn_t *c ) {
 
 	//Define
 	zhttp_t rq = {0}, rs = {0};
-	const struct senderrecvr *sr = p->ctx;
+	const protocol_t *sr = p->ctx;
 	char err[2048] = {0};
 	int status = 0;
 	c->req = &rq;

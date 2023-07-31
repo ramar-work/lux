@@ -35,15 +35,15 @@
 
 #if 0
 struct cdata;
-//struct filter;
-//struct senderrecvr;
+//filter_t;
+//protocol_t;
 
 
 //Added 12-08-20, track per connection data
 struct cdata {
 	int count;  //How many times until we hit the keep-alive mark?
 	int status;  //What is the status of the request?
-	struct senderrecvr *ctx;  //Access the context through here now
+	protocol_t *ctx;  //Access the context through here now
 	struct sconfig *config;  //Server config
 	struct lconfig *hconfig;  //Host config
 	char *ipv4;  //The IPv4 address of the incoming request (in string format)
@@ -72,7 +72,7 @@ typedef struct conn_t {
 	struct lconfig *hconfig;
 
 	// Global reference to make for less arguments
-	// struct senderrecvr *ctx;	
+	// protocol_t *ctx;	
 
 	// The inner data shuttled between actions per connection 
 	void *data;
@@ -111,14 +111,14 @@ typedef struct conn_t {
 
 #if 0
 //Each new request works in its own environment.
-struct senderrecvr { 
+protocol_t { 
 	const int (*read)( int, zhttp_t *, zhttp_t *, struct cdata * );
 	const int (*write)( int, zhttp_t *, zhttp_t *, struct cdata * ); 
 	int (*init)( void **, char *, int );
 	void (*free)( void ** );
 	const int (*pre)( int, zhttp_t *, zhttp_t *, struct cdata * );
 	const int (*post)( int, zhttp_t *, zhttp_t *, struct cdata * );
-	const struct filter *filters;
+	const filter_t *filters;
 	const char *config;
 	void *data;
 	char error[ SERVER_ERROR_BUFLEN ];
@@ -160,10 +160,10 @@ typedef struct server_t {
 	int *fdset;
 
 	// All the loaded filters can go here
-	const struct filter *filters;
+	const struct filter_t *filters;
 
 	// This does make sense to be here...
-	struct senderrecvr *ctx;
+	struct protocol_t *ctx;
 
 	// 
 	char err[ 128 ];
@@ -174,16 +174,16 @@ typedef struct server_t {
 
 
 // "Filter" output messages with this
-struct filter {
+typedef struct filter_t {
 	const char *name;
 	//const int (*filter)( int, zhttp_t *, zhttp_t *, struct cdata * );
 	const int (*filter)( const server_t *, conn_t * );
-};
+} filter_t;
 
 
 
 //Each new request works in its own environment.
-struct senderrecvr { 
+typedef struct protocol_t {
 #if 0
 	const int (*read)( int, zhttp_t *, zhttp_t *, struct cdata * );
 	const int (*write)( int, zhttp_t *, zhttp_t *, struct cdata * ); 
@@ -191,7 +191,7 @@ struct senderrecvr {
 	void (*free)( void ** );
 	const int (*pre)( int, zhttp_t *, zhttp_t *, struct cdata * );
 	const int (*post)( int, zhttp_t *, zhttp_t *, struct cdata * );
-	const struct filter *filters;
+	const filter_t *filters;
 	const char *config;
 	void *data;
 	char error[ SERVER_ERROR_BUFLEN ];
@@ -205,7 +205,7 @@ struct senderrecvr {
 	const int (*post)( server_t *, conn_t * );
 	//const char *config;
 #endif
-};
+} protocol_t;
 
 
 int srv_response ( server_t *, conn_t * );

@@ -85,7 +85,7 @@ struct Test cases[] = {
 };
 
 
-struct filter_test {
+filter_t_test {
 	int (*filter)( 
 		zhttp_t *, 
 		zhttp_t *, 
@@ -100,7 +100,7 @@ struct filter_test {
 }; 
 
 
-struct filter_test filter_tests[] = {
+filter_t_test filter_tests[] = {
 #if 0
 	FILTER( filter_lua, TEST_LUA_DIR "bad-config", "/index.lua" ),
 	FILTER( filter_lua, TEST_LUA_DIR "blank-config", "/index.lua" ),
@@ -118,7 +118,7 @@ struct filter_test filter_tests[] = {
 };
 
 #if 0
-struct filter_test filter_tests[] = {
+filter_t_test filter_tests[] = {
 	//Static filters can go here
 	FILTER( filter_static, TEST_STATIC_DIR "static/text", "/index.html" ),
 	FILTER( filter_static, TEST_STATIC_DIR "static/binary", "/index.html" ),
@@ -127,7 +127,7 @@ struct filter_test filter_tests[] = {
 #endif
 
 #if 0
-struct filter_test filter_tests[] = {
+filter_t_test filter_tests[] = {
 	//zWalkerory filters can go here
 	{ "memory", filter_memory },
 	{ NULL }
@@ -135,7 +135,7 @@ struct filter_test filter_tests[] = {
 #endif
 
 #if 0
-struct filter_test filter_tests[] = {
+filter_t_test filter_tests[] = {
 	//Echo filters can go here
 	{ "echo", "/", "/", filter_echo },
 	{ NULL }
@@ -157,7 +157,7 @@ void log_buf ( zhttp_t *res, char *log, int loglen ) {
 int main ( int argc, char *argv[] ) {
 
 	FILE *file = stderr;
-	struct filter_test *f = filter_tests;
+	filter_t_test *f = filter_tests;
 
 	while ( f->name ) {
 		fprintf( stderr, "Running tests against filter '%s'\n", f->name );

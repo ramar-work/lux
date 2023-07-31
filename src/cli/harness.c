@@ -78,7 +78,7 @@
 	"-h, --help               Show help and quit.\n"
 
 //Define a list of filters
-struct filter filters[16] = { 
+filter_t filters[16] = { 
 	{ "static", filter_static }
 ,	{ "echo", filter_echo }
 ,	{ "dirent", filter_dirent }
@@ -289,7 +289,7 @@ int main ( int argc, char * argv[] ) {
 
 	if ( arg.filter ) {
 		filter = NULL;
-		for ( struct filter *f = filters; f->name; f++ ) {
+		for ( filter_t *f = filters; f->name; f++ ) {
 			if ( strcmp( f->name, arg.filter ) == 0 ) {
 				filter = f->filter, fname = (char *)f->name;
 				break;

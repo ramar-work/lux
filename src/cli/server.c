@@ -140,7 +140,7 @@ char pidbuf[128] = {0};
 
 FILE * logfd = NULL, * accessfd = NULL;
 
-struct senderrecvr *ctx = NULL;
+protocol_t *ctx = NULL;
 
 #if 0
 struct threadinfo_t {
@@ -188,7 +188,7 @@ struct values {
 
 
 //Define a list of filters
-struct filter http_filters[] = { 
+filter_t http_filters[] = { 
 #if 0
 	{ "static", filter_static }
 ,	{ "dirent", filter_dirent }
@@ -315,18 +315,18 @@ void sigkill( int signum ) {
 //Return fi
 static int findex() {
 	int fi = 0;
-	for ( struct filter *f = http_filters; f->name; f++, fi++ ); 
+	for ( filter_t *f = http_filters; f->name; f++, fi++ ); 
 	return fi;	
 }
 #endif
 
-struct filter dns_filters[] = {
+filter_t dns_filters[] = {
 	{ "dns", NULL },
 	{ NULL }
 };
 
 //Define a list of "context types"
-struct senderrecvr sr[] = {
+protocol_t sr[] = {
 #if 0
 	{ "http", read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost },
 #endif
@@ -812,7 +812,7 @@ int cmd_libs( struct values *v, char *err, int errlen ) {
 	int findex = 0;
 
 	//Find the last index
-	for ( struct filter *f = http_filters; f->name; f++, findex++ );
+	for ( filter_t *f = http_filters; f->name; f++, findex++ );
 
 	//Open directory
 	if ( !( dir = opendir( v->libdir ) ) ) {
@@ -823,7 +823,7 @@ int cmd_libs( struct values *v, char *err, int errlen ) {
 	//List whatever directory
 	for ( ; ( d = readdir( dir ) );  ) { 
 		void *lib = NULL;
-		struct filter *f = &http_filters[ findex ];
+		filter_t *f = &http_filters[ findex ];
 		char fpath[2048] = {0};
 
 		//Skip '.' & '..', and stop if you can't open it...
@@ -893,12 +893,12 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 #endif
 
 	fprintf( stderr, "Filters enabled:\n" );
-	for ( struct filter *f = http_filters; f->name; f++ ) {
+	for ( filter_t *f = http_filters; f->name; f++ ) {
 		fprintf( stderr, "[ %-16s ] %p\n", f->name, f->filter ); 
 	}
 
 	//TODO: Check if Lua is enabled first
-	for ( struct filter *f = http_filters; f->name; f++ ) {
+	for ( filter_t *f = http_filters; f->name; f++ ) {
 		if ( strcmp( f->name, "lua" ) == 0 ) {
 			isLuaEnabled = 1;
 			break;
