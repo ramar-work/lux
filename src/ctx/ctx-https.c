@@ -613,8 +613,6 @@ const int write_gnutls ( server_t *p, conn_t *conn ) {
 	// TODO: Still need to be mindful of who can and cannot support sendfile
      #ifdef SENDFILE_ENABLED
 	if ( rs->atype == ZHTTP_MESSAGE_SENDFILE ) {
-
-FPRINTF( "header length is %d\n", total );
 		//Send the header first
 		int hlen = total;	
 		for ( ; total; ) {
@@ -674,7 +672,6 @@ FPRINTF( "header length is %d\n", total );
 		FPRINTF( "Header write complete (sent %d out of %d bytes)\n", pos, hlen );
 
 		//Then send the file
-FPRINTF( "content-length is %d\n", rs->clen );
 		for ( total = rs->clen; total; ) {
 			//sent = sendfile( fd, rs->fd, NULL, CTX_WRITE_SIZE );
 			//TODO: Test this extensively, g->session should hold an open file
