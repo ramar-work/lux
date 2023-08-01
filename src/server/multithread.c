@@ -38,8 +38,9 @@ static void * server_proc( void *t ) {
 
 	// Close a file
 	if ( close( conn.fd ) == -1 ) {
-		snprintf( conn.err, sizeof( conn.err ), "Error closing TCP socket connection: %s\n", strerror( errno ) );
-		FPRINTF( conn.err );
+		snprintf( conn.err, sizeof( conn.err ), 
+			"Error closing TCP socket connection: %s\n", strerror( errno ) );
+		FPRINTF( "%s\n", conn.err );
 	}
 
 	#if 0
@@ -104,7 +105,7 @@ int srv_multithread( server_t *p ) {
 
 	// Define
 	pthread_attr_t attr;
-	const short int client_max = 12; // CLIENT_MAX_SIMULTANEOUS
+	const short int client_max = p->max_per; // CLIENT_MAX_SIMULTANEOUS
 
 	//Initialize thread attribute thing
 	if ( pthread_attr_init( &attr ) != 0 ) {

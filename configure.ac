@@ -1,7 +1,7 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ([2.71])
-AC_INIT([hypno],[0.3.8b],[ramar@ramar.work])
+AC_INIT([hypno],[0.4.0],[ramar@ramar.work])
 AC_CONFIG_SRCDIR([example/config.lua])
 
 # Define files to perform substitutions on
@@ -54,6 +54,7 @@ include_filter_c=1
 include_filter_lua=1
 include_filter_static=1
 include_filter_echo=1
+include_sendfile=1
 ld_flags="-ldl -lpthread -lm"
 cc="gcc"
 debug_flags=
@@ -305,6 +306,7 @@ AC_SUBST(with_json)
 AC_SUBST(with_msgpack)
 AC_SUBST(disable_tls)
 AC_SUBST(include_filter_c)
+AC_SUBST(include_sendfile)
 AC_SUBST(include_filter_lua)
 AC_SUBST(include_filter_static)
 AC_SUBST(include_filter_echo)

@@ -387,7 +387,7 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 			}
 			else {
 				FPRINTF( "TLS got error code: %d = %s.\n", rd, gnutls_strerror( rd ) );
-				snprintf( conn->err, sizeof( conn->err ), 
+				snprintf( conn->err, sizeof( conn->err ), "%s",
 					(char *)gnutls_strerror( rd ) );
 				return 0;
 			}
@@ -543,7 +543,8 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 			}
 			else {
 				//FPRINTF( "TLS got error code: %d = %s.\n", rd, gnutls_strerror( rd ) );
-				snprintf( conn->err, sizeof( conn->err ), (char *)gnutls_strerror( rd ) );
+				snprintf( conn->err, sizeof( conn->err ), "%s",
+					(char *)gnutls_strerror( rd ) );
 				return 0;
 			}
 			
@@ -610,8 +611,10 @@ const int write_gnutls ( server_t *p, conn_t *conn ) {
 	conn->stage = CONN_POST;
 
 	// TODO: Still need to be mindful of who can and cannot support sendfile
-     #if SENDFILE_ENABLED 
+     #ifdef SENDFILE_ENABLED
 	if ( rs->atype == ZHTTP_MESSAGE_SENDFILE ) {
+
+FPRINTF( "header length is %d\n", total );
 		//Send the header first
 		int hlen = total;	
 		for ( ; total; ) {
@@ -671,6 +674,7 @@ const int write_gnutls ( server_t *p, conn_t *conn ) {
 		FPRINTF( "Header write complete (sent %d out of %d bytes)\n", pos, hlen );
 
 		//Then send the file
+FPRINTF( "content-length is %d\n", rs->clen );
 		for ( total = rs->clen; total; ) {
 			//sent = sendfile( fd, rs->fd, NULL, CTX_WRITE_SIZE );
 			//TODO: Test this extensively, g->session should hold an open file
@@ -690,7 +694,7 @@ const int write_gnutls ( server_t *p, conn_t *conn ) {
 				struct timespec n = {0};
 				clock_gettime( CLOCK_REALTIME, &n );
 				
-				if ( ( n.tv_sec - timer.tv_sec ) > 5 ) {
+				if ( ( n.tv_sec - timer.tv_sec ) > p->timeout ) {
 					snprintf( conn->err, sizeof( conn->err ), 
 						"Timeout reached on write end of socket - body." );
 					return 0;

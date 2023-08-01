@@ -46,24 +46,24 @@ static int calc( lua_State *L, int alg ) {
 	memset( buf, 0, sizeof( buf ) );
 
 	if ( alg == 1 ) {
-		buflen = gnutls_hash_get_len( GNUTLS_MAC_SHA1 );
-		status = gnutls_hash_fast( GNUTLS_MAC_SHA1, src, srclen, &buf );
+		buflen = gnutls_hash_get_len( (gnutls_digest_algorithm_t)GNUTLS_MAC_SHA1 );
+		status = gnutls_hash_fast( (gnutls_digest_algorithm_t)GNUTLS_MAC_SHA1, src, srclen, &buf );
 	}
 	else if ( alg == 224 ) {
-		buflen = gnutls_hash_get_len( GNUTLS_MAC_SHA224 );
-		status = gnutls_hash_fast( GNUTLS_MAC_SHA224, src, srclen, &buf );
+		buflen = gnutls_hash_get_len( (gnutls_digest_algorithm_t)GNUTLS_MAC_SHA224 );
+		status = gnutls_hash_fast( (gnutls_digest_algorithm_t)GNUTLS_MAC_SHA224, src, srclen, &buf );
 	}
 	else if ( alg == 256 ){
-		buflen = gnutls_hash_get_len( GNUTLS_MAC_SHA256 );
-		status = gnutls_hash_fast( GNUTLS_MAC_SHA256, src, srclen, &buf );
+		buflen = gnutls_hash_get_len( (gnutls_digest_algorithm_t)GNUTLS_MAC_SHA256 );
+		status = gnutls_hash_fast( (gnutls_digest_algorithm_t)GNUTLS_MAC_SHA256, src, srclen, &buf );
 	}
 	else if ( alg == 384 ) {
-		buflen = gnutls_hash_get_len( GNUTLS_MAC_SHA384 );
-		status = gnutls_hash_fast( GNUTLS_MAC_SHA384, src, srclen, &buf );
+		buflen = gnutls_hash_get_len( (gnutls_digest_algorithm_t)GNUTLS_MAC_SHA384 );
+		status = gnutls_hash_fast( (gnutls_digest_algorithm_t)GNUTLS_MAC_SHA384, src, srclen, &buf );
 	}
 	else if ( alg == 512 ) {
-		buflen = gnutls_hash_get_len( GNUTLS_MAC_SHA512 );
-		status = gnutls_hash_fast( GNUTLS_MAC_SHA512, src, srclen, &buf );
+		buflen = gnutls_hash_get_len( (gnutls_digest_algorithm_t)GNUTLS_MAC_SHA512 );
+		status = gnutls_hash_fast( (gnutls_digest_algorithm_t)GNUTLS_MAC_SHA512, src, srclen, &buf );
 	}
 
 	//TODO: Let's be more specific about errors here.

@@ -191,11 +191,9 @@
  #define SESSION_DB_PATH CONFDIR "hypno.db"
 #endif
 
-/* Default model */
-#if 0
-#undef HBLOCK_H
-#undef HFORK_H
-#undef HTHREAD_H
+/* Use sendfile or not */
+#if @include_sendfile@
+ #define SENDFILE_ENABLED
 #endif
 
 /* Define to 1 if you have the `dl' library (-ldl). */

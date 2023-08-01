@@ -216,13 +216,13 @@ int fdset[ 10 ] = { -1 };
 
 // TODO: Move me to src/ctx/mock.c
 //In lieu of an actual ctx object, we do this to mock pre & post which don't exist
-const int fkctpre( server_t *, conn_t * ) {
+const int fkctpre( server_t *p, conn_t *c ) {
 	return 1;
 }
 
 // TODO: Move me to src/ctx/mock.c
 //const int fkctpost( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c) {
-const int fkctpost( server_t *, conn_t * ) {
+const int fkctpost( server_t *p, conn_t *c ) {
 	return 1;
 }
 
@@ -479,8 +479,9 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	// Prep this
 	server_t server; 
 	server.interrupt = 0;
+	server.max_per = 32;
 	server.ctx = &sr[ 0 ];
-	server.timeout = 5;
+	server.timeout = 30;
 	server.fd = -1;
 	server.data = NULL;
 	server.fdset = NULL;

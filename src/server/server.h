@@ -102,7 +102,7 @@ typedef struct conn_t {
 	int errlen;
 
 	// Error buffer
-	char err[ 128 ];
+	char err[ 256 ];
 
 	// Keep buffer for ipv4 address
 	char ipv4[ 32 ];
@@ -197,6 +197,9 @@ typedef struct server_t {
 
 	// Catch an interrupt
 	int interrupt;
+
+	// Client max simultaneous
+	short int max_per;
 
 #ifdef DEBUG_H
 	int tapout;

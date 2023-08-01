@@ -493,12 +493,11 @@ static unsigned char *httptrim (unsigned char *msg, const char *trim, int len, i
 // Initialize a new ZHTTP record
 static zhttpr_t * init_record() {
 	zhttpr_t *record = NULL;
-	record = malloc( sizeof( zhttpr_t ) );
-	if ( !record ) {
+	int size = sizeof( zhttpr_t );
+	if ( !( record = malloc( size ) ) || !memset( record, 0, size ) ) {
 		return NULL;
 	}
-	memset( record, 0, sizeof( zhttpr_t ) );
-	record->type = ZHTTP_NONE;
+	record->type = ZHTTP_NO_CONTENT;
 	return record;
 }
 

@@ -534,10 +534,10 @@ static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) 
 	res->status = 200;
 	res->ctype = (char *)mime->mimetype;
 	#else
-	http_set_fd( res, 200 ); 
-	http_set_content_length( res, sb.st_size ); 
-	http_set_message_type( res, ZHTTP_MESSAGE_SENDFILE ); 
-	http_set_status( res, 200 ); 
+	http_set_fd( res, fd );
+	http_set_content_length( res, sb.st_size );
+	http_set_message_type( res, ZHTTP_MESSAGE_SENDFILE );
+	http_set_status( res, 200 );
 	http_set_ctype( res, mime->mimetype );
 	#endif
 
@@ -1177,7 +1177,7 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 	//Execute each model
 	for ( struct imvc_t **m = ld.pp.imvc_tlist; m && *m; m++ ) {
 		//Define
-		char err[2048] = {0}, msymname[1024] = {0}, mpath[2048] = {0};
+		char err[2048] = {0}, msymname[1024] = {0}, mpath[ 2192 ] = {0};
 
 		//Check for a file
 		if ( *(*m)->file == 'a' ) {
@@ -1324,7 +1324,7 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 	for ( struct imvc_t **v = ld.pp.imvc_tlist; v && *v; v++ ) {
 		if ( *(*v)->file == 'v' ) {
 			int len = 0, renlen = 0;
-			char vpath[ 2048 ] = {0};
+			char vpath[ 2192 ] = {0};
 			unsigned char *src, *render;
 			zRender * rz = zrender_init();
 			zrender_set_default_dialect( rz );

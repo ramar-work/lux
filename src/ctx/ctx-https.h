@@ -28,14 +28,14 @@
 #include "../util.h"
 #include "../config.h"
 
-#if SENDFILE_ENABLED 
+#ifdef SENDFILE_ENABLED
  #include <sys/sendfile.h>
 #endif
 
 #if !defined(DISABLE_TLS) && !defined(CTXHTTPS_H)
  #include <gnutls/gnutls.h>
  #define CTXHTTPS_H
- #define CTXHTTPS_SNI_LENGTH 256
+ #define CTXHTTPS_SNI_LENGTH 128
 
 // TODO: Can probably trim this even more
 struct gnutls_abstr {

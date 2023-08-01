@@ -29,10 +29,23 @@ LDFLAGS = @ld_flags@
 DEBUGFLAGS = @debug_flags@
 MODEL = HTHREAD_H
 ASAN_OPTIONS = log_path=asan.log
-GCCFLAGS = -Wall -Werror -Wno-unused -Wno-strict-overflow -Wno-unused-result -Wno-strict-aliasing -Wno-format-truncation -Wno-return-local-addr -D$(MODEL) -O2 $(IFLAGS)
+BASEFLAGS = \
+	-Wall \
+	-Werror \
+	-Wno-unused \
+	-Wno-strict-overflow \
+	-Wno-unused-result \
+	-Wno-strict-aliasing
+GCCFLAGS = $(BASEFLAGS) \
+	-Wno-format-truncation \
+	-Wno-return-local-addr \
+	-O2 $(IFLAGS)
+CLANGFLAGS = $(BASEFLAGS) \
+	-O2 $(IFLAGS)
 INITMETHOD = @initsys@
 CFLAGS = $(GCCFLAGS) $(DEBUGFLAGS)
-CC = @cc@ 
+#CFLAGS = $(CLANGFLAGS) $(DEBUGFLAGS)
+CC = @cc@
 SRC = \
 	@srcdir@/vendor/zrender.c \
 	@srcdir@/vendor/ztable.c \
@@ -99,6 +112,12 @@ main: $(DEPS) $(OBJ)
 # NOTE this only works with Clang atm: -g -O0 -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
 debug: CFLAGS += -g -O0 $(DEBUGFLAGS)
 debug: main
+	@printf '' > /dev/null
+
+# clang - Builds code with debugging flags on (need logic for if CC == clang)
+clang: CC = clang
+clang: CFLAGS = $(CLANGFLAGS) -g -O0 -fsanitize=address -fsanitize-undefined-trap-on-error -DDEBUG_H
+clang: main
 	@printf '' > /dev/null
 
 # install - Runs a full system install
