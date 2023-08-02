@@ -937,14 +937,14 @@ void lt_printall ( zTable *t ) {
 		zhType kt;
 		int hash;	
 		const char *kk=NULL, *vv=NULL;
-		char bkbuf[1024] = {0}, 
-         strbuf[512] = {0},
-				 inbuf[11] = {0},
-				 habuf[11] = {0},
-         nmbuf[125] = {0};
+		char bkbuf[1024] = {0};
+		char strbuf[512] = {0};
+		char inbuf[12] = {0};
+		char habuf[12] = {0};
+		char nmbuf[125] = {0};
 
 		//Index
-		sprintf(inbuf, "%d", ii);
+		snprintf(inbuf, sizeof( inbuf ) - 1, "%d", ii);
 	
 		//Hashes
 		for ( int i=0, j=0; i < lt_max_slots ; i++ ) {
