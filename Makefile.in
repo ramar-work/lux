@@ -59,7 +59,7 @@ SRC = \
 	@srcdir@/src/lua.c \
 	@srcdir@/src/util.c \
 	@srcdir@/src/loader.c \
-	@srcdir@/src/log.c \
+	@srcdir@/src/logging/log.c \
 	@srcdir@/src/lua/lib.c \
 	@srcdir@/src/lua/db.c \
 	@srcdir@/src/lua/lua.c \
@@ -109,14 +109,18 @@ main: $(DEPS) $(OBJ)
 #	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(DEPS) $(LDFLAGS)
 
 # debug - Builds code with debugging flags on (need logic for if CC == clang)
-# NOTE this only works with Clang atm: -g -O0 -fsanitize=address -fsanitize-undefined-trap-on-error $(DEBUGFLAGS)
-debug: CFLAGS += -g -O0 $(DEBUGFLAGS)
+debug: CFLAGS += -g -O0 -DDEBUG_H
 debug: main
+	@printf '' > /dev/null
+
+# tight - Builds code with debugging flags on and ASAN
+tight: CFLAGS += -g -O1 -fsanitize=address -fno-omit-frame-pointer -DDEBUG_H
+tight: main
 	@printf '' > /dev/null
 
 # clang - Builds code with debugging flags on (need logic for if CC == clang)
 clang: CC = clang
-clang: CFLAGS = $(CLANGFLAGS) -g -O0 -fsanitize=address -fsanitize-undefined-trap-on-error -DDEBUG_H
+clang: CFLAGS = $(CLANGFLAGS) -g -O0 -fsanitize-undefined-trap-on-error -fsanitize=address -DDEBUG_H
 clang: main
 	@printf '' > /dev/null
 

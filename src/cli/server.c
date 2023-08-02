@@ -45,7 +45,7 @@
 #include <pwd.h>
 #include <pthread.h>
 #include "../config.h"
-#include "../log.h"
+#include "../logging/log.h"
 #include "../server/server.h"
 #if 0
 #include "../filters/filter-static.h"
@@ -155,6 +155,7 @@ struct values {
 	char libdir[ PATH_MAX ];
 	char pidfile[ PATH_MAX ];
 	model_t model;
+	short int maxper;
 #ifdef DEBUG_H
 	int tapout;
 #endif
@@ -169,6 +170,7 @@ struct values {
 ,	.uid = -1 
 ,	.gid = -1 
 ,	.model = SERVER_MULTITHREAD
+,	.maxper = 0 
 #ifdef DEBUG_H
 ,	.tapout = 32
 #endif
@@ -464,10 +466,9 @@ void see_runas_user ( struct values *v ) {
 #endif
 
 
-
 // Run a server
 int cmd_server ( struct values *v, char *err, int errlen ) {
-	
+
 	// Define all we need
 	struct sockaddr_in sa, *si = &sa;
 	//short unsigned int port = v->port, *pport = &port;
@@ -479,9 +480,12 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	// Prep this
 	server_t server; 
 	server.interrupt = 0;
-	server.max_per = 32;
+	server.max_per = !v->maxper ? 64 : v->maxper;
 	server.ctx = &sr[ 0 ];
 	server.timeout = 30;
+	server.ttimeout = 60;
+	server.rtimeout = 30;
+	server.wtimeout = 30;
 	server.fd = -1;
 	server.data = NULL;
 	server.fdset = NULL;
@@ -541,6 +545,9 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	if ( !( logfd = fopen( v->logfile, "a" ) ) ) {
 		return eprintf( "Couldn't open error log file at: %s...\n", logfile );
 	}
+
+	// Set reference
+	server.log_fd = logfd;
   #endif
 
   #if 0
@@ -553,6 +560,9 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	if ( !( accessfd = fopen( v->accessfile, "a" ) ) ) {
 		return eprintf( "Couldn't open access log file at: %s...\n", accessfile );
 	}
+
+	// Set reference
+	server.access_fd = accessfd;
   #endif
 
 	// Setup and open a TCP socket
@@ -915,6 +925,11 @@ int main ( int argc, char *argv[] ) {
 			OPTARG( *argv, "--access-file" );
 			memset( v.accessfile, 0, sizeof( v.accessfile ) );
 			snprintf( v.accessfile, sizeof( v.accessfile) - 1, "%s", *argv );
+		}
+		else if ( !strcmp( *argv, "--max-per" ) ) {
+			OPTARG( *argv, "--max-per" );
+			//TODO: This should be safeatoi 
+			v.maxper = atoi( *argv );
 		}
 	#ifdef DEBUG_H
 		else if ( !strcmp( *argv, "--tapout" ) ) {

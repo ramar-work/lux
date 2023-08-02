@@ -5,6 +5,9 @@
 #include <string.h>
 #include <time.h>
 
+#ifndef LOG_H
+#define LOG_H
+
 int f_open( char *name, void **d ) ;
 
 int f_close( void *d ) ;
@@ -29,10 +32,10 @@ struct log {
 	void *data;
 };
 
-struct loginfo {
-	char *ip;
+
+typedef struct loginfo_t {
+#if 0
 	unsigned long reqid;
-	struct timespec start;
 	char *ident;
 	char *id;
 	char *method;
@@ -44,6 +47,17 @@ struct loginfo {
 	int date;
 	int status;
 	int size;
+#endif
+	char *ip;
+	struct timespec start;
 	struct timespec end;
-};
+} loginfo_t;
 
+#define time_current(u) \
+	clock_gettime( CLOCK_REALTIME, u )
+
+int time_format ( struct timespec *, char *, int );
+int time_diff_sec ( struct timespec *, struct timespec * );
+long time_diff_nsec ( struct timespec *, struct timespec * );
+
+#endif

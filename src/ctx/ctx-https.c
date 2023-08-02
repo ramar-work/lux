@@ -298,10 +298,16 @@ const int pre_gnutls ( server_t *p, conn_t *conn ) {
 		
 			// Check here that this is a valid host
 			FPRINTF( "GOT SNI NAME: '%s'\n", g->sniname ); 
-			for ( struct lconfig **h = conn->config->hosts; h && *h ; h++ ) {
-				if ( (*h)->tlsready == 1 && ( !strcmp( g->sniname, (*h)->name ) || !strcmp( g->sniname, (*h)->alias ) ) ) {
-					invalid = 0;
-					break;
+			for ( struct lconfig **h = p->config->hosts; h && *h ; h++ ) {
+				if ( (*h)->tlsready == 1 ) {
+					if ( !strcmp( g->sniname, (*h)->name ) ) {
+						invalid = 0;
+						break;
+					}
+					else if ( (*h)->alias && !strcmp( g->sniname, (*h)->alias ) ) { 
+						invalid = 0;
+						break;
+					}
 				}
 			}
 
@@ -399,8 +405,9 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 				return 0;
 			}
 
-			// Just stop trying to read if you get here
-			if ( ( n.tv_sec - timer.tv_sec ) > p->timeout ) {
+			// TODO: This is after an arbitrary limit, we need to analyze
+			// thie size make sure that it is "worth it"
+			if ( ( n.tv_sec - timer.tv_sec ) >= p->rtimeout ) {
 				conn->stage = CONN_WRITE;
 				(void)http_set_error( rs, 408, "Timeout reached." );
 				return 1;
@@ -555,8 +562,7 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 				return 0;
 			}
 
-			if ( ( n.tv_sec - timer.tv_sec ) >= p->timeout ) {
-				conn->count = -3;
+			if ( ( n.tv_sec - timer.tv_sec ) >= p->rtimeout ) {
 				conn->stage = CONN_WRITE;
 				(void)http_set_error( rs, 408, "Timeout reached." );
 				return 1;
@@ -581,7 +587,6 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 
 	//Finally, process the body (chunked may still need something fancy)
 	if ( !http_parse_content( rq, rq->msg, rq->clen ) ) {
-		conn->count = -3;
 		conn->stage = CONN_WRITE;
 		return http_set_error( rs, 500, (char *)rq->errmsg ); 
 	}
@@ -657,7 +662,7 @@ const int write_gnutls ( server_t *p, conn_t *conn ) {
 				struct timespec n = {0};
 				clock_gettime( CLOCK_REALTIME, &n );
 				
-				if ( ( n.tv_sec - timer.tv_sec ) >= p->timeout ) {
+				if ( ( n.tv_sec - timer.tv_sec ) >= p->wtimeout ) {
 					// Cut if we can't get this message out for some reason
 					snprintf( conn->err, sizeof( conn->err ), 
 						"Timeout reached on write end of socket - header." );
@@ -691,7 +696,7 @@ const int write_gnutls ( server_t *p, conn_t *conn ) {
 				struct timespec n = {0};
 				clock_gettime( CLOCK_REALTIME, &n );
 				
-				if ( ( n.tv_sec - timer.tv_sec ) > p->timeout ) {
+				if ( ( n.tv_sec - timer.tv_sec ) > p->wtimeout ) {
 					snprintf( conn->err, sizeof( conn->err ), 
 						"Timeout reached on write end of socket - body." );
 					return 0;
@@ -762,7 +767,7 @@ const int write_gnutls ( server_t *p, conn_t *conn ) {
 			struct timespec n = {0};
 			clock_gettime( CLOCK_REALTIME, &n );
 			
-			if ( ( n.tv_sec - timer.tv_sec ) > p->timeout ) {
+			if ( ( n.tv_sec - timer.tv_sec ) > p->wtimeout ) {
 				snprintf( conn->err, sizeof( conn->err ), 
 					"Timeout reached on write end of socket - body." );
 				return 0;

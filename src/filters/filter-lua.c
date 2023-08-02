@@ -1098,7 +1098,7 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 	ld.req = conn->req; 
 	ld.res = conn->res;
 	ld.res->atype = ZHTTP_MESSAGE_MALLOC;
-	memcpy( (void *)ld.root, conn->hconfig->dir, strlen( conn->hconfig->dir ) );
+	memcpy( (void *)ld.root, conn->config->dir, strlen( conn->config->dir ) );
 
 	//Then initialize the Lua state
 	if ( !( ld.state = luaL_newstate() ) ) {

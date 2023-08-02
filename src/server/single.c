@@ -18,7 +18,6 @@ int srv_single ( server_t *p ) {
 		conn_t conn;
 		memset( &conn, 0, sizeof( conn_t ) );
 		conn.count = 0;
-		conn.status = 0;
 		conn.data = NULL;
 		//conn.start = 0;
 		//conn.end = 0;

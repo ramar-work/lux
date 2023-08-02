@@ -6,26 +6,11 @@
 
 #include "server.h"
 #include "../config.h"
+#include "../logging/log.h"
 
-typedef enum threadstatus_t {
-	THREAD_AVAILABLE = 0,
-	THREAD_ACTIVE,
-	THREAD_INACTIVE
-} threadstatus_t;
-
-// TODO: Eventually, this will be replaced by conn_t
-struct threadinfo_t {
-	int fd;
-	//char running;	
-	threadstatus_t running;	
-	pthread_t id;
-	char ipaddr[ 128 ]; // Might be a little heavy..
-	//protocol_t *ctx;
-	server_t *server;
-#if 0
-	struct timespec start;
-	struct timespec end;
-#endif	
-};
+#ifndef SRCSRV_MULTITHREAD_H
+#define SRCSRV_MULTITHREAD_H
 
 int srv_multithread ( server_t * );
+
+#endif

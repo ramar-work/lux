@@ -91,6 +91,7 @@ static struct lconfig ** build_hosts ( zTable *t ) {
 	if ( !loader_run( t, rules ) ) {
 		//...
 	}
+
 	return hosts;
 }
 
@@ -215,6 +216,44 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 		free( config );
 		lua_close( L );
 		return NULL;
+	}
+
+	//Check it for any inconsistencies
+	for ( struct lconfig **h = config->hosts; h && *h ; h++ ) {
+		if ( !(*h)->name ) {
+			snprintf( err, errlen, 
+				"Parse issue at server config file: %s\n", file );
+			free_t( t );
+			free( config );
+			lua_close( L );
+			return NULL;
+		}
+
+		if ( !(*h)->dir ) {
+			snprintf( err, errlen, 
+				"Directory (key 'dir') not specified for host '%s' at config file: %s\n", (*h)->name, file );
+			free_t( t );
+			free( config );
+			lua_close( L );
+			return NULL;
+		}
+
+		if ( !(*h)->filter ) {
+			snprintf( err, errlen, 
+				"Filter (key 'filter' not specified for host '%s' at config file: %s\n", (*h)->name, file );
+			free_t( t );
+			free( config );
+			lua_close( L );
+			return NULL;
+		}
+	#if 0
+		// This will never be a failure, but it needs to be far more flexible
+		// Honestly, just turning this into a hash table works much better...
+		if ( !(*h)->alias ) {
+			snprintf( err, errlen, 
+				"Filter (key 'filter' not specified for host '%s' at config file: %s\n", (*h)->name, file );
+		}
+	#endif
 	}
 
 	//This is the web root 
