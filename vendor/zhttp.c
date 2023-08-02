@@ -343,7 +343,7 @@ char *zhttp_url_encode ( unsigned char *p, int len ) {
 
 // Decode a string
 unsigned char *zhttp_url_decode ( char *p, int len, int *nlen ) {
-	int nl = 0;
+	size_t nl = 0;
 	unsigned char *m = NULL;
 	static const unsigned char base[] = {
 		['0'] = 0
@@ -597,19 +597,39 @@ static int http_get_content_length ( zhttpr_t **list ) {
 }
 
 
+#if 0
+char a[] =
+	"multipart/form-data; boundary=----WebKitFormBoundaryAvA33EhHy5kGaWO\r\n\r\n";
+char b[] =
+	"application/json; charset=utf-8\r\n\r\n";
+char c[] = 
+	"application/octet-stream\r\n\r\n";
+char d[] = 
+	"something/weird; boundary=----WebKitFormBoundaryAvA33EhHy5kGaWO; charset=utf-8\r\n\r\n";
+#endif
 
 // Return the content type of the response or request
-static char * http_get_content_type ( zhttpr_t **list, HttpContentType *type ) {
+static char * http_get_content_type ( zhttp_t *en, zhttpr_t **list, HttpContentType *type ) {
+
 	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
 		for ( const char **id = zhttp_content_type_id; *id; id++ ) { 
-			const char *f = (*slist)->field;
 			if ( strcmp( (*slist)->field, *id ) == 0 ) {
+				int a = 0; 
 				int s = (*slist)->size;
 				char *ctype = (char *)(*slist)->value;
+				unsigned char *v = (*slist)->value;
+
+fprintf( stderr, "Original:\n" );
+write( 2, (*slist)->value, (*slist)->size );
+
+				// Set and initialize the most important structures
+				en->ctype = ctype;
+				en->boundary = NULL;
+				en->charset = NULL;
 
 				// Nul-terminate the content type header
 				// TODO: Works, but is a bit gnarly for most to look at...
-				for ( unsigned char *v = (*slist)->value; ( *v != '\r' ) || ( *v = '\0' ); v++ );
+				for ( ; ( *v != '\r' && *v != ';' ) || ( *v = '\0' ); v++, a++, s-- );
 
 				if ( memcmp( ctype, zhttp_multipart, strlen( zhttp_multipart ) ) == 0 )
 					*type = ZHTTP_MULTIPART;
@@ -618,6 +638,31 @@ static char * http_get_content_type ( zhttpr_t **list, HttpContentType *type ) {
 				else {
 					*type = ZHTTP_OTHER;
 				}
+
+				// Trim any white space 
+				for ( ; ( *v == ' ' ); v++, a++, s-- );
+
+				// Set boundary and charset if any
+				for ( ; ( *v != '\r' ) || ( *v = '\0' ) ; v++, s-- ) {
+					//If you see a '=', check for either boundary or the other
+					if ( s > 9 && memcmp( v, "boundary=", 9 ) == 0 )
+						en->boundary = (char *)v + 9;
+					else if ( s > 8 && memcmp( v, "charset=", 8 ) == 0 ) {
+						en->charset = (char *)v + 8;
+					}
+
+					//Check for these things
+					if ( *v == ';' ) {
+						*v = '\0';
+					}
+				}
+
+			#if 1
+				fprintf( stderr, "CTYPE: %s\n", en->ctype );
+				fprintf( stderr, "BOUNDARY: %s\n", en->boundary );
+				fprintf( stderr, "CHARSET: %s\n", en->charset );
+			#endif
+
 				return ctype;
 			}
 		}
@@ -627,29 +672,6 @@ static char * http_get_content_type ( zhttpr_t **list, HttpContentType *type ) {
 	return (char *)default_content_type;
 }
 
-
-
-// Return the boundary string in use with a multipart body
-static char * http_get_boundary ( zhttpr_t **list ) {
-	
-	const char *bnd = "boundary=";
-	int blen = strlen( bnd );
-
-	// TODO: Theoretically, I can now use the content-type member...
-	for ( zhttpr_t **slist = list; slist && *slist; slist++ ) {
-		const char *f = (*slist)->field;
-	
-		// TODO: Either make this a loop or use a helper to trim down on line length
-		// TODO: This is repetitive
-		if ( !strcmp( f, "Content-Type" ) || !strcmp( f, "content-type" ) || !strcmp( f, "Content-type" ) ) {
-			int s = (*slist)->size;
-			for ( unsigned char *v = (*slist)->value; ( *v != '\r' && s > 1 ) || ( *v = '\0' ); v++, s-- );
-			char *c = memstr( (*slist)->value, bnd, (*slist)->size );
-			return c += blen;
-		}
-	}
-	return NULL;
-}
 
 
 
@@ -857,13 +879,13 @@ zhttp_t * http_parse_header ( zhttp_t *en, int plen ) {
 	if ( !( en->host = http_get_host( en, en->headers, &en->port ) ) && en->port == -1 )
 		return fatal_error( en, ZHTTP_INVALID_PORT );
 
-	if ( !( en->ctype = http_get_content_type( en->headers, &en->formtype ) ) )
+	if ( !( en->ctype = http_get_content_type( en, en->headers, &en->formtype ) ) )
 		return fatal_error( en, ZHTTP_UNSPECIFIED_CONTENT_TYPE );
 
 	if ( en->idempotent && ( en->clen = http_get_content_length( en->headers ) ) < 0 )
 		return fatal_error( en, ZHTTP_INVALID_CONTENT_LENGTH );
 
-	if ( en->formtype == ZHTTP_MULTIPART && !( en->boundary = http_get_boundary( en->headers ) ) )
+	if ( en->formtype == ZHTTP_MULTIPART && !en->boundary )
 		return fatal_error( en, ZHTTP_UNSPECIFIED_MULTIPART_BOUNDARY );
 
 	return en;

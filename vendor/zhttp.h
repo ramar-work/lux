@@ -273,12 +273,7 @@ typedef struct HTTPRecord {
 typedef struct HTTPBody {
 	char *path;
 	char *ctype; 
-#if 0
-	char *sctype;  // simplified content-type
-	const char *ctype_encoding;
-	const char *ctype_mimetype;
-	const char *ctype_boundary;
-#endif
+	char *charset;
 	char *host;
 	char *method;
 	char *protocol;
