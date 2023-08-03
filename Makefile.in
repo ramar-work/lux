@@ -162,7 +162,7 @@ systemd-install:
 		s#__LOGDIR__#$(LOGDIR)#g; \
 		s#__WWWROOT__#$(WWWROOT)#; \
 		s/__WWWPORT__/$(WWWPORT)/; \
-	}" $(srcdir)/etc/etc.systemd.system.hypnotls.service > $(SVCPATH)/$(BINNAME)tls.service
+	}" $(srcdir)/etc/etc.systemd.system.hypno.service > $(SVCPATH)/$(BINNAME).service
 
 # cygwin-install - Installs hypno as a service suitable for use with Cygwin 
 cygwin-install:
