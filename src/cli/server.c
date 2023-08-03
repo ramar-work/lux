@@ -15,7 +15,6 @@
  *   --fork             Daemonize the server          
  *   --configuration <arg>     Use this file for configuration
  *   --port <arg>       Set a differnt port           
- *   --ssl              Use ssl or not..              
  *   --user <arg>       Choose a user to start as     
  * 
  * LICENSE
@@ -105,7 +104,6 @@
 	"-b, --database <arg>     Define a specific database connection.\n"\
 	"-x, --dump-args          Dump passed arguments.\n" \
 	"    --no-fork            Do not fork\n" \
-	"    --use-ssl            Use SSL\n" \
 	"    --debug              set debug rules\n"
 #endif
 
@@ -116,15 +114,7 @@
 	fprintf( stderr, "\n" ) \
 	) ? 0 : 0
 
-const int defport = 2000;
-
-char * logfile = "/var/log/hypno-error.log";
-
-char * accessfile = "/var/log/hypno-access.log";
-
-const char libn[] = "libname";
-
-const char appn[] = "filter";
+const int defport = DEFAULT_WWW_PORT;
 
 char pidbuf[128] = {0};
 
@@ -132,16 +122,27 @@ FILE * logfd = NULL, * accessfd = NULL;
 
 protocol_t *ctx = NULL;
 
+int procpid = 0;
+
+int fdset[ 10 ] = { -1 };
+
 typedef enum model_t {
 	SERVER_ONESHOT = 0,
-	SERVER_FORK,
 	SERVER_MULTITHREAD,
 } model_t;
+
+
+
+typedef enum userprotocol_t {
+	UP_HTTP = 0,
+	UP_HTTPS
+} userprotocol_t;
+
+
 
 struct values {
 	int port;
 	pid_t pid;
-	int ssl;
 	int start;
 	int kill;
 	int fork;
@@ -155,29 +156,30 @@ struct values {
 	char libdir[ PATH_MAX ];
 	char pidfile[ PATH_MAX ];
 	model_t model;
+	userprotocol_t userprotocol;
 	short int maxper;
 #ifdef DEBUG_H
 	int tapout;
 #endif
 } v = {
 	.port = 80
-,	.pid = 80 
-,	.ssl = 0 
-,	.start = 0 
-,	.kill = 0 
-,	.fork = 0 
-,	.dump = 0 
-,	.uid = -1 
-,	.gid = -1 
+,	.pid = 0
+,	.start = 0
+,	.kill = 0
+,	.fork = 0
+,	.dump = 0
+,	.uid = -1
+,	.gid = -1
 ,	.model = SERVER_MULTITHREAD
-,	.maxper = 0 
+,	.userprotocol = UP_HTTP
+,	.maxper = 0
 #ifdef DEBUG_H
 ,	.tapout = 32
 #endif
 };
 
 
-//Define a list of filters
+
 filter_t http_filters[] = { 
 #if 0
 	{ "static", filter_static }
@@ -205,29 +207,82 @@ filter_t http_filters[] = {
 };
 
 
+
+protocol_t sr[] = {
+	{ "http", read_notls, write_notls, create_notls, free_notls, pre_notls, post_notls },
+	{ "https", read_gnutls, write_gnutls, create_gnutls, free_gnutls, pre_gnutls, post_gnutls },
+#if 0
+	{ "dns", read_dns, write_dns, create_dns, NULL, pre_dns, post_dns },
+	{ "rtmp", read_rtmp, write_rtmp, create_rtmp, NULL, pre_rtmp, post_rtmp },
+#endif
+	{ NULL }
+};
+
+
+
 struct log loggers[] = {
 	{ f_open, f_close, f_write, f_handler }
 ,	{ sqlite3_log_open, sqlite3_log_close, sqlite3_log_write, sqlite3_handler }
 };
 
-int cmd_kill ( struct values *, char *, int );
 
-int procpid = 0;
 
-int fdset[ 10 ] = { -1 };
+// We can drop privileges permanently
+int revoke_priv ( struct values *v, char *err, int errlen ) {
+	//You're root, but you need to drop to v->user, v->group
+	//This can fail in a number of ways:
+	//- you're not root, 
+	//- the user or group specified does not exist
+	//- completely different thing could go wrong
+	//Privilege seperation should be done here.
+	struct passwd *p = getpwnam( v->user );
+	gid_t ogid = v->gid, ngid;
+	uid_t ouid = v->uid, nuid; 
 
-// TODO: Move me to src/ctx/mock.c
-//In lieu of an actual ctx object, we do this to mock pre & post which don't exist
-const int fkctpre( server_t *p, conn_t *c ) {
+	//uid and gid should be blank if a user was specified
+	if ( ouid == -1 ) {
+		ogid = getegid(), ouid = geteuid();	
+	}
+
+	//Die if we can't find the user that we're supposed to run as
+	if ( !p ) {
+		snprintf( err, errlen, "user %s not found.\n", v->user );
+		return 0;
+	}
+
+	//This is the user to switch to
+	ngid = p->pw_gid, nuid = p->pw_uid;
+
+	//Finally, if the two aren't the same, switch to the new one
+	if ( ngid != ogid ) {
+		char *gname = getpwuid( ngid )->pw_name;
+	#if 1
+		if ( setegid( ngid ) == -1 || setgid( ngid ) == -1 ) {
+	#else
+		if ( setreuid( ngid, ngid ) == -1 ) {
+	#endif
+			snprintf( err, errlen, "Failed to set run-as group '%s': %s\n", gname, strerror( errno ) );
+			return 0;
+		}
+	} 
+
+	//seteuid does not work, why?
+	if ( nuid != ouid ) {
+	#if 1
+		if ( /*seteuid( nuid ) == -1 || */ setuid( nuid ) == -1 ) {
+	#else
+		if ( setreuid( nuid, nuid ) == -1 ) {
+	#endif
+			snprintf( err, errlen, "Failed to set run-as user '%s': %s\n", p->pw_name, strerror( errno ) );
+			return 0;
+		}
+	}
 	return 1;
 }
 
-// TODO: Move me to src/ctx/mock.c
-//const int fkctpost( int fd, zhttp_t *a, zhttp_t *b, struct cdata *c) {
-const int fkctpost( server_t *p, conn_t *c ) {
-	return 1;
-}
 
+
+// Write the process ID
 int write_pid( int pid, char *pidfile ) {
 
 	char buf[ 64 ] = { 0 };
@@ -254,6 +309,9 @@ int write_pid( int pid, char *pidfile ) {
 	return 1;
 }
 
+
+
+// A sigkill handler
 void sigkill( int signum ) {
 	fprintf( stderr, "Received SIGKILL - Killing the server...\n" );
 	char err[ 2048 ] = {0};
@@ -303,24 +361,10 @@ void sigkill( int signum ) {
 
 
 
-//Define a list of "context types"
-protocol_t sr[] = {
-#if 1
-	{ "http", read_notls, write_notls, create_notls, free_notls, pre_notls, post_notls },
-#endif
-#if 1
-	{ "https", read_gnutls, write_gnutls, create_gnutls, free_gnutls, pre_gnutls, post_gnutls },
-#endif
-#if 0
-	{ "dns", read_dns, write_dns, create_dns, NULL, pre_dns, post_dns },
-#endif
-#if 0
-	{ "rtmp", read_rtmp, write_rtmp, create_rtmp, NULL, pre_rtmp, post_rtmp },
-#endif
-	{ NULL }
-};
 
 
+
+// Use the command line to kill a running server
 int cmd_kill ( struct values *v, char *err, int errlen ) {
 	//Open a file
 	struct stat sb;
@@ -389,70 +433,6 @@ int cmd_kill ( struct values *v, char *err, int errlen ) {
 }
 
 
-//We can drop privileges permanently
-int revoke_priv ( struct values *v, char *err, int errlen ) {
-	//You're root, but you need to drop to v->user, v->group
-	//This can fail in a number of ways:
-	//- you're not root, 
-	//- the user or group specified does not exist
-	//- completely different thing could go wrong
-	//Privilege seperation should be done here.
-	struct passwd *p = getpwnam( v->user );
-	gid_t ogid = v->gid, ngid;
-	uid_t ouid = v->uid, nuid; 
-
-	//uid and gid should be blank if a user was specified
-	if ( ouid == -1 ) {
-		ogid = getegid(), ouid = geteuid();	
-	}
-
-	//Die if we can't find the user that we're supposed to run as
-	if ( !p ) {
-		snprintf( err, errlen, "user %s not found.\n", v->user );
-		return 0;
-	}
-
-	//This is the user to switch to
-	ngid = p->pw_gid, nuid = p->pw_uid;
-
-	//Finally, if the two aren't the same, switch to the new one
-	if ( ngid != ogid ) {
-		char *gname = getpwuid( ngid )->pw_name;
-	#if 1
-		if ( setegid( ngid ) == -1 || setgid( ngid ) == -1 ) {
-	#else
-		if ( setreuid( ngid, ngid ) == -1 ) {
-	#endif
-			snprintf( err, errlen, "Failed to set run-as group '%s': %s\n", gname, strerror( errno ) );
-			return 0;
-		}
-	} 
-
-	//seteuid does not work, why?
-	if ( nuid != ouid ) {
-	#if 1
-		if ( /*seteuid( nuid ) == -1 || */ setuid( nuid ) == -1 ) {
-	#else
-		if ( setreuid( nuid, nuid ) == -1 ) {
-	#endif
-			snprintf( err, errlen, "Failed to set run-as user '%s': %s\n", p->pw_name, strerror( errno ) );
-			return 0;
-		}
-	}
-	return 1;
-}
-
-
-#if 0
-void see_runas_user ( struct values *v ) {
-	fprintf( stderr, "username: %s\n", p->pw_name	 );
-	fprintf( stderr, "current user id: %d\n", ouid );
-	fprintf( stderr, "current group id: %d\n", ogid );
-	fprintf( stderr, "runas user id: %d\n", p->pw_uid );
-	fprintf( stderr, "runas group id: %d\n", p->pw_gid );
-}
-#endif
-
 
 // Run a server
 int cmd_server ( struct values *v, char *err, int errlen ) {
@@ -469,7 +449,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	server_t server; 
 	server.interrupt = 0;
 	server.max_per = !v->maxper ? 64 : v->maxper;
-	server.ctx = &sr[ 0 ];
 	server.timeout = 30;
 	server.ttimeout = 60;
 	server.rtimeout = 30;
@@ -484,7 +463,17 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	#ifdef DEBUG_H
 	server.tapout = v->tapout;
 	#endif
-	//*pport = server.port;
+
+	// Check that the protocol choice is valid and set a reference
+	if ( v->userprotocol == UP_HTTP )
+		server.ctx = &sr[ (int)UP_HTTP ];
+	else if ( v->userprotocol == UP_HTTPS )
+		server.ctx = &sr[ (int)UP_HTTPS ];
+	else {
+		snprintf( err, errlen, "Invalid protocol specified...\n" );
+		return 0;
+	}
+	 
 
 	// Logging functions are now a context of their own.
 	// But locking will most likely be needed, so either
@@ -492,14 +481,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	// control. 
 	// server.log = -1;
 	// server.access = -1;
-
-	// TODO: Come back to this...
-	// server.filters = -1;
-
-	// Prep the timers and mark the start time 
-	//memset( &server.start, 0, sizeof( struct timespec ) );
-	//memset( &server.end, 0, sizeof( struct timespec ) );
-	//clock_gettime( CLOCK_REALTIME, &server.start ); 
 
 	//Die if config is null or file not there 
 	if ( !( server.conffile = v->config ) ) {
@@ -531,7 +512,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
   #else
 	// Open a log file here
 	if ( !( logfd = fopen( v->logfile, "a" ) ) ) {
-		return eprintf( "Couldn't open error log file at: %s...\n", logfile );
+		return eprintf( "Couldn't open error log file at: %s...\n", v->logfile );
 	}
 
 	// Set reference
@@ -546,7 +527,7 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
   #else
 	// Open an access file too 
 	if ( !( accessfd = fopen( v->accessfile, "a" ) ) ) {
-		return eprintf( "Couldn't open access log file at: %s...\n", accessfile );
+		return eprintf( "Couldn't open access log file at: %s...\n", v->accessfile );
 	}
 
 	// Set reference
@@ -695,11 +676,15 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 
 
 
+#if 0
+// Previously was able to use shared objects, very unsure about this
 int cmd_libs( struct values *v, char *err, int errlen ) {
 	//Define
 	DIR *dir;
 	struct dirent *d;
 	int findex = 0;
+	const char *appn = "filter";
+	const char *libn = "libname";
 
 	//Find the last index
 	for ( filter_t *f = http_filters; f->name; f++, findex++ );
@@ -749,69 +734,52 @@ int cmd_libs( struct values *v, char *err, int errlen ) {
 
 	return 1;
 }
+#endif
 
 
 
-//dump
+// Dump the user's command line 
 int cmd_dump( struct values *v, char *err, int errlen ) {
 	int isLuaEnabled = 0;
 	fprintf( stderr, "Hypno is running with the following settings.\n" );
 	fprintf( stderr, "===============\n" );
 	fprintf( stderr, "Port:                %d\n", v->port );
-	fprintf( stderr, "Using SSL?:          %s\n", v->ssl ? "T" : "F" );
-	fprintf( stderr, "Daemonized:          %s\n", v->fork ? "T" : "F" );
 	fprintf( stderr, "User:                %s (%d)\n", v->user, v->uid );
 	fprintf( stderr, "Group:               %s (%d)\n", v->group, v->gid );
-	fprintf( stderr, "Config File:         %s\n", v->config );
+	fprintf( stderr, "Server config File:  %s\n", v->config );
 	fprintf( stderr, "PID file:            %s\n", v->pidfile );
-	fprintf( stderr, "Library Directory:   %s\n", v->libdir );
 	fprintf( stderr, "Config Directory:    %s\n", CONFDIR );
 	fprintf( stderr, "Share Directory:     %s\n", SHAREDIR );
 	fprintf( stderr, "Session DB:          %s\n", SESSION_DB_PATH );
-#ifdef HFORK_H
-	fprintf( stderr, "Running in fork mode.\n" );
-#endif
-#ifdef HTHREAD_H
-	fprintf( stderr, "Running in threaded mode.\n" );
-#endif
-#ifdef HBLOCK_H
-	fprintf( stderr, "Running in blocking mode (NOTE: Performance will suffer, only use this for testing).\n" );
-#endif
-#ifdef LEAKTEST_H
- 	fprintf( stderr, "Leak testing is enabled, server will stop after %d requests.\n",
-		LEAKLIMIT ); 
-#endif
+	fprintf( stderr, "Model:               %s\n", 
+		v->model == SERVER_ONESHOT ? "oneshot" : "multithread" );
+	fprintf( stderr, "Default Protocol:    %s\n", 
+		v->userprotocol == UP_HTTP ? "http" : "https" );
+	//fprintf( stderr, "Daemonized:          %s\n", v->fork ? "T" : "F" );
+	//fprintf( stderr, "Library Directory:   %s\n", v->libdir );
 
-	fprintf( stderr, "Filters enabled:\n" );
+	fprintf( stderr, "Filters enabled:     " );
 	for ( filter_t *f = http_filters; f->name; f++ ) {
-		fprintf( stderr, "[ %-16s ] %p\n", f->name, f->filter ); 
+		fprintf( stderr, "%s (%p), ", f->name, f->filter ); 
 	}
+	fprintf( stderr, "\n" );
 
-	//TODO: Check if Lua is enabled first
 	for ( filter_t *f = http_filters; f->name; f++ ) {
 		if ( strcmp( f->name, "lua" ) == 0 ) {
-			isLuaEnabled = 1;
+			fprintf( stderr, "Lua modules enabled: " );
+			for ( struct lua_fset *f = functions; f->namespace; f++ ) {
+				f->functions ? fprintf( stderr, "%s, ", f->namespace ) : 0;
+			} 
+			fprintf( stderr, "\n" );
 			break;
 		}
 	}
 
-#if 1
-	if ( isLuaEnabled ) {
-		fprintf( stderr, "Lua modules enabled:\n" );
-		for ( struct lua_fset *f = functions; f->namespace; f++ ) {
-			fprintf( stderr, "[ %-16s ] %p\n", f->namespace, f->functions ); 
-		} 
-	}
-#endif
-
-
-#if 0
-	// TODO: Should only be supported in debug mode.
-	// TODO: Also should be a bit shorter...
-	// TODO: Also should only display if TLS is enabled...
-	if ( 1 ) {
+#ifdef DEBUG_H
+	if ( 0 ) {
 		fprintf( stderr, "GnuTLS supported ciphersuites\n" );
 		fprintf( stderr, "=============================\n" );
+		// TODO: output to buffer so that we can control formatting and print to one line
 		for ( const gnutls_cipher_algorithm_t *cip = gnutls_cipher_list(); cip && *cip; cip++ ) {
 			const char *cname = gnutls_cipher_get_name( *cip );
 			fprintf( stderr, "%s\n", cname );
@@ -822,21 +790,8 @@ int cmd_dump( struct values *v, char *err, int errlen ) {
 }
 
 
-//...
-void print_options ( struct values *v ) {
-	const char *fmt = "%-10s: %s\n";
-	fprintf( stderr, "%s invoked with options:\n", __FILE__ );
-	fprintf( stderr, "%10s: %d\n", "start", v->start );	
-	fprintf( stderr, "%10s: %d\n", "kill", v->kill );	
-	fprintf( stderr, "%10s: %d\n", "port", v->port );	
-	fprintf( stderr, "%10s: %d\n", "fork", v->fork );	
-	fprintf( stderr, "%10s: %s\n", "config", v->config );	
-	fprintf( stderr, "%10s: %s\n", "user", v->user );	
-	fprintf( stderr, "%10s: %s\n", "ssl", v->ssl ? "true" : "false" );	
-}
 
-
-
+// The main program
 int main ( int argc, char *argv[] ) {
 	char err[ 2048 ] = { 0 };
 	int *port = NULL; 
@@ -845,7 +800,6 @@ int main ( int argc, char *argv[] ) {
 	struct values v = { 0 };
 	v.port = 80;
 	v.pid = 80;
-	v.ssl = 0 ;
 	v.start = 0; 
 	v.kill = 0 ;
 	v.fork = 0 ;
@@ -876,12 +830,6 @@ int main ( int argc, char *argv[] ) {
 			v.kill = 1;
 		else if ( OPTEVAL( *argv, "-x", "--dump" ) ) 
 			v.dump = 1;
-		else if ( !strcmp( *argv, "--model=threaded" ) ) 
-			v.model = SERVER_MULTITHREAD;
-		else if ( !strcmp( *argv, "--model=oneshot" ) ) 
-			v.model = SERVER_ONESHOT;
-		else if ( !strcmp( *argv, "--use-ssl" ) ) 
-			v.ssl = 1;
 		else if ( OPTEVAL( *argv, "-c", "--configuration" ) ) {
 			OPTARG( *argv, "--configuration" );
 			snprintf( v.config, sizeof( v.config ) - 1, "%s", *argv );	
@@ -918,6 +866,14 @@ int main ( int argc, char *argv[] ) {
 			//TODO: This should be safeatoi 
 			v.maxper = atoi( *argv );
 		}
+		else if ( !strcmp( *argv, "--model=threaded" ) ) 
+			v.model = SERVER_MULTITHREAD;
+		else if ( !strcmp( *argv, "--model=oneshot" ) ) 
+			v.model = SERVER_ONESHOT;
+		else if ( !strcmp( *argv, "--protocol=http" ) ) 
+			v.userprotocol = UP_HTTP;
+		else if ( !strcmp( *argv, "--protocol=https" ) ) 
+			v.userprotocol = UP_HTTPS;
 	#ifdef DEBUG_H
 		else if ( !strcmp( *argv, "--tapout" ) ) {
 			OPTARG( *argv, "--tapout" );

@@ -284,17 +284,20 @@ $(DISTDIR).tar.gz: $(DISTDIR)
 $(DISTDIR):
 	rm -f $(DISTDIR).tar.gz
 	rm -rf $(DISTDIR)
-	mkdir -p $(DISTDIR)/src \
-		$(DISTDIR)/vendor \
-		$(DISTDIR)/include \
+	mkdir -p \
+		$(DISTDIR)/bin \
 		$(DISTDIR)/etc \
 		$(DISTDIR)/example \
-		$(DISTDIR)/bin \
-		$(DISTDIR)/lib
+		$(DISTDIR)/include \
+		$(DISTDIR)/lib \
+		$(DISTDIR)/share \
+		$(DISTDIR)/src \
+		$(DISTDIR)/vendor
 	cp $(FILES) $(DISTDIR)/
 	cp -r etc/* $(DISTDIR)/etc/
-	cp -r src/* $(DISTDIR)/src/
 	cp -r example/* $(DISTDIR)/example/
+	cp -r src/* $(DISTDIR)/src/
+	cp -r share/* $(DISTDIR)/share/
 	cp -r vendor/*.[ch] vendor/lua-$(LUAVER)/ $(DISTDIR)/vendor/
 
 # Check that packaging worked (super useful for other distributions...) 

@@ -1,7 +1,7 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ([2.71])
-AC_INIT([hypno],[0.4.0],[ramar@ramar.work])
+AC_INIT([hypno],[0.9b],[ramar@ramar.work])
 AC_CONFIG_SRCDIR([example/config.lua])
 
 # Define files to perform substitutions on
@@ -18,7 +18,7 @@ AC_CONFIG_FILES([Makefile src/config.h])
 
 # Variables that would have a default variable in the Makefile
 wwwroot="/var/www"
-wwwport=80
+wwwport=2000
 srvuser="http"
 srvgroup="http"
 logdir="/var/log/hypno"

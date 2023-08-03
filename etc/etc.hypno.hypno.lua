@@ -2,27 +2,29 @@
 return {
 	
 	-- Repository thing 
-	repository = "file:///home/ramar/repo"
+	repository = "file:///home/ramar/repo",
 
 	-- Log
-, log = {
-		access = "file:///home/ramar/access.log"
-	, error = "file:///home/ramar/error.log"
-	, style = "combined"
-	}
+	log = {
+		access = "file:///home/ramar/access.log",
+		error = "file:///home/ramar/error.log",
+		style = "combined"
+	},
 
 	-- User
-, user = "ramar"
+	user = "ramar",
 
 	-- Group
-, group = "ramar"
+	group = "ramar",
+
+	-- PID
+	pid = "",
 
 	-- Port
-, port = 2222
+	port = 2222,
 
 	-- Protocols
-, protocols = {
+	protocols = {
 		{ type = "http", port = 80 }
 	}
-
 }

@@ -55,6 +55,11 @@
  #define HTDOCS_DIR "@wwwroot@"
 #endif
 
+/* Set a default port */
+#ifndef DEFAULT_WWW_PORT
+ #define DEFAULT_WWW_PORT @wwwport@
+#endif
+
 /* How often should a process poll for new data? */
 #ifndef POLL_INTERVAL
  #define POLL_INTERVAL @poll_interval@
