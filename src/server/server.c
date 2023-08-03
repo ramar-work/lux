@@ -166,34 +166,23 @@ static const int srv_log( const server_t *p, conn_t *conn ) {
 
 
 
-// End the request by deallocating http bodies
-static void srv_end( const server_t *p, conn_t *conn ) {
-	http_free_body( conn->req ), http_free_body( conn->res );
-	//free( conn->req ), free( conn->res );
-	return;
-}
-
-
-
 // Generate a response
 int srv_response ( server_t *p, conn_t *conn ) {
+	FPRINTF( "Server connection started...\n" );
 
 	//Define
-	zhttp_t rq = {0}, rs = {0};
 	const protocol_t *sr = p->ctx;
-
-	// Set up the connection
-	// TODO: These need to be void pointers or some other kind of opaque
 	conn->stage = CONN_INIT;
-#if 1
-	//This all needs to moved to pre, and possibly allocated there
+
+#if 0
+	zhttp_t rq = {0}, rs = {0};
 	conn->req = &rq;
 	conn->res = &rs;
 	conn->req->type = ZHTTP_IS_CLIENT;
 	conn->res->type = ZHTTP_IS_SERVER;
 #endif
 
-	FPRINTF( "Setting any pre data for current protocol.\n" );
+	FPRINTF( "Setting pre data for protocol %s.\n", p->ctx->name );
 	if ( !sr->pre( p, conn ) ) {
 		FPRINTF( "(%s)->pre failure: %s\n", p->ctx->name, conn->err );
 		return 0;
@@ -204,9 +193,7 @@ int srv_response ( server_t *p, conn_t *conn ) {
 	if ( !sr->read( p, conn ) ) {
 		FPRINTF( "(%s)->read failure: %s\n", p->ctx->name, conn->err );
 		//Log what happened
-		sr->post( p, conn );	
-		srv_end( p, conn );
-		return 0;
+		//sr->post( p, conn );	
 	}
 
 	FPRINTF( "Running srv_proc()\n" );
@@ -221,20 +208,17 @@ int srv_response ( server_t *p, conn_t *conn ) {
 		//Log what happened, but don't stop
 	}
 
-	FPRINTF( "Running conn->ctx->post()\n" );
-	if ( !sr->post( p, conn ) ) {
-		FPRINTF( "(%s)->post failure: %s\n", p->ctx->name, conn->err );
-		//Log what happened, but don't stop
-	}
-
 	FPRINTF( "Running srv_log\n" );
 	if ( !srv_log( p, conn ) ) {
 		//Log what happened, but don't stop
 		FPRINTF( "(%s)->log failure: %s\n", p->ctx->name, conn->err );
 	}
 
-	FPRINTF( "Running srv_end\n" );
-	srv_end( p, conn ); 
+	// Logging from here makes the most sense.
+	FPRINTF( "Running conn->ctx->post()\n" );
+	sr->post( p, conn );
+
+	FPRINTF( "Server connection done...\n" );
 	return 1;
 }
 

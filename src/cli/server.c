@@ -301,24 +301,12 @@ void sigkill( int signum ) {
 	//cmd_kill( NULL, err, sizeof( err ) );
 }
 
-#if 0
-//Return fi
-static int findex() {
-	int fi = 0;
-	for ( filter_t *f = http_filters; f->name; f++, fi++ ); 
-	return fi;	
-}
-#endif
 
-filter_t dns_filters[] = {
-	{ "dns", NULL },
-	{ NULL }
-};
 
 //Define a list of "context types"
 protocol_t sr[] = {
-#if 0
-	{ "http", read_notls, write_notls, create_notls, NULL, pre_notls, fkctpost },
+#if 1
+	{ "http", read_notls, write_notls, create_notls, free_notls, pre_notls, post_notls },
 #endif
 #if 1
 	{ "https", read_gnutls, write_gnutls, create_gnutls, free_gnutls, pre_gnutls, post_gnutls },
@@ -677,7 +665,6 @@ int cmd_server ( struct values *v, char *err, int errlen ) {
 	#endif
 
 	// Evaluate server mode
-	//fprintf( stderr, "server model: %d\n", SERVER_ONESHOT );
 	if ( v->model == SERVER_ONESHOT )
 		srv_single( &server );
 	else if ( v->model == SERVER_MULTITHREAD ) {

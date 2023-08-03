@@ -1,12 +1,7 @@
 #include "single.h"
 
 int srv_single ( server_t *p ) {
-#if 1
-#if 0
-	for ( int fd, count = 0, i = 0; i < LEAKLIMIT; i++ ) { 
-#else
 	for ( int count = 0; ; ) {
-#endif
 		//Client address and length?
 		char ip[ 128 ] = { 0 };
 		struct sockaddr_storage addrinfo = { 0 };
@@ -79,6 +74,5 @@ int srv_single ( server_t *p ) {
 		}	
 		#endif
 	}
-#endif
 	return 1;
 }

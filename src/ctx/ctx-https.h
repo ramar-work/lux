@@ -45,9 +45,9 @@ struct gnutls_abstr {
 };
 
 const int pre_gnutls ( server_t *, conn_t * );
-const int post_gnutls ( server_t *, conn_t * );
 const int read_gnutls ( server_t *, conn_t * );
 const int write_gnutls ( server_t *, conn_t * );
+const void post_gnutls ( server_t *, conn_t * );
 int create_gnutls( server_t * );
 void free_gnutls( server_t * );
 #endif

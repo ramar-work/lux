@@ -245,7 +245,7 @@ typedef struct protocol_t {
 	int (*init)( server_t * );
 	void (*free)( server_t * );
 	const int (*pre)( server_t *, conn_t * );
-	const int (*post)( server_t *, conn_t * );
+	const void (*post)( server_t *, conn_t * );
 } protocol_t;
 
 

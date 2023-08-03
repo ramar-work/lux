@@ -26,22 +26,18 @@
 #include "../server/server.h"
 #include "../config.h"
 
+#ifdef SENDFILE_ENABLED
+ #include <sys/sendfile.h>
+#endif
+
 #ifndef CTXHTTP_H
 #define CTXHTTP_H
 
-#if 0
-int create_notls ( void **, char *, int ); 
-
-const int pre_notls ( int, zhttp_t *, zhttp_t *, struct cdata *);
-
-const int read_notls ( int, zhttp_t *, zhttp_t *, struct cdata *);
-
-const int write_notls ( int, zhttp_t *, zhttp_t *, struct cdata *);
-#else
 int create_notls ( server_t * );
+void free_notls ( server_t * );
 const int pre_notls ( server_t *, conn_t *);
 const int read_notls ( server_t *, conn_t *);
 const int write_notls ( server_t *, conn_t *);
-#endif
+const void post_notls ( server_t *, conn_t *);
 
 #endif
