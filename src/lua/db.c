@@ -52,10 +52,15 @@ int db_exec ( lua_State *L ) {
 	//Check for arguments...
 	luaL_checktype( L, 1, LUA_TTABLE );
 
+
+	// Doubling the count is safest...
+	int count = lua_count( L, 1 );
+	count *= 2;
+
 	//Within this table need to exist a few keys
 	//TODO: Doing this statically will save time, energy and memory
 	t = &tt;
-	lt_init( t, NULL, 32 ); 
+	lt_init( t, NULL, count ); 
 
 	//Convert to C table for slightly easier key extraction	
 	if ( !lua_to_ztable( L, 1, t ) || !lt_lock( t ) ) {
