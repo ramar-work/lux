@@ -1,2 +1,15 @@
-*
+#*
+
+# NOTE: Explicit matches will be maintained here until the codebase is fully back in Git
+
+# include/ should never be tracked
+include/
+
+# lib/ should never be tracked
+lib/
+
+# Track nothing in test b/c this is for testing only.
+# TODO: This should probably be installed somewhere else.
+test/**
+
 !src/
