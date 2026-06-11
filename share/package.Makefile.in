@@ -1,0 +1,24 @@
+# An example Makefile
+#TAR=@TAR@
+#SED=@SED@
+#AWK=@AWK@
+NAME=@name@
+#GZIP=@GZIP@
+
+# explain | Explains each target and what it does
+explain:
+	@sed -n '/^#/p;' Makefile | \
+		sed '{ s/# //; s/ | /|/; }' | \
+		awk -F '|' '{ printf "%-15s- %s\n", $$1, $$2 }'
+
+
+# compress | Compress this package (in lieu of lxpkg -C)
+compress:
+	tar chof - . | gzip -9 -c > ../$(NAME).tar.gz 
+
+
+dontuseme:
+	tar chof - $(DISTDIR) | gzip -9 -c > $@	
+	rm -rf $(DISTDIR)
+	test -d archives/ || mkdir archives/
+	mv $@ archives/

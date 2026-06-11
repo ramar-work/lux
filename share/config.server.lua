@@ -1,0 +1,27 @@
+--------------------------------------------------
+-- config.lua
+-- ==========
+--
+-- Server config file for lux.
+--
+-- NOTE: All keys at the most shallow depth in the 
+-- table 'hosts' correspond to the names of the 
+-- instances that are available to your lux server.
+-- (e.g. localhost resolves to localhost)
+-- 
+-- Each of these names will need to be defined in 
+-- your system's /etc/hosts file to resolve. 
+-- 
+--------------------------------------------------
+return {
+	wwwroot = "@root@",
+	filter = "@default_filter@",
+	hosts = {
+		-- Default host in case no domain is specified
+		["localhost"] = { 
+			-- root_default = "/index.html",
+			dir = "localhost",
+			filter = "lua"
+		},
+	}
+}
