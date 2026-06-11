@@ -619,9 +619,6 @@ static char * http_get_content_type ( zhttp_t *en, zhttpr_t **list, HttpContentT
 				char *ctype = (char *)(*slist)->value;
 				unsigned char *v = (*slist)->value;
 
-fprintf( stderr, "Original:\n" );
-write( 2, (*slist)->value, (*slist)->size );
-
 				// Set and initialize the most important structures
 				en->ctype = ctype;
 				en->boundary = NULL;
@@ -640,7 +637,7 @@ write( 2, (*slist)->value, (*slist)->size );
 				}
 
 				// Trim any white space 
-				for ( ; ( *v == ' ' ); v++, a++, s-- );
+				for ( ; *v == ' '; v++, a++, s-- );
 
 				// Set boundary and charset if any
 				for ( ; ( *v != '\r' ) || ( *v = '\0' ) ; v++, s-- ) {
@@ -1053,9 +1050,10 @@ zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 	en->atype = ZHTTP_MESSAGE_MALLOC;
 	en->type = ZHTTP_IS_CLIENT;
 
-	char clen[ 32 ] = {0};
+	char clen[ 64 ] = {0};
 	en->clen = 0, en->mlen = 0, en->hlen = 0;
 
+	//TODO: We should check if the protocol is actually supported by the server
 	if ( !en->protocol ) {
 		en->protocol = "HTTP/1.1";
 	}
@@ -1122,43 +1120,43 @@ zhttp_t * http_finalize_request ( zhttp_t *en, char *err, int errlen ) {
 			else {
 				//Assumes JSON or a single file or something
 				zhttpr_t **body = en->body;
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)(*body)->value, (*body)->size ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)(*body)->value, (*body)->size );
 			}
 		}
 		else if ( rtype == ZHTTP_URL_ENCODED ) {
 			for ( zhttpr_t **body = en->body; body && *body; body++ ) {
 				zhttpr_t *r = *body;
 				if ( *en->body != *body ) {
-					zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)"&", 1 );
+					zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)"&", 1 );
 				}
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)r->field, strlen( r->field ) ); 
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)"=", 1 ); 
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)r->value, r->size ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)r->field, strlen( r->field ) ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)"=", 1 ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)r->value, r->size ); 
 			}
 		}
 		else {
 			//Handle multipart requests
 			for ( zhttpr_t **body = en->body; body && *body; body++ ) {
 				zhttpr_t *r = *body;
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)en->boundary, strlen( en->boundary ) ); 
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)"\r\n", 2 ); 
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)cdisph, sizeof( cdisph ) ); 
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)cdispt, sizeof( cdispt ) ); 
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)nameh, sizeof( nameh ) ); 
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)"\"", 1 );
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)r->field, strlen( r->field ) ); 
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)"\"", 1 );
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)"\r\n\r\n", 4 ); 
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)r->value, r->size ); 
-				zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)"\r\n", 2 ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)en->boundary, strlen( en->boundary ) ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)"\r\n", 2 ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)cdisph, sizeof( cdisph ) ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)cdispt, sizeof( cdispt ) ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)nameh, sizeof( nameh ) ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)"\"", 1 );
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)r->field, strlen( r->field ) ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)"\"", 1 );
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)"\r\n\r\n", 4 ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)r->value, r->size ); 
+				zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)"\r\n", 2 ); 
 			}
-			zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)en->boundary, strlen( en->boundary ) ); 
-			zhttp_append_to_uint8t( &msg, &en->clen, (unsigned char *)"--", 2 ); 
+			zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)en->boundary, strlen( en->boundary ) ); 
+			zhttp_append_to_uint8t( &msg, (int *)&en->clen, (unsigned char *)"--", 2 ); 
 		}
 	}
 
 	//TODO: Do this in a better way
-	snprintf( clen, sizeof( clen ), "%d", en->clen );
+	snprintf( clen, sizeof( clen ), "%d", (int)en->clen );
 	int expbody = !strcmp( en->method, "POST" ) || !strcmp( en->method, "PUT" );
 	struct t { const char *value, *fmt, reqd, add; } m[] = {
 		{ en->method, "%s ", 1, 1 },
@@ -1226,7 +1224,7 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 	char http_header_fmt[] = 
 		"HTTP/1.1 %d %s\r\n"
 		"Content-Type: %s\r\n"
-		"Content-Length: %d\r\n";
+		"Content-Length: %lu\r\n";
 		"Connection: close\r\n";
 
 	if ( !en->headers && !en->body && !en->fd ) {
@@ -1244,10 +1242,14 @@ zhttp_t * http_finalize_response ( zhttp_t *en, char *err, int errlen ) {
 		return NULL;
 	}
 
+	#if 1
 	if ( body && *body && ( !(*body)->value || !(*body)->size ) ) {
 		snprintf( err, errlen, "%s", "No body length specified with response." );
 		return NULL;
 	}
+	#else
+	// We should just send a blank response in some cases.  it is valid...
+	#endif
 
 	//This assumes (perhaps wrongly) that ctype is already set.
 	en->clen = !en->clen ? (*en->body)->size : en->clen;
@@ -1491,8 +1493,8 @@ void print_httpbody_to_file ( zhttp_t *rb, const char *path ) {
 	}
 #endif
 
-	ZHTTP_PRINTF( fb, "rb->mlen: '%d'\n", rb->mlen );
-	ZHTTP_PRINTF( fb, "rb->clen: '%d'\n", rb->clen );
+	ZHTTP_PRINTF( fb, "rb->mlen: '%ld'\n", rb->mlen );
+	ZHTTP_PRINTF( fb, "rb->clen: '%ld'\n", rb->clen );
 	ZHTTP_PRINTF( fb, "rb->hlen: '%d'\n", rb->hlen );
 	ZHTTP_PRINTF( fb, "rb->status: '%d'\n", rb->status );
 	ZHTTP_PRINTF( fb, "rb->ctype: '%s'\n", rb->ctype );
