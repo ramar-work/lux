@@ -1,20 +1,22 @@
 # @configure_input@
 ## --------------------------------------------------------- ##
-## Makefile
+## lux makefile
 ## 
 ## @summary
 ## Contains all the targets necessary to assemble
 ## Hypno on most machines. 
 ##
 ## @author
-## Copyright 2022-2023 Ironhead, Inc.
+## Copyright 2022-2026 Antonio R. Collins II dba rwk apps
 ## --------------------------------------------------------- ##
 BINNAME = @PACKAGE_NAME@
 VERSION = @PACKAGE_VERSION@
-PREFIX = @prefix@
-EXEC_PREFIX = @exec_prefix@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
 BINDIR = @bindir@
 LOGDIR = @logdir@
+CONFDIR = @confdir@
+DATADIR = @sharedir@
 WWWROOT = @wwwroot@
 WWWPORT = @wwwport@
 SVCPATH = @svcpath@
@@ -22,6 +24,7 @@ srcdir = @srcdir@
 VPATH = @srcdir@
 SRVUSER = @srvuser@
 SRVGROUP = @srvgroup@
+UNITFILE = @unit_file@
 LUAVER = 5.4.4
 GNUTLSVER = 3.6.16
 IFLAGS = -Ivendor -Iinclude
@@ -39,10 +42,11 @@ BASEFLAGS = \
 GCCFLAGS = $(BASEFLAGS) \
 	-Wno-format-truncation \
 	-Wno-return-local-addr \
-	-O2 $(IFLAGS)
+	-O3 $(IFLAGS)
 CLANGFLAGS = $(BASEFLAGS) \
-	-O2 $(IFLAGS)
+	-O3 $(IFLAGS)
 INITMETHOD = @initsys@
+INITEXAMPLES = @examples@
 CFLAGS = $(GCCFLAGS) $(DEBUGFLAGS)
 #CFLAGS = $(CLANGFLAGS) $(DEBUGFLAGS)
 CC = @cc@
@@ -65,7 +69,7 @@ SRC = \
 	@srcdir@/src/lua/lua.c \
 	@srcdir@/src/lua/json.c \
 	@srcdir@/src/lua/rand.c \
-	@srcdir@/src/lua/filesystem.c \
+	@srcdir@/src/lua/fs.c \
 	@srcdir@/src/lua/http.c \
 	@srcdir@/src/lua/hash.c \
 	@srcdir@/src/lua/enc.c \
@@ -75,11 +79,13 @@ SRC = \
 	@srcdir@/src/server/server.c \
  	@srcdir@/src/server/single.c \
  	@srcdir@/src/server/multithread.c \
+ 	@srcdir@/src/filters/shared.c \
  	@srcdir@/src/filters/filter-echo.c \
-	@srcdir@/src/filters/filter-lua.c
+	@srcdir@/src/filters/filter-lua.c \
+	@srcdir@/src/filters/filter-static.c \
+	@srcdir@/src/cli/lxcommon.c
 
 #	@srcdir@/src/xml.c
-#	@srcdir@/src/filters/filter-static.c 
 #	@srcdir@/src/filters/filter-dirent.c 
 #	@srcdir@/src/filters/filter-redirect.c 
 
@@ -95,124 +101,158 @@ FILES = \
 	install-sh \
 	LICENSE \
 	Makefile.in \
+	mk/tests.mk \
+	mk/docs.mk \
 	README.md
 
-# FIXME: $(DEPS) will result in wasted space on cli target, since it uses neither TLS nor SQLite3
-# main - Compiles all code needed to get hypno running
-main: $(DEPS) $(OBJ)
-	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(CFLAGS) $(srcdir)/src/cli/server.c -o $(srcdir)/bin/$(BINNAME)-server $(OBJ) $(DEPS) $(LDFLAGS)
-	$(CC) $(CFLAGS) $(srcdir)/src/cli/cli.c -o $(srcdir)/bin/$(BINNAME)-cli $(OBJ) $(DEPS) $(LDFLAGS)
 
-# FIXME: Harness is totally broken right now...
-#testharness:
-#	$(CC) $(CFLAGS) $(srcdir)/src/cli/harness.c -o $(srcdir)/bin/$(BINNAME)-harness $(OBJ) $(DEPS) $(LDFLAGS)
+# Include any temporary targets that should run first
+-include tmp.mk
+
+# main - Compiles all code needed to get lux running
+main: server cli conf package
+
+# server - Builds the server only
+server: $(DEPS) $(OBJ)
+	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/lxsrv.c -o $(srcdir)/bin/lxsrv $(OBJ) $(DEPS) $(LDFLAGS) -larchive
+
+# package - Builds lxpkg only
+package: $(DEPS) $(OBJ)
+	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/lxpkg.c -o $(srcdir)/bin/lxpkg $(OBJ) $(DEPS) $(LDFLAGS) -larchive
+
+# cli - Builds admin tool only
+# FIXME: $(DEPS) will result in wasted space here.  TLS, for example, is not used
+cli: $(DEPS) $(OBJ) 
+	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/lxcli.c -o $(srcdir)/bin/lxcli $(OBJ) $(DEPS) $(LDFLAGS) -larchive
+
+# conf - Builds lxconf only
+conf: $(DEPS) $(OBJ)
+	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
+	$(CC) $(CFLAGS) $(srcdir)/src/cli/lxconf.c -o $(srcdir)/bin/lxconf $(OBJ) $(DEPS) $(LDFLAGS) -larchive
 
 # debug - Builds code with debugging flags on (need logic for if CC == clang)
 debug: CFLAGS += -g -O0 -DDEBUG_H
 debug: main
 	@printf '' > /dev/null
 
-# tight - Builds code with debugging flags on and ASAN
-tight: CFLAGS += -g -O1 -fsanitize=address -fno-omit-frame-pointer -DDEBUG_H
-tight: main
-	@printf '' > /dev/null
-
-# clang - Builds code with debugging flags on (need logic for if CC == clang)
+# clang/safe - Builds code without debugging symbols or flags, but trap and dump core on ASAN errors
 clang: CC = clang
-clang: CFLAGS = $(CLANGFLAGS) -g -O0 -fsanitize-undefined-trap-on-error -fsanitize=address -DDEBUG_H
+clang: CFLAGS = $(CLANGFLAGS) -O3 -fsanitize-undefined-trap-on-error -fsanitize=address
 clang: main
 	@printf '' > /dev/null
 
-# install - Runs a full system install
-install: filesystem-install $(INITMETHOD)-install
+# clangdebug - Builds code with debugging flags on and ASAN
+clangdebug: CFLAGS = $(CLANGFLAGS) -g -O0 -fsanitize=address -fsanitize-undefined-trap-on-error -fno-omit-frame-pointer -DDEBUG_H
+clangdebug: CC = clang
+clangdebug: main
 	@printf '' > /dev/null
 
-# filesystem-install - Installs targets to $PREFIX/{bin,share} and /var/lib
+# install - Runs a full system install
+install: filesystem-install $(INITMETHOD)-install $(INITEXAMPLES)-install
+	@printf '' > /dev/null
+
+# filesystem-install - Installs targets to $prefix/{bin,share} and /var/lib
 filesystem-install:
-	echo 'Running filesystem-install...'
-	install -d $(PREFIX)/bin
-	install -m 0755 $(srcdir)/bin/hypno-cli $(PREFIX)/bin/
-	install -m 0755 $(srcdir)/bin/hypno-server $(PREFIX)/bin/
-	install -d $(PREFIX)/share/$(BINNAME)
+	#echo 'Running filesystem-install...'
+	install -d $(exec_prefix)/bin
+	install -m 0755 $(srcdir)/bin/* $(exec_prefix)/bin/
+	# When an external library is completed, this can go here
+	#install -d $(exec_prefix)/lib
+	#install -m 0755 $(srcdir)/lib/* $(exec_prefix)/lib/
+	# Install the shared readonly files directory
+	install -d $(DATADIR)
 	find $(srcdir)/share/ -maxdepth 1 -type f | \
-		xargs -IFF sh -c 'install -m 644 FF $(PREFIX)/share/$(BINNAME)/'
-	install -d /etc/$(BINNAME)
-	install -m 644 $(srcdir)/etc/etc.hypno.hypno.lua /etc/$(BINNAME)/hypno.lua
+		xargs -IFF sh -c 'install -m 644 FF $(DATADIR)/'
+	# Install the configuration file (and a directory to keep it manageable)
+	install -d $(CONFDIR)/
+	install -m 644 $(srcdir)/etc/etc.lux.lux.lua $(CONFDIR)/server.lua
+	# Install the logging directory
 	install -d $(LOGDIR)/ && chown $(SRVUSER):$(SRVGROUP) $(LOGDIR)/
+	# Install the server configuration again?
 	-install -d $(WWWROOT)/ && chown $(SRVUSER):$(SRVGROUP) $(WWWROOT)/
-	-test ! -f $(WWWROOT)/config.lua && \
+	cp $(srcdir)/example/config.lua $(WWWROOT)/server.lua
+	sed -i 's;wwwroot = "example";wwwroot = "$(WWWROOT)";' $(WWWROOT)/server.lua
+
+# examples-install - Install examples for new users
+examples-install:
+	-test -f $(WWWROOT)/server.lua && \
 		cp -r $(srcdir)/example/* $(WWWROOT)/ && \
-		sed -i 's;wwwroot = "example";wwwroot = "$(WWWROOT)";' $(WWWROOT)/config.lua
+		sed -i 's;wwwroot = "example";wwwroot = "$(WWWROOT)";' $(WWWROOT)/server.lua
 
 # lib-install - Create and install library directory for extensions
 lib-install:
-	echo 'Running lib-install...'
+	#echo 'Running lib-install...'
 	install -d /var/lib/$(BINNAME)
 	install -m 0755 $(srcdir)/lib/* /var/lib/$(BINNAME)/
 	chown -R $(SRVUSER):$(SRVGROUP) /var/lib/$(BINNAME)/
 
+# none-install - Installs (you guessed it) nothing
+none-install: 
+
+# launchd-install - Installs launchd files for Macs
+launchd-install: 
+
+# sysv-install - Installs launchd files for Macs
+sysv-install: 
+
+# bsdinit-install - Installs rc.d files for BSD systems 
+bsdinit-install: 
+
 # systemd-install - Installs systemd on Linux systems
 systemd-install:
-	echo 'Running systemd-install...'
+	#echo 'Running systemd-install...'
 	sed "{ \
-		s#__PREFIX__#$(PREFIX)#; \
+		s#__prefix__#$(prefix)#; \
 		s#__SRVUSER__#$(SRVUSER)#; \
 		s#__SRVGROUP__#$(SRVGROUP)#; \
 		s#__LOGDIR__#$(LOGDIR)#g; \
 		s#__WWWROOT__#$(WWWROOT)#; \
 		s/__WWWPORT__/$(WWWPORT)/; \
-	}" $(srcdir)/etc/etc.systemd.system.hypno.service > $(SVCPATH)/$(BINNAME).service
+	}" $(UNITFILE) > $(SVCPATH)/$(BINNAME).service
 
-# cygwin-install - Installs hypno as a service suitable for use with Cygwin 
+#}" $(srcdir)/etc/etc.systemd.system.lux.service > $(SVCPATH)/$(BINNAME).service
+# cygwin-install - Installs lux as a service suitable for use with Cygwin 
 cygwin-install:
-	cygstart --action=runas cygrunsrv --install hypno --user $(USER) -p /usr/local/bin/hypno-server -a '--start --config /var/www/config.lua'
+	cygstart --action=runas cygrunsrv --install lux --user $(USER) -p /usr/local/bin/lux-server -a '--start --config /var/www/config.lua'
 
-# uninstall - Uninstalls hypno
+# uninstall - Uninstalls lux
 uninstall:
-	rm -f $(PREFIX)/bin/$(BINNAME)-cli
-	rm -f $(PREFIX)/bin/$(BINNAME)-server
+	rm -f $(prefix)/bin/lxcli
+	rm -f $(prefix)/bin/lxsrv
+	rm -f $(prefix)/bin/lxpkg
+	rm -f $(prefix)/bin/lxconf
 	rm -f $(SVCPATH)/$(BINNAME).service
 	rm -f /etc/$(BINNAME)/*
 	-rmdir /etc/$(BINNAME)
 	rm -f /var/lib/$(BINNAME)/*
 	-rmdir /var/lib/$(BINNAME)
-	rm -f $(PREFIX)/share/$(BINNAME)/*
-	-rmdir $(PREFIX)/share/$(BINNAME)
+	rm -f $(prefix)/share/$(BINNAME)/*
+	-rmdir $(prefix)/share/$(BINNAME)
 
-# examples - Runs hypno with the files in example/.  Use -e PORT to change port number.
+# examples - Runs lux with the files in example/.  Use -e PORT to change port number.
 examples: PORT=2222
 examples: main
 	@clear
 	@lua -e "a=loadfile( 'example/config.lua' )(); \
 		hosts = {}; for k,v in pairs(a.hosts) do table.insert( hosts, 'http://' .. k ) end; \
 		print( 'Hosts at example/config.lua are:\n' .. table.concat( hosts, '\n' ) );"
-	@printf "Starting hypno-server, and listening for requests at port 2222...\n"
+	@printf "Starting lux server, and listening for requests at port 2222...\n"
 	@$(srcdir)/bin/$(BINNAME)-server \
 		--start \
-		--log-file /dev/stderr \
-		--access-file /dev/stderr \
+		--logfile /dev/stderr \
+		--accessfile /dev/stderr \
 		--port $(PORT) \
 		--user $$USER \
 		--group $$USER \
-		--config $(srcdir)/example/config.lua
-
-# a quick server test would look like
-# kill <pid>
-test: PORT=2222
-test: ADDR=http://localhost:$(PORT)
-test: CONFIG=$(srcdir)/example/config.lua
-test: OPTIONS=--start -l /dev/null -a /dev/null -p $(PORT) -u $$USER -g $$USER -c $(CONFIG)
-test:
-	@$(srcdir)/bin/$(BINNAME)-server $(OPTIONS) & echo $$! > ./test
-	@wget -qSO- $(ADDR) 2>&1 | grep '200 OK' >/dev/null && echo "Test OK" || echo "Test failed!"
-	-@kill -9 `cat $(srcdir)/test`
-	-@rm -f $(srcdir)/test
+		--configuration $(srcdir)/example/config.lua
 
 # vendor/sqlite3.o - Build SQLite from our local copy
 vendor/sqlite3.o: CFLAGS+=-Wno-misleading-indentation -Wno-deprecated-declarations
 vendor/sqlite3.o:
-	$(CC) $(CFLAGS) -lpthread -c -o vendor/sqlite3.o vendor/sqlite3.c
+	$(CC) $(CFLAGS) -c -o vendor/sqlite3.o vendor/sqlite3.c
 
 # vendor/liblua.a - Build Lua 5.4.4 statically
 lib/liblua.a: 
@@ -223,8 +263,6 @@ lib/liblua.a:
 		mv src/liblua.a ../../lib/ && \
 		cp include/lauxlib.h include/luaconf.h include/lua.h include/lualib.h ../../include/
 
-#	-@cd vendor/ && cd lua-$(LUAVER) && make MYCFLAGS="-fPIC" && mv src/liblua.a ../
-
 # vendor/gnutls.a - Build GnuTLS 3.6.x statically
 lib/libgnutls.a: 
 	-@mkdir $(srcdir)/lib/ $(srcdir)/include/
@@ -233,7 +271,6 @@ lib/libgnutls.a:
 		./configure --prefix=`readlink -f ../../` --disable-guile --enable-static && \
 		make && \
 		make install
-
 
 # clean - Get rid of object files and tests 
 clean:
@@ -246,112 +283,10 @@ veryclean: clean
 	-@rm -rf $(srcdir)/lib/ $(srcdir)/include/
 	-@rm -rf autom4te.cache config.guess config.log config.status config.sub configure Makefile
 
-# distclean - Run `clean` in prep for a clean package
-distclean: clean
-	-@rm -rf $(srcdir)/lib/ $(srcdir)/include/
-	-@rm -rf autom4te.cache config.guess config.log config.status config.sub configure Makefile
-
-# distboot - Run a bootstrapping procedure to initialize autoconf
-distboot:
-	autoupdate && autoreconf --install
-
-# disttest - RUn an automated build against a different OS
-disttest:
-	test ! -z $(REMOTE)
-	test -f $(DISTDIR).tar.gz
-	scp $(DISTDIR).tar.gz $(REMOTE):~/
-	ssh $(REMOTE) ' \
-		rm -rf $(DISTDIR); \
-		tar xzf $(DISTDIR).tar.gz && \
-		cd $(DISTDIR)/ && \
-		./configure --enable-local-lua --enable-local-sqlite3 && \
-		make -j2'	
-
 # list - List all the targets and what they do
 list:
 	@printf 'Available options are:\n'
 	@sed -n '/^# / { s/# //; 1d; p; }' Makefile | awk -F '-' '{ printf "  %-20s - %s\n", $$1, $$2 }'
-
-# Create a package (in a different way)
-dist: $(DISTDIR).tar.gz
-
-# Create a package archive 
-$(DISTDIR).tar.gz: $(DISTDIR)
-	tar chof - $(DISTDIR) | gzip -9 -c > $@	
-	rm -rf $(DISTDIR)
-
-# Create a package directory
-$(DISTDIR):
-	rm -f $(DISTDIR).tar.gz
-	rm -rf $(DISTDIR)
-	mkdir -p \
-		$(DISTDIR)/bin \
-		$(DISTDIR)/etc \
-		$(DISTDIR)/example \
-		$(DISTDIR)/include \
-		$(DISTDIR)/lib \
-		$(DISTDIR)/share \
-		$(DISTDIR)/src \
-		$(DISTDIR)/vendor
-	cp $(FILES) $(DISTDIR)/
-	cp -r etc/* $(DISTDIR)/etc/
-	cp -r example/* $(DISTDIR)/example/
-	cp -r src/* $(DISTDIR)/src/
-	cp -r share/* $(DISTDIR)/share/
-	cp -r vendor/*.[ch] vendor/lua-$(LUAVER)/ $(DISTDIR)/vendor/
-
-# Check that packaging worked (super useful for other distributions...) 
-distcheck:
-	gzip -cd $(DISTDIR).tar.gz | tar xvf -
-	cd $(DISTDIR) && ./configure
-	cd $(DISTDIR) && $(MAKE)
-	cd $(DISTDIR) && $(MAKE) clean
-	rm -rf $(DISTDIR)
-	@echo "*** package $(DISTDIR).tar.gz is ready for distribution."
-
-# tests - Build some common tests
-tests:
-	cd src/lua/tests && $(MAKE) -f Makefile
-	
-# check - Run common tests
-check: main
-	@echo "*** all tests passed"	
-
-
-# copyright-update - Update copyright info across all source code
-copyright-update:
-	@find src -type f -name "*.[ch]" | \
-		xargs sed -i "s/Copyright 2020-$$(( `date +%Y` - 1 ))/Copyright 2020-`date +%Y`/"
-
-# key - Generate a private key for use SSL/TLS certificates
-key:
-	-mkdir $(DIR)/
-	certtool \
-		--generate-privkey \
-		--sec-param High \
-		--outfile $(DIR)/$(DOMAIN).pem && \
-	chmod 600 $(DIR)/$(DOMAIN).pem && \
-	chown $(SRVUSER):$(SRVGROUP) $(DIR)/$(DOMAIN).pem
-
-# csr - Generate a certificate signing request
-csr:
-	-mkdir $(DIR)/
-	certtool --generate-request --load-privkey $(DIR)/$(DOMAIN).pem --outfile $(DIR)/$(DOMAIN).csr
-
-# cert - Generate a self-signed certificate for use with example sites
-cert:
-	-mkdir $(DIR)/
-	certtool \
-		--generate-self-signed \
-		--load-privkey $(DIR)/$(DOMAIN).pem \
-		--template etc/cert.template \
-		--outfile $(DIR)/$(DOMAIN)-cert.pem
-
-# cert-bundle - Generate private key, certificate signing reqeust and self-signed certificate all at once 
-cert-bundle: CERTNAME=cert
-cert-bundle: DIR=/mnt/c/Users/ramar/certs
-cert-bundle: DOMAIN=thatname.com
-cert-bundle: key csr cert
 
 Makefile: Makefile.in config.status
 	./config.status $@
@@ -359,4 +294,16 @@ Makefile: Makefile.in config.status
 config.status: configure
 	./config.status --recheck
 
-.PHONY: check clean dist distcheck docs install tests
+# Include documentation recipes
+include mk/docs.mk
+
+# Include www documentation recipes
+-include mk/docswww.mk
+
+# Include packaging recipes
+-include mk/pkg.mk
+
+# Include test recipes
+include mk/tests.mk
+
+.PHONY: check clean dist distcheck docs install test tests bugs 

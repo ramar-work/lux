@@ -1,24 +1,23 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * config.h
  * ========
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * General configuration at compile time
  * Under construction.
  *
  * LICENSE
  * -------
- * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG
- * ---------
- * - 
  * ------------------------------------------- */
+
+/* Do not edit this line: needed for INT_MAX comparison */
+#include <limits.h>
+
 /* Define the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT "ramar@ramar.work"
+#define PACKAGE_BUGREPORT "ramar@ramarcollins.com"
 
 /* Define the full name of this package. */
 #define PACKAGE_NAME "@PACKAGE_NAME@"
@@ -33,7 +32,13 @@
 #define PACKAGE_TARNAME "@PACKAGE_NAME@"
 
 /* Define the home page for this package. */
-#define PACKAGE_URL "http://ramar.work"
+#define PACKAGE_URL "https://ramarcollins.com"
+
+/* Define a key name for response table */
+#define CKEY_RESPONSE "response"
+
+/* Define a key name for shadow directory */
+#define CKEY_SHADOW "shadow"
 
 /* How long should each client be allowed to persist? */
 #ifndef CLIENT_REQUEST_TIMEOUT
@@ -43,11 +48,6 @@
 /* Default status for too many connections */
 #ifndef LOAD_TOO_HIGH_STATUS
  #define LOAD_TOO_HIGH_STATUS 503
-#endif
-
-/* How many clients until the main thread cleans up */
-#ifndef CLIENT_MAX_SIMULTANEOUS
- #define CLIENT_MAX_SIMULTANEOUS @max_simultaneous_connections@
 #endif
 
 /* Where are the default htdocs? */
@@ -60,9 +60,17 @@
  #define DEFAULT_WWW_PORT @wwwport@
 #endif
 
+#if ( DEFAULT_WWW_PORT > 65535 ) || ( DEFAULT_WWW_PORT < 0 ) 
+ #error "Port specified (" DEFAULT_WWW_PORT ") is invalid."
+#endif
+
 /* How often should a process poll for new data? */
 #ifndef POLL_INTERVAL
  #define POLL_INTERVAL @poll_interval@
+#endif
+
+#if POLL_INTERVAL < 0
+ #error "Poll interval specified (" DEFAULT_WWW_PORT ") is invalid."
 #endif
 
 /* Default read buffer size */
@@ -75,9 +83,17 @@
  #define CTX_READ_SIZE @read_size@
 #endif
 
+#if CTX_READ_SIZE < 0
+ #error "Context read size specified (" CTX_READ_SIZE ") is invalid."
+#endif
+
 /* Default file receive size (8MB) */
 #ifndef CTX_READ_MAX
  #define CTX_READ_MAX @read_max@
+#endif
+
+#if CTX_READ_MAX < 0
+ #error "Context read maximum specified (" CTX_READ_MAX ") is invalid."
 #endif
 
 /* Default write sink size (1MB) */
@@ -86,19 +102,61 @@
  #define CTX_WRITE_SIZE @write_size@
 #endif
 
+#if CTX_WRITE_SIZE < 0
+ #error "Context write size specified (" CTX_WRITE_SIZE ") is invalid."
+#endif
+
 /* Default stack size of each new thread  */
 #ifndef STACK_SIZE
  #define STACK_SIZE @stack_size@
 #endif
 
-/* Default thread limit */
-#ifndef MAX_THREADS
- #define MAX_THREADS @max_threads@
+#if STACK_SIZE < PTHREAD_STACK_MIN
+ #error "Defined stack size: " STACK_SIZE " is less than system minimum, " PTHREAD_STACK_MIN "." \
+	"Please define a size greater than this."
 #endif
 
-/* Default listener backlog */
-#ifndef BACKLOG
- #define BACKLOG @socket_backlog@
+/* Default thread limit */
+#ifndef LUX_MAX_THREADS
+ #define LUX_MAX_THREADS @max_threads@
+#endif
+
+#if LUX_MAX_THREADS < 0
+ #error "Maximum thread count specified (" LUX_MAX_THREADS ") is invalid."
+#endif
+
+/* How many clients until the main thread cleans up */
+#ifndef CLIENT_MAX_SIMULTANEOUS
+ #define CLIENT_MAX_SIMULTANEOUS @max_simultaneous_connections@
+#endif
+
+#if CLIENT_MAX_SIMULATANEOUS < 0
+ #error "Maximum simultaneous connections count specified (" CLIENT_MAX_SIMULATANEOUS ") is invalid."
+#endif
+
+/* Default max connection count, when this is reached, we clean up */
+#ifndef LUX_MAX_CONN_COUNT
+ #define LUX_MAX_CONN_COUNT @max_conn_count@
+#endif
+
+#if LUX_MAX_CONN_COUNT < 0
+ #error "Maximum connection count ( " LUX_MAX_CONN_COUNT " ) cannot be negative."
+#endif
+
+#if LUX_MAX_CONN_COUNT > INT_MAX
+ #error "Maximum connection count ( " LUX_MAX_CONN_COUNT " ) cannot exceed " INT_MAX " (INT_MAX)."
+#endif
+
+#if LUX_MAX_THREADS < LUX_MAX_CONN_COUNT
+ #error \
+	"Defined maximum thread count (" LUX_MAX_THREADS ") is less than maximum " \
+	"simultaneous connections (" LUX_MAX_CONN_COUNT ").  " \
+	"Please define a size greater than " LUX_MAX_CONN_COUNT "."
+#endif
+
+/* Default listener backlog (default = 2x MAX_CONN_COUNT) */
+#ifndef LUX_BACKLOG
+ #define LUX_BACKLOG @socket_backlog@
 #endif
 
 /* Default logging directory */
@@ -111,9 +169,9 @@
  #define ERROR_LOGFILE ERROR_LOGDIR "@default_error_file_name@"
 #endif
 
-/* Default access log file location */
-#ifndef ACCESS_LOGFILE
- #define ACCESS_LOGFILE ERROR_LOGDIR "@default_access_file_name@"
+/* Default error log database location */
+#ifndef ERROR_LOGDB
+ #define ERROR_LOGDB ERROR_LOGDIR "/log.db"
 #endif
 
 /* Enable XML support */
@@ -193,7 +251,7 @@
 
 /* Define the path to the session database. */
 #ifndef SESSION_DB_PATH
- #define SESSION_DB_PATH CONFDIR "hypno.db"
+ #define SESSION_DB_PATH CONFDIR "lux.db"
 #endif
 
 /* Use sendfile or not */
