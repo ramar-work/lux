@@ -47,7 +47,7 @@
 # ----------------------------------------------------------
 TMPDIR=tmp
 DOCDIR=www/docs
-DOMAIN=luxserver.org
+DOCDOMAIN=luxserver.org
 DATE=$(shell date +%F)
 
 
@@ -231,7 +231,7 @@ docs-config:
 	printf '\txsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9 http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd"\n'; \
 	printf '\txmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'; \
 	printf '\t<url>\n'; \
-	printf '\t\t<loc>https://$(DOMAIN)/</loc>\n'; \
+	printf '\t\t<loc>https://$(DOCDOMAIN)/</loc>\n'; \
 	printf '\t\t<lastmod>$(DATE)</lastmod>\n'; \
 	printf '\t\t<changefreq>weekly</changefreq>\n'; \
 	printf '\t\t<priority>0.8</priority>\n'; \
