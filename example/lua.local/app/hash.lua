@@ -1,1 +1,0 @@
--- Do a variety of hashes

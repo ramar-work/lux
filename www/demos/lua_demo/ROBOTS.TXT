@@ -1,0 +1,3 @@
+# By default, allow everything
+User-Agent: *
+Allow: /
