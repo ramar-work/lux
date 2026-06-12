@@ -1,8 +1,8 @@
 # -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 AC_PREREQ([2.71])
-AC_INIT([lux],[0.9.5l],[ramar@ramarcollins.com])
-AC_CONFIG_SRCDIR([example/config.lua])
+AC_INIT([lux],[0.9.5k],[ramar@ramarcollins.com])
+AC_CONFIG_SRCDIR([src/config.h.in])
 
 # Define files to perform substitutions on
 #AC_CONFIG_HEADERS([config.h])
