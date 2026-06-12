@@ -1,0 +1,13 @@
+[Unit]
+Description=lux, a Lua-based web and application server.
+DefaultDependencies=no
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=__PREFIX__/bin/lxsrv --start --port __WWWPORT__ --user __SRVUSER__:__SRVGROUP__ --configuration __WWWROOT__/config.lua --logfile __LOGDIR__/lxlog.db -W 16000 --protocol=https 
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
