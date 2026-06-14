@@ -18,12 +18,10 @@ AC_CONFIG_FILES([Makefile src/config.h share/package.Makefile])
 
 # Variables that would have a default variable in the Makefile
 cc="gcc"
-confdir=${sysconfdir}/lux
 debug_flags=
 default_access_file_name="access.log"
 default_domain="localhost"
 default_error_file_name="error.log"
-default_svcpath="/etc/systemd/system"
 disable_mysql=1
 disable_oracle=1
 disable_pgsql=1
@@ -41,7 +39,6 @@ ld_flags="-ldl -lpthread -lm"
 local_lua=0
 local_sqlite3=0
 local_tls=0
-logdir=${localstatedir}/log/lux
 max_conn_count=128
 max_simultaneous_connections=64
 max_threads=1024
@@ -51,7 +48,6 @@ poll_interval=1000000
 preamble_size=2048
 read_max=8388608
 read_size=4096
-sharedir=${datarootdir}/lux
 socket_backlog=4096
 srvgroup="http"
 srvuser="http"
@@ -59,13 +55,27 @@ stack_size=100000
 svcpath=
 systemd=yes
 sysv=no
-sysvpath="/etc/init.d"
 unit_file=${srcdir}/etc/etc.systemd.system.lux.service
 with_json=1
 with_msgpack=0
 with_xml=0
 write_size=8192
 wwwport=2000
+
+# Directories that have built-in values
+# should default to /usr/local/etc, but is overriden with /etc for something like Debian
+#confdir=${sysconfdir}/lux
+confdir=
+default_svcpath="/etc/systemd/system"
+# Local state dir is the base for logging
+# should default to /usr/local/var, but this can also be /var
+#logdir=${localstatedir}/log/lux
+logdir=
+# Data root dir is teh "share dir" (which is /usr/local/share for docs, and ro files)
+#sharedir=${datarootdir}/lux
+sharedir=
+sysvpath="/etc/init.d"
+#wwwroot=${localstatedir}/www/lux
 wwwroot=${localstatedir}/www/lux
 
 # Certtool/certificate stuff
@@ -90,9 +100,6 @@ AC_SUBST(max_threads)
 AC_ARG_WITH([max-write-buffer], AS_HELP_STRING([--with-max-write-buffer=n],[Set default server port for listening]), [write_size=${withval}])
 AC_SUBST(write_size)
 
-AC_ARG_WITH([www-root], AS_HELP_STRING([--with-www-root=DIR],[Set default web directory for applications]), [wwwroot=${withval}])
-AC_SUBST(wwwroot)
-
 AC_ARG_WITH([www-port], AS_HELP_STRING([--with-www-port=PORT],[Set default server port for listening]), [wwwport=${withval}])
 AC_SUBST(wwwport)
 
@@ -102,16 +109,54 @@ AC_SUBST(srvuser)
 AC_ARG_WITH([www-group], AS_HELP_STRING([--with-www-group],[Set default group for managing the web server]),[srvgroup=${withval}])
 AC_SUBST(srvgroup)
 
-AC_ARG_WITH([log-dir], AS_HELP_STRING([--with-log-dir],[Set access and error log directory]), [logdir=${withval}])
-AC_SUBST(logdir)
 
-# Figure out the configuration directory
-AC_ARG_WITH([conf-dir], AS_HELP_STRING([--with-conf-dir],[Set a different configuration directory]), [confdir=${withval}])
+
+# Ascertain the configuration directory
+#AC_ARG_WITH([conf-dir], AS_HELP_STRING([--with-conf-dir],[Set a different configuration directory]), [confdir=${withval}])
+if test -z $confdir; then
+	# Expand $prefix so substitutions work for header files.  
+	# NOTE: this will break builds that bypass ./configure.
+	if test "`echo ${sysconfdir} | cut -c1`" == "$"; then
+		sysconfdir=`echo $sysconfdir | sed 's/${prefix}//' | sed "s;^;$(echo $prefix);"` 
+	fi
+	#echo $sysconfdir
+	confdir=`echo ${sysconfdir}/lux`
+fi
 AC_SUBST(confdir)
 
-# Figure out the dependency directory
-AC_ARG_WITH([share-dir], AS_HELP_STRING([--with-share-dir],[Set a different configuration directory]), [sharedir=${withval}])
+
+# Ascertain the logging directory
+#AC_ARG_WITH([log-dir], AS_HELP_STRING([--with-log-dir],[Set access and error log directory]), [logdir=${withval}])
+if test -z $logdir; then
+	# Expand $prefix so substitutions work for header files.  
+	# NOTE: this will break builds that bypass ./configure.
+	if test "`echo ${localstatedir} | cut -c1`" == "$"; then
+		localstatedir=`echo $localstatedir | sed 's/${prefix}//' | sed "s;^;$(echo $prefix);"` 
+	fi
+	#echo $logdir
+	logdir=`echo ${localstatedir}/log/lux`
+fi
+AC_SUBST(logdir)
+
+
+# Ascertain the share directory
+#AC_ARG_WITH([share-dir], AS_HELP_STRING([--with-share-dir],[Set a different configuration directory]), [sharedir=${withval}])
+if test -z $sharedir; then
+	# Expand $prefix so substitutions work for header files.  
+	# NOTE: this will break builds that bypass ./configure.
+	if test "`echo ${datarootdir} | cut -c1`" == "$"; then
+		datarootdir=`echo $datarootdir | sed 's/${prefix}//' | sed "s;^;$(echo $prefix);"` 
+	fi
+	#echo $sharedir
+	sharedir=`echo ${datarootdir}/lux`
+fi
 AC_SUBST(sharedir)
+
+
+# Ascertain the wwwrootdir directory
+AC_ARG_WITH([www-root], AS_HELP_STRING([--with-www-root=DIR],[Set default web directory for applications]), [wwwroot=${withval}])
+AC_SUBST(wwwroot)
+
 
 AC_ARG_WITH([cc], AS_HELP_STRING([--with-cc=CC],[Set a different C compiler as the default]), [cc=${withval}])
 AC_SUBST(cc)
