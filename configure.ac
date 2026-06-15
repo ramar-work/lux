@@ -110,6 +110,10 @@ AC_ARG_WITH([www-group], AS_HELP_STRING([--with-www-group],[Set default group fo
 AC_SUBST(srvgroup)
 
 
+# Handle cases in which $prefix isn't specified at all
+if test "x${prefix}" == "xNONE"; then
+	prefix=/usr/local
+fi
 
 # Ascertain the configuration directory
 #AC_ARG_WITH([conf-dir], AS_HELP_STRING([--with-conf-dir],[Set a different configuration directory]), [confdir=${withval}])
