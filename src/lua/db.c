@@ -1,32 +1,11 @@
-/* -------------------------------------------- * 
-db
-==
+/**
+ * db.c
+ * ====
+ *
+ * Database primitives for Lua.  Currently works with SQLite.
+ *
+ */
 
-Database primitives for Lua
-
-
-LICENSE
--------
-See LICENSE in the top-level directory for more information.
-
-
-Usage
------
-Database does something weird.
-
-
-### exec ###
-
-How to use db.exec.
-
-It's very complicated.
-
-A bunch of notes on how to use this thing.
-
-```
-Yeah
-```
- * -------------------------------------------- */
 #include "db.h"
 
 static const char *engines[] = {
@@ -38,7 +17,107 @@ static const char *engines[] = {
 
 
 
-//Accepts three arguments { db, [query,file], bind_args }
+/**
+ * db.exec ( *table* )
+ * ----
+ *
+ * Connect to and interact with a database.
+ *
+ * C API: int db_exec ( lua_State *L )
+ *
+ * Usage
+ * -----
+ * This function accepts a table and, upon success returns a table with keys `results`
+ * (a table), `status` (a boolean) and `affected` (a number containing the count of
+ * affected rows). 
+ *
+ * When calling `db.exec`, any of the following keys may be specified, but `conn` and
+ * either `query` or `file` are required.:
+ *
+ * Key | Type | Value
+ * --- | ---- | ----
+ * conn | *string* | A URI indicating the location of the database (See Caveats below for more information)
+ * query | *string* | A string containing the query to execute.
+ * file | *string* | A string containing the path to a file containing SQL code for execution.
+ * bindargs | *table* | A table composed of text keys and values with the bind arguments to be used.
+ *
+ * The URI for a database connection looks something like the following:
+ * <pre>
+ * sqlite3://db/my_database_file.db
+ * </pre>
+ *
+ * Breaking this down using the following diagram, we'll explain what each of these
+ * parts symbolize:
+ * <pre>
+ * [ sqlite3:// ] [ db/my_database_file.db ]
+ * </pre>
+ *
+ * 1. is the connection type to use.  Currently, only SQLite is supported, but Postgres and MySQL will be quite similar.  lux will eventually support Oracle, SQL Server and Mongo as well.
+ * 2. is the path to the database relative to the current instance.  This is really only relevant for SQLite3.  Other engines will need to include the hostname and database.
+ *
+ *
+ * Examples
+ * -----
+ *
+ * Connecting to a SQLite database and getting some records is pretty straightforward.
+ * Specify the connection via the `conn` key and the SQL to execute via `string`:
+ * <pre>
+ * r = db.exec{
+ *   conn = "sqlite3://db/blog.db",
+ *   string = "SELECT * FROM user_accounts"
+ * }
+ * </pre>
+ *
+ * A good convention is to keep your primary database connection in your instance's
+ * config.lua.  (`lxconf` and `lxcli` will create a configuration with this key when
+ * creating a new instance by default).  So the following would also be legal:
+ * <pre>
+ * -- Contents of config.lua
+ * return {
+ *   -- Omitting the rest of the file....
+ *   db = "sqlite3://db/myconn.db",
+ * }
+ * </pre>
+ *
+ * Then in one of the model files (anything under $instance/app/), use `config.db`
+ * to reference the database connection:
+ * <pre>
+ * r = db.exec{
+ *   conn = config.db,
+ *   string = "SELECT * FROM user_accounts"
+ * }
+ * </pre>
+ *
+ * Successful calls will return a table containing `results`, `status` and `affected`.
+ * Simply iterating through results will make the most sense if we're doing something
+ * like formatting a table of results.
+ *
+ * A typical setup for this would look something like:
+ * <pre>
+ * -- Contents of app/model.lua
+ * r = db.exec{ conn = config.db, string = "SELECT * FROM user_accounts" }
+ * </pre>
+ *
+ * And, in a corresponding view file, we can write:
+ * <pre>
+ * &lt;!-- Contents of views/model.tpl --&gt;
+ * &lt;table&gt;
+ * {{ #r.results }}
+ *  &lt;tr>
+ *   &lt;td>{{ .name }}&lt;/td>
+ *   &lt;td>{{ .salary }}&lt;/td>
+ *   &lt;td>{{ .date_created }}&lt;/td>
+ *  &lt;/tr>
+ * {{ /r.results }}
+ * &lt;/table>
+ * </pre>
+ *
+ * Caveats
+ * -----
+ * All binds are made using text keys vs array notation (like what you'll see in
+ * an engine like Postgres).
+ *
+ */
 int db_exec ( lua_State *L ) {
 	//Define everything at the top
 	const char *connstr = NULL, *query = NULL;
@@ -46,7 +125,7 @@ int db_exec ( lua_State *L ) {
 	int pos, len = 0, inc = 0;
 	char err[ 1024 ] = { 0 };
 	zTable tt, *t, *results;
-	zdb_t zdb = { 0 }; 
+	zdb_t zdb = { 0 };
 	zdbv_t **zdbbind = NULL;
 
 	//Check for arguments...
@@ -60,7 +139,7 @@ int db_exec ( lua_State *L ) {
 	//Within this table need to exist a few keys
 	//TODO: Doing this statically will save time, energy and memory
 	t = &tt;
-	lt_init( t, NULL, count ); 
+	lt_init( t, NULL, count );
 
 	//Convert to C table for slightly easier key extraction	
 	if ( !lua_to_ztable( L, 1, t ) || !lt_lock( t ) ) {
@@ -91,7 +170,7 @@ int db_exec ( lua_State *L ) {
 			}
 		}
 		if ( !connstr ) {
-			char buf[64] = {0}, *i = index( dbstr, ':' );
+			char buf[64] = {0}, *i = strchr( dbstr, ':' );
 			memcpy( buf, dbstr, strlen( dbstr ) - ( ( i ) ? strlen( i ) : 0 ) );
 			return luaL_error( L, "Unsupported database type: '%s'.", buf );
 		}
@@ -99,9 +178,9 @@ int db_exec ( lua_State *L ) {
 
 	//Get the shadow path if there is one
 	//TODO: Eventually, this should be replaced with lua_retglobal
-	lua_getglobal( L, "shadow" ); 
+	lua_getglobal( L, "shadow" );
 	if ( lua_isnil( L, -1 ) )
-		lua_pop( L, 1 ); 
+		lua_pop( L, 1 );
 	else {
 		//Translate the connection to the right path
 		snprintf( shadow, sizeof( shadow ), "%s", lua_tostring( L, -1 ) );
@@ -131,7 +210,7 @@ int db_exec ( lua_State *L ) {
 	}
 
 	#if 0
-	//Extract a type as well... 
+	//Extract a type as well...
 	if ( ( pos = lt_geti( t, "memory" ) ) > -1 ) {
 		char *type = lt_text_at( t, pos );
 		if ( !type ) {
@@ -148,7 +227,7 @@ int db_exec ( lua_State *L ) {
 		}
 		lt_dump( t );
 		exit( 0 );
-	}	 
+	}	
 	#endif
 
 	//Finally, handle bind args if there are any
@@ -190,11 +269,11 @@ int db_exec ( lua_State *L ) {
 
 			if ( kv->value.type == ZTABLE_TXT ) {
 				if ( !kv->value.v.vchar ) {
-					tv->value = zhttp_dupstr( "" ); 
+					tv->value = zhttp_dupstr( "" );
 					tv->len = 0;
 				}
 				else {
-					tv->value = zhttp_dupstr( kv->value.v.vchar ); 
+					tv->value = zhttp_dupstr( kv->value.v.vchar );
 					tv->len = strlen( kv->value.v.vchar );
 				}
 			}
@@ -207,7 +286,7 @@ int db_exec ( lua_State *L ) {
 			else {
 				//This should result in failure
 				lt_free( t ), lt_free( tt );
-				return luaL_error( L, "Invalid type of bindarg at key '%s'", key ); 
+				return luaL_error( L, "Invalid type of bindarg at key '%s'", key );
 			}
 			add_item( &zdbbind, tv, zdbv_t *, &zlen );
 		}
@@ -215,8 +294,8 @@ int db_exec ( lua_State *L ) {
 		lt_free( tt ), free( tt );
 	}
 
-	//Open or connect to database, run the query and close the connection 
-	if ( !zdb_open( &zdb, conn, ZDB_SQLITE ) ) { 
+	//Open or connect to database, run the query and close the connection
+	if ( !zdb_open( &zdb, conn, ZDB_SQLITE ) ) {
 		( len ) ? free( (void *)query ) : 0;
 		return luaL_error( L, "Connection error." );
 	}

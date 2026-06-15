@@ -268,11 +268,10 @@ vendor/sqlite3.o:
 # vendor/liblua.a - Build Lua 5.4.4 statically
 lib/liblua.a: 
 	-@mkdir $(srcdir)/lib/ $(srcdir)/include/
-	-@cd vendor/ && \
-		cd lua-$(LUAVER) && \
-		make MYCFLAGS="-fPIC" && \
-		mv src/liblua.a ../../lib/ && \
-		cp include/lauxlib.h include/luaconf.h include/lua.h include/lualib.h ../../include/
+	-@cd vendor/lua-$(LUAVER) && \
+		make MYCFLAGS="-fPIC" -e TMPDIR=/tmp && \
+		make install INSTALL_TOP=../../.. INSTALL_MAN=/tmp INSTALL_BIN=/tmp && \
+		rm -f /tmp/lua.1 /tmp/luac.1 /tmp/lua /tmp/luac
 
 # vendor/gnutls.a - Build GnuTLS 3.6.x statically
 lib/libgnutls.a: 
