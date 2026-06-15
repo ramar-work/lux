@@ -17,27 +17,46 @@ $(DISTDIR):
 	mkdir -p \
 		$(DISTDIR)/bin \
 		$(DISTDIR)/etc \
-		$(DISTDIR)/example \
 		$(DISTDIR)/include \
 		$(DISTDIR)/lib \
 		$(DISTDIR)/mk \
 		$(DISTDIR)/share \
 		$(DISTDIR)/src \
-		$(DISTDIR)/vendor
+		$(DISTDIR)/vendor \
+		$(DISTDIR)/www
 	cp $(FILES) $(DISTDIR)/
 	cp -r etc/* $(DISTDIR)/etc/
-	cp -r example/* $(DISTDIR)/example/
 	cp -r mk/docs.mk mk/tests.mk $(DISTDIR)/mk/
 	cp -r src/* $(DISTDIR)/src/
 	cp -r share/* $(DISTDIR)/share/
 	cp -r vendor/*.[ch] vendor/lua-$(LUAVER)/ $(DISTDIR)/vendor/
+	cp -r www/demos $(DISTDIR)/www/
+	cp -r www/docs $(DISTDIR)/www/
 
 # Check that packaging worked (super useful for other pkgributions...) 
 pkgcheck:
-	gzip -cd $(DISTDIR).tar.gz | tar xvf -
-	cd $(DISTDIR) && ./configure
-	cd $(DISTDIR) && $(MAKE)
-	cd $(DISTDIR) && $(MAKE) clean
+	gzip -cd archives/$(DISTDIR).tar.gz | tar xvf -
+	cd $(DISTDIR) && \
+		./configure \
+			--disable-tls-support \
+			--disable-systemd \
+			--enable-local-lua \
+			--enable-local-sqlite3 \
+			--prefix=`realpath ./$(DISTDIR)` \
+			--localstatedir=`realpath ./$(DISTDIR)`/var \
+			--datarootdir=`realpath ./$(DISTDIR)`/share \
+			--sysconfdir=`realpath ./$(DISTDIR)`/etc \
+			--with-www-root=`realpath ./$(DISTDIR)`/www \
+			--with-www-user=$(USER) \
+			--with-www-group=users
+	cd $(DISTDIR) && \
+		$(MAKE) -j2
+	cd $(DISTDIR) && \
+		$(MAKE) install 
+	cd $(DISTDIR) && \
+		$(MAKE) uninstall 
+	cd $(DISTDIR) && \
+		$(MAKE) clean
 	rm -rf $(DISTDIR)
 	@echo "*** package $(DISTDIR).tar.gz is ready for distribution."
 
@@ -50,7 +69,7 @@ pkgclean: clean
 pkgboot:
 	autoupdate && autoreconf --install
 
-# pkgtest - RUn an automated build against a different OS
+# pkgtest - Run an automated build against a different OS
 #pkgtest:
 #	test ! -z $(REMOTE)
 #	test -f $(DISTDIR).tar.gz

@@ -218,19 +218,30 @@ systemd-install:
 cygwin-install:
 	cygstart --action=runas cygrunsrv --install lux --user $(USER) -p /usr/local/bin/lux-server -a '--start --config /var/www/config.lua'
 
-# uninstall - Uninstalls lux
-uninstall:
-	rm -f $(prefix)/bin/lxcli
-	rm -f $(prefix)/bin/lxsrv
-	rm -f $(prefix)/bin/lxpkg
-	rm -f $(prefix)/bin/lxconf
+# uninstall - Uninstalls lux and any init files.  Leave the wwwroot alone for now.
+uninstall: filesystem-uninstall $(INITMETHOD)-uninstall wwwroot-uninstall
+	@printf '' > /dev/null
+
+# filesystem-uninstall - Uninstalls lux and any init files.  Leave the wwwroot alone for now.
+filesystem-uninstall: $(INITMETHOD)-uninstall wwwroot-uninstall
+	rm -f $(exec_prefix)/bin/lxcli
+	rm -f $(exec_prefix)/bin/lxsrv
+	rm -f $(exec_prefix)/bin/lxpkg
+	rm -f $(exec_prefix)/bin/lxconf
+	rm -rf $(DATADIR)/
+	rm -rf $(CONFDIR)/
+	rm -rf $(LOGDIR)/
+
+# none-uninstall - Uninstalls (you guessed it) nothing
+none-uninstall:
+
+# systemd-uninstall - Uninstalls (you guessed it) nothing
+systemd-uninstall:
 	rm -f $(SVCPATH)/$(BINNAME).service
-	rm -f /etc/$(BINNAME)/*
-	-rmdir /etc/$(BINNAME)
-	rm -f /var/lib/$(BINNAME)/*
-	-rmdir /var/lib/$(BINNAME)
-	rm -f $(prefix)/share/$(BINNAME)/*
-	-rmdir $(prefix)/share/$(BINNAME)
+
+# wwwroot-uninstall - Uninstalls (you guessed it) nothing
+wwwroot-uninstall:
+	echo '$(WWWROOT) must be removed manually.'
 
 # examples - Runs lux with the files in example/.  Use -e PORT to change port number.
 examples: PORT=2222
