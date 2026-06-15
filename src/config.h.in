@@ -60,6 +60,7 @@
  #define DEFAULT_WWW_PORT @wwwport@
 #endif
 
+/* Check for misconfigurations with default port */
 #if ( DEFAULT_WWW_PORT > 65535 ) || ( DEFAULT_WWW_PORT < 0 ) 
  #error "Port specified (" DEFAULT_WWW_PORT ") is invalid."
 #endif
@@ -261,3 +262,16 @@
 
 /* Define to 1 if you have the `dl' library (-ldl). */
 /* #define HAVE_LIBDL 1 */
+
+/* Define an optionally larger read limit for the fs module. */
+#ifndef LUA_FS_READ_LIMIT
+ #define LUA_FS_READ_LIMIT 4194304
+#endif
+
+#if LUA_FS_READ_LIMIT < 0
+ #error "LUA_FS_READ_LIMIT (" LUA_FS_READ_LIMIT ") cannot be negative."
+#endif
+
+#if LUA_FS_READ_LIMIT > INT_MAX
+ #error "LUA_FS_READ_LIMIT (" LUA_FS_READ_LIMIT ") exceeds max size: " INT_MAX "."
+#endif
