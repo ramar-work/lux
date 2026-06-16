@@ -356,7 +356,7 @@ Default configuration directory: $confdir
 Default share directory: $sharedir
 Default protocol: $protocol
 Init system: $initsys
-Daemon service file path: $svcpath
+Daemon service file path: `test ${initsys} == "none" && echo "none" || echo $svcpath`
 Chosen threading model: $modelflags
 Default domain: $default_domain
 Maximum thread usage (per context): $max_threads
