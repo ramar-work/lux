@@ -173,8 +173,8 @@ filesystem-install:
 	install -d $(LOGDIR)/ && chown $(SRVUSER):$(SRVGROUP) $(LOGDIR)/
 	# Install the server configuration again?
 	-install -d $(WWWROOT)/ && chown $(SRVUSER):$(SRVGROUP) $(WWWROOT)/
-	cp $(srcdir)/share/config.server.lua $(WWWROOT)/config.lua
-	sed -i 's;wwwroot = "@root@";wwwroot = "$(WWWROOT)";' $(WWWROOT)/config.lua
+	# Copy if no files exist
+	test -f $(WWWROOT)/config.lua || cp $(srcdir)/share/config.server.lua $(WWWROOT)/config.lua
 
 # examples-install - Install examples for new users
 examples-install:

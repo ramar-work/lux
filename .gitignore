@@ -2,6 +2,9 @@
 
 # NOTE: Explicit matches will be maintained here until the codebase is fully back in Git
 
+# archives/ should never be tracked
+archives/
+
 # include/ should never be tracked
 include/
 
@@ -12,4 +15,8 @@ lib/
 # TODO: This should probably be installed somewhere else.
 test/**
 
+# Track all source code
 !src/
+
+# Leave the top-level Makefile off
+Makefile

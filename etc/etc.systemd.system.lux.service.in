@@ -5,7 +5,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=__PREFIX__/bin/lxsrv --start --port __WWWPORT__ --user __SRVUSER__:__SRVGROUP__ --configuration __WWWROOT__/config.lua --logfile __LOGDIR__/lxlog.db -W 16000 --protocol=https 
+ExecStart=@prefix@/bin/lxsrv --start --port @wwwport@ --user @srvuser@:@srvgroup@ --configuration @wwwroot@/config.lua --logfile @logdir@/lxlog.db -W @write_size@ --protocol=@protocol@
 Restart=on-failure
 RestartSec=10s
 

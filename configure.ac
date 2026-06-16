@@ -6,7 +6,7 @@ AC_CONFIG_SRCDIR([src/config.h.in])
 
 # Define files to perform substitutions on
 #AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile src/config.h share/package.Makefile])
+AC_CONFIG_FILES([Makefile src/config.h share/package.Makefile etc/etc.systemd.system.lux.service share/config.server.lua])
 #src/lua/tests/Makefile])
 #src/config.h])
 #                 example/Makefile
@@ -46,6 +46,7 @@ modelflags="HTHREAD_H"
 objdeps=
 poll_interval=1000000
 preamble_size=2048
+protocol=
 read_max=8388608
 read_size=4096
 socket_backlog=4096
@@ -67,15 +68,15 @@ wwwport=2000
 #confdir=${sysconfdir}/lux
 confdir=
 default_svcpath="/etc/systemd/system"
-# Local state dir is the base for logging
-# should default to /usr/local/var, but this can also be /var
+# Local state dir is the base for logging.  Should default to /usr/local/var, but this can also be /var
 #logdir=${localstatedir}/log/lux
 logdir=
-# Data root dir is teh "share dir" (which is /usr/local/share for docs, and ro files)
+# Data root dir is the "share dir" (which is /usr/local/share for docs, and ro files)
 #sharedir=${datarootdir}/lux
 sharedir=
 sysvpath="/etc/init.d"
 #wwwroot=${localstatedir}/www/lux
+# wwwroot (or wwwrootdir) is the home for all sites.  This could probably also go in /var
 wwwroot=${localstatedir}/www/lux
 
 # Certtool/certificate stuff
@@ -88,6 +89,15 @@ default_server_name="localhost"
 default_server_ip="127.0.0.1"
 
 # Handle common easy options
+AC_ARG_WITH([default-protocol], AS_HELP_STRING([--with-default-protocol=\[http,https\]],[Use this protocol by default when starting a new server]), [protocol=${withval}])
+#AC_SUBST(protocol)
+if test ! -z $protocol; then
+	if ! test "${protocol}" == "https" && ! test "${protocol}" == "http"; then
+		printf "Protocol value ${protocol} is invalid\n"
+		exit 1
+	fi
+fi
+
 AC_ARG_WITH([server-backlog], AS_HELP_STRING([--with-server-backlog=n],[Set server backlog to a different value]), [socket_backlog=${withval}])
 AC_SUBST(socket_backlog)
 
@@ -164,12 +174,6 @@ AC_SUBST(wwwroot)
 
 AC_ARG_WITH([cc], AS_HELP_STRING([--with-cc=CC],[Set a different C compiler as the default]), [cc=${withval}])
 AC_SUBST(cc)
-
-AC_ARG_WITH([systemd-unit-file],
-	AS_HELP_STRING([--with-systemd-unit-file=FILE],[Use an alternate systemd unit file when installing]),
-	[unit_file=${withval}]
-)
-AC_SUBST(unit_file)
 
 # Disable or enable examples
 AC_ARG_ENABLE([examples], AS_HELP_STRING([--disable-examples],[Skip examples when installing]),[examples=none])
@@ -286,10 +290,14 @@ else
 	ld_flags+=" -llua"
 fi
 
+
 # Check for TLS support and find GnuTLS header and libs if present; and add flags
 AC_ARG_ENABLE([tls-support], AS_HELP_STRING([--disable-tls-support],[Disable TLS support]), [disable_tls=1])
 AC_ARG_ENABLE([local-tls], AS_HELP_STRING([--enable-local-tls],[Use the provided GnuTLS libraries]), [local_tls=1])
 if test ${disable_tls} == 0; then
+	if test -z $protocol; then
+		protocol="https"
+	fi
 	if test ${local_tls} == 1; then
 		#build the local one
 		objdeps+="lib/libgnutls.a "
@@ -301,6 +309,10 @@ if test ${disable_tls} == 0; then
 		AC_CHECK_LIB([gnutls], [main], [], AC_MSG_FAILURE(${GNUTLS_LIB_ERRMSG}))
 		ld_flags+=" -lgnutls"
 	fi
+else
+	# TLS support won't be there, so force 'http'
+	printf "Forcing protocol 'http', TLS support was not included.\n"
+	protocol="http"
 fi
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -334,18 +346,18 @@ cat << EOF
 
 *** lux configured with: ***
 
-Path: $wwwroot
+Web root directory: $wwwroot
 Default port: $wwwport
 Default server user: $srvuser
 Default server group: $srvgroup
 Default logging directory: $logdir
 Default configuration directory: $confdir
 Default share directory: $sharedir
+Default protocol: $protocol
 Init system: $initsys
 Daemon service file path: $svcpath
 Chosen threading model: $modelflags
 Default domain: $default_domain
-Service File: $unit_file
 Maximum thread usage (per context): $max_threads
 Maximum connection count (per context): $max_conn_count
 Server backlog count: $socket_backlog
@@ -385,6 +397,7 @@ AC_SUBST(modelflags)
 AC_SUBST(objdeps)
 AC_SUBST(poll_interval)
 AC_SUBST(preamble_size)
+AC_SUBST(protocol)
 AC_SUBST(read_max)
 AC_SUBST(read_size)
 AC_SUBST(socket_backlog)

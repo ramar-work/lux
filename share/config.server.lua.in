@@ -14,8 +14,8 @@
 -- 
 --------------------------------------------------
 return {
-	wwwroot = "@root@",
-	filter = "@default_filter@",
+	wwwroot = "@wwwroot@",
+	-- filter = "@default_filter@",
 	hosts = {
 		-- Default host in case no domain is specified
 		["localhost"] = { 
