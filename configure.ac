@@ -261,20 +261,6 @@ AC_CHECK_LIB([archive], [archive_entry_new])
 # TODO: Do you need this?
 #AC_CHECK_LIB([crypto], [main])
 
-# Find SQLite3 headers or use the local version
-AC_ARG_ENABLE([local-sqlite3], AS_HELP_STRING([--enable-local-sqlite3],[Use the provided SQLite3 library]), [local_sqlite3=1])
-if test ${local_sqlite3} == 1; then
-	objdeps+="vendor/sqlite3.o "
-else
-	# Find SQLite3 header
-	SQLITE3_HEADER_ERRMSG="SQLite3 headers were not found"
-	AC_CHECK_HEADER([sqlite3.h], [], AC_MSG_FAILURE([${SQLITE3_HEADER_ERRMSG}]))
-	SQLITE3_LIB_ERRMSG="SQLite3 library not found"
-	# FIXME: Replace `main' with a function in `-lsqlite3':
-	AC_CHECK_LIB([sqlite3], [main], [], AC_MSG_FAILURE(${SQLITE3_LIB_ERRMSG}))
-	ld_flags+=" -lsqlite3"
-fi
-
 # Find Lua headers or use the local version
 # FIXME: Add option for static vs dynamic
 AC_ARG_ENABLE([local-lua], AS_HELP_STRING([--enable-local-lua],[Use the provided Lua libraries]), [local_lua=1])
@@ -288,6 +274,21 @@ else
 	# FIXME: Replace `main' with a function in `-lgnutls':
 	AC_CHECK_LIB([lua], [main], [], AC_MSG_FAILURE(${LUA_LIB_ERRMSG}))
 	ld_flags+=" -llua"
+fi
+
+
+# Find SQLite3 headers or use the local version
+AC_ARG_ENABLE([local-sqlite3], AS_HELP_STRING([--enable-local-sqlite3],[Use the provided SQLite3 library]), [local_sqlite3=1])
+if test ${local_sqlite3} == 1; then
+	objdeps+="vendor/sqlite3.o "
+else
+	# Find SQLite3 header
+	SQLITE3_HEADER_ERRMSG="SQLite3 headers were not found"
+	AC_CHECK_HEADER([sqlite3.h], [], AC_MSG_FAILURE([${SQLITE3_HEADER_ERRMSG}]))
+	SQLITE3_LIB_ERRMSG="SQLite3 library not found"
+	# FIXME: Replace `main' with a function in `-lsqlite3':
+	AC_CHECK_LIB([sqlite3], [main], [], AC_MSG_FAILURE(${SQLITE3_LIB_ERRMSG}))
+	ld_flags+=" -lsqlite3"
 fi
 
 
@@ -408,6 +409,7 @@ AC_SUBST(svcpath)
 AC_SUBST(systemd)
 AC_SUBST(sysv)
 AC_SUBST(sysvpath)
+AC_SUBST(unit_file)
 AC_SUBST(with_json)
 AC_SUBST(with_msgpack)
 AC_SUBST(with_xml)

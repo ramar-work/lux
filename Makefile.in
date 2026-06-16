@@ -288,9 +288,13 @@ clean:
 	-@find $(srcdir)/bin/ -maxdepth 1 -type f | xargs rm
 	-@find $(srcdir)/vendor/ -type f -name "*.o" | xargs rm
 
-# veryclean - Run `clean` and get rid of autoconf files as well
+# clean - Get rid of object files, tests and external dependencies
 veryclean: clean
-	-@rm -rf $(srcdir)/lib/ $(srcdir)/include/
+	-@rm -rf $(srcdir)/lib/
+	-@rm -rf $(srcdir)/include/
+
+# pristine - Run 'clean', 'veryclean' and get rid of autoconf files as well
+pristine: clean veryclean
 	-@rm -rf autom4te.cache config.guess config.log config.status config.sub configure Makefile
 
 # list - List all the targets and what they do
