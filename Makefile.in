@@ -203,15 +203,7 @@ bsdinit-install:
 
 # systemd-install - Installs systemd on Linux systems
 systemd-install:
-	#echo 'Running systemd-install...'
-	sed "{ \
-		s#__prefix__#$(prefix)#; \
-		s#__SRVUSER__#$(SRVUSER)#; \
-		s#__SRVGROUP__#$(SRVGROUP)#; \
-		s#__LOGDIR__#$(LOGDIR)#g; \
-		s#__WWWROOT__#$(WWWROOT)#; \
-		s/__WWWPORT__/$(WWWPORT)/; \
-	}" $(UNITFILE) > $(SVCPATH)/$(BINNAME).service
+	cp $(UNITFILE) $(SVCPATH)/$(BINNAME).service
 
 #}" $(srcdir)/etc/etc.systemd.system.lux.service > $(SVCPATH)/$(BINNAME).service
 # cygwin-install - Installs lux as a service suitable for use with Cygwin 
