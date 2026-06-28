@@ -1,24 +1,38 @@
-/* -------------------------------------------- * 
-json.c 
-=========
-
-JSON deserialization / serialization 
-
-
-LICENSE
--------
-Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
-See LICENSE in the top-level directory for more information.
-
- * -------------------------------------------- */
+/**
+ * json.c
+ * ======
+ *
+ * Use this module to decode, encode and validate JSON objects.
+ *
+ */
 #include "json.h"
 
+
+
 /**
- * int json_check( lua_State *L )
- * 
- * Decodes a Lua string composed of JSON to Lua table.
+ * json.decode ( [*string*] )
+ * ----
  *
- */ 
+ * Decodes a Lua string composed of JSON to a Lua table.
+ *
+ * C API: int json_decode ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * `json.decode` accepts one argument, a string composed of valid JSON.
+ * Lua will throw an error if another type is received, or if the
+ * structure given is not valid JSON.
+ *
+ * Examples
+ * --------
+ *
+ * The following code will turn the JSON object `{ my: "string" }` into
+ * a table:
+ * <pre>
+ * local t = json.decode( '{ my: "string" }' )
+ * </pre>
+ *
+ */
 int json_decode ( lua_State *L ) {
 	char *src = NULL, *cmp = NULL, err[ 1024 ] = {0};
 	int cmplen = 0;
@@ -66,15 +80,36 @@ int json_decode ( lua_State *L ) {
 
 
 /**
- * int json_encode( lua_State *L )
+ * json.encode ( *table* )
+ * ---
  *
  * Encodes a Lua table to JSON string.
  *
- */ 
+ * C API: int json_encode( lua_State *L )
+ *
+ * Usage
+ * ----
+ * `json.encode` accepts one argument, a table.  If any other type
+ * is received, Lua will throw an error.
+ *
+ * Examples
+ * --------
+ *
+ * The following code will turn the table `{ ["my"] = "string" }` into
+ * a JSON object (a string that can be parsed with Javascript or any
+ * other JSON parser).
+ *
+ * <pre>
+ * local t = json.encode( { my = "string" } )
+ * -- OR
+ * local t = json.encode{ my = "string" }
+ * </pre>
+ *
+ */
 int json_encode ( lua_State *L ) {
 	luaL_checktype( L, 1, LUA_TTABLE );
 	char * src = NULL, err[ 1024 ] = {0};
-	zTable *zt = NULL; 
+	zTable *zt = NULL;
 	int count = 0;
 	struct mjson **mjson = NULL;
 
@@ -87,13 +122,13 @@ int json_encode ( lua_State *L ) {
 
 	//Check if the table failed to be created
 	if ( !( zt = lt_make( count * 2 ) ) ) {
-		return luaL_error( L, "no space to allocate for JSON conversion." ); 
+		return luaL_error( L, "no space to allocate for JSON conversion." );
 	}
 
 	//Then convert
 	if ( !lua_to_ztable( L, 1, zt ) ) {
 		lt_free( zt ), free( zt );
-		return luaL_error( L, "conversion to binary structure failed." ); 
+		return luaL_error( L, "conversion to binary structure failed." );
 	}
 
 	lua_pop( L, 1 );
@@ -114,24 +149,35 @@ int json_encode ( lua_State *L ) {
 }
 
 
-/**
- * int json_check( lua_State *L )
- *
- * Performs a syntax check on a JSON string.
- *
- */ 
-int json_check ( lua_State *L ) {
-	luaL_checktype( L, 1, LUA_TTABLE );
-	return 0;
-}
-
 
 /**
- * int json_load( lua_State *L )
+ * json.load ( *string* file )
+ * -----
  *
  * Loads a file and turns into a Lua table.
  *
- */ 
+ * C API: int json_load( lua_State *L )
+ *
+ * Usage
+ * -----
+ * This function accepts just one argument, a string containing
+ * the path to a JSON document.  Lua will throw an error in the
+ * event it cannot:
+ *
+ * - Locate the file
+ * - Parse the file
+ * - Allocate enough space for the file
+ *
+ *
+ * Examples
+ * --------
+ * Load a private asset named 'skullduggery.json':
+ *
+ * <pre>
+ * local t = json.load( "private.skullduggery.json" )
+ * </pre>
+ *
+ */
 int json_load ( lua_State *L ) {
 	char *file = NULL, *content = NULL, *cmp = NULL;
 	char err[ 1024 ] = {0};
@@ -152,7 +198,7 @@ int json_load ( lua_State *L ) {
 
 	if ( ( fd = open( file, O_RDWR ) ) == -1 ) {
 		return luaL_error( L, "open failed at json_load(): %s", strerror( errno ) );
-	} 
+	}
 
 	if ( !( content = malloc( sb.st_size + 1 ) ) || !memset( content, 0, sb.st_size + 1 ) ) {
 		return luaL_error( L, "allocation failed at json_load(): %s", strerror( errno ) );
@@ -173,13 +219,9 @@ int json_load ( lua_State *L ) {
 		return luaL_error( L, "compression failed at json_load()" );
 	}
 
-	/**
-	 * NOTE: 
-   * 'struct mjson **mjson' relies on allocated string 'cmp' as its 
-	 * source.  Can't delete this reference until we're done with the
-   * list.
-   * 
-   */
+	//NOTE: 'struct mjson **mjson' relies on allocated string 'cmp' as its
+	//source.  Can't delete this reference until we're done with the
+	//list.
 	if ( ( mjson = zjson_decode( cmp, cmplen, err, sizeof( err )) ) )
 		0;	
 	else {

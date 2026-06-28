@@ -1,9 +1,9 @@
-/* ------------------------------------------- * 
- * dec.h 
+/* ------------------------------------------- *
+ * dec.h
  * =====
  * Popular decoding routines
  *
- * 
+ *
  * Usage
  * -----
  * ....
@@ -24,5 +24,5 @@
 #ifndef LDEC_H
 #define LDEC_H
 int base64_decode ( lua_State * );
-extern struct luaL_Reg dec_set[]; 
+extern struct luaL_Reg dec_set[];
 #endif

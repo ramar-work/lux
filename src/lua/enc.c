@@ -1,21 +1,10 @@
-/* -------------------------------------------- * 
- * enc.c 
+/**
+ * enc.c
  * =====
- * 
- * Summary 
- * -------
- * Popular encoding routines
  *
- * LICENSE
- * -------
- * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
+ * Handle common encodings.
  *
- * See LICENSE in the top-level directory for more information.
- *
- * CHANGELOG 
- * ---------
- * -
- * -------------------------------------------- */
+ */
 #include "enc.h"
 
 static char b64[64] =
@@ -30,7 +19,7 @@ static char b64[64] =
 //with some modifications
 char *spc_base64_encode( unsigned char *input, int len ) {
 	char *output, *p;
-	int i = 0, mod = len % 3, size = ( ( len / 3 ) + ( mod ? 1 : 0 ) ) * 4 + 1; 
+	int i = 0, mod = len % 3, size = ( ( len / 3 ) + ( mod ? 1 : 0 ) ) * 4 + 1;
 
 	if ( !( p = output = malloc( size ) ) || !memset( p, 0, size ) ) {
 		return NULL;
@@ -52,14 +41,14 @@ char *spc_base64_encode( unsigned char *input, int len ) {
 		*p++ = b64[ input[ i++ ] >> 2 ];
 		*p++ = b64[ (( input[ i - 1 ] << 4 ) | ( input[ i ] >> 4 )) & 0x3f ];
 		if ( mod == 1 ) {
-			*p++ = '='; 
+			*p++ = '=';
 			*p++ = '=';
 			*p = 0;
 			return output;
 		}
 		else {
 			*p++ = b64[ (input[i] << 2 ) & 0x3f ];
-			*p++ = '='; 
+			*p++ = '=';
 			*p = 0;
 			return output;
 		}
@@ -70,6 +59,23 @@ char *spc_base64_encode( unsigned char *input, int len ) {
 
 
 
+/**
+ * enc.base64 ( *string* )
+ * ----
+ *
+ * Encode a string to base64.
+ *
+ * C API: int base64_encode ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * TBD
+ *
+ * Examples
+ * --------
+ * TBD
+ *
+ */
 int base64_encode ( lua_State *L ) {
 	luaL_checkstring( L, 1 );
 	char *block = NULL, *str = NULL;

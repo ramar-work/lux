@@ -1,8 +1,8 @@
-/* ------------------------------------------- * 
- * lib.c 
+/* ------------------------------------------- *
+ * lib.c
  * ====
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * -
  *
@@ -12,7 +12,7 @@
  *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
  * -
  * ------------------------------------------- */
@@ -20,12 +20,17 @@
 #include "lua.h"
 #include "rand.h"
 #include "http.h"
-#include "filesystem.h"
+#include "fs.h"
 #include "db.h"
 #include "json.h"
 #include "enc.h"
 #include "dec.h"
 #include "session.h"
+
+#if 0
+#include "response.h"
+#endif
+
 #ifndef DISABLE_TLS
  #include "hash.h"
 #endif
@@ -39,6 +44,9 @@ struct lua_fset functions[] = {
 , { "json", json_set }
 , { "enc", enc_set }
 , { "dec", dec_set }
+#if 0
+, { "response", response_set }
+#endif
 #if 0
 , { "session", session_set }
 #endif

@@ -1,8 +1,8 @@
-/* ------------------------------------------- * 
- * http.h 
+/* ------------------------------------------- *
+ * http.h
  * ======
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * Handle any web request from Lua (w/o cURL).
  *
@@ -18,8 +18,8 @@
  * - Consider merging with zhttp to enable packaging responses.
  * - Allow alternate SSL backends. (at least OpenSSL)
  * - Test with http://etc.com:2000 (port numbers)
- * 
- * CHANGELOG 
+ *
+ * CHANGELOG
  * ---------
  * -
  * ------------------------------------------- */

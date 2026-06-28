@@ -1,8 +1,8 @@
-/* -------------------------------------------- * 
- * lua.c 
+/* -------------------------------------------- *
+ * lua.c
  * ====
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * Helpful extensions for Lua
  *
@@ -12,7 +12,7 @@
  *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
  * -
  * -------------------------------------------- */
@@ -29,7 +29,7 @@ static int __lua_dump ( zKeyval *kv, int ii, void *p ) {
 	//Define things
 	struct dumper *pp = (struct dumper *)p;
 	const int maxlen = 24576;
-	const char spaces[] = 
+	const char spaces[] =
 	"                    "
 	"                    "
 	"                    "
@@ -37,7 +37,7 @@ static int __lua_dump ( zKeyval *kv, int ii, void *p ) {
 	"                    ";
 	struct { int t; zhRecord *r; } items[2] = {
 		{ kv->key.type  , &kv->key.v    },
-		{ kv->value.type, &kv->value.v  } 
+		{ kv->value.type, &kv->value.v  }
 	};
 
 	//Initialize our buffer for writing and write the index plus tabs
@@ -45,12 +45,12 @@ static int __lua_dump ( zKeyval *kv, int ii, void *p ) {
 	memset( b, 0, maxlen );
 	int w = 0;
 	if ( pp->pretty ) {
-		w = snprintf( b, maxlen, "%s", &spaces[ 100 - pp->level ]  ); 
+		w = snprintf( b, maxlen, "%s", &spaces[ 100 - pp->level ]  );
 	}
 
 	//Then loop through both sides of zKeyval and dump the values
 	for ( int i = 0; i < 2; i++ ) {
-		zhRecord *r = items[i].r; 
+		zhRecord *r = items[i].r;
 		int t = items[i].t;
 		if ( i ) {
 			w += snprintf( &b[w], maxlen - w, "%s", " -> " );
@@ -71,9 +71,9 @@ static int __lua_dump ( zKeyval *kv, int ii, void *p ) {
 			else {
 				w += snprintf( &b[w], maxlen - w, "(%s) ", lt_typename( t ) );
 				if ( t == ZTABLE_TXT )
-					w += snprintf( &b[w], maxlen - w, "(len: %ld) ", strlen( r->vchar ) ); 
+					w += snprintf( &b[w], maxlen - w, "(len: %ld) ", strlen( r->vchar ) );
 				else if ( t == ZTABLE_BLB ) {
-					w += snprintf( &b[w], maxlen - w, "(len: %d) ", r->vblob.size ); 
+					w += snprintf( &b[w], maxlen - w, "(len: %d) ", r->vblob.size );
 				}	
 			}
 		}
@@ -94,7 +94,7 @@ static int __lua_dump ( zKeyval *kv, int ii, void *p ) {
 				w += snprintf( &b[w], maxlen - w, "BLOB" );
 			else {
 				w += snprintf( &b[w], maxlen - w, "<<" );
-				memcpy( &b[w], bb->blob, bb->size ); 
+				memcpy( &b[w], bb->blob, bb->size );
 				w += bb->size;
 				w += snprintf( &b[w], maxlen - w, ">>" );
 			}
@@ -104,7 +104,7 @@ static int __lua_dump ( zKeyval *kv, int ii, void *p ) {
 	//Add a newline
 	w += snprintf( &b[w], maxlen - w, "%c ", pp->sep );
 
-	//Increment total size 
+	//Increment total size
 	pp->len += w;
 
 	//...and reallocate
@@ -136,7 +136,7 @@ int lua_dump_var ( lua_State *L ) {
 	//Turn to ztable and dump?
 	struct dumper d = { 0 };
 	zTable tt, *results, *t = &tt;
-	lt_init( t, NULL, 32 ); 
+	lt_init( t, NULL, 32 );
 	d.sep = ',';
 
 	//...		
@@ -163,7 +163,7 @@ int lua_dump_var ( lua_State *L ) {
 	d.buffer[ d.pos - 2 ] = ' ', d.buffer[ d.pos - 1 ] = '}';
 
 	if ( !lua_pushlstring( L, d.buffer, d.len ) ) {
-		//Needs to be handled properly 
+		//Needs to be handled properly
 		free( d.buffer );
 		return 0;
 	}

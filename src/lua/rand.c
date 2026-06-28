@@ -1,21 +1,25 @@
-/* -------------------------------------------- * 
-rand
-====
- * -------------------------------------------- */
+/**
+ * rand.c
+ * ======
+ *
+ * Use this module to generate random characters, numbers, or blobs.
+ *
+ *
+ */
 #include "rand.h"
 
-static char alpha[] = 
+static char alpha[] =
 	"abcdefghijklmnopqrstuvwxyz"
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 ;
 
-static char alnum[] = 
+static char alnum[] =
 	"abcdefghijklmnopqrstuvwxyz"
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	"0123456789"
 ;
 
-static char ascii[] = 
+static char ascii[] =
 	"abcdefghijklmnopqrstuvwxyz"
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	" !\"#$%&'()*+,-./0123456789"
@@ -23,11 +27,14 @@ static char ascii[] =
 ;
 
 
-static char numerics[] = 
+static char numerics[] =
 	"0123456789"
 ;
 
-unsigned char * generate ( unsigned char *str, unsigned int len, unsigned int size ) {
+
+
+// Generates a sequence of characters
+static unsigned char * generate ( unsigned char *str, unsigned int len, unsigned int size ) {
 	unsigned char * buf = NULL;
 	struct timespec t = { 0 };
 	if ( clock_gettime( CLOCK_REALTIME, &t ) == -1 ) {
@@ -52,6 +59,20 @@ unsigned char * generate ( unsigned char *str, unsigned int len, unsigned int si
 }
 
 
+
+/**
+ * rand.alpha ( [ *number* length ] )
+ * ----
+ *
+ * Create a random sequence of alphanumeric characters *length* bytes long.
+ * *NOTE: Length may not exceed 65536.*
+ *
+ * C API: int rand_alpha ( lua_State *L )
+ *
+ * Usage
+ * ----
+ *
+ */
 int rand_alpha ( lua_State *L ) {
 	luaL_checknumber( L, 1 );
 	unsigned char *buf = NULL;
@@ -66,6 +87,20 @@ int rand_alpha ( lua_State *L ) {
 }
 
 
+
+/**
+ * rand.str ( [ *number* length ] )
+ * ----
+ *
+ * Create a random sequence of printable ASCII characters *length* bytes long.
+ * *NOTE: Length may not exceed 65536.*
+ *
+ * C API: int rand_str ( lua_State *L )
+ *
+ * Usage
+ * ----
+ *
+ */
 int rand_str ( lua_State *L ) {
 	luaL_checknumber( L, 1 );
 	unsigned char *buf = NULL;
@@ -81,6 +116,19 @@ int rand_str ( lua_State *L ) {
 }
 
 
+/**
+ * rand.ascii ( [ *number* length ] )
+ * ----
+ *
+ * Create a random sequence of printable ASCII characters *length* bytes long.
+ * *NOTE: Length may not exceed 65536.*
+ *
+ * C API: int rand_ascii ( lua_State *L )
+ *
+ * Usage
+ * ----
+ *
+ */
 int rand_ascii ( lua_State *L ) {
 	luaL_checknumber( L, 1 );
 	unsigned char *buf = NULL;
@@ -95,6 +143,20 @@ int rand_ascii ( lua_State *L ) {
 }
 
 
+/**
+ * rand.seq ( [ *number* length ] )
+ * ----
+ *
+ * Create a random sequence of *length* characters from 0 - 255.
+ * *NOTE: Length may not exceed 65536.*
+ *
+ * C API: int rand_seq ( lua_State *L )
+ *
+ * Usage
+ * ----
+ *
+ *
+ */
 int rand_seq ( lua_State *L ) {
 	luaL_checknumber( L, 1 );
 	int bfsize = lua_tonumber( L, 1 );
@@ -115,6 +177,19 @@ int rand_seq ( lua_State *L ) {
 }
 
 
+/**
+ * rand.nums ( [ *number* length ] )
+ * ----
+ *
+ * Create a random sequence of length *len* of numbers
+ * *NOTE: Length may not exceed 65536.*
+ *
+ * C API: int rand_nums ( lua_State *L )
+ *
+ * Usage
+ * ----
+ *
+ */
 int rand_nums ( lua_State *L ) {
 	luaL_checknumber( L, 1 );
 	int bfsize = lua_tonumber( L, 1 );

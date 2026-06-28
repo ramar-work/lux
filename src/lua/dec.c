@@ -1,21 +1,10 @@
-/* -------------------------------------------- * 
- * dec.c 
- * =====
- * 
- * Summary 
- * -------
+/**
+ * dec.c
+ * ====
+ *
  * Popular encoding routines
  *
- * LICENSE
- * -------
- * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- *
- * See LICENSE in the top-level directory for more information.
- *
- * CHANGELOG 
- * ---------
- * -
- * -------------------------------------------- */
+ */
 #include "dec.h"
 
 static char b64r[ 256 ] = {
@@ -123,6 +112,24 @@ unsigned char *spc_base64_decode( char *buf, int *len ) {
 }
 
 
+/**
+ * dec.base64 ( *string* )
+ * ----
+ *
+ * Decode a string from base64.  Returns a table with keys
+ * `size` and `value`.
+ *
+ * C API: int base64_decode ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * TBD
+ *
+ * Examples
+ * --------
+ * TBD
+ *
+ */
 int base64_decode ( lua_State *L ) {
 	luaL_checkstring( L, 1 );
 	unsigned char *block = NULL, *str = NULL;

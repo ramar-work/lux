@@ -1,28 +1,10 @@
-/* -------------------------------------------- * 
- * http.c 
+/**
+ * http.c
  * ====
- * 
- * Summary 
- * -------
- * Handle any web request from Lua (w/o cURL).
  *
- * LICENSE
- * -------
- * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
+ * Handle HTTP requests from Lua.
  *
- * See LICENSE in the top-level directory for more information.
- *
- * TODO
- * ----
- * - Only handles GET right now.  Needs other methods.
- * - Consider merging with zhttp to enable packaging responses.
- * - Allow alternate SSL backends. (at least OpenSSL)
- * - Test with http://etc.com:2000 (port numbers)
- * 
- * CHANGELOG 
- * ---------
- * -
- * -------------------------------------------- */
+ */
 #include "http.h"
 
 #define ERR(v,l,...) \
@@ -32,12 +14,12 @@
 //#define SHOW_RESPONSE
 //#define WRITE_RESPONSE
 #define SHOW_REQUEST
-#define VERBOSE 
+#define VERBOSE
 //#define SSL_DEBUG
 //#define INCLUDE_TIMEOUT
 /*Stop*/
 
-#ifndef SSL_DEBUG 
+#ifndef SSL_DEBUG
  #define SSLPRINTF( ... )
  #define EXIT(x)
  #define MEXIT(x,m)
@@ -58,22 +40,22 @@
  #define VPRINTF( ... ) fprintf( stderr, __VA_ARGS__ ) ; fflush(stderr);
 #endif
 
-static const char *content_type_id[] = { 
+static const char *content_type_id[] = {
 	"Content-Type: "
 , "content-type: "
 , "Content-type: "
-, NULL 
+, NULL
 };
 
-static const char *content_length_id[] = { 
+static const char *content_length_id[] = {
 	"Content-Length: "
 , "content-length: "
 , "Content-length: "
-, NULL 
+, NULL
 };
 
 //User-Agent
-static const char default_ua[] = 
+static const char default_ua[] =
 	"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36";
 
 
@@ -82,7 +64,7 @@ static int radix_decode( char *number, int radix ) {
 	const int hex[127] = {['0']=0,1,2,3,4,5,6,7,8,9,
 		['a']=10,['b']=11,['c']=12,13,14,15,['A']=10,11,12,13,14,15};
 	int tot=0, mult=1, len=strlen(number);
-	number += len; //strlen( digits ); 
+	number += len; //strlen( digits );
 	while ( len-- ) {
 		//TODO: cut ascii characters not in a certain range...
 		tot += ( hex[ (int)*(--number) ] * mult);
@@ -97,18 +79,18 @@ static int radix_decode( char *number, int radix ) {
 int extract_body ( wwwResponse *r ) {
 	//when sending this, we have to skip the header
 	const char *t = "\r\n\r\n";
-	uint8_t *nsrc = r->data; 
+	uint8_t *nsrc = r->data;
 	uint8_t *rr = malloc(1);
 	int pos, tot=0, y=0, br = r->len;
 
 	if (( pos = memstrat( r->data, t, br ) ) == -1 ) {
-		fprintf( stderr, "carriage return not found...\n" ); 
+		fprintf( stderr, "carriage return not found...\n" );
 		return 0;
 	}
 
 	//Move ptrs and increment things, this is the start of the headers...
 	pos += 4;
-	nsrc += pos; 
+	nsrc += pos;
 	br -= pos;
 	t += 2;
 	r->body = &r->data[ pos ];
@@ -116,7 +98,7 @@ int extract_body ( wwwResponse *r ) {
 	//chunked
 	if ( !r->chunked ) {
 		return 1;
-	} 
+	}
 
 	//find the next \r\n, after reading the bytes
 	while ( 1 ) {
@@ -196,8 +178,8 @@ struct intpair { char *c; int i; } tests[] = {
 };
 struct intpair *a = tests;
 
-while ( (++a)->c ) 
-	printf("%d == %d = %s\n", 
+while ( (++a)->c )
+	printf("%d == %d = %s\n",
 	p=radix_decode( a->c, 16 ),a->i,p==a->i?"true":"false");
 exit( 0);
 #endif
@@ -207,7 +189,7 @@ exit( 0);
 static size_t WriteDataCallbackCurl (void *p, size_t size, size_t nmemb, void *ud) {
 	size_t realsize = size * nmemb;
 	Sbuffer *sb = (Sbuffer *)ud;
-	uint8_t *ptr = realloc( sb->buf, sb->len + realsize + 1 ); 
+	uint8_t *ptr = realloc( sb->buf, sb->len + realsize + 1 );
 	if ( !ptr ) {
 		fprintf( stderr, "No additional memory to complete request.\n" );
 		return 0;
@@ -249,7 +231,7 @@ static int get_content_length (char *msg, int mlen) {
 
 	if ( pos == -1 ) {
 		return -1;
-	} 
+	}
 
 	int r = memchrat( &msg[ pos ], '\r', mlen - pos );	
 	int s = memchrat( &msg[ pos ], ' ', mlen - pos );	
@@ -264,7 +246,7 @@ static int get_content_length (char *msg, int mlen) {
 static char * get_content_type (char *dest, char *msg, int mlen) {
 #if 0
 	int pos;
-	if ( (pos = memstrat( msg, "Content-Type", mlen )) == -1 ) { 
+	if ( (pos = memstrat( msg, "Content-Type", mlen )) == -1 ) {
 		return NULL;
 	}
 #endif
@@ -278,7 +260,7 @@ static char * get_content_type (char *dest, char *msg, int mlen) {
 	if ( pos == -1 ) {
 		return NULL;
 	}
- 
+
 	//TODO: Make this safer
 	int r = memchrat( &msg[ pos ], '\r', mlen - pos );	
 	int s = memchrat( &msg[ pos ], ' ', mlen - pos );	
@@ -359,22 +341,15 @@ char * path_www ( const char *p ) {
 }
 
 
-const char GetMsgFmt[] = 
+const char GetMsgFmt[] =
 	"GET %s HTTP/1.1\r\n"
 	"Host: %s\r\n"
 	"User-Agent: %s\r\n\r\n"
 ;
 
 
-
-//Get a new fd
-int get_fd ( ) {
-	return 0;
-}
-
-
-
-int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char *errmsg, int errlen ) {
+// Create a new HTTP request
+static int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char *errmsg, int errlen ) {
 	//socket connect is the shorter way to do this...
 	struct addrinfo hints, *servinfo, *pp;
 	int rv, sockfd;
@@ -387,7 +362,7 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 	//Prepare our response structure
 	memset( res, 0, sizeof( zhttp_t ) );
 
-#ifdef INCLUDE_TIMEOUT 
+#ifdef INCLUDE_TIMEOUT
 	//Set up a timer to kill requests that are taking too long.
 	//TODO: There is an alternate way to do with with socket(), I think
 	struct itimerval timer;
@@ -444,14 +419,14 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 	}
 
 	//This is some weird stuff...
-#ifdef INCLUDE_TIMEOUT 
+#ifdef INCLUDE_TIMEOUT
 	struct sigaction da;
 	da.sa_handler = SIG_DFL;
 	sigaction( SIGVTALRM, &da, NULL );
 #endif
 
 	//Get the internet address
-	inet_ntop( pp->ai_family, 
+	inet_ntop( pp->ai_family,
 		get_in_addr((struct sockaddr *)pp->ai_addr), ipv4, sizeof( ipv4 ));
 	freeaddrinfo( servinfo );
 
@@ -463,7 +438,7 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 	for ( int b; ; ) {
 		//These should be blocking, so this is probably a legitimate error
 		if ( ( b = send( sockfd, bmsg, mlen, 0 )) == -1 ) {
-			snprintf( errmsg, errlen, 
+			snprintf( errmsg, errlen,
 				"Error sending mesaage to: %s - %s\n", s, strerror(errno) );
 			return 0;
 		}
@@ -479,7 +454,7 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 #if 0
 	if ( !( msg = malloc( 16 ) ) || !memset( msg, 0, 16 ) ) {
 		return ERR( errmsg, errlen, "%s\n", "Allocation failure." );
-	} 
+	}
 #endif
 
 	for ( int blen = 0, chunked = 0;; ) {
@@ -507,7 +482,7 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 				return ERR( errmsg, errlen, "%s\n", "Chunked not implemented for HTTP" );
 			}
 			if (( crlf = memstrat( xbuf, "\r\n\r\n", blen ) ) == -1 ) {
-				0;//this means that something went wrong... 
+				0;//this means that something went wrong...
 			}
 			//fprintf(stderr, "found content length and eoh: %d, %d\n", r->clen, crlf );
 			crlf += 4;
@@ -519,7 +494,7 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 			return ERR( errmsg, errlen, "%s\n", "Realloc of destination buffer failed." );
 		}
 
-		memcpy( &res->msg[ res->mlen ], xbuf, blen ); 
+		memcpy( &res->msg[ res->mlen ], xbuf, blen );
 		res->mlen += blen;
 
 		if ( !res->clen )
@@ -540,6 +515,7 @@ int make_http_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char 
 
 
 #ifndef DISABLE_TLS
+// Create an HTTPS request
 int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char *errmsg, int errlen ) {
 #if 1
 	//Define
@@ -554,10 +530,10 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 	memset( &xcred, 0, sizeof(gnutls_certificate_credentials_t));
 
 	//Do socket connect (but after initial connect, I need the file desc)
-	if ( !gnutls_check_version("3.4.6") ) 
+	if ( !gnutls_check_version("3.4.6") )
 		return ERR( errmsg, errlen, "%s\n", "GnuTLS 3.4.6 or later is required for this example." );	
 
-	if ( ( err = gnutls_global_init() ) < 0 ) 
+	if ( ( err = gnutls_global_init() ) < 0 )
 		return ERR( errmsg, errlen, "%s\n", gnutls_strerror( err ));
 
 	if ( ( err = gnutls_certificate_allocate_credentials( &xcred ) ) < 0 )
@@ -576,7 +552,7 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 	if ( ( err = gnutls_server_name_set( session, GNUTLS_NAME_DNS, r->host, strlen(r->host)) ) < 0 )
 		return ERR( errmsg, errlen, "%s\n", gnutls_strerror( err ));
 
-	if ( ( err = gnutls_set_default_priority( session ) ) < 0 ) 
+	if ( ( err = gnutls_set_default_priority( session ) ) < 0 )
 		return ERR( errmsg, errlen, "%s\n", gnutls_strerror( err ));
 	
 	if ( ( err = gnutls_credentials_set( session, GNUTLS_CRD_CERTIFICATE, xcred )) < 0 )
@@ -599,7 +575,7 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 	//Prepare our response structure
 	memset( res, 0, sizeof( zhttp_t ) );
 
-#ifdef INCLUDE_TIMEOUT 
+#ifdef INCLUDE_TIMEOUT
 	//Set up a timer to kill requests that are taking too long.
 	//TODO: There is an alternate way to do with with socket(), I think
 	struct itimerval timer;
@@ -656,14 +632,14 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 	}
 
 	//This is some weird stuff...
-#ifdef INCLUDE_TIMEOUT 
+#ifdef INCLUDE_TIMEOUT
 	struct sigaction da;
 	da.sa_handler = SIG_DFL;
 	sigaction( SIGVTALRM, &da, NULL );
 #endif
 
 	//Get the internet address
-	inet_ntop( pp->ai_family, 
+	inet_ntop( pp->ai_family,
 		get_in_addr((struct sockaddr *)pp->ai_addr), ipv4, sizeof( ipv4 ));
 	freeaddrinfo( servinfo );
 #endif
@@ -707,13 +683,13 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 	#if 0
 	if ( !( msg = malloc( 16 ) ) || !memset( msg, 0, 16 ) ) {
 		return ERR( r->err, "%s\n", "Allocation failure." );
-	} 
+	}
 	#endif
 
 	//there should probably be another condition used...
 	for ( ;; ) {	
 		char xbuf[ 4096 ] = {0};
-		int ret = gnutls_record_recv( session, xbuf, sizeof(xbuf)); 
+		int ret = gnutls_record_recv( session, xbuf, sizeof(xbuf));
 		SSLPRINTF( "gnutls_record_recv returned %d\n", ret );
 
 		//receive
@@ -734,7 +710,7 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 			SSLPRINTF( "AM i HERE?!\n" );
 			if ( !first++ ) {
 
-				//Get status, content-length or xfer-encoding if available 
+				//Get status, content-length or xfer-encoding if available
 				char ctypebuf[ 128 ] = {0};
 				res->status = get_status( (char *)xbuf, ret );
 				res->clen = get_content_length( xbuf, ret );
@@ -783,7 +759,7 @@ int make_https_request ( const char *p, int port, zhttp_t *r, zhttp_t *res, char
 			//If it's chunked, try sending a 100-continue
 			if ( chunked ) {
 				const char *cont = "HTTP/1.1 100 Continue\r\n\r\n";
-				//int err = gnutls_record_send( session, cont, strlen(cont)); 
+				//int err = gnutls_record_send( session, cont, strlen(cont));
 				fprintf(stderr, "%s (%d)\n", gnutls_strerror( err ), err );
 			}
 			else {
@@ -842,8 +818,8 @@ int load_www ( const char *p, zhttp_t *r, char *errmsg, int errlen ) {
 #endif
 	
 #if 0
-	//NOTE: Although it is definitely easier to use CURL to handle the rest of the 
-	//request, dealing with TLS at C level is more complicated than it probably should be.  
+	//NOTE: Although it is definitely easier to use CURL to handle the rest of the
+	//request, dealing with TLS at C level is more complicated than it probably should be. 
 	//Do either an insecure request or a secure request
 	if ( !secure ) {
 		//socket connect is the shorter way to do this...
@@ -855,7 +831,7 @@ int load_www ( const char *p, zhttp_t *r, char *errmsg, int errlen ) {
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
 
-	#ifdef INCLUDE_TIMEOUT 
+	#ifdef INCLUDE_TIMEOUT
 		//Set up a timer to kill requests that are taking too long.
 		//TODO: There is an alternate way to do with with socket(), I think
 		struct itimerval timer;
@@ -912,14 +888,14 @@ int load_www ( const char *p, zhttp_t *r, char *errmsg, int errlen ) {
 		}
 
 		//This is some weird stuff...
-	#ifdef INCLUDE_TIMEOUT 
+	#ifdef INCLUDE_TIMEOUT
 		struct sigaction da;
 		da.sa_handler = SIG_DFL;
 		sigaction( SIGVTALRM, &da, NULL );
 	#endif
 
 		//Get the internet address
-		inet_ntop( pp->ai_family, 
+		inet_ntop( pp->ai_family,
 			get_in_addr((struct sockaddr *)pp->ai_addr), r->ipv4, sizeof(r->ipv4));
 		#ifdef DEBUG_H
     fprintf( stderr,"Client connected to: %s\n", r->ipv4 );
@@ -949,12 +925,12 @@ int load_www ( const char *p, zhttp_t *r, char *errmsg, int errlen ) {
 
 			break;
 		}
- 
+
 		//WE most likely will receive a very large page... so do that here...	
 		int crlf = -1, first = 0;
 		if ( !( msg = malloc( 16 ) ) || !memset( msg, 0, 16 ) ) {
 			return ERR( r->err, "%s\n", "Allocation failure." );
-		} 
+		}
 
 		for ( int blen = 0, chunked = 0;; ) {
 			uint8_t xbuf[ 4096 ] = {0} ;
@@ -980,7 +956,7 @@ int load_www ( const char *p, zhttp_t *r, char *errmsg, int errlen ) {
 					return ERR( r->err, "%s\n", "Chunked not implemented for HTTP" );
 				}
 				if (( crlf = memstrat( xbuf, "\r\n\r\n", blen ) ) == -1 ) {
-					0;//this means that something went wrong... 
+					0;//this means that something went wrong...
 				}
 				//fprintf(stderr, "found content length and eoh: %d, %d\n", r->clen, crlf );
 				crlf += 4;
@@ -992,7 +968,7 @@ int load_www ( const char *p, zhttp_t *r, char *errmsg, int errlen ) {
 				return ERR( r->err, "%s\n", "Realloc of destination buffer failed." );
 			}
 
-			memcpy( &msg[ r->len ], xbuf, blen ); 
+			memcpy( &msg[ r->len ], xbuf, blen );
 			r->len += blen;
 
 			if ( !r->clen )
@@ -1065,7 +1041,7 @@ int load_www ( const char *p, zhttp_t *r, char *errmsg, int errlen ) {
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
 
-	#ifdef INCLUDE_TIMEOUT 
+	#ifdef INCLUDE_TIMEOUT
 		//Set up a timer to kill requests that are taking too long.
 		//TODO: There is an alternate way to do with with socket(), I think
 		struct itimerval timer;
@@ -1159,13 +1135,13 @@ int load_www ( const char *p, zhttp_t *r, char *errmsg, int errlen ) {
 		int crlf = -1, first = 0;
 		if ( !( msg = malloc( 16 ) ) || !memset( msg, 0, 16 ) ) {
 			return ERR( r->err, "%s\n", "Allocation failure." );
-		} 
+		}
 	
 		//there should probably be another condition used...
 		for ( ;; ) {	
 			char xbuf[ 4096 ];
-			memset( xbuf, 0, sizeof(xbuf) ); 
-			int ret = gnutls_record_recv( session, xbuf, sizeof(xbuf)); 
+			memset( xbuf, 0, sizeof(xbuf) );
+			int ret = gnutls_record_recv( session, xbuf, sizeof(xbuf));
 			SSLPRINTF( "gnutls_record_recv returned %d\n", ret );
 
 			//receive
@@ -1183,9 +1159,9 @@ int load_www ( const char *p, zhttp_t *r, char *errmsg, int errlen ) {
 			}
 			else if ( ret > 0 ) {
 				SSLPRINTF( "Recvd %d bytes:\n", ret );
-write( 2, xbuf, ret );
+//write( 2, xbuf, ret );
 				if ( !first++ ) {
-					//Get status, content-length or xfer-encoding if available 
+					//Get status, content-length or xfer-encoding if available
 					r->status = get_status( (char *)xbuf, ret );
 					r->clen = get_content_length( xbuf, ret );
 					if ( !get_content_type( r->ctype, (char *)xbuf, ret ) ) {
@@ -1225,7 +1201,7 @@ write( 2, xbuf, ret );
 					}
 					else {
 						fprintf(stderr, "not sure what happened.." );
-					} 
+					}
 				}
 			}
 
@@ -1240,7 +1216,7 @@ write( 2, xbuf, ret );
 			//If it's chunked, try sending a 100-continue
 			if ( r->chunked ) {
 				const char *cont = "HTTP/1.1 100 Continue\r\n\r\n";
-				//int err = gnutls_record_send( session, cont, strlen(cont)); 
+				//int err = gnutls_record_send( session, cont, strlen(cont));
 				fprintf(stderr, "%s (%d)\n", gnutls_strerror( err ), err );
 			}
 			else {
@@ -1289,7 +1265,7 @@ int extr_simple_args ( zhttp_t *r, zTable *t, char *err, int errlen ) {
 	const char **i = items;
 	for ( int pos; *i; i++ ) {
 		if ( ( pos = lt_geti( t, *i ) ) > -1 ) {
-			lt_reset( t ); 
+			lt_reset( t );
 			lt_set( t, pos + 1 );
 
 			//If this is a body and there is only one thing, then we need to throw that back...
@@ -1321,7 +1297,7 @@ int extr_simple_args ( zhttp_t *r, zTable *t, char *err, int errlen ) {
 				else {
 					snprintf( err, errlen, "%s", "Got invalid type of header key" );
 					return 0;
-				} 
+				}
 			}
 		}
 	}
@@ -1341,7 +1317,7 @@ int extr_body_args ( zhttp_t *r, zTable *t, char *err, int errlen ) {
 		
 
 		//If this is a body and there is only one thing, then that's all there is
-		lt_reset( t ); 
+		lt_reset( t );
 		zKeyval *kv = lt_retkv( t, pos );
 
 		//Die if the value returned isn't text or table
@@ -1380,7 +1356,7 @@ int extr_body_args ( zhttp_t *r, zTable *t, char *err, int errlen ) {
 			else {
 				snprintf( err, errlen, "%s", "Got invalid type of body key" );
 				return 0;
-			} 
+			}
 		}
 	}
 	return 1;
@@ -1415,7 +1391,7 @@ int extr_args ( zhttp_t *r, zTable *t const char *text ) {
 			}
 			else if ( !strcmp( text, "body" ) ) {
 				//You need to save something
-				int len = strlen( kv->value.v.vchar ); 
+				int len = strlen( kv->value.v.vchar );
 				http_copy_formvalue( r, kv->key.v.vchar, kv->value.v.vchar, len );
 			}
 		}
@@ -1426,7 +1402,42 @@ int extr_args ( zhttp_t *r, zTable *t const char *text ) {
 
 
 
-//A long form Lua function for making requests...
+/**
+ * http.send ( *table* )
+ * ----
+ *
+ * Create custom HTTP requests.
+ *
+ * C API: int http_request ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * This function accepts one table with at a minimum, three keys specified:
+ *
+ * Key | Type | Value
+ * --- | ---- | ----
+ * address | *string* | The URI to make the request against
+ * method | *string* | The method to use when making the request.  Must be one of: GET, POST, PUT, PATCH or DELETE (TRACE and CONNECT are not supported)
+ * ctype | *string* | Specify the "Content-Type" to use when making the request
+ * useragent | *string* | Specify the "User-Agent" to use when making the request (The default is: `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36`)
+ * headers | *table* | A table (composed of text keys and values) of headers to use when making the request.
+ * query | *table* | A table (composed of text keys and values) of variables to pass in the query string of the request (Example: Using `query = { a = "b" }` in a request to "http://example.com" will look like a request for `http://example.com?a=b` on the client side.
+ * protocol | *string* | The specific HTTP version to use when making the request. (NOTE: You can specify what you want here, but that doesn't mean the client on the other side will understand what you are talking about.)
+ * body | *string* or *table* | The body to send when making the request.
+ *
+ * lux is smart enough to know whether or not you want to make a secure request
+ * by looking at the URI specified by the `address` key.  In other words, if you
+ * make a request for `https://coldcuts.org`, lux will connect via TLS.
+ *
+ * Examples
+ * ----
+ * TBD
+ *
+ * Caveats
+ * ----
+ * TBD
+ *
+ */
 int http_request ( lua_State *L ) {
 	//#1 needs to be either string or table
 	const char *addr = NULL; //lua_tostring( L, 1 );
@@ -1449,7 +1460,7 @@ int http_request ( lua_State *L ) {
 		}
 		if ( lua_isstring( L, 1 ) )
 			addr = lua_tostring( L, 1 );
-		else { 
+		else {
 			if ( !lua_to_ztable( L, 1, rt ) || !lt_lock( rt ) )
 				return luaL_error( L, "Could not convert Lua data to hash table." );
 			else {
@@ -1479,7 +1490,7 @@ int http_request ( lua_State *L ) {
 	lua_pop( L, argcount );
 
 	if ( !rt ) {
-		qhttp.method = zhttp_dupstr( "GET" ); 
+		qhttp.method = zhttp_dupstr( "GET" );
 		qhttp.ctype = zhttp_dupstr( "text/html" );
 		//Always add a user agent by default
 		http_copy_header( &qhttp, "User-Agent", default_ua );
@@ -1491,14 +1502,14 @@ int http_request ( lua_State *L ) {
 
 		//Get the content-type, type (of request)
 		if ( lt_geti( rt, "method" ) == -1 )
-			qhttp.method = zhttp_dupstr( "GET" ); 
+			qhttp.method = zhttp_dupstr( "GET" );
 		else {
 			qhttp.method = zhttp_dupstr( lt_text( rt, "method" ) );
 		}
 
 		//Get the content-type, type (of request)
 		if ( lt_geti( rt, "ctype" ) == -1 )
-			qhttp.ctype = zhttp_dupstr( "text/html" ); 
+			qhttp.ctype = zhttp_dupstr( "text/html" );
 		else {
 			qhttp.ctype = zhttp_dupstr( lt_text( rt, "ctype" ) );
 		}
@@ -1515,6 +1526,11 @@ int http_request ( lua_State *L ) {
 			if ( !extr_simple_args( &qhttp, rt, err, sizeof( err ) ) ) {
 				return luaL_error( L, err );
 			}
+		}
+
+		//Set a different protocol (in some cases, you want it)
+		if ( lt_geti( rt, "protocol" ) > -1 ) {
+			qhttp.protocol = zhttp_dupstr( lt_text( rt, "protocol" ) );
 		}
 
 		//Get any body if there is one
@@ -1549,22 +1565,24 @@ int http_request ( lua_State *L ) {
 
 	//Finalize a request first?
 	if ( !http_finalize_request( &qhttp, err, sizeof( err ) ) ) {
-		return luaL_error( L, err ); 
+		return luaL_error( L, err );
 	}
+
+//write( 2, qhttp.msg, qhttp.mlen );
 
 	//This is just going to send the request
 	if ( !secure ) {
 		if ( !make_http_request( addr, port, &qhttp, &rhttp, err, sizeof(err) ) ) {
-			return luaL_error( L, err ); 
+			return luaL_error( L, err );
 		}
 	}
 	else {
 #ifndef DISABLE_TLS
 		if ( !make_https_request( addr, port, &qhttp, &rhttp, err, sizeof(err) ) ) {
-			return luaL_error( L, err ); 
+			return luaL_error( L, err );
 		}
 #else
-		return luaL_error( L, "HTTPS support is not compiled in." ); 
+		return luaL_error( L, "HTTPS support is not compiled in." );
 #endif
 	}
 
@@ -1584,13 +1602,8 @@ int http_request ( lua_State *L ) {
 	//Check that you have headers
 	if ( ( hlen = memstrat( rhttp.msg, "\r\n\r\n", rhttp.mlen ) ) == -1 ) {
 		snprintf( err, sizeof( err ), "Header parsing failed" );
-		return luaL_error( L, err ); 
+		return luaL_error( L, err );
 	}
-
-#if 0
-print_httpbody( &rhttp );
-write( 2, rhttp.msg, rhttp.mlen );
-#endif
 
 	//Add the headers as a table of their own
 	lua_pushstring( L, "headers" ), lua_newtable( L );
@@ -1601,7 +1614,10 @@ write( 2, rhttp.msg, rhttp.mlen );
 
 	//Stop if the body length is invalid...
 	if ( rhttp.clen < 0 ) {
-		return luaL_error( L, "Received invalid content length: %d\n", rhttp.clen ); 
+		//You're going to have to try to figure it out in some cases
+		if ( ( rhttp.clen = rhttp.mlen - ( hlen + 4 ) ) < 0 ) {
+			return luaL_error( L, "Received invalid content length: %d\n", rhttp.clen );
+		}
 	}
 
 	//Finally, add the body if there is one

@@ -1,40 +1,20 @@
-/* -------------------------------------------- * 
-session
-=======
+/**
+ * session.c
+ * =========
+ *
+ * Session primitives
+ *
+ */
 
-Session primitives.
- 
-Usage
------
-Session...
-
-### start ###
-
-### check ###
-
-### stop ###
-
-### set ###
-
-### get ###
-
-
-LICENSE
--------
-Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
-See LICENSE in the top-level directory for more information.
-
-See LICENSE for licensing information.
- * -------------------------------------------- */
 #include "session.h"
 
-static const char sdbpath[] = 
+static const char sdbpath[] =
 	SESSION_DB_PATH;
 
-static const char check_for_session_table[] = 
+static const char check_for_session_table[] =
 	"SELECT name FROM sqlite_master WHERE type='table' AND name='session'";
 
-static const char create_session_table[] = 
+static const char create_session_table[] =
 "CREATE TABLE session ("
 "		id INTEGER PRIMARY KEY AUTOINCREMENT"
 ",	sid TEXT"
@@ -43,7 +23,7 @@ static const char create_session_table[] =
 ",	send INTEGER	)"
 ;
 
-static const char create_session_values_table[] = 
+static const char create_session_values_table[] =
 "CREATE TABLE session_values ("
 "		id INTEGER PRIMARY KEY AUTOINCREMENT"
 ",	sid INTEGER"
@@ -51,9 +31,9 @@ static const char create_session_values_table[] =
 ",	value TEXT )"
 ;
 
-const char insert_session_values[] = 
+const char insert_session_values[] =
 "INSERT INTO session"
-"		(id, sid, matchid, sstart, send)" 
+"		(id, sid, matchid, sstart, send)"
 "VALUES"
 "		(NULL, :sid, :mid, :start, :end)"
 ;
@@ -76,19 +56,19 @@ int check ( lua_State *L ) {
 
 int start ( lua_State *L ) {
 	zTable tt, *t, *results;
-	zdb_t zdb = { 0 }; 
+	zdb_t zdb = { 0 };
 	int zdb_arglen = 0, pos = -1;
 	zdbv_t **zdbbind = NULL;
 	char *token = NULL;
 	char *path = NULL;
 	char err[ 1024 ] = { 0 };
-	char conn[ PATH_MAX ] = {0}; 
+	char conn[ PATH_MAX ] = {0};
 	char randid[32] = {0};
 	char start[ 128 ] = {0}, end[ 128 ] = {0};
 	int expiry = 0; // Hardcoded for 5 min for now...
 	struct timespec tm = { 0 };
-	const unsigned char word[] = 
-		"ABCDEFGHIJKLMNOPQRSTUVWXYZ" 
+	const unsigned char word[] =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		"abcdefghijklmnopqrstuvwxyz"
 		"0123456789"
 	;
@@ -96,7 +76,7 @@ int start ( lua_State *L ) {
 	//Initialize a table for arguments
 	luaL_checktype( L, 1, LUA_TTABLE );
 	t = &tt;
-	lt_init( t, NULL, 32 ); 
+	lt_init( t, NULL, 32 );
 
 	//Convert to C table for slightly easier key extraction	
 	if ( !lua_to_ztable( L, 1, t ) || !lt_lock( t ) ) {
@@ -105,7 +85,7 @@ int start ( lua_State *L ) {
 	}
 
 	//Get rid of the table on the stack
-	lua_pop( L, 1 ); 
+	lua_pop( L, 1 );
 
 	//Check for expiry and token
 	if ( ( pos = lt_geti( t, "expiry" ) ) > -1 ) {
@@ -125,14 +105,14 @@ int start ( lua_State *L ) {
 	}
 
 	//Get the sid name (if the user has specified one)
-	lua_getglobal( L, "sid" ); 
+	lua_getglobal( L, "sid" );
 	const char *sid = ( lua_isnil( L, -1 ) ) ? "sid" : lua_tostring( L, -1 );
-	lua_pop( L, 1 ); 
+	lua_pop( L, 1 );
 
 	//Get the shadow path if there is one & create a database connection string
-	lua_getglobal( L, "shadow" ); 
+	lua_getglobal( L, "shadow" );
 	if ( lua_isnil( L, -1 ) )
-		lua_pop( L, 1 ); 
+		lua_pop( L, 1 );
 	else {
 		//Translate the connection to the right path
 		char shadow[ 2048 ] = {0};
@@ -148,11 +128,11 @@ int start ( lua_State *L ) {
 
 	srand( tm.tv_nsec );
 	for ( int i = 0; i < sizeof( randid ) - 1; i++ ) {
-		randid[ i ] = word[ rand() % ( sizeof( word ) - 1 ) ]; 
+		randid[ i ] = word[ rand() % ( sizeof( word ) - 1 ) ];
 	}
 
 	//Open a database handle
-	if ( !zdb_open( &zdb, conn, ZDB_SQLITE ) ) { 
+	if ( !zdb_open( &zdb, conn, ZDB_SQLITE ) ) {
 		return luaL_error( L, "Connection error." );
 	}
 
@@ -198,13 +178,13 @@ int start ( lua_State *L ) {
 	zdbv_t * ev = malloc( sizeof( zdbv_t ) );
 	memset( ev, 0, sizeof( zdbv_t ) );
 	snprintf( end, sizeof( end ), "%ld", tm.tv_sec + expiry );
-	ev->field = zhttp_dupstr( ":end" ); 
-	ev->value = zhttp_dupstr( end );  
+	ev->field = zhttp_dupstr( ":end" );
+	ev->value = zhttp_dupstr( end ); 
 	ev->len = strlen( end );
 	add_item( &zdbbind, ev, zdbv_t *, &zdb_arglen );
 
-	//Bind the match ID (typically a username, but anything 
-	//to associate the session value with something) 
+	//Bind the match ID (typically a username, but anything
+	//to associate the session value with something)
 	zdbv_t * id_v = malloc( sizeof( zdbv_t ) );
 	memset( id_v, 0, sizeof( zdbv_t ) );
 	id_v->field = zhttp_dupstr( ":mid" );
@@ -231,9 +211,9 @@ int start ( lua_State *L ) {
 	}
 
 	//Use set cookie to send a session identifier (name can be changed from config)
-	lua_getglobal( L, "response" ); 
+	lua_getglobal( L, "response" );
 	if ( lua_isnil( L, -1 ) ) {
-		lua_pop( L, 1 ); 
+		lua_pop( L, 1 );
 		lua_newtable( L );
 		lua_setstrbool( L, "delay", 1, 1 );
 		lua_pushstring( L, "headers" ), lua_newtable( L );
@@ -245,7 +225,7 @@ int start ( lua_State *L ) {
 		//Converting with Lua takes more memory, but is so much easier to do
 		zTable tx, *ttx;
 		ttx = &tx;
-		lt_init( ttx, NULL, 32 ); 
+		lt_init( ttx, NULL, 32 );
 
 		if ( !lua_to_ztable( L, 1, ttx ) || !lt_lock( ttx ) ) {
 			lt_free( ttx );
@@ -265,7 +245,7 @@ int start ( lua_State *L ) {
 			zKeyval *x = lt_next( t1p );  // Skip the first one
 			for ( ; ( x = lt_next( t1p ) ) && x->key.type != ZTABLE_TRM ;  ) {	
 				zhValue k = x->key, v = x->value;
-				if ( k.type == ZTABLE_TXT ) 
+				if ( k.type == ZTABLE_TXT )
 					lua_pushstring( L, k.v.vchar );
 				else if ( k.type == ZTABLE_INT )
 					lua_pushnumber( L, k.v.vint );

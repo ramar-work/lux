@@ -1,29 +1,16 @@
-/* -------------------------------------------- * 
- * hash.c 
- * ======
- * 
- * Summary 
- * -------
- * Handle common hashing tasks via Lua
+/**
+ * hash.c
+ * ====
  *
- * LICENSE
- * -------
- * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
+ * Handle common hashing tasks via Lua.
  *
- * See LICENSE in the top-level directory for more information.
- *
- * CHANGELOG 
- * ---------
-sha1
-sha224
-sha256
-sha384
-sha512
- * -------------------------------------------- */
+ */
+
 #include "hash.h"
 
 #ifndef DISABLE_TLS
 
+// Calculate different SHA hashes
 static int calc( lua_State *L, int alg ) {
 	uint8_t *src = NULL, buf[64] = {0}, fbuf[ sizeof( buf ) + 1 ] = {0};
 	int status = -1, srclen = 0, buflen = 0, type = lua_type( L, 1 );
@@ -81,32 +68,155 @@ static int calc( lua_State *L, int alg ) {
 	return 1;
 }
 
+
+
+/**
+ * hash.sha1 ( *string* )
+ * -----
+ *
+ * Generate a SHA1 hash.
+ *
+ * C API: int generate_sha1( lua_State *L )
+ *
+ * Usage
+ * -----
+ * Takes one argument, a string, and hashes it.
+ *
+ *
+ * Examples
+ * -----
+ * Creates a SHA1 hash of the string `"Hello, World"`:
+ * <pre>
+ * local h = hash.sha1( "Hello, World" ) -- hash value
+ * </pre>
+ *
+ */
 int generate_sha1( lua_State *L ) {
 	return calc( L, 1 );
 }
 
+
+
+/**
+ * hash.sha224 ( *string* )
+ * ---
+ *
+ * Generate a SHA224 hash of str
+ *
+ * C API: int generate_sha224( lua_State *L )
+ *
+ * Usage
+ * -----
+ *
+ * Takes one argument, a string, and hashes it.
+ *
+ * Examples
+ * -----
+ *
+ * Creates a SHA224 hash of the string `"Hello, World"`:
+ * <pre>
+ * local h = hash.sha224( "Hello, World" )
+ * -- &lt;hash value&gt;
+ * </pre>
+ *
+ */
 int generate_sha224( lua_State *L ) {
 	return calc( L, 224 );
 }
 
+
+
+/**
+ * hash.sha256 ( *string* )
+ * ---
+ *
+ * Generate a SHA256 hash of str
+ *
+ * C API: int generate_sha256( lua_State *L )
+ *
+ * Usage
+ * -----
+ *
+ * Takes one argument, a string, and hashes it.
+ *
+ * Examples
+ * -----
+ *
+ * Creates a SHA256 hash of the string `"Hello, World"`:
+ * <pre>
+ * local h = hash.sha256( "Hello, World" )
+ * -- &lt;hash value&gt;
+ * </pre>
+ *
+ */
 int generate_sha256( lua_State *L ) {
 	return calc( L, 256 );
 }
 
+
+
+/**
+ * hash.sha384 ( *string* )
+ * ---
+ *
+ * Generate a SHA384 hash of str
+ *
+ * C API: int generate_sha384( lua_State *L )
+ *
+ * Usage
+ * -----
+ *
+ * Takes one argument, a string, and hashes it.
+ *
+ * Examples
+ * -----
+ *
+ * Creates a SHA384 hash of the string `"Hello, World"`:
+ * <pre>
+ * local h = hash.sha384( "Hello, World" )
+ * -- &lt;hash value&gt;
+ * </pre>
+ *
+ */
 int generate_sha384( lua_State *L ) {
 	return calc( L, 384 );
 }
 
+
+
+/**
+ * hash.sha512 ( *string* )
+ * ---
+ *
+ * Generate a SHA512 hash of str
+ *
+ * C API: int generate_sha512( lua_State *L )
+ *
+ * Usage
+ * -----
+ *
+ * Takes one argument, a string, and hashes it.
+ *
+ * Examples
+ * -----
+ *
+ * Creates a SHA512 hash of the string `"Hello, World"`:
+ * <pre>
+ * local h = hash.sha512( "Hello, World" )
+ * -- &lt;hash value&gt;
+ * </pre>
+ *
+ */
 int generate_sha512( lua_State *L ) {
 	return calc( L, 512 );
 }
 
 struct luaL_Reg hash_set[] = {
- { "sha1", generate_sha1 }
-,{ "sha224", generate_sha224 }
-,{ "sha256", generate_sha256 }
-,{ "sha384", generate_sha384 }
-,{ "sha512", generate_sha512 }
-,{ NULL }
+	 { "sha1", generate_sha1 }
+	,{ "sha224", generate_sha224 }
+	,{ "sha256", generate_sha256 }
+	,{ "sha384", generate_sha384 }
+	,{ "sha512", generate_sha512 }
+	,{ NULL }
 };
 #endif

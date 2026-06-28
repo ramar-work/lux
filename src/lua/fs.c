@@ -1,50 +1,20 @@
-/* -------------------------------------------- * 
-filesystem.c 
-============
+/**
+ * fs.c
+ * ====
+ *
+ * Filesystem primitives for Lua
+ *
+ */
+#include "fs.h"
 
-Database primitives for Lua
-
-
-LICENSE
--------
-Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
-See LICENSE in the top-level directory for more information.
-
-
-USAGE 
------
-### read ###
-
-Read a file in its entirety.
-
-
-### write ###
-
-Write out a file.
-
-
-### stat ###
-
-Get file info.
-
-
-### exists ###
-
-Simply check if a file exists on a system.
-
-
-TODO
-----
-add mkdir, rmdir, rm -rf, and ls
- 
- * -------------------------------------------- */
-#include "filesystem.h"
+// 6/15/26 - Increased static read limit to 4MB
+static const int _RLIMIT = LUA_FS_READ_LIMIT;
 
 static char *sw_path( lua_State *L, const char *path, char *spath, int splen ) {
 	int len = 0;
 
 	//Get the shadow path if there is one
-	lua_getglobal( L, "shadow" ); 
+	lua_getglobal( L, "shadow" );
 	if ( lua_isnil( L, -1 ) ) {
 		lua_pop( L, 1 );
 		return NULL;
@@ -72,7 +42,7 @@ static char *sw_path( lua_State *L, const char *path, char *spath, int splen ) {
 
 static zTable * get_config_limits( lua_State *L ) {
 	//Get the shadow path if there is one
-	lua_getglobal( L, "config" ); 
+	lua_getglobal( L, "config" );
 	if ( lua_isnil( L, -1 ) ) {
 		lua_pop( L, 1 );
 		return NULL;
@@ -81,15 +51,32 @@ static zTable * get_config_limits( lua_State *L ) {
 	zTable *t = lt_make( 1024 );
 	if ( !lua_to_ztable( L, 1, t ) ) {
 		return NULL;
-	} 
+	}
 
 	lt_lock( t );
 	lua_pop( L, 1 );
 	return t;
-} 
+}
 
 
 
+/**
+ * fs.pwd ( *string* )
+ * ----
+ *
+ * Print the working directory relative to the current instance.
+ *
+ * C API: int fs_pwd ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * ...
+ *
+ * Examples
+ * --------
+ * ...
+ *
+ */
 int fs_pwd ( lua_State *L ) {
 	char *fspath = NULL, fp[ PATH_MAX ] = {0}, rp[ PATH_MAX ] = {0};
 	char pathbuf[ PATH_MAX ];
@@ -125,11 +112,28 @@ int fs_pwd ( lua_State *L ) {
 
 
 
+/**
+ * fs.read ( *string* )
+ * ----
+ *
+ * Read a file in the filesystem.
+ *
+ * C API: int fs_read ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * ...
+ *
+ * Examples
+ * --------
+ * ...
+ *
+ */
 int fs_read ( lua_State *L ) {
 	luaL_checktype( L, 1, LUA_TSTRING );
 	struct stat sb;
 	int fd, rlimit = 0;
-	char *fspath, err[ 1024 ] = { 0 }; 
+	char *fspath, err[ 1024 ] = { 0 };
 	char pathbuf[ PATH_MAX ];
 	const char *funct = "fs.read", *filename = lua_tostring( L, 1 );
 	unsigned char *rb = NULL;
@@ -149,11 +153,11 @@ int fs_read ( lua_State *L ) {
 	//Pop and get limits, etc
 	lua_pop( L, 1 );
 	if ( !( ct =  get_config_limits( L ) ) )
-		rlimit = 100000;
+		rlimit = _RLIMIT;
 	else {
 		int i = lt_geti( ct, "readlimit" );
 		if ( !( rlimit = lt_int_at( ct, i ) ) ) {
-			rlimit = 100000;
+			rlimit = _RLIMIT;
 		}
 	}
 
@@ -210,17 +214,34 @@ int fs_read ( lua_State *L ) {
 }
 
 
+/**
+ * fs.write ( [ *string* ] or [ *string*, *string* ] )
+ * -----
+ *
+ * Write a file to filesystem.
+ *
+ * int fs_write ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * ...
+ *
+ * Examples
+ * --------
+ * ...
+ *
+ */
 int fs_write ( lua_State *L ) {
 	//Need to write to a file
 	luaL_checktype( L, 1, LUA_TSTRING );
 	luaL_checktype( L, 2, LUA_TSTRING );
-	if ( lua_gettop( L ) == 3 ) { 
+	if ( lua_gettop( L ) == 3 ) {
 		luaL_checktype( L, 3, LUA_TNUMBER );
 	}
 
 	//
 	char *fspath = NULL;
-	const char *src = lua_tostring( L, 1 ); 
+	const char *src = lua_tostring( L, 1 );
 	char pathbuf[ PATH_MAX ];
 	const unsigned char *data;
 	unsigned long size = 0;
@@ -268,10 +289,25 @@ int fs_write ( lua_State *L ) {
 }
 
 
+/**
+ * fs.exists ( *string* )
+ * -----
+ *
+ * Check for the existence of a file in the filesystem.  Returns a boolean.
+ * C API: int fs_exists ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * ...
+ *
+ * Examples
+ * --------
+ * ...
+ */
 int fs_exists ( lua_State *L ) {
 	struct stat sb;
 	int status = 0;
-	char *fspath = NULL; 
+	char *fspath = NULL;
 	const char *opath = NULL;
 	char pathbuf[ PATH_MAX ] = {0};
 	luaL_checktype( L, 1, LUA_TSTRING );
@@ -286,14 +322,32 @@ int fs_exists ( lua_State *L ) {
 	}
 
 	//Check if the file exists
-	lua_pushboolean( L, ( access( pathbuf, F_OK ) > -1 ) ); 
+	lua_pushboolean( L, ( access( pathbuf, F_OK ) > -1 ) );
 	return 1;
 }
 
 
+
+/**
+ * fs.stat ( *string* )
+ * -----
+ *
+ * Query metadata about a file in the filesystem.
+ *
+ * C API: int fs_exists ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * ...
+ *
+ * Examples
+ * --------
+ * ...
+ *
+ */
 int fs_stat ( lua_State *L ) {
 	struct stat sb;
-	char *fspath = NULL; 
+	char *fspath = NULL;
 	const char *opath = NULL;
 	char pathbuf[ PATH_MAX ];
 	luaL_checktype( L, 1, LUA_TSTRING );
@@ -347,6 +401,23 @@ int fs_stat ( lua_State *L ) {
 }
 
 
+/**
+ * fs.list ( *string* )
+ * -----
+ *
+ * Retrieve a directory listing.  Returns table.
+ *
+ * C API: int fs_list ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * ...
+ *
+ * Examples
+ * --------
+ * ...
+ *
+ */
 int fs_list ( lua_State *L ) {
 	DIR *dir;
 	struct dirent *dd;
@@ -425,8 +496,27 @@ int fs_list ( lua_State *L ) {
 
 
 
+/**
+ * fs.mkdir ( [ *string* ] or [ *string*, *boolean* ] )
+ * ----
+ *
+ * Create a directory.
+ *
+ * C API: int fs_mkdir ( lua_State *L )
+ *
+ * Usage
+ * ----
+ * Specify the directory to create as the first argument.  An optional
+ * second argument will create the directory and its parents if they
+ * are not present (similar to `mkdir -p` on Linux and friends).
+ *
+ * Examples
+ * --------
+ * ...
+ *
+ */
 int fs_mkdir ( lua_State *L ) {
-	const char *dir = NULL, *mode = NULL; 
+	const char *dir = NULL, *mode = NULL;
 	char pathbuf[ PATH_MAX ];
 
 	//Check for a string argument
@@ -437,7 +527,7 @@ int fs_mkdir ( lua_State *L ) {
 
 #if 0
 	//Mode as a string is probably simplest...
-	//Block characters that don't match rw or x and 
+	//Block characters that don't match rw or x and
 	//Number is not bad either, but you'll have to break it up...
 #endif
 
