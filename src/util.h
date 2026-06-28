@@ -1,24 +1,24 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * util.h
  * ======
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * General utilities
  *
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
- * - 
+ * -
  * ------------------------------------------- */
 #ifndef _WIN32
  #define _POSIX_C_SOURCE 200809L
-#endif 
+#endif
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -96,7 +96,7 @@ int * datoi( const char *value );
 char *get_lstr( char **str, char chr, int *lt );
 char *msg_get_value ( const char *value, const char *chrs, unsigned char *msg, int len );
 char *copystr ( unsigned char *src, int len ) ;
-unsigned char *append_to_uint8t ( unsigned char **, int *, unsigned char *, int ); 
+unsigned char *append_to_uint8t ( unsigned char **, int *, unsigned char *, int );
 unsigned char * srand_uint8t( unsigned char *, int, unsigned char *, int );
 void *add_item_to_list( void ***, void *, int , int * );
 char *append_strings_to_char (char **, int *, char *, ... );

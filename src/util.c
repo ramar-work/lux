@@ -1,8 +1,8 @@
-/* ------------------------------------------- * 
- * util.c 
+/* ------------------------------------------- *
+ * util.c
  * =========
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * General utilities.
  *
@@ -12,7 +12,7 @@
  *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
  * -
  * ------------------------------------------- */
@@ -20,7 +20,7 @@
 
 
 unsigned char * srand_uint8t( unsigned char *src, int srclen, unsigned char *buf, int buflen ) {
-	if ( !buf || !memset( buf, 0, buflen ) ) { 
+	if ( !buf || !memset( buf, 0, buflen ) ) {
 		return NULL;
 	}
 	
@@ -45,14 +45,14 @@ unsigned char *read_file ( const char *filename, int *len, char *err, int errlen
 	struct stat sb;
 	memset( &sb, 0, sizeof( struct stat ) );
 
-	//Check for the file 
+	//Check for the file
 	if ( (fstat = stat( filename, &sb )) == -1 ) {
 		//fprintf( stderr, "FILE STAT ERROR: %s\n", strerror( errno ) );
 		snprintf( err, errlen, "Stat error on %s: %s\n", filename, strerror( errno ) );
 		return NULL;	
 	}
 
-	//Check for the file 
+	//Check for the file
 	if ( (fd = open( filename, O_RDONLY )) == -1 ) {
 		snprintf( err, errlen, "File open error on %s: %s\n", filename, strerror( errno ) );
 		return NULL;	
@@ -66,7 +66,7 @@ unsigned char *read_file ( const char *filename, int *len, char *err, int errlen
 		return NULL;	
 	}
 
-	//Read the entire file into memory, b/c we'll probably have space 
+	//Read the entire file into memory, b/c we'll probably have space
 	if ( (bytesRead = read( fd, buf, sb.st_size )) == -1 ) {
 		snprintf( err, errlen, "read error: %s, %s\n", filename, strerror( errno ) );
 		free( buf );
@@ -95,7 +95,7 @@ int * satoi( const char *value, int *p ) {
 		v++;
 	}
 	*p = atoi( value );
-	return p; 
+	return p;
 }
 
 
@@ -110,7 +110,7 @@ int * datoi( const char *value ) {
 
 	int *p = malloc( sizeof(int) );
 	*p = atoi( value );
-	return p; 
+	return p;
 }
 
 
@@ -178,12 +178,12 @@ char *msg_get_value ( const char *value, const char *chrs, unsigned char *msg, i
 
 		//Set 'end' if not already...	
 		if ( end == -1 && pend == -1 ) {
-			end = len - start; 
+			end = len - start;
 		}
 
 		//Prepare for edge cases...
 		if ((bContent = malloc( end + 1 )) == NULL ) {
-			return ""; 
+			return "";
 		}
 
 		//Prepare the raw buffer..
@@ -226,7 +226,7 @@ char *append_strings_to_char (char **dest, int *len, char *delim, ... ) {
 	va_start( args, delim );
 	p = va_arg( args, char * );
 
-	while ( p ) { 
+	while ( p ) {
 		if ( delim && !append_to_uint8t( (unsigned char **)dest, len, (unsigned char *)delim, strlen( delim ) ) ) {
 			return NULL;
 		}
@@ -236,7 +236,7 @@ char *append_strings_to_char (char **dest, int *len, char *delim, ... ) {
 		}
 
 		p = va_arg( args, char * );
-	} 
+	}
 
 	va_end( args );
 	return (char *)append_to_uint8t( (unsigned char **)dest, len, (unsigned char *)"\0", 1 );
@@ -252,29 +252,29 @@ void * add_item_to_list( void ***list, void *element, int size, int * len ) {
 
 	//Reallocate
 	if (( (*list) = realloc( (*list), size * ( (*len) + 2 ) )) == NULL ) {
-		FPRINTF( "Failed to reallocate block from %d to %d\n", size, size * ((*len) + 2) ); 
+		FPRINTF( "Failed to reallocate block from %d to %d\n", size, size * ((*len) + 2) );
 		return NULL;
 	}
 
 #if 0
-	fprintf( stderr, 
-		"Successfully reallocated block to size %d\n", size * ((*len) + 2) ); 
+	fprintf( stderr,
+		"Successfully reallocated block to size %d\n", size * ((*len) + 2) );
 	fprintf( stderr, "list => %p, %d, %d, %d\n", *list, (*len), (*len) + 1, size * ((*len) + 2 ) );
 #endif
 
-	(*list)[ *len ] = element; 
-	(*list)[ (*len) + 1 ] = NULL; 
-	(*len) += 1; 
+	(*list)[ *len ] = element;
+	(*list)[ (*len) + 1 ] = NULL;
+	(*len) += 1;
 	return list;
 }
 
-//Trim any characters 
+//Trim any characters
 unsigned char *trim (unsigned char *msg, char *trim, int len, int *nlen) {
 	//Define stuff
 	unsigned char *m = msg;
 	int nl= len;
 	//Move forwards and backwards to find whitespace...
-	while ( memchr(trim, *(m + ( nl - 1 )), 4) && nl-- ) ; 
+	while ( memchr(trim, *(m + ( nl - 1 )), 4) && nl-- ) ;
 	while ( memchr(trim, *m, 4) && nl-- ) m++;
 	*nlen = nl;
 	return m;
@@ -282,7 +282,7 @@ unsigned char *trim (unsigned char *msg, char *trim, int len, int *nlen) {
 
 
 
-//Duplicate a block 
+//Duplicate a block
 unsigned char * dupblk( const unsigned char *v, int vlen ) {
 	unsigned char * vv = malloc( vlen );
 	memset( vv, 0, vlen );
