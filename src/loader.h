@@ -1,18 +1,18 @@
-/* ------------------------------------------- * 
- * loader.h 
+/* ------------------------------------------- *
+ * loader.h
  * =========
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * Data structures for loader.
  *
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
  * No entries yet.
  *
@@ -24,7 +24,7 @@
 #define LOADER_H
 
 struct rule {
-	const char *key; 
+	const char *key;
 	const char *type;
 	union {
 		char **s;
@@ -34,9 +34,9 @@ struct rule {
 	int (*handler)( zKeyval *, int, void * );
 };
 
-struct fp_iterator { 
-	int len, depth; 
-	void *userdata; 
+struct fp_iterator {
+	int len, depth;
+	void *userdata;
 	int (*exec)( zKeyval *, int, void * );
 	zTable *source;
 };
