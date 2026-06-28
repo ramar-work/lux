@@ -1,26 +1,26 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * mime.c
  * ======
- * 
- * Summary 
+ *
+ * Summary
  * -------
- * Functions and data allowing Hypno to deal with different mimetypes.
- * messages. 
+ * Functions and data allowing lux to deal with
+ * different mimetypes.
  *
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
- * 
+ *
  * ------------------------------------------- */
 #include "mime.h"
 
 static const struct mime mime[] = {
-/*sed -n 7,115p mime.c | sed 's/\t//' | awk -F ' ' '{ printf "  { %13s %-80s },\n", $2, $3 }'*/ 
+/*sed -n 7,115p mime.c | sed 's/\t//' | awk -F ' ' '{ printf "  { %13s %-80s },\n", $2, $3 }'*/
   {    "unknown", "application/octet-stream"                                      /*octet-stream*/ },
   {       "html", "text/html"                                             /*default content-type*/ },
   {        "htm", "text/html"                                                                      },

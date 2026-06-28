@@ -1,21 +1,21 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * mime.h
  * ======
- * 
- * Summary 
+ *
+ * Summary
  * -------
- * Header file for functions and data allowing Hypno to deal with different 
- * mimetypes.
+ * Header file for functions and data allowing lux
+ * to deal with different mimetypes.
  *
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
- * - 
+ * -
  * ------------------------------------------- */
 #include <inttypes.h>
 #include <string.h>
