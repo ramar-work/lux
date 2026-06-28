@@ -1,27 +1,26 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * filter-echo.h
  * ===========
- * 
- * Summary 
+ *
+ * Summary
  * -------
- * Header file for functions comprising the echo filter for stress testing 
- * Hypno's capabilities. 
+ * Header file for functions comprising the echo filter.
  *
  * Usage
  * -----
- * filter-echo.c forces hypno to simply echo back what was sent.  This is mostly
+ * filter-echo.c forces lux to simply echo back what was sent.  This is mostly
  * for testing and has little use for anything but diagnostics.  It can safely
  * be disabled in production.
  *
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
- * 
+ *
  * ------------------------------------------- */
 #include <zhttp.h>
 #include "../mime.h"
