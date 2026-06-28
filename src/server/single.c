@@ -8,8 +8,7 @@ int srv_single ( server_t *p ) {
 		socklen_t addrlen = sizeof( addrinfo );
 
 
-		// Create a structure for connection info 
-		//struct cdata conn = { .ctx = p->ctx };
+		// Create a structure for connection info
 		conn_t conn;
 		memset( &conn, 0, sizeof( conn_t ) );
 		conn.count = 0;
@@ -26,37 +25,36 @@ int srv_single ( server_t *p ) {
 				snprintf( p->err, sizeof( p->err ), "Try accept again: %s\n", strerror( errno ) );
 				continue;	
 			}
-			else if ( errno == EMFILE || errno == ENFILE ) { 
+			else if ( errno == EMFILE || errno == ENFILE ) {
 				//These both refer to open file limits
 				snprintf( p->err, sizeof( p->err ), "Too many open files, try closing some requests.\n" );
-				//fprintf( stderr, "%s\n", err );
-				fprintf( p->log_fd, "%s\n", p->err );
+				fprintf( stderr, "%s\n", p->err );
 				return 0;
 			}
-			else if ( errno == EINTR ) { 
+			else if ( errno == EINTR ) {
 				//In this situation we'll handle signals
 				snprintf( p->err, sizeof( p->err ), "Signal received: %s\n", strerror( errno ) );
-				fprintf( p->log_fd, "%s", p->err );
+				fprintf( stderr, "%s", p->err );
 				return 0;
 			}
 			else {
-				//All other codes really should just stop. 
+				//All other codes really should just stop.
 				snprintf( p->err, sizeof( p->err ), "accept() failed: %s\n", strerror( errno ) );
-				fprintf( p->log_fd, "%s", p->err );
+				fprintf( stderr, "%s", p->err );
 				return 0;
 			}
 		}
 
 		//Log an access message including the IP in either ipv6 or v4
 		if ( addrinfo.ss_family == AF_INET )
-			inet_ntop( AF_INET, &((struct sockaddr_in *)&addrinfo)->sin_addr, ip, sizeof( ip ) ); 
+			inet_ntop( AF_INET, &((struct sockaddr_in *)&addrinfo)->sin_addr, ip, sizeof( ip ) );
 		else {
-			inet_ntop( AF_INET6, &((struct sockaddr_in6 *)&addrinfo)->sin6_addr, ip, sizeof( ip ) ); 
+			inet_ntop( AF_INET6, &((struct sockaddr_in6 *)&addrinfo)->sin6_addr, ip, sizeof( ip ) );
 		}
 
 		// Go ahead and service it
 		if ( !srv_response( p, &conn ) ) {
-			FPRINTF( "I'm so lost... \n" );
+			FPRINTF( "Failed to serve a response... \n" );
 		}
 
 		// Close the file descriptor
@@ -69,7 +67,7 @@ int srv_single ( server_t *p ) {
 		count++;
 		FPRINTF( "Waiting for next connection.\n" );
 		#ifdef DEBUG_H
-		if ( count >= p->tapout ) { 
+		if ( count >= p->tapout ) {
 			break;
 		}	
 		#endif
