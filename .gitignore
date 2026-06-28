@@ -23,3 +23,8 @@ Makefile
 
 # Leave this off as it's for testing quickly
 conf.sh
+
+# Leave these off for now
+src/ctx/ctx-dns.h
+src/ctx/ctx-return.c
+src/ctx/ctx-return.h
