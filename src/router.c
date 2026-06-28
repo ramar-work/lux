@@ -1,10 +1,10 @@
-/* ------------------------------------------- * 
- * router.c 
+/* ------------------------------------------- *
+ * router.c
  * =========
- * 
- * Summary 
+ *
+ * Summary
  * -------
- * Loads config files written with Lua into a structure that C can easily talk 
+ * Loads config files written with Lua into a structure that C can easily talk
  * to.
  *
  * LICENSE
@@ -13,7 +13,7 @@
  *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
  * -
  * ------------------------------------------- */
@@ -23,7 +23,7 @@
 	add_item_to_list( (void ***)LIST, ELEMENT, sizeof( SIZE ), LEN )
 
 #ifndef DEBUG_H
- 
+
 #define DUMPMATCH( NUM )
  #define RDUMPACTION( NUM )
  #define FPRINTF(...)
@@ -34,24 +34,24 @@
 	( NUM == ACT_SINGLE   ) ? "ACT_SINGLE" : \
 	( NUM == ACT_EITHER   ) ? "ACT_EITHER" : \
 	( NUM == ACT_RAW  ) ? "ACT_RAW" : \
-	( NUM == ACT_NONE ) ? "ACT_NONE" : "UNKNOWN" 
+	( NUM == ACT_NONE ) ? "ACT_NONE" : "UNKNOWN"
 
  #define DUMPMATCH( NUM ) \
 	( NUM == RE_NUMBER    ) ? "RE_NUMBER" : \
 	( NUM == RE_STRING ) ? "RE_STRING" : \
 	( NUM == RE_ANY   ) ? "RE_ANY" : \
-	( NUM == RE_NONE ) ? "RE_NONE" : "UNKNOWN" 
+	( NUM == RE_NONE ) ? "RE_NONE" : "UNKNOWN"
 
  #define FPRINTF(...) \
 	fprintf( stderr, __VA_ARGS__ )
 #endif
 
 
-static const char NUMS[] = 
+static const char NUMS[] =
 	"0123456789";
 
 
-static const char ALPHA[] = 
+static const char ALPHA[] =
 	"abcdefghijklmnopqrstuvwxyz"
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	;
@@ -73,9 +73,9 @@ static void * add_item_to_list( void ***list, void *element, int size, int * len
 		return NULL;
 	}
 
-	(*list)[ *len ] = element; 
-	(*list)[ (*len) + 1 ] = NULL; 
-	(*len) += 1; 
+	(*list)[ *len ] = element;
+	(*list)[ (*len) + 1 ] = NULL;
+	(*len) += 1;
 	return list;
 }
 
@@ -112,10 +112,10 @@ static void free_urimap ( struct urimap *mmap ) {
 
 
 char * router_strdup ( char *c ) {
-	char *p = malloc( strlen( c ) + 1 ); 
+	char *p = malloc( strlen( c ) + 1 );
 	memset( p, 0, strlen( c ) + 1 );
 	memcpy( p, c, strlen( c ) );
-	return p; 
+	return p;
 }
 
 
@@ -170,10 +170,10 @@ static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 				}
 			}
 
-			if ( e->len == 1 ) 
+			if ( e->len == 1 )
 				e->mustbe = RE_ANY;
 			else if ( e->len > 1 && e->type == ACT_ID ) {
-				if ( memcmp( e->string[1], "number", 6 ) == 0 ) 
+				if ( memcmp( e->string[1], "number", 6 ) == 0 )
 					e->mustbe = RE_NUMBER;
 				else if ( memcmp( e->string[1], "string", 6 ) == 0 ) {
 					e->mustbe = RE_STRING;
@@ -211,7 +211,7 @@ static struct urimap * build_urimap ( struct urimap *map, const char *uri ) {
 int compare_urimaps ( struct urimap *map1, struct urimap *map2 ) {
 
 	//...
-	struct element **elist = map1->list; 
+	struct element **elist = map1->list;
 	struct element **ilist = map2->list;
 	if ( map1->listlen != map2->listlen ) {
 		return 0;
@@ -252,7 +252,7 @@ int compare_urimaps ( struct urimap *map1, struct urimap *map2 ) {
 			if ( (*elist)->mustbe != RE_ANY ) {
 				while ( *s ) {
 					if ( !memchr( n, *s, nl ) ) {
-						return 0;  
+						return 0; 
 					}
 					s++;
 				}
@@ -262,7 +262,7 @@ int compare_urimaps ( struct urimap *map1, struct urimap *map2 ) {
 			//These should just match one to one
 			char *ii = *(*ilist)->string;
 			char *ee = *(*elist)->string;
-			if ( !ii ) { 
+			if ( !ii ) {
 				return 0;
 			}
 			else if ( strlen( ii ) != strlen( ee ) ) {
@@ -283,7 +283,7 @@ int compare_urimaps ( struct urimap *map1, struct urimap *map2 ) {
 
 
 
-//Stub function to pull text member out of something 
+//Stub function to pull text member out of something
 const char * route_rword ( void *f ) {
 	return ( const char * )f;
 }
@@ -303,32 +303,32 @@ const char * route_resolve ( const char *uri, const char *rname ) {
 
 	//check that we're not just looking for root
 	if ( rlen == 1 && ulen == 1 && *uri == '/' && *rname == '/' ) {
-		free_urimap( &urimap ); 
+		free_urimap( &urimap );
 		return rname;
 	}
 	else if ( rlen == 2 && ulen == 1 && rname[0] == '/' && rname[1] == '/' ) {
-		free_urimap( &urimap ); 
+		free_urimap( &urimap );
 		return ( *uri == '/' && *rname == '/' ) ? rname : NULL;
 	}
 
-	//Build URI map for the current route 
+	//Build URI map for the current route
 	if ( !build_urimap( &cmap, rname ) ) {
-		free_urimap( &urimap ); 
+		free_urimap( &urimap );
 		return NULL;	
 	}
 
 	//Can these really match?
 	if ( compare_urimaps( &cmap, &urimap ) ) {
-		free_urimap( &cmap ); 
-		free_urimap( &urimap ); 
+		free_urimap( &cmap );
+		free_urimap( &urimap );
 		return rname;
 	}
 
 	//Destroy the cmap
-	free_urimap( &cmap ); 
-	free_urimap( &urimap ); 
+	free_urimap( &cmap );
+	free_urimap( &urimap );
 	return NULL;
-} 
+}
 
 
 
@@ -356,15 +356,15 @@ void * route_complex_resolve ( const char *uri, void **rlist, const char *(*rc)(
 
 		//check that we're not just looking for root
 		if ( rlen == 1 && ulen == 1 && *uri == '/' && *rname == '/' ) {
-			free_urimap( &urimap ); 
+			free_urimap( &urimap );
 			return *rlist;
 		}
 		else if ( rlen == 2 && ulen == 1 && rname[0] == '/' && rname[1] == '/' ) {
-			free_urimap( &urimap ); 
+			free_urimap( &urimap );
 			return ( *uri == '/' && *rname == '/' ) ? *rlist : NULL;
 		}
 
-		//Build URI map for the current route 
+		//Build URI map for the current route
 		if ( !build_urimap( &cmap, rname ) ) {
 			rlist++;
 			continue;
@@ -372,17 +372,17 @@ void * route_complex_resolve ( const char *uri, void **rlist, const char *(*rc)(
 
 		//Can these really match?
 		if ( compare_urimaps( &cmap, &urimap ) ) {
-			free_urimap( &cmap ); 
-			free_urimap( &urimap ); 
+			free_urimap( &cmap );
+			free_urimap( &urimap );
 			return *rlist;
 		}
 	
 		//Destroy the cmap
-		free_urimap( &cmap ); 
+		free_urimap( &cmap );
 		rlist++;
 	}
 
-	free_urimap( &urimap ); 
+	free_urimap( &urimap );
 	return NULL;
 }
 
@@ -401,8 +401,8 @@ void dump_urimap( struct urimap *map ) {
 		if ( (*a)->len ) {
 			for ( int i=0; i<(*a)->len; i++ ) { fprintf( stderr, "'%s', ", *b ); b++; }
 		}
-		fprintf( stderr, 
-			" action=%s, be=%s, len=%d )\n", 
+		fprintf( stderr,
+			" action=%s, be=%s, len=%d )\n",
 			RDUMPACTION( (*a)->type ), DUMPMATCH( (*a)->mustbe ), (*a)->len );
 		a++;
 	}
