@@ -1,18 +1,18 @@
-/* ------------------------------------------- * 
- * configs.h 
+/* ------------------------------------------- *
+ * configs.h
  * =========
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * -
  *
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
  * No entries yet.
  *
@@ -34,7 +34,7 @@
 #ifndef LCONFIG_H
 #define LCONFIG_H
 
-//Site configs go here
+// Site configs go here
 struct lconfig {
 	char *name;	
 	char *alias;
@@ -49,7 +49,7 @@ struct lconfig {
 };
 
 
-//Global config goes here
+// Global config goes here
 struct sconfig {
 	char *wwwroot;
 	struct lconfig **hosts;

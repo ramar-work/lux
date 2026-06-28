@@ -1,20 +1,20 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * configs.c
  * =========
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * -
  *
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
- * - 
+ * -
  * ------------------------------------------- */
 #include "configs.h"
 
@@ -37,7 +37,7 @@ static int hosts_iterator ( zKeyval * kv, int i, void *p ) {
 	if ( kv->key.type == ZTABLE_TXT && kv->value.type == ZTABLE_TBL && f->depth == 2 ) {
 		struct lconfig *w = malloc( sizeof( struct lconfig ) );
 		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
-		//FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count ); 
+		//FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count );
 		nt = loader_shallow_copy( st, i+1, i+count );
 		memset( w, 0, sizeof( struct lconfig ) );
 		const struct rule rules[] = {
@@ -84,7 +84,7 @@ struct lconfig * find_host ( struct lconfig **hosts, char *hostname ) {
 static struct lconfig ** build_hosts ( zTable *t ) {
 	struct lconfig **hosts = NULL;
 	const struct rule rules[] = {
-		{ "hosts", "t", .v.t = (void ***)&hosts, hosts_iterator }, 
+		{ "hosts", "t", .v.t = (void ***)&hosts, hosts_iterator },
 		{ NULL }
 	};
 
@@ -130,11 +130,11 @@ static int check_server_root( char **item, char *err, int errlen ) {
 	}
 
 	//If it starts with a '/', assume its absolute
-	if ( **item == '/' ) { 
+	if ( **item == '/' ) {
 		if ( stat( *item, &sb ) > -1 )
 			return 1;
 		else {
-			snprintf( err, errlen, "wwwroot '%s' does not exist or is not accessible.", *item ); 
+			snprintf( err, errlen, "wwwroot '%s' does not exist or is not accessible.", *item );
 			return 0;
 		}
 	}
@@ -158,9 +158,13 @@ static int check_server_root( char **item, char *err, int errlen ) {
 struct sconfig * build_server_config ( const char *file, char *err, int errlen ) {
 	FPRINTF( "Configuration parsing started...\n" );
 
-	struct sconfig *config = NULL; 
+	struct stat st;
+	struct sconfig *config = NULL;
 	zTable *t = NULL;
 	lua_State *L = NULL;
+
+	// Initialize
+	memset( &st, 0, sizeof( struct stat ) );
 
 	//Allocate Lua
 	if ( ( L = luaL_newstate() ) == NULL ) {
@@ -174,15 +178,34 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 		return NULL;
 	}
 
+#if 0
 	//After this conversion takes place, destroy the environment
 	if ( !lua_exec_file( L, file, err, errlen ) ) {
 		free( config );
 		lua_close( L );
 		return NULL;
 	}
+#else
+	// stat
+	if ( stat( file, &st ) == -1 ) {
+		char terr[ 1024 ] = {0};
+		strerror_r( errno, terr, sizeof( terr ) ); 	
+		snprintf( err, errlen, "Failed to stat() file: %s: %s", file, terr );
+		free( config );
+		lua_close( L );
+		return NULL;
+	}
+
+	// open
+	if ( !lua_exec_file( L, file, err, errlen ) ) {
+		free( config );
+		lua_close( L );
+		return NULL;
+	}
+#endif
 
 	//Allocate a table for the configuration
-	if ( !(t = malloc(sizeof(zTable))) || !lt_init( t, NULL, 2048 ) ) {
+	if ( !( t = malloc(sizeof(zTable)) ) || !lt_init( t, NULL, 2048 ) ) {
 		snprintf( err, errlen, "Could not initialize table when parsing config at: %s\n", file );
 		free_t( t );
 		free( config );
@@ -221,7 +244,7 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 	//Check it for any inconsistencies
 	for ( struct lconfig **h = config->hosts; h && *h ; h++ ) {
 		if ( !(*h)->name ) {
-			snprintf( err, errlen, 
+			snprintf( err, errlen,
 				"Parse issue at server config file: %s\n", file );
 			free_t( t );
 			free( config );
@@ -230,7 +253,7 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 		}
 
 		if ( !(*h)->dir ) {
-			snprintf( err, errlen, 
+			snprintf( err, errlen,
 				"Directory (key 'dir') not specified for host '%s' at config file: %s\n", (*h)->name, file );
 			free_t( t );
 			free( config );
@@ -239,7 +262,7 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 		}
 
 		if ( !(*h)->filter ) {
-			snprintf( err, errlen, 
+			snprintf( err, errlen,
 				"Filter (key 'filter' not specified for host '%s' at config file: %s\n", (*h)->name, file );
 			free_t( t );
 			free( config );
@@ -250,17 +273,17 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 		// This will never be a failure, but it needs to be far more flexible
 		// Honestly, just turning this into a hash table works much better...
 		if ( !(*h)->alias ) {
-			snprintf( err, errlen, 
+			snprintf( err, errlen,
 				"Filter (key 'filter' not specified for host '%s' at config file: %s\n", (*h)->name, file );
 		}
 	#endif
 	}
 
-	//This is the web root 
-	config->wwwroot = dupstr( loader_get_char_value( t, "wwwroot" ) ); 
+	//This is the web root
+	config->wwwroot = dupstr( loader_get_char_value( t, "wwwroot" ) );
 
 	//This is the global root default
-	//config->root_default = strdup( loader_get_char_value( t, "root_default" ) ); 
+	//config->root_default = strdup( loader_get_char_value( t, "root_default" ) );
 
 	//Die if the webroot is inaccessible
 	if ( config->wwwroot && !check_server_root( &config->wwwroot, err, errlen ) ) {
@@ -268,7 +291,7 @@ struct sconfig * build_server_config ( const char *file, char *err, int errlen )
 		free( config );
 		lua_close( L );
 		return NULL;
-	} 
+	}
 
 	//Destroy lua_State and the tables...
 	config->src = t;	
@@ -307,7 +330,7 @@ void free_server_config( struct sconfig *config ) {
 
 
 #ifdef DEBUG_H
-// Dump the entire server configuration 
+// Dump the entire server configuration
 void dump_server_config( struct sconfig *sc ) {
 	if ( !sc ) {
 		return;
@@ -317,7 +340,7 @@ void dump_server_config( struct sconfig *sc ) {
 	fprintf( stderr, "server->src: (%p)\n", sc->src );
 	fprintf( stderr, "server->hosts: (%p)\n", sc->hosts );
 
-	if ( sc->hosts ) { 
+	if ( sc->hosts ) {
 		dump_hosts( sc->hosts );
 	}
 
