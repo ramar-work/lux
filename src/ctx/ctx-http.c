@@ -1,19 +1,22 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * ctx-http.c
  * ========
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * Functions for dealing with HTTP contexts.
  *
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
  * ------------------------------------------- */
 #include "ctx-http.h"
+
+// 32 x 4 for now...
+#define IOVEC_HEADER_MAX 128
 
 // Size of \r\n\r\n
 static const int bhsize = 4;
@@ -21,9 +24,20 @@ static const int bhsize = 4;
 // Size of zhttp_t object
 static const int zhttp_size = sizeof( zhttp_t );
 
-// Define an interval for polling 
+//
+static const char newline[] = "\r\n";
+
+//
+static const char prefmt[] = "%x\r\n";
+
+// Define an interval for polling
 static const struct timespec __interval__ = { 0, POLL_INTERVAL };
 
+// Define a chunked encoding
+static const char encchunked[] = "Transfer-Encoding: chunked\r\n";
+
+// Close by default for now
+static const char cclose[] = "Connection: close\r\n";
 
 
 // Create an HTTPBody
@@ -42,14 +56,14 @@ static zhttp_t * create_zhttp_t ( HttpServiceType t ) {
 
 // Does nothing, but is required to be a member of all contexts.
 int create_notls ( server_t *p ) {
-	return 1; 
+	return 1;
 }
 
 
 
 // Also does nothing, but is required to be a member of all contexts.
 void free_notls ( server_t *p ) {
-	return; 
+	return;
 }
 
 
@@ -124,9 +138,9 @@ const int read_notls ( server_t *p, conn_t *conn ) {
 			nanosleep( &__interval__, NULL );
 		}
 		else {
-			FPRINTF( "Received %d additional header bytes on fd %d\n", rd, conn->fd ); 
+			FPRINTF( "Received %d additional header bytes on fd %d\n", rd, conn->fd );
 			bsize -= rd, total += rd, x += rd;
-			recvd = http_header_received( conn->req->preamble, total ); 
+			recvd = http_header_received( conn->req->preamble, total );
 			hlen = recvd;
 			if ( recvd == ZHTTP_PREAMBLE_SIZE ) {
 				break;
@@ -174,7 +188,7 @@ const int read_notls ( server_t *p, conn_t *conn ) {
 	// Check here if the thing is too big
 	if ( conn->req->clen > CTX_READ_MAX ) {
 		snprintf( conn->err, sizeof( conn->err ),
-			"Content-Length (%d) exceeds read max (%d).", conn->req->clen, CTX_READ_MAX );
+			"Content-Length (%lu) exceeds read max (%d).", conn->req->clen, CTX_READ_MAX );
 		conn->stage = CONN_WRITE;
 		(void)http_set_error( conn->res, 500, (char *)conn->err );
 		return 1;
@@ -190,7 +204,7 @@ const int read_notls ( server_t *p, conn_t *conn ) {
 		// Then send a 100-continue to the server...
 		nsize = conn->req->mlen + size + 4;
 		char *a = http_make_request( conn->res, 100, "Continue" );
-		send( a ); 
+		send( a );
 	}
 	#endif
 
@@ -206,14 +220,14 @@ const int read_notls ( server_t *p, conn_t *conn ) {
 
 	// Take any excess in the preamble and move that into xp
 	int crecvd = total - ( hlen + bhsize );
-	FPRINTF( "crecvd: %d, %d, %d, %d\n", 
+	FPRINTF( "crecvd: %d, %d, %d, %lu\n",
 		crecvd, ( hlen + bhsize ), nsize, conn->req->clen );
 	if ( crecvd > 0 ) {
 		unsigned char *hp = conn->req->preamble + ( hlen + bhsize );
 		memmove( xp, hp, crecvd );
 		memset( hp, 0, crecvd );
-		xp += crecvd; 
-	} 
+		xp += crecvd;
+	}
 
 	// Get the rest of the message
 	// FPRINTF( "crecvd: %d, clen: %d\n", crecvd, conn->req->clen );
@@ -250,7 +264,7 @@ const int read_notls ( server_t *p, conn_t *conn ) {
 		}
 		else {
 			// Process a successfully read buffer
-			FPRINTF( "Received %d additional bytes on fd %d\n", rd, conn->fd ); 
+			FPRINTF( "Received %d additional bytes on fd %d\n", rd, conn->fd );
 			xp += rd, total += rd, crecvd += rd;
 			if ( ( conn->req->clen - crecvd ) < size ) {
 				bsize = conn->req->clen - crecvd;
@@ -269,7 +283,7 @@ const int read_notls ( server_t *p, conn_t *conn ) {
 		return 1;
 	}
 
-	FPRINTF( "Read complete (read %d out of %d bytes for content)\n",
+	FPRINTF( "Read complete (read %d out of %ld bytes for content)\n",
 		crecvd, conn->req->clen );
 	conn->stage = CONN_PROC;
 	return 1;
@@ -281,161 +295,160 @@ const int read_notls ( server_t *p, conn_t *conn ) {
 const int write_notls ( server_t *p, conn_t *conn ) {
 
 	// Define
-	int sent = 0, pos = 0, try = 0, total = conn->res->mlen;
-	unsigned char *ptr = conn->res->msg;
-	struct timespec timer = {0}, n = {0};
+	int sent = 0;
+	int chunk = 0;
+	int veccount = 1;
+
+	unsigned int hlen = 0;
+	unsigned long ptrlen = 0; //conn->res->mlen;
+	unsigned char *ptr = 0; //conn->res->msg;
+
+	time_t starttime = 0;
+	zhttp_t *r = conn->res;
+	zhttpr_t **hx = conn->res->headers;
+
+	struct iovec vec[ IOVEC_HEADER_MAX ];
+	struct timespec timer = {0};
 
 	// Get the time at the start
 	clock_gettime( CLOCK_REALTIME, &timer );
+	starttime = timer.tv_sec;
 
 	// Mark the next stage
 	conn->stage = CONN_POST;
 
-#ifdef SENDFILE_ENABLED 
-	if ( conn->res->atype == ZHTTP_MESSAGE_SENDFILE ) {
-		// Send the header first
-		int hlen = total;	
-		for ( ; total; ) {
-			sent = send( conn->fd, ptr, total, MSG_DONTWAIT | MSG_NOSIGNAL );
-			if ( sent == 0 ) {
-				FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", conn->res->mlen );
-				break;
-			}
-			else if ( sent > -1 ) {
-				pos += sent, total -= sent, ptr += sent;
-				FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
-				if ( total == 0 ) {
-					FPRINTF( "sent == 0, assuming all %d bytes of header have been sent...\n", conn->res->mlen );
-					break;
-				}
-			}
-			else {
-				if ( !total ) {
-					FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
-					return 1;
-				}
-
-				if ( errno != EAGAIN || errno != EWOULDBLOCK ) {
-					// Most likely, the other end closed early
-					snprintf( conn->err, sizeof( conn->err ), 
-						"Got socket write error: %s\n", strerror( errno ) );
-					FPRINTF( "FATAL: %s\n", conn->err );
-					conn->stage = CONN_POST;
-					return 0;
-				}
-
-				memset( &n, 0, sizeof( struct timespec ) );	
-				clock_gettime( CLOCK_REALTIME, &n );
-				
-				if ( ( n.tv_sec - timer.tv_sec ) >= p->wtimeout ) {
-					// Cut if we can't get this message out for some reason
-					snprintf( conn->err, sizeof( conn->err ), 
-						"Timeout reached on write end of socket - header." );
-					FPRINTF( "%s\n", conn->err );
-					conn->stage = CONN_POST;
-					return 0;
-				}
-
-				FPRINTF("Trying again to send header to socket. (%d).\n", sent );
-				nanosleep( &__interval__, NULL );
-			}
-			FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
-		}
-		FPRINTF( "Header write complete (sent %d out of %d bytes)\n", pos, hlen );
-
-		// Then send the file
-		for ( total = conn->res->clen; total; ) {
-			sent = sendfile( conn->fd, conn->res->fd, NULL, CTX_WRITE_SIZE );
-			FPRINTF( "Bytes sent from open file %d: %d\n", conn->fd, sent );
-			if ( sent == 0 )
-				break;
-			else if ( sent > -1 )
-				total -= sent, pos += sent;
-			else {
-				if ( errno != EAGAIN || errno != EWOULDBLOCK ) {
-					snprintf( conn->err, sizeof( conn->err ),
-						"Got socket write error: %s\n", strerror( errno ) );
-					FPRINTF( "FATAL: %s\n", conn->err );
-					conn->stage = CONN_POST;
-					return 0;
-				}
-
-				memset( &n, 0, sizeof( struct timespec ) );
-				clock_gettime( CLOCK_REALTIME, &n );
-				
-				if ( ( n.tv_sec - timer.tv_sec ) > p->wtimeout ) {
-					snprintf( conn->err, sizeof( conn->err ),
-						"Timeout reached on write end of socket - body." );
-					FPRINTF( "FATAL: %s\n", conn->err );
-					conn->stage = CONN_POST;
-					return 0;
-				}
-
-				FPRINTF("Trying again to send file to socket. (%d).\n", sent );
-				nanosleep( &__interval__, NULL );
-			}
-			FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
-		}
-		FPRINTF( "Write complete (sent %d out of %d bytes)\n", pos, conn->res->clen );
-		return 1;
+	// Set mesage pointers and sizes
+	if ( r->atype == ZHTTP_MESSAGE_STATIC || r->atype == ZHTTP_MESSAGE_MALLOC ) {
+		hlen = r->mlen - r->clen;
+		//ptrlen = (*r->body)->size;
+		//ptr = (*r->body)->value;
+		ptr = r->msg + hlen;
+		ptrlen = r->clen;
 	}
+	else if ( r->atype == ZHTTP_MESSAGE_SENDFILE ) {
+		hlen = r->mlen;
+		ptrlen = r->clen;
+		ptr = mmap( NULL, ptrlen, PROT_READ, MAP_PRIVATE, r->fd, 0 );
+		if ( ptr == MAP_FAILED ) {
+			FPRINTF( "FATAL: mmap() failed: %s\n", strerror( errno ) );
+			return 0;
+		}
+	}
+	else {
+		FPRINTF( "FATAL: Message preparation failed\n" );
+		return 0;
+	}
+
+#if 0
+	// If the client explicitly asked you not to chunk and the message is too big
+	// you'll have to reject
 #endif
 
-	// Start writing data to socket
-	for ( ;; ) {
-		sent = send( conn->fd, ptr, total, MSG_DONTWAIT | MSG_NOSIGNAL );
-		FPRINTF( "Bytes sent: %d, over file %d\n", sent, conn->fd );
+	// Initialize the header
+	memset( vec, 0, sizeof( struct iovec ) * IOVEC_HEADER_MAX );
+	vec[ 0 ].iov_base = r->msg, vec[ 0 ].iov_len = hlen;
 
-		if ( sent == 0 ) {
-			FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", conn->res->mlen );
-			break;	
+	#if 0	
+	// Additional headers should be done from here too...
+	for ( ; hx && *hx; hx++, hcount += 4 ) {
+		if ( hcount >= IOVEC_HEADER_MAX - 1 || hcount > IOV_MAX ) {
+			FPRINTF( "FATAL: max header count reached\n" );
+			if ( r->atype == ZHTTP_MESSAGE_SENDFILE ) munmap( ptr, ptrlen );
+			return 0;
 		}
-		else if ( sent > -1 ) {
-			pos += sent, total -= sent, ptr += sent;	
-			FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
-			if ( total == 0 ) {
-				FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", conn->res->mlen );
-				break;
-			}
-		}
-		else {
-			if ( !total ) {
-				FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
-				return 1;
-			}
-			
-			if ( errno != EAGAIN || errno != EWOULDBLOCK ) {
-				snprintf( conn->err, sizeof( conn->err ),
-					"Got socket write error: %s\n", strerror( errno ) );
-				FPRINTF( "FATAL: %s\n", conn->err );
-				conn->stage = CONN_POST;
-				return 0;	
-			}
+		i->iov_base = (void *)(*hx)->field, i->iov_len = strlen( (*hx)->field ), i++;	
+		i->iov_base = (void *)hdiv, i->iov_len = 2, i++;	
+		i->iov_base = (*hx)->value, i->iov_len = (*hx)->size, i++;	
+		i->iov_base = (void *)hnewl, i->iov_len = 2, i++;	
+	}
+	#endif
 
-			memset( &n, 0, sizeof( struct timespec ) );	
-			clock_gettime( CLOCK_REALTIME, &n );
-			
-			if ( ( n.tv_sec - timer.tv_sec ) > p->wtimeout ) {
-				snprintf( conn->err, sizeof( conn->err ), 
-					"Timeout reached on write end of socket - body." );
-				FPRINTF( "%s\n", conn->err );
-				conn->stage = CONN_POST;
-				return 0;
-			}
-
-			nanosleep( &__interval__, NULL );
-		}
-		FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
+	// Figure the whole chunked thing out...
+	if ( ptrlen <= p->wbuffer && r->atype != ZHTTP_MESSAGE_SENDFILE ) {
+		// TODO: This should not be...
+		vec[ 1 ].iov_base = ptr;
+		vec[ 1 ].iov_len = ptrlen;
+		veccount++, ptrlen = 0; // NOTE: ptrlen == 0 means that the chunk loop won't run
+	}
+	else {
+		chunk = 1;
+		vec[ 0 ].iov_len -= 2;
+		vec[ 1 ].iov_base = (void *)encchunked;
+		vec[ 1 ].iov_len = sizeof( encchunked ) - 1;
+		veccount++;
+		vec[ 2 ].iov_base = (void *)newline;
+		vec[ 2 ].iov_len = 2;
+		veccount++;
 	}
 
-	FPRINTF( "Write complete (sent %d out of %d bytes)\n", pos, conn->req->mlen );
+#if 0
+FPRINTF( "%ld\n", r->clen );
+FPRINTF( "vec 0: %p, %ld\n", vec[0].iov_base, vec[0].iov_len );
+FPRINTF( "vec 1: %p, %ld\n", vec[1].iov_base, vec[1].iov_len );
+writev( 2, vec, veccount );
+#endif
+
+	// Decide whether or not to chunk
+	if ( ( sent = writev( conn->fd, vec, veccount ) ) == -1 ) {
+		FPRINTF( "FATAL: header write() failed: %s\n", strerror( errno ) );
+		return 0;
+	}
+
+
+	// Send remainder of response via chunked encoding
+	const unsigned long totlen = ptrlen;
+	for ( int ssent = 0, buflen = p->wbuffer; ptrlen; ) {
+
+		// Figure out before everything, how much is left, bin should always end at zero...
+		if ( buflen > ptrlen ) {
+			buflen = ptrlen;
+		}	
+
+		// Write the octal number and preamble
+		char pre[16] = {0};
+		int prelen = snprintf( pre, sizeof( pre ), prefmt, buflen );
+		struct iovec v[3] = {
+			{ .iov_base = pre, .iov_len = prelen },
+			{ .iov_base = ptr, .iov_len = buflen },
+			{ .iov_base = "\r\n", .iov_len = 2 },
+		};	
+
+		if ( ( ssent = writev( conn->fd, v, 3 ) ) == -1 ) {
+			snprintf( conn->err, sizeof( conn->err ), "Got socket write error: %s\n", strerror( errno ) );
+			FPRINTF( "FATAL: %s\n", conn->err );
+			conn->stage = CONN_POST;
+			return 0;
+		}
+
+		//writev( 2, v, 3 );
+		//FPRINTF( "SENT = %d, REMAINING = %lu/%lu\n", ssent, ptrlen, totlen );
+
+		// Increment binary
+		sent += ssent, ptr += buflen, ptrlen -= buflen;
+	}
+
+	if ( chunk && write( conn->fd, "0\r\n\r\n", 5 ) == -1 ) {
+		if ( errno == ENOBUFS || errno == ENOMEM )
+			;/* TODO: We can save the message in these cases, but that's a later date */
+		snprintf( conn->err, sizeof( conn->err ), "Got socket write error: %s\n", strerror( errno ) );
+		FPRINTF( "FATAL: %s\n", conn->err );
+		conn->stage = CONN_POST;
+		return 0;
+	}
+
+	// This is at the end
+	if ( r->atype == ZHTTP_MESSAGE_SENDFILE ) {
+		munmap( ptr, ptrlen );
+	}
+
+	FPRINTF( "SENT %d/%lu BYTES TO TLS CONNECTION ID: %d\n", sent, totlen, conn->connid );
 	return 1;
 }
 
 
 
 // Deallocate these structures
-const void post_notls ( server_t *p, conn_t *conn ) {
+void post_notls ( server_t *p, conn_t *conn ) {
 	// Also need to destroy the http bodies
 	http_free_body( conn->req ), http_free_body( conn->res );
 

@@ -1,8 +1,8 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * ctx-https.h
  * ========
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * Header for HTTPS functions.
  *
@@ -13,17 +13,19 @@
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
- * - 
+ * -
  * ------------------------------------------- */
 #include <sys/stat.h>
+#include <sys/uio.h>
 #include <stddef.h>
 #include <zwalker.h>
 #include <ztable.h>
+#include <sys/mman.h>
 #include "../server/server.h"
 #include "../util.h"
 #include "../config.h"
@@ -47,7 +49,7 @@ struct gnutls_abstr {
 const int pre_gnutls ( server_t *, conn_t * );
 const int read_gnutls ( server_t *, conn_t * );
 const int write_gnutls ( server_t *, conn_t * );
-const void post_gnutls ( server_t *, conn_t * );
+void post_gnutls ( server_t *, conn_t * );
 int create_gnutls( server_t * );
 void free_gnutls( server_t * );
 #endif

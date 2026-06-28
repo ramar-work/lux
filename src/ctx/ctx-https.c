@@ -1,8 +1,8 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * ctx-https.c
  * ========
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * Functions for dealing with HTTPS contexts.
  * Requires GnuTLS.
@@ -10,7 +10,7 @@
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
  * ------------------------------------------- */
@@ -18,15 +18,29 @@
 
 #ifndef DISABLE_TLS
 
+// 32 x 4 for now...
+#define IOVEC_HEADER_MAX 128
+
 // Size of \r\n\r\n
 static const int bhsize = 4;
 
 // Size of zhttp_t object
 static const int zhttp_size = sizeof( zhttp_t );
 
+// New line
+static const char newline[] = "\r\n";
+
+// Preamble format
+static const char prefmt[] = "%x\r\n";
+
+// Define a chunked encoding
+static const char encchunked[] = "Transfer-Encoding: chunked\r\n";
+
+// Close by default for now
+static const char cclose[] = "Connection: close\r\n";
+
 // Interval for fake polling here...
 static const struct timespec __interval__ = { 0, 100000000 };
-
 
 
 // Create an HTTPBody
@@ -43,7 +57,7 @@ static zhttp_t * create_zhttp_t ( HttpServiceType t ) {
 
 
 
-// Destroy the GnuTLS context per thread 
+// Destroy the GnuTLS context per thread
 static void destroy_gnutls ( struct gnutls_abstr *g ) {
 	if ( g ) {
 		gnutls_deinit( g->session );
@@ -58,11 +72,11 @@ static void destroy_gnutls ( struct gnutls_abstr *g ) {
 static int process_certs ( server_t *p, gnutls_certificate_credentials_t *t, int *count ) {
 	int found = 0;
 
-	// Find the certificates and keys that each host is pointing to 
+	// Find the certificates and keys that each host is pointing to
 	for ( struct lconfig **h = p->config->hosts; h && *h ; h++ ) {
 		// Define everything here
 		char crt[2048] = {0};
-		char key[2048] = {0}; 
+		char key[2048] = {0};
 		char ca[2048] = {0};
 		const char *fmt = "%s/%s/%s";
 		const char *wwwroot = p->config->wwwroot;
@@ -142,7 +156,7 @@ int create_gnutls ( server_t *p ) {
 	}
 
 
-	// Certificate credentials allocate and set 
+	// Certificate credentials allocate and set
 	if ( !( bob = malloc( size ) ) || !memset( bob, 0, size ) ) {
 		snprintf( p->err, sizeof( p->err ),
 			"allocation failure - %s", gnutls_strerror( status ) );
@@ -151,7 +165,7 @@ int create_gnutls ( server_t *p ) {
 	}
 
 
-	// Certificate credentials allocate and set 
+	// Certificate credentials allocate and set
 	if ( ( status = gnutls_certificate_allocate_credentials( bob ) ) != GNUTLS_E_SUCCESS ) {
 		snprintf( p->err, sizeof( p->err ),
 			"certificate strucutre allocation failed - %s", gnutls_strerror( status ) );
@@ -209,9 +223,10 @@ const int pre_gnutls ( server_t *p, conn_t *conn ) {
 	}
 
 	// Start a GnuTLS session
-	// TODO: You might need this too: GNUTLS_NO_SIGNAL 
+	// TODO: You might need this too: GNUTLS_NO_SIGNAL
 	ret = gnutls_init( &g->session,
-		GNUTLS_SERVER | GNUTLS_NONBLOCK | GNUTLS_NO_TICKETS );
+		GNUTLS_SERVER | GNUTLS_NO_TICKETS );
+		//GNUTLS_SERVER | GNUTLS_NONBLOCK | GNUTLS_NO_TICKETS );
 	if ( ret != GNUTLS_E_SUCCESS ) {
 		snprintf( conn->err, sizeof( conn->err ),
 			"Failed to initialize new TLS session for incoming connection: %s\n",
@@ -237,8 +252,8 @@ const int pre_gnutls ( server_t *p, conn_t *conn ) {
 	// NOTE: What is this doing?
 	ret = gnutls_credentials_set( g->session, GNUTLS_CRD_CERTIFICATE, *cred );
 	if ( ret != GNUTLS_E_SUCCESS ) {
-		snprintf( conn->err, sizeof( conn->err ), 
-			"Failed to set credentials for incoming connection: %s\n", 
+		snprintf( conn->err, sizeof( conn->err ),
+			"Failed to set credentials for incoming connection: %s\n",
 			gnutls_strerror( ret ) );
 		FPRINTF( "FATAL: %s\n", conn->err );
 		conn->stage = CONN_POST;
@@ -247,7 +262,7 @@ const int pre_gnutls ( server_t *p, conn_t *conn ) {
 
 
 	// TODO: This might not be necessary
-	// gnutls_certificate_server_set_request( g->session, GNUTLS_CERT_IGNORE ); 
+	// gnutls_certificate_server_set_request( g->session, GNUTLS_CERT_IGNORE );
 
 	// Set a handshake timeout (perhaps a server or individual site option)
 	gnutls_handshake_set_timeout( g->session, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT );
@@ -277,7 +292,7 @@ const int pre_gnutls ( server_t *p, conn_t *conn ) {
 				// TODO: This really isn't fatal, but if the client does not
 				// support this, we can't safely move forward.  Need to add
 				// an explicit check for SNI support...
-				snprintf( conn->err, sizeof( conn->err ), 
+				snprintf( conn->err, sizeof( conn->err ),
 					"Could not get server name: %s\n", gnutls_strerror( sret ) );
 				FPRINTF( "FATAL: %s\n", conn->err );
 				conn->stage = CONN_POST;
@@ -291,7 +306,7 @@ const int pre_gnutls ( server_t *p, conn_t *conn ) {
 						invalid = 0;
 						break;
 					}
-					else if ( (*h)->alias && !strcmp( g->sniname, (*h)->alias ) ) { 
+					else if ( (*h)->alias && !strcmp( g->sniname, (*h)->alias ) ) {
 						invalid = 0;
 						break;
 					}
@@ -426,7 +441,7 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 			FPRINTF( "Received %d additional header bytes on fd %d\n", rd, conn->fd );
 			int pending = 0;
 			bsize -= rd, total += rd, x += rd;
-			recvd = http_header_received( conn->req->preamble, total ); 
+			recvd = http_header_received( conn->req->preamble, total );
 			hlen = recvd;
 			if ( recvd == ZHTTP_PREAMBLE_SIZE ) {
 				break;
@@ -473,7 +488,7 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 			(void)http_set_error( conn->res, 500, (char *)conn->req->errmsg );
 			return 1;
 		}
-		FPRINTF( "%s: Read complete, finished parsing content body (read %d bytes)\n", 
+		FPRINTF( "%s: Read complete, finished parsing content body (read %d bytes)\n",
 				p->ctx->name, total );
 		conn->stage = CONN_PROC;
 		return 1;
@@ -482,9 +497,9 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 	// Check here if the thing is too big
 	if ( conn->req->clen > CTX_READ_MAX ) {
 		snprintf( conn->err, sizeof( conn->err ),
-			"Content-Length (%d) exceeds read max (%d).", conn->req->clen, CTX_READ_MAX );
+			"Content-Length (%ld) exceeds read max (%d).", conn->req->clen, CTX_READ_MAX );
 		conn->stage = CONN_WRITE;
-		(void)http_set_error( conn->res, 500, (char *)conn->err ); 
+		(void)http_set_error( conn->res, 500, (char *)conn->err );
 		return 1;
 	}
 
@@ -498,7 +513,7 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 		// Then send a 100-continue to the server...
 		nsize = conn->req->mlen + size + 4;
 		char *a = http_make_request( conn->res, 100, "Continue" );
-		send( a ); 
+		send( a );
 	}
 	#endif
 
@@ -514,7 +529,7 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 
 	// Take any excess in the preamble and move that into xp
 	int crecvd = total - ( hlen + bhsize );
-	FPRINTF( "crecvd: %d, %d, %d, %d\n",
+	FPRINTF( "crecvd: %d, %d, %d, %ld\n",
 		crecvd, ( hlen + bhsize ), nsize, conn->req->clen );
 	if ( crecvd > 0 ) {
 		unsigned char *hp = conn->req->preamble + ( hlen + bhsize );
@@ -576,7 +591,7 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 		}
 		else {
 			// Process a successfully read buffer
-			FPRINTF( "Received %d additional bytes on fd %d\n", rd, conn->fd ); 
+			FPRINTF( "Received %d additional bytes on fd %d\n", rd, conn->fd );
 			xp += rd, total += rd, crecvd += rd;
 			if ( ( conn->req->clen - crecvd ) < size ) {
 				bsize = conn->req->clen - crecvd;
@@ -595,8 +610,7 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 		return 1;
 	}
 
-	FPRINTF( "Read complete (read %d out of %d bytes for content)\n",
-		crecvd, conn->req->clen );
+	FPRINTF( "Read complete (read %d out of %ld bytes for content)\n", crecvd, conn->req->clen );
 	conn->stage = CONN_PROC;
 	return 1;
 }
@@ -607,18 +621,28 @@ const int read_gnutls ( server_t *p, conn_t *conn ) {
 const int write_gnutls ( server_t *p, conn_t *conn ) {
 
 	// Define
-	int sent = 0, pos = 0, pending;
-	// zhttp_t *rq = conn->req;
-	// zhttp_t *rs = conn->res;
-	unsigned char *ptr = conn->res->msg;
-	int total = conn->res->mlen;
+	int sent = 0;
+	int chunk = 0;
+	int veccount = 1;
+	int csent = 0;
+	int ssent = 0;
+	int total = 0; // should be tsent
+
+	unsigned int hlen = 0;
+	unsigned long ptrlen = 0; //conn->res->mlen;
+	unsigned char *ptr = 0; //conn->res->msg;
+
+	time_t starttime = 0;
+	zhttp_t *r = conn->res;
+	zhttpr_t **hx = conn->res->headers;
+
+	struct iovec vec[ IOVEC_HEADER_MAX ];
 	struct gnutls_abstr *g = (struct gnutls_abstr *)conn->data;
-	struct timespec timer = {0}, n = {0};
+	struct timespec timer = {0};
 
 	// Check that g is something
 	if ( !g || !g->session ) {
-		snprintf( conn->err, sizeof( conn->err ),
-			"GnuTLS initialization failure occurred!" );
+		snprintf( conn->err, sizeof( conn->err ), "GnuTLS initialization failure occurred!" );
 		FPRINTF( "FATAL: %s\n", conn->err );
 		conn->stage = CONN_POST;
 		return 0;
@@ -626,189 +650,199 @@ const int write_gnutls ( server_t *p, conn_t *conn ) {
 
 	// Get the time at the start
 	clock_gettime( CLOCK_REALTIME, &timer );
+	starttime = timer.tv_sec;
 
 	// For now, we're not rewriting anything or starting again.
 	conn->stage = CONN_POST;
 
- #ifdef SENDFILE_ENABLED
-	if ( conn->res->atype == ZHTTP_MESSAGE_SENDFILE ) {
-		// Send the header first
-		int hlen = total;	
-		for ( ; total; ) {
-			sent = gnutls_record_send( g->session, ptr, total );
-			if ( sent == 0 ) {
-				FPRINTF( "sent == 0, assuming all %d bytes of header have been sent...\n", conn->res->mlen );
-				break;
-			}
-			else if ( sent > -1 ) {
-				pos += sent, total -= sent, ptr += sent;	
-				FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
-				int pending = gnutls_record_check_pending( g->session );
-				FPRINTF( "pending == %d, do we try again?\n", pending );
-				if ( total == 0 ) {
-					FPRINTF( "sent == 0, assuming all %d bytes of header have been sent...\n", conn->res->mlen );
-					break;
-				}
-			}
-			else {
-				if ( sent != GNUTLS_E_INTERRUPTED && sent != GNUTLS_E_AGAIN ) { 
-					// Most likely, the other end closed early
-					snprintf( conn->err, sizeof( conn->err ), 
-						"Got socket write error: %s\n", gnutls_strerror( errno ) );
-					FPRINTF( "FATAL: %s\n", conn->err );
-					conn->stage = CONN_POST;
-					return 0;
-				}
-
-				if ( errno != EAGAIN || errno != EWOULDBLOCK ) {
-					// Most likely, the other end closed early
-					snprintf( conn->err, sizeof( conn->err ),
-						"Got socket write error: %s\n", strerror( errno ) );
-					FPRINTF( "FATAL: %s\n", conn->err );
-					conn->stage = CONN_POST;
-					return 0;
-				}
-
-				if ( !total ) {
-					FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
-					return 1;
-				}
-				
-				memset( &n, 0, sizeof( struct timespec ) );	
-				clock_gettime( CLOCK_REALTIME, &n );
-				
-				if ( ( n.tv_sec - timer.tv_sec ) >= p->wtimeout ) {
-					// Cut if we can't get this message out for some reason
-					snprintf( conn->err, sizeof( conn->err ),
-						"Timeout reached on write end of socket - header." );
-					FPRINTF( "%s\n", conn->err );
-					conn->stage = CONN_POST;
-					return 0;
-				}
-
-				FPRINTF("Trying again to send header to socket. (%d).\n", sent );
-				nanosleep( &__interval__, NULL );
-			}
-			FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
+	// Set mesage pointers and sizes
+	if ( r->atype == ZHTTP_MESSAGE_STATIC || r->atype == ZHTTP_MESSAGE_MALLOC ) {
+		hlen = r->mlen - r->clen;
+		//ptrlen = (*r->body)->size;
+		//ptr = (*r->body)->value;
+		ptr = r->msg + hlen;
+		ptrlen = r->clen;
+	//FPRINTF( "APP MESSAGE (STATIC/MALLOC) = %p\n", ptr );
+	}
+	else if ( r->atype == ZHTTP_MESSAGE_SENDFILE ) {
+		hlen = r->mlen;
+		ptrlen = r->clen;
+		ptr = mmap( NULL, ptrlen, PROT_READ, MAP_PRIVATE, r->fd, 0 );
+	//FPRINTF( "APP MESSAGE (SENDFILE) = %p\n", ptr );
+		if ( ptr == MAP_FAILED ) {
+			FPRINTF( "FATAL: mmap() failed: %s\n", strerror( errno ) );
+			return 0;
 		}
-		FPRINTF( "Header write complete (sent %d out of %d bytes)\n", pos, hlen );
+	}
+	else {
+		FPRINTF( "FATAL: Message preparation failed\n" );
+		return 0;
+	}
 
-		// Then send the file
-		for ( total = conn->res->clen; total; ) {
-			sent = gnutls_record_send_file( g->session, conn->res->fd, NULL, CTX_WRITE_SIZE );
-			FPRINTF( "Bytes sent from open file %d: %d\n", conn->res->fd, sent );
-			if ( sent == 0 )
-				break;
-			else if ( sent > -1 )
-				total -= sent, pos += sent;
-			else {
-				if ( errno != EAGAIN || errno != EWOULDBLOCK ) {
-					snprintf( conn->err, sizeof( conn->err ), 
-						"Got socket write error: %s\n", strerror( errno ) );
-					FPRINTF( "FATAL: %s\n", conn->err );
-					conn->stage = CONN_POST;
-					return 0;	
-				}
 
-				memset( &n, 0, sizeof( struct timespec ) );
-				clock_gettime( CLOCK_REALTIME, &n );
-				
-				if ( ( n.tv_sec - timer.tv_sec ) > p->wtimeout ) {
-					snprintf( conn->err, sizeof( conn->err ),
-						"Timeout reached on write end of socket - body." );
-					FPRINTF( "FATAL: %s\n", conn->err );
-					conn->stage = CONN_POST;
-					return 0;
-				}
+#if 0
+	// If the client explicitly asked you not to chunk and the message is too big
+	// you'll have to reject
+FPRINTF( "HEADER LENGTH = %d\n", hlen );
+FPRINTF( "CONTENT LENGTH = %ld\n", ptrlen );
+FPRINTF( "BUFFER LENGTH = %d\n", p->wbuffer );
+FPRINTF( "TYPE = %s\n", r->atype == ZHTTP_MESSAGE_SENDFILE ? "SENDFILE" : "STATIC/MALLOC" );
+FPRINTF( "MESSAGE = %p\n", ptr );
+FPRINTF( "CHUNK = %s\n", chunk ? "YES" : "NO" );
+#endif
 
-				FPRINTF("Trying again to send file to socket. (%d).\n", sent );
-				nanosleep( &__interval__, NULL );
-			}
-			FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
+	// Initialize the header
+	memset( vec, 0, sizeof( struct iovec ) * IOVEC_HEADER_MAX );
+	vec[ 0 ].iov_base = r->msg, vec[ 0 ].iov_len = hlen;
+
+#if 0	
+	// Additional headers should be done from here too...
+	for ( ; hx && *hx; hx++, hcount += 4 ) {
+		if ( hcount >= IOVEC_HEADER_MAX - 1 || hcount > IOV_MAX ) {
+			FPRINTF( "FATAL: max header count reached\n" );
+			if ( r->atype == ZHTTP_MESSAGE_SENDFILE ) munmap( ptr, ptrlen );
+			return 0;
 		}
-
-		FPRINTF( "Write complete (sent %d out of %d bytes)\n", pos, conn->res->clen );
-		return 1;
+		i->iov_base = (void *)(*hx)->field, i->iov_len = strlen( (*hx)->field ), i++;	
+		i->iov_base = (void *)hdiv, i->iov_len = 2, i++;	
+		i->iov_base = (*hx)->value, i->iov_len = (*hx)->size, i++;	
+		i->iov_base = (void *)hnewl, i->iov_len = 2, i++;	
 	}
 #endif
 
-
-	// Start writing data to socket
-	for ( ;; ) {
-		sent = gnutls_record_send( g->session, ptr, total );
-		FPRINTF( "Bytes sent: %d, over file %d\n", sent, conn->fd );
-		if ( sent == 0 ) {
-			FPRINTF( "sent == 0, assuming all %d bytes have been sent...\n", conn->res->mlen );
-			break;	
-		}
-		else if ( sent > -1 ) {
-			pos += sent, total -= sent, ptr += sent;
-			FPRINTF( "sent == %d, %d bytes remain to be sent...\n", sent, total );
-			if ( total == 0 ) {
-				FPRINTF( "total == 0, assuming all %d bytes have been sent...\n", conn->res->mlen );
-				break;
-			}
-		}
-		else {
-			FPRINTF( "Caught error condition: %d, %s\n", sent, gnutls_strerror( sent ) );
-			if ( sent == GNUTLS_E_INTERRUPTED || sent == GNUTLS_E_AGAIN ) {
-				FPRINTF("TLS was interrupted...  Try request again...\n" );
-				continue;
-			}
-			#if 0
-			else if ( sent == EAGAIN || sent == EWOULDBLOCK ) {
-				if ( ++try == 2 ) {
-					FPRINTF( "Tried three times to write to socket. We're done.\n" );
-					return 0;	
-				}
-				FPRINTF( "Tried %d times to write to socket. Trying again?\n", try );
-				continue;
-			}
-			#endif
-			else {
-				// this would just be some uncaught condition...
-				snprintf( conn->err, sizeof( conn->err ),
-					"Caught unknown condition: %s\n", gnutls_strerror( sent ) );
-				return 0;
-			}
-
-			if ( !total ) {
-				FPRINTF( "sent == %d, total = 0:  Message should be done\n", sent );
-				return 1;
-			}
-			
-			if ( errno != EAGAIN || errno != EWOULDBLOCK ) {
-				snprintf( conn->err, sizeof( conn->err ),
-					"Got socket write error: %s\n", strerror( errno ) );
-				FPRINTF( "FATAL: %s\n", conn->err );
-				conn->stage = CONN_POST;
-				return 0;
-			}
-
-			memset( &n, 0, sizeof( struct timespec ) );
-			clock_gettime( CLOCK_REALTIME, &n );
-			
-			if ( ( n.tv_sec - timer.tv_sec ) > p->wtimeout ) {
-				snprintf( conn->err, sizeof( conn->err ),
-					"Timeout reached on write end of socket - body." );
-				FPRINTF( "%s\n", conn->err );
-				conn->stage = CONN_POST;
-				return 0;
-			}
-
-			nanosleep( &__interval__, NULL );
-		}
-		FPRINTF( "Bytes sent: %d, leftover: %d\n", pos, total );
+	// Figure the whole chunked thing out...
+	if ( ptrlen <= p->wbuffer && r->atype != ZHTTP_MESSAGE_SENDFILE ) {
+		// TODO: This should not be...
+		vec[ 1 ].iov_base = ptr;
+		vec[ 1 ].iov_len = ptrlen;
+		veccount++, ptrlen = 0; // NOTE: ptrlen == 0 means that the chunk loop won't run
+	}
+	else {
+		chunk = 1;
+		vec[ 0 ].iov_len -= 2;
+		vec[ 1 ].iov_base = (void *)encchunked;
+		vec[ 1 ].iov_len = sizeof( encchunked ) - 1;
+		veccount++;
+		vec[ 2 ].iov_base = (void *)newline;
+		vec[ 2 ].iov_len = 2;
+		veccount++;
 	}
 
-	FPRINTF( "Write complete (sent %d out of %d bytes)\n", pos, conn->req->mlen );
+#if 0
+FPRINTF( "%ld\n", r->clen );
+FPRINTF( "vec 0: %p, %ld\n", vec[0].iov_base, vec[0].iov_len );
+FPRINTF( "vec 1: %p, %ld\n", vec[1].iov_base, vec[1].iov_len );
+if ( veccount > 2 ) {
+FPRINTF( "vec 2: %p, %ld\n", vec[2].iov_base, vec[2].iov_len );
+}
+//writev( 2, vec, veccount );
+if ( r->atype == ZHTTP_MESSAGE_SENDFILE ) {
+FPRINTF( "This should be using sendfile" );
+}
+#endif
+
+	// Cork here
+	const unsigned long totlen = ptrlen;
+	gnutls_record_cork( g->session );
+
+	// Cache the header data (or full message if under a certain limit) here
+	for ( int i = 0, tsent = 0, total = 0; i < veccount; i++ ) {
+		//FPRINTF( "vec %d: %p, %ld\n", i, vec[i].iov_base, vec[i].iov_len );
+		struct iovec w = vec[ i ];
+		if ( ( csent += gnutls_record_send( g->session, w.iov_base, w.iov_len ) ) < 0 ) {
+			FPRINTF( "FATAL: TLS error %s\n", gnutls_strerror( errno ) );
+			return 0;
+		}
+	}
+	//FPRINTF( "CACHED %d bytes\n", csent );
+
+	// Ensure it sends via uncorking
+	if ( ( ssent = gnutls_record_uncork( g->session, GNUTLS_RECORD_WAIT ) ) < 0 ) {
+		FPRINTF( "FATAL: TLS error %s\n", gnutls_strerror( errno ) );
+		return 0;
+	}
+	else if ( ssent < csent ) {
+		FPRINTF( "FATAL: GnuTLS didn't finish writing the data %s\n", gnutls_strerror( errno ) );
+		return 0;
+	}
+	FPRINTF( "CACHED = %d, SENT = %d, TOTAL SENT = %d, REMAINING = %lu/%lu\n",
+		csent, ssent, sent, ptrlen, hlen + totlen );
+	//FPRINTF( "SENT %d bytes\n", ssent );
+
+	// Set this stuff
+	sent += ssent;
+	total += csent;
+
+	//FPRINTF( "TOTAL REMAINING: %ld, %ld\n", totlen, ptrlen );
+	// Send remainder of response via chunked encoding
+	for ( int tsent = 0, buflen = p->wbuffer; ptrlen; ) {
+		//FPRINTF( "BUFFER SPECIFIED = %d\n", buflen );
+
+		// Figure out before everything, how much is left, bin should always end at zero...
+		if ( buflen > ptrlen ) {
+			buflen = ptrlen;
+		}	
+
+		// Write the octal number and preamble
+		char pre[16] = {0};
+		int ssent = 0;
+		int csent = 0;
+		int prelen = snprintf( pre, sizeof( pre ), prefmt, buflen );
+		struct iovec v[3] = {
+			{ .iov_base = pre, .iov_len = prelen },
+			{ .iov_base = ptr, .iov_len = buflen },
+			{ .iov_base = "\r\n", .iov_len = 2 },
+		};
+
+		// Cork
+		gnutls_record_cork( g->session );
+
+		// Cache these messages
+		for ( int i = 0; i < 3; i++ ) {
+			struct iovec w = v[ i ];	
+			if ( ( csent += gnutls_record_send( g->session, w.iov_base, w.iov_len ) ) < 0 ) {
+				snprintf( conn->err, sizeof( conn->err ), "Got socket write error: %s\n", strerror( errno ) );
+				FPRINTF( "FATAL: TLS error %s\n", gnutls_strerror( errno ) );
+				conn->stage = CONN_POST;
+				return 0;
+			}
+		}
+
+		// Ensure it sends via uncorking
+		if ( ( ssent = gnutls_record_uncork( g->session, GNUTLS_RECORD_WAIT ) ) < 0 ) {
+			FPRINTF( "FATAL: TLS error %s\n", gnutls_strerror( errno ) );
+			return 0;
+		}
+		else if ( ssent < csent ) {
+			FPRINTF( "FATAL: GnuTLS didn't finish writing the data %s\n", gnutls_strerror( errno ) );
+			return 0;
+		}
+
+		// Increment binary
+		FPRINTF( "SENT = %d, TOTAL SENT = %d, REMAINING = %lu/%lu\n", ssent, sent, ptrlen, totlen );
+		sent += ssent, ptr += buflen, ptrlen -= buflen;
+	}
+	
+	if ( chunk && gnutls_record_send( g->session, "0\r\n\r\n", 5 ) < 0 ) {
+		snprintf( conn->err, sizeof( conn->err ), "Got socket write error: %s\n", strerror( errno ) );
+		FPRINTF( "FATAL: TLS error %s\n", gnutls_strerror( errno ) );
+		conn->stage = CONN_POST;
+		return 0;
+	}
+
+	if ( r->atype == ZHTTP_MESSAGE_SENDFILE ) {
+		munmap( ptr, ptrlen );
+	}
+
+	// End summary
+	FPRINTF( "SENT %d/%lu BYTES TO CONNECTION ID: %d\n", sent, totlen, conn->connid );
 	return 1;
 }
 
 
 
-// End GnuTLS 
-const void post_gnutls ( server_t *p, conn_t *conn ) {
+// End GnuTLS
+void post_gnutls ( server_t *p, conn_t *conn ) {
 	FPRINTF( "Shutting down TLS connection and closing write end\n" );
 
 	// Close TLS sesssion
@@ -836,7 +870,7 @@ const void post_gnutls ( server_t *p, conn_t *conn ) {
 // Destroy the GnuTLS context completely
 void free_gnutls( server_t *p ) {
 	FPRINTF( "Destroying pre data for current protocol.\n" );
-	gnutls_certificate_credentials_t *cred =   
+	gnutls_certificate_credentials_t *cred =  
 		(gnutls_certificate_credentials_t *)p->data;
 	gnutls_certificate_free_credentials( *cred );
 	free( p->data );
