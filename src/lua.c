@@ -1,8 +1,8 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * lua.c
  * ======
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * -
  *
@@ -16,211 +16,303 @@
  *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
- * 
+ *
  * ------------------------------------------- */
 #include "lua.h"
 
-//Dump a stack
-void lua_istack ( lua_State *L ) {
-	fprintf( stderr, "\n" );
-	for ( int i = 1; i <= lua_gettop( L ); i++ ) {
-		fprintf( stderr, "[%d] => %s", i, lua_typename( L, lua_type( L, i ) ) );
-		if ( lua_type( L, i ) == LUA_TSTRING ) {
-			fprintf( stderr, " > %s", lua_tostring( L, i ) );
-		}
-		fprintf( stderr, "\n" );
-	}
-}
+
+static void lua_rdumptable( lua_State *L, int i, int d );
+
+struct data {
+	unsigned short count;
+	unsigned short index;
+	unsigned short tinsert;
+	unsigned short tpull;
+};
 
 
 
-//TODO: Reject keys that aren't a certain type
-void lua_dumpstack ( lua_State *L ) {
-	const char spaces[] = /*"\t\t\t\t\t\t\t\t\t\t"*/"          ";
-	const int top = lua_gettop( L );
-	struct data { unsigned short count, index; } data[64], *dd = data;
-	memset( data, 0, sizeof( data ) );
-	dd->count = 1;
 
-	//Return early if no values
-	if ( ( dd->index = top ) == 0 ) {
-		fprintf( stderr, "%s\n", "No values on stack." );
-		return;
-	}
+/**
+ * void lua_rdumpstack( lua_State *L )
+ *
+ * Dump the Lua stack.
+ *
+ */
+void lua_rdumpstack( lua_State *L ) {
+	//	
+	for ( int i = 1, top = lua_gettop( L ); i <= top; i++ ) {
 
-	//Loop through all values on the stack
-	for ( int it, depth=0, ix=0, index=top; index >= 1; ix++ ) {
-		fprintf( stderr, "%s[%d:%d] ", &spaces[ 10 - depth ], index, ix );
+		fprintf( stderr, "[%d] => ", i );
 
-		for ( int t = 0, count = dd->count; count > 0; count-- ) {
-			if ( ( it = lua_type( L, index ) ) == LUA_TSTRING )
-				fprintf( stderr, "(%s) %s", lua_typename( L, it ), lua_tostring( L, index ) );
-			else if ( it == LUA_TFUNCTION )
-				fprintf( stderr, "(%s) %d", lua_typename( L, it ), index );
-			else if ( it == LUA_TNUMBER )
-				fprintf( stderr, "(%s) %lld", lua_typename( L, it ), (long long)lua_tointeger( L, index ) );
-			else if ( it == LUA_TBOOLEAN)
-				fprintf( stderr, "(%s) %s", lua_typename( L, it ), lua_toboolean( L, index ) ? "T" : "F" );
-			else if ( it == LUA_TTHREAD )
-				fprintf( stderr, "(%s) %p", lua_typename( L, it ), lua_tothread( L, index ) );
-			else if ( it == LUA_TLIGHTUSERDATA || it == LUA_TUSERDATA )
-				fprintf( stderr, "(%s) %p", lua_typename( L, it ), lua_touserdata( L, index ) );
-			else if ( it == LUA_TNIL || it == LUA_TNONE )
-				fprintf( stderr, "(%s) %p", lua_typename( L, it ), lua_topointer( L, index ) );
-			else if ( it == LUA_TTABLE ) {
-				fprintf( stderr, "(%s) %p", lua_typename( L, it ), lua_topointer( L, index ) );
-			}
-
-			//Handle keys
-			if ( count > 1 )
-				index++, t = 1, dd->count -= 2, fprintf( stderr, " -> " );
-			//Handle new tables
-			else if ( it == LUA_TTABLE ) {
-				lua_pushnil( L );
-				if ( lua_next( L, index ) != 0 ) {
-					++dd, ++depth; 
-					dd->index = index, dd->count = 2, index = lua_gettop( L );
-				}
-			}
-			//Handle situations in which a table is on the "other side"
-			else if ( t ) {
-				lua_pop( L, 1 );
-				//TODO: This is quite gnarly... Maybe clarify a bit? 
-				while ( depth && !lua_next( L, dd->index ) ) {
-					( ( index = dd->index ) > top ) ? lua_pop( L, 1 ) : 0;
-					--dd, --depth, fprintf( stderr, "\n%s}", &spaces[ 10 - depth ] );
-				}
-				( depth ) ? dd->count = 2, index = lua_gettop( L ) : 0;
-			}
-		}
-		fprintf( stderr, "\n" );
-		index--;
-	}
-}
-
-
-
-//Takes all items in a table and merges them into 
-//a single table (removes whatever was there)
-int lua_merge( lua_State *L ) {
-	const int top = lua_gettop( L );
-	struct data { unsigned short index, tinsert, tpull; } data[64], *dd = data;
-	memset( data, 0, sizeof( data ) );
-
-	//Return early if no values
-	if ( top < 2 ) {
-		return 1;
-	}
-
-	//Push a blank table at the beginning
-	lua_newtable( L ), lua_insert( L, 1 );
-
-	//set some defaults
-	dd->index = 1, dd->tinsert = 1;
-
-	//Loop through all values on the stack
-	for ( int kt, it, depth = 0, index = top + 1; index > 1; ) {
-		if ( !depth ) {
-			if ( ( it = lua_type( L, index ) ) == LUA_TTABLE ) {
-				lua_pushnil( L );
-				if ( lua_next( L, index ) )
-					dd++, dd->tinsert = 1, dd->index = 1, dd->tpull = index, depth++;
-				else {
-					lua_pushnumber( L, dd->index );
-					lua_newtable( L );
-					lua_settable( L, dd->tinsert );
-					dd->index ++;
-				}
-			}
-			else {
-				lua_pushnumber( L, dd->index );
-				if ( ( it = lua_type( L, index ) ) == LUA_TSTRING )
-					lua_pushstring( L, lua_tostring( L, index ) );
-				else if ( it == LUA_TNUMBER ) {
-					lua_pushinteger( L, lua_tointeger( L, index ) );
-				}
-				lua_settable( L, dd->tinsert );
-				dd->index ++;
-			}
+		// Get the key first
+		if ( lua_type( L, i ) == LUA_TNUMBER )
+			fprintf( stderr, "(%s) %lld", lua_typename( L, lua_type( L, i ) ), lua_tointeger( L, i ) );
+		else if ( lua_type( L, i ) == LUA_TSTRING )
+			fprintf( stderr, "(%s) %s", lua_typename( L, lua_type( L, i ) ), lua_tostring( L, i ) );
+		else if ( lua_type( L, i ) == LUA_TFUNCTION )
+			fprintf( stderr, "(%s) %p::function", lua_typename( L, lua_type( L, i ) ), lua_topointer( L, i ) );
+		else if ( lua_type( L, i ) == LUA_TBOOLEAN )
+			fprintf( stderr, "(%s) %s", lua_typename( L, lua_type( L, i ) ), lua_toboolean( L, i ) ? "T" : "F" );
+		else if ( lua_type( L, i ) == LUA_TTHREAD )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, i ) ), lua_topointer( L, i ) );
+		else if ( lua_type( L, i ) == LUA_TLIGHTUSERDATA || lua_type( L, i ) == LUA_TUSERDATA )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, i ) ), (void *)lua_touserdata( L, i ) );
+		else if ( lua_type( L, i ) == LUA_TNIL || lua_type( L, i ) == LUA_TNONE )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, i ) ), lua_topointer( L, i ) );
+		else if ( lua_type( L, i ) == LUA_TTABLE ) {
+			fprintf( stderr, "(%s) %p {\n", lua_typename( L, lua_type( L, i ) ), lua_topointer( L, i ) );
+			lua_rdumptable( L, i, 1 );
+			fprintf( stderr, "}" );
 		}
 		else {
-			//Add the key again to maintain lua_next behavior
-			if ( ( kt = lua_type( L, -2 ) ) == LUA_TNUMBER )
-				lua_pushnumber( L, lua_tonumber( L, -2 ) );
-			else if ( kt == LUA_TSTRING )
-				lua_pushstring( L, lua_tostring( L, -2 ) );
-			else {
-				//fprintf( stderr, "Invalid key type: %s\n", lua_typename( L, kt ) );
-				fprintf( stderr, "ERROR: HANDLE OTHER KEY TYPES!\n" );
+			const char *typename = lua_typename( L, lua_type( L, i ) );
+			FPRINTF( "Got invalid key type: %s in table at index %d\n", typename, i );
+			return;
+		}
+
+		fprintf( stderr, "\n" );
+
+	}
+}
+
+
+
+/**
+ * static void lua_rdumptable( lua_State *L, int i, int ind )
+ *
+ * Recursive dump of Lua tables that may be on the stack.
+ *
+ */
+static void lua_rdumptable( lua_State *L, int i, int ind ) {
+
+	//Add this entry to start iteration through table.	
+	lua_pushnil( L );
+
+	// Push the next two values from the table at $src index.
+	for ( ; lua_next( L, i ) != 0; ) {
+
+		//Print any spaces
+		for ( int ii = 0; ii < ind; ii++ ) fprintf( stderr, "%s", "  " );
+
+		// Get the key first
+		if ( lua_type( L, -2 ) == LUA_TNUMBER ) /* Notice that the keys are always integers */
+			fprintf( stderr, "(%s) %lld", lua_typename( L, lua_type( L, -2 ) ), lua_tointeger( L, -2 ) );
+		else if ( lua_type( L, -2 ) == LUA_TSTRING )
+			fprintf( stderr, "(%s) %s", lua_typename( L, lua_type( L, -2 ) ), lua_tostring( L, -2 ) );
+		else if ( lua_type( L, -2 ) == LUA_TFUNCTION )
+			fprintf( stderr, "(%s) %p::function", lua_typename( L, lua_type( L, -2 ) ), lua_topointer( L, -2 ) );
+		else if ( lua_type( L, -2 ) == LUA_TBOOLEAN )
+			fprintf( stderr, "(%s) %s", lua_typename( L, lua_type( L, -2 ) ), lua_toboolean( L, -2 ) ? "T" : "F" );
+		else if ( lua_type( L, -2 ) == LUA_TTHREAD )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, -2 ) ), lua_topointer( L, -2 ) );
+		else if ( lua_type( L, -2 ) == LUA_TLIGHTUSERDATA || lua_type( L, -2 ) == LUA_TUSERDATA )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, -2 ) ), (void *)lua_touserdata( L, -2 ) );
+		else if ( lua_type( L, -2 ) == LUA_TNIL || lua_type( L, -2 ) == LUA_TNONE )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, -2 ) ), lua_topointer( L, -2 ) );
+		else if ( lua_type( L, -2 ) == LUA_TTABLE )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, -2 ) ), lua_topointer( L, -2 ) );
+		else {
+			const char *typename = lua_typename( L, lua_type( L, -2 ) );
+			FPRINTF( "Got invalid key type: %s in table at index %d\n", typename, i );
+			return;
+		}
+
+		// Print a seperator
+		fprintf( stderr, " => " );
+
+		// Then get whatever values
+		int WW = -1;
+		if ( lua_type( L, WW ) == LUA_TNUMBER )
+			fprintf( stderr, "(%s) %f", lua_typename( L, lua_type( L, WW ) ), lua_tonumber( L, WW ) );
+		else if ( lua_type( L, WW ) == LUA_TSTRING )
+			fprintf( stderr, "(%s) %s", lua_typename( L, lua_type( L, WW ) ), lua_tostring( L, WW ) );
+		else if ( lua_type( L, WW ) == LUA_TFUNCTION )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, WW ) ), lua_topointer( L, WW ) );
+		else if ( lua_type( L, WW ) == LUA_TBOOLEAN )
+			fprintf( stderr, "(%s) %s", lua_typename( L, lua_type( L, WW ) ), lua_tostring( L, WW ) );
+		else if ( lua_type( L, WW ) == LUA_TTHREAD )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, WW ) ), lua_topointer( L, WW ) );
+		else if ( lua_type( L, WW ) == LUA_TLIGHTUSERDATA || lua_type( L, WW ) == LUA_TUSERDATA )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, WW ) ), (void *)lua_touserdata( L, WW ) );
+		else if ( lua_type( L, WW ) == LUA_TNIL || lua_type( L, WW ) == LUA_TNONE )
+			fprintf( stderr, "(%s) %p", lua_typename( L, lua_type( L, WW ) ), lua_topointer( L, WW ) );
+		else if ( lua_type( L, WW ) == LUA_TTABLE ) {
+			fprintf( stderr, "(%s) %p {\n", lua_typename( L, lua_type( L, WW ) ), lua_topointer( L, i ) );
+			++ind;
+			lua_rdumptable( L, lua_gettop( L ), ind );
+			--ind;
+			//Print any spaces
+			for ( int ii = 0; ii < ind; ii++ ) fprintf( stderr, "%s", "  " );
+			fprintf( stderr, "}" );
+		}
+		else {
+			const char *typename = lua_typename( L, lua_type( L, -1 ) );
+			FPRINTF( "Got invalid value type: %s in table at index %d\n", typename, i );
+			return;
+		}
+
+		// New line for purtiness
+		fprintf( stderr, "\n" );
+
+		// Pop and move to the next key
+		lua_pop( L, 1 );
+	}	
+
+	return;
+}
+
+
+
+
+/**
+ * int lua_rmerge (lua_State *L, int dest, int src, char *err, int errlen )
+ *
+ * Recursive version of Lua merge.
+ *
+ */
+int lua_rmerge ( lua_State *L, int dest, int src, char *err, int errlen ) {
+
+	//Maybe get the top one time
+	int ltop = lua_gettop( L );
+
+	//Assumes that the user is adding a table, and probably shouldn't
+	if ( ltop < 2 ) {
+		snprintf( err, errlen, "Nothing to merge.  Aborting...\n" );
+		return 0;
+	}
+
+	//Check if destination or source indices are out of range
+	if ( dest > ltop || src > ltop ) {
+		const char fmt[] = "%s table index out of range.  Aborting...\n";
+		snprintf( err, errlen, fmt, ( dest > ltop ) ? "Destination" : "Source" );
+		return 0;
+	}
+
+	//Check that at least two more entries can be added to the stack
+	if ( !lua_checkstack( L, 2 ) ) {
+		snprintf( err, errlen, "Exhausted Lua stack space.  Aborting...\n" );
+		return 0;
+	}
+
+	//Add this entry to start iteration through table.	
+	lua_pushnil( L );
+
+	// Push the next two values from the table at $src index.
+	for ( ; lua_next( L, src ) != 0; ) {
+		// Get the key first
+		if ( lua_type( L, -2 ) == LUA_TNUMBER ) /* Notice that the keys are always integers */
+			lua_pushnumber( L, lua_tointeger( L, -2 ) );
+		else if ( lua_type( L, -2 ) == LUA_TSTRING )
+			lua_pushstring( L, lua_tostring( L, -2 ) );
+		else {
+			const char *typename = lua_typename( L, lua_type( L, -2 ) );
+			snprintf( err, errlen, "Got invalid key type: %s at table\n", typename );
+			return 0;
+		}
+
+		// Then get whatever values
+		if ( lua_type( L, -2 ) == LUA_TNIL || lua_type( L, -2 ) == LUA_TNONE )
+			lua_pushnil( L ); // This should come out as 'null'
+		else if ( lua_type( L, -2 ) == LUA_TNUMBER )
+			lua_pushnumber( L, lua_tonumber( L, -2 ) );
+		else if ( lua_type( L, -2 ) == LUA_TBOOLEAN )
+			lua_pushboolean( L, lua_toboolean( L, -2 ) );
+		else if ( lua_type( L, -2 ) == LUA_TSTRING )
+			lua_pushstring( L, lua_tostring( L, -2 ) );
+		else if ( lua_type( L, -2 ) == LUA_TTABLE ) {
+			int t = lua_gettop( L ) - 1;
+			if ( !lua_checkstack( L, 1 ) ) {
+				snprintf( err, errlen, "Exhausted Lua stack space when descending\n" );
 				return 0;
 			}
-
-			lua_insert( L, dd->tpull + 1 ), lua_settable( L, dd->tinsert );
-
-			if ( !lua_next( L, dd->tpull ) ) {
-				lua_pop( L, 1 ), dd--, depth--;
+			lua_newtable( L );
+			if ( !lua_rmerge( L, t + 2, t, err, errlen ) ) {
+				return 0;
 			}
 		}
-		( !depth ) ? index-- : 0;
-	}
+		#if 0
+		// TODO: We could use the byte representation of other types
+		// but this doesn't actually seem all that helpful
+		#endif
+		else {
+			const char *typename = lua_typename( L, lua_type( L, -1 ) );
+			snprintf( err, errlen, "Got invalid value type: %s at table\n", typename );
+			return 0;
+		}
+
+		// Set the table values
+		lua_settable( L, dest );
+			
+		// Then pop them
+		lua_pop( L, 1 );
+	}	
+
 	return 1;
 }
 
 
 
-//A better load file
+/**
+ * int lua_exec_file( lua_State *L, const char *f, char *err, int errlen )
+ *
+ * luaL_loadfile( ... ) with error handling.
+ *
+ */
 int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 	int len = 0, lerr = 0;
-	struct stat check;
 
 	if ( !f || !strlen( f ) ) {
 		snprintf( err, errlen, "%s", "No filename supplied to load or execute." );
 		return 0;
 	}
 
+#if 0
+	struct stat check;
 	//Since this is supposed to accept a file, why not just check for existence?
 	if ( stat( f, &check ) == -1 ) {
 		snprintf( err, errlen, "File %s inaccessible: %s.", f, strerror(errno) );
 		return 0;
 	}
 
+	// This was an error, but now it shouldn't be
 	if ( check.st_size == 0 ) {
 		snprintf( err, errlen, "File %s is zero-length.  Nothing to execute.", f );
 		return 0;
 	}
+#endif
 
 	//Load the string, execute
 	if (( lerr = luaL_loadfile( L, f )) != LUA_OK ) {
 		if ( lerr == LUA_ERRSYNTAX )
-			len = snprintf( err, errlen, "Syntax error at %s: ", f );
+			len = snprintf( err, errlen, "Syntax error: " );
 		else if ( lerr == LUA_ERRMEM )
-			len = snprintf( err, errlen, "Memory allocation error at %s: ", f );
+			len = snprintf( err, errlen, "Memory allocation error: " );
 	#ifdef LUA_53
 		else if ( lerr == LUA_ERRGCMM )
-			len = snprintf( err, errlen, "GC meta-method error at %s: ", f );
+			len = snprintf( err, errlen, "GC meta-method error: " );
 	#endif
 		else if ( lerr == LUA_ERRFILE )
-			len = snprintf( err, errlen, "File access error at %s: ", f );
+			len = snprintf( err, errlen, "File access error: " );
 		else {
-			len = snprintf( err, errlen, "Unknown error occurred at %s: ", f );
+			len = snprintf( err, errlen, "Unknown: "  );
 		}
 	
 		errlen -= len;	
 		snprintf( &err[ len ], errlen, "%s\n", (char *)lua_tostring( L, -1 ) );
-		//fprintf(stderr, "LUA LOAD ERROR: %s, %s", err, (char *)lua_tostring( L, -1 ) );
 		lua_pop( L, lua_gettop( L ) );
 		return 0;	
 	}
 
 	//Then execute
 	if (( lerr = lua_pcall( L, 0, LUA_MULTRET, 0 ) ) != LUA_OK ) {
-		if ( lerr == LUA_ERRRUN ) 
+		if ( lerr == LUA_ERRRUN )
 			len = snprintf( err, errlen, "Runtime error when executing %s: ", f );
-		else if ( lerr == LUA_ERRMEM ) 
+		else if ( lerr == LUA_ERRMEM )
 			len = snprintf( err, errlen, "Memory allocation error at %s: ", f );
-		else if ( lerr == LUA_ERRERR ) 
+		else if ( lerr == LUA_ERRERR )
 			len = snprintf( err, errlen, "Error while running message handler for %s: ", f );
 	#ifdef LUA_53
 		else if ( lerr == LUA_ERRGCMM ) {
@@ -240,9 +332,15 @@ int lua_exec_file( lua_State *L, const char *f, char *err, int errlen ) {
 
 
 	
-//Copy all records from a ztable_t to a Lua table at any point in the stack.
+
+/**
+ * int ztable_to_lua ( lua_State *L, ztable_t *t )
+ *
+ * Copy all records from a ztable_t to a Lua table at any point in the stack.
+ *
+ */
 int ztable_to_lua ( lua_State *L, ztable_t *t ) {
-	short ti[ 128 ] = { 0 }, *xi = ti; 
+	short ti[ 128 ] = { 0 }, *xi = ti;
 
 	lt_kfdump( t, 1 );
 
@@ -305,41 +403,13 @@ int ztable_to_lua ( lua_State *L, ztable_t *t ) {
 }
 
 
-#if 0
-//Count the elements in a table.
-int lua_xcount ( lua_State *L, int i ) {
-	int count = 0;
 
-	if ( !lua_istable( L, i ) ) {
-		fprintf( stderr, "[%s, %d] Value at %i is not a table\n", __FILE__, __LINE__, i );
-		return 0;
-	}
-
-	//Descend, but keep in mind that we always have a count...
-	lua_pushnil( L );
-	for ( int v; lua_next( L, i ) != 0; ) {
-		if ( ( v = lua_type( L, -1 ) ) == LUA_TTABLE ) {
-			count += lua_count( L, i + 2 ); 
-		}
-
-		if ( lua_type( L, -2 ) == LUA_TSTRING )
-			FPRINTF( "KEY IS %s => ", lua_tostring( L, -2 ) );	
-		else {
-			FPRINTF( "KEY IS %s => ", lua_typename( L, lua_type( L, -2 ) ) );	
-		}
-
-		FPRINTF( "(points to type %s)\n", lua_typename( L, lua_type( L, -1 ) ) );	
-		lua_pop( L, 1 );
-		count++;
-	}
-
-	return count;
-}
-#endif
-
-
-
-//Count the elements in a table.
+/**
+ * int lua_count ( lua_State *L, int i )
+ *
+ * Counts the elements in a table.
+ *
+ */
 int lua_count ( lua_State *L, int i ) {
 	int count = 0;
 
@@ -353,7 +423,7 @@ int lua_count ( lua_State *L, int i ) {
 	lua_pushnil( L );
 	for ( int v; lua_next( L, i ) != 0; ) {
 		if ( ( v = lua_type( L, -1 ) ) == LUA_TTABLE ) {
-			count += lua_count( L, i + 2 ); 
+			count += lua_count( L, i + 2 );
 		}
 #if 0
 		if ( lua_type( L, -2 ) != LUA_TSTRING ) {
@@ -374,7 +444,12 @@ int lua_count ( lua_State *L, int i ) {
 
 
 
-//Attempts to retrieve a key from global table and clears the stack if it doesn't match.
+/**
+ * int lua_retglobal( lua_State *L, const char *key, int type )
+ *
+ * Attempts to retriev e a key from a global table and clears the stack if a match is not found.
+ *
+ */
 int lua_retglobal( lua_State *L, const char *key, int type ) {
 	lua_getglobal( L, key );
 	int pos = lua_gettop( L );	
@@ -401,7 +476,13 @@ static char B[ 1024 ];
 
 #define TELL(fmt,a) 1
 
-//Convert Lua tables to regular tables
+
+/**
+ * int lua_to_ztable ( lua_State *L, int index, ztable_t *t )
+ *
+ * Convert Lua tables to ztable_t.
+ *
+ */
 int lua_to_ztable ( lua_State *L, int index, ztable_t *t ) {
 
 	if ( !lua_checkstack( L, 3 ) ) {
@@ -412,7 +493,7 @@ int lua_to_ztable ( lua_State *L, int index, ztable_t *t ) {
 	lua_pushnil( L );
 
 	while ( lua_next( L, index ) != 0 ) {
-		int kt = lua_type( L, -2 ); 
+		int kt = lua_type( L, -2 );
 		int vt = lua_type( L, -1 );
 
 		//Get key (remember Lua indices always start at 1.  Hence the minus.
@@ -449,28 +530,28 @@ int lua_to_ztable ( lua_State *L, int index, ztable_t *t ) {
 		#endif
 		}
 		else if ( vt == LUA_TTABLE ) {
-			TELL( " (table at %d)\n", index ); 
+			TELL( " (table at %d)\n", index );
 			lt_descend( t );
 			//tables with nothing should not recurse...
-			lua_to_ztable( L, index + 2, t ); 
+			lua_to_ztable( L, index + 2, t );
 			lt_ascend( t );
 		}
 		else if ( vt == LUA_TBOOLEAN ) {
-			char *v = lua_toboolean( L, -1 ) ? "true" : "false"; 
+			char *v = lua_toboolean( L, -1 ) ? "true" : "false";
 			lt_addtextvalue( t, v );
 			lt_finalize( t );
 		}
 	#if 0
 		else if ( vt == LUA_TUSERDATA | vt == LUA_TLIGHTUSERDATA ) {
 			lua_addudvalue( t, lua_touserdata( L, -1 ) );
-			lt_finalize( t ); 
+			lt_finalize( t );
 		}
 		else if ( vt == LUA_TFUNCTION ) {
 			//Somehow we have to inject scope...
 			//Then we need to execute
 			lua_pcall( L, 1, 1 );
 			//We can execute immediately, or wait until the environment is on
-			//(or just use a file)  
+			//(or just use a file) 
 		}
 		else if ( vt == LUA_TNONE | vt == LUA_TNIL ) {
 
@@ -488,7 +569,7 @@ int lua_to_ztable ( lua_State *L, int index, ztable_t *t ) {
 			fprintf( stderr, "Got invalid value in table!" );
 			//return 0;
 			char buf[ 1024 ] = {0}, *type = (char *)lua_typename( L, vt );
-			snprintf( buf, sizeof( buf ), "%s%s%s", "[[[", type, "]]]" ); 
+			snprintf( buf, sizeof( buf ), "%s%s%s", "[[[", type, "]]]" );
 			lt_addtextvalue( t, buf );
 			lt_finalize( t );
 		}
@@ -501,7 +582,13 @@ int lua_to_ztable ( lua_State *L, int index, ztable_t *t ) {
 
 
 
-//Retrieve a value from a table (and return the index it was found at or -1)
+/**
+ * const char * lua_getv ( lua_State *L, const char *key, int index )
+ *
+ * Locate a value in a table and return the index in which it was found.
+ * No match == -1.
+ *
+ */
 const char * lua_getv ( lua_State *L, const char *key, int index ) {
 	lua_pushnil( L );
 
@@ -515,4 +602,4 @@ const char * lua_getv ( lua_State *L, const char *key, int index ) {
 	}
 
 	return NULL;
-} 
+}

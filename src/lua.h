@@ -1,20 +1,20 @@
-/* ------------------------------------------- * 
+/* ------------------------------------------- *
  * lua.h
  * ======
- * 
- * Summary 
+ *
+ * Summary
  * -------
  * Lua primitives
  *
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
+ *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
- * - 
+ * -
  * ------------------------------------------- */
 #include <lua.h>
 #include <lauxlib.h>
@@ -31,11 +31,13 @@
 #include "config.h"
 
 #ifndef LUA_BASE_H
-#define LUA_BASE_H 
+#define LUA_BASE_H
 
 #define LD_LEN 128
 
 #define LD_ERRBUF_LEN 1024
+
+#define RESPONSE_KEY "__response__"
 
 #define lua_setintbool(L, i, v, p) \
 	lua_pushinteger(L, i), lua_pushboolean(L, v), lua_settable(L, p)
@@ -90,12 +92,16 @@ void lua_dumpstack ( lua_State * );
 int ztable_to_lua ( lua_State *, zTable * ) ;
 int lua_to_ztable ( lua_State *, int, zTable * ) ;
 int lua_exec_file( lua_State *, const char *, char *, int );
+int lua_rmerge (lua_State *, int, int, char *, int ) ;
 int lua_merge ( lua_State * );
 int lua_count ( lua_State *, int );
 int lua_xcount ( lua_State *, int );
 void lua_istack ( lua_State * );
 int lua_retglobal( lua_State *, const char *, int );
 const char *lua_getv ( lua_State *, const char *, int );
+
+
+void lua_rdumpstack( lua_State *L );
 
 //int http_error( zhttp_t *, int, char *, ... );
 //unsigned char *read_file ( const char *, int *, char *, int );
