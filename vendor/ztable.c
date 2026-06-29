@@ -80,7 +80,7 @@ static const char *lt_polymorph_type_names[] = {
 	[ZTABLE_FLT] = "float",     
 	[ZTABLE_TXT] = "text",     
 	[ZTABLE_BLB] = "blob",     
-#ifdef ZTABLE_NUL
+#ifdef ZTABLE_NULL
 	[ZTABLE_NUL] = "null",     
 #endif
 	[ZTABLE_USR] = "userdata",     
@@ -94,8 +94,6 @@ static const zhRecord nul = { 0 };
 static const zhRecord *zt_nul = &nul;
 
 static const int lt_maxbuf = 64;
-
-static const int lt_buflen = 4096;
 
 static const int lt_max_slots = LT_MAX_COLLISIONS;
 
@@ -111,6 +109,12 @@ struct zh_iterator {
 };
 
 
+/**
+ * static int lt_hashu (unsigned char *ustr, int len, int size)
+ *
+ * A hashing function (TODO: This could be MUCH faster)
+ *
+ */
 #if 0
 static int lt_hashu (unsigned char *ustr, int len, int size) {
 	unsigned int hash = lt_hash;
@@ -137,15 +141,21 @@ static unsigned int lt_hashu ( unsigned char *ustr, int len, int size ) {
 #endif
 
 
-//Build a string or some other index in reverse
-int build_backwards (zKeyval *t, unsigned char *buf, int bs) { 
-	//This should return if there is no value...
+/**
+ * int build_backwards (zKeyval *t, unsigned char *buf, int bs)
+ *
+ * Builds a hash string by starting at the innermost entry and 
+ * stepping up the parent hierarchy until we reach the root.
+ *
+ */
+int build_backwards (zKeyval *t, unsigned char *buf, int bs) {
+	// This should return if there is no value...
 	int size = 0, mm = bs;
 	zKeyval *p =  t;
 
 	while ( p ) {
-	//for ( zKeyval *p = t; p;  ) {
-		//This should only run if there is a blob or pKey	
+	// for ( zKeyval *p = t; p;  ) {
+		// This should only run if there is a blob or pKey
 		if ( p->key.type == ZTABLE_INT || p->key.type == ZTABLE_FLT ) {
 			char b[128] = {0};
 			double f = (t->key.type == ZTABLE_FLT) ? p->key.v.vfloat : (double)p->key.v.vint;
@@ -167,19 +177,19 @@ int build_backwards (zKeyval *t, unsigned char *buf, int bs) {
 			buf[ --mm ] = '.';
 		}
 		else {
-			//return -1;
-			//return 0;
+			// return -1;
+			// return 0;
 #ifdef DEBUG_H
-		//fprintf( stderr, "(%s)", lt_typename( p->key.type ) );
+		// fprintf( stderr, "(%s)", lt_typename( p->key.type ) );
 #endif
 		}
 #ifdef DEBUG_H
-		//fprintf( stderr, "%p.", p );
+		// fprintf( stderr, "%p.", p );
 #endif
 		p = p->parent;
 	}
 
-	//Copy and clean
+	// Copy and clean
 	if ( ( size = bs - (++mm) ) > 0 ) {
 		memmove( &buf[ 0 ], &buf[ mm ], size );
 		memset( &buf[size], 0, bs - size );
@@ -190,10 +200,15 @@ int build_backwards (zKeyval *t, unsigned char *buf, int bs) {
 }
 
 
-//Get full string (using build_backwards) 
+/**
+ * unsigned char *lt_get_full_key ( zTable *t, int hash, unsigned char *buf, int bs )
+ *
+ * Retrieves the full string used to reference a value within hash table.
+ *
+ */
 unsigned char *lt_get_full_key ( zTable *t, int hash, unsigned char *buf, int bs ) {
 	zKeyval *kv = lt_retkv( t, hash );	
-	//unsigned char tmp[ 2048 ] = { 0 };
+	// unsigned char tmp[ 2048 ] = { 0 };
 	if ( kv ) {
 		build_backwards( kv, buf, bs - 1 );
 		return buf;
@@ -202,12 +217,17 @@ unsigned char *lt_get_full_key ( zTable *t, int hash, unsigned char *buf, int bs
 }
 
 
-//Trim things
+/**
+ * unsigned char *lt_trim ( unsigned char *msg, char *trim, int len, int *nlen )
+ *
+ * Trim characters in [trim] from [msg].
+ *
+ */
 unsigned char *lt_trim ( unsigned char *msg, char *trim, int len, int *nlen ) {
-	//Define stuff
+	// Define stuff
 	unsigned char *m = msg;
 	int nl= len;
-	//Move forwards and backwards to find whitespace...
+	// Move forwards and backwards to find whitespace...
 	while ( memchr(trim, *(m + ( nl - 1 )), 4) && nl-- ) ; 
 	while ( memchr(trim, *m, 4) && nl-- ) m++;
 	*nlen = nl;
@@ -215,32 +235,64 @@ unsigned char *lt_trim ( unsigned char *msg, char *trim, int len, int *nlen ) {
 }
 
 
-//Count indices in a table. If index is greater than 1 and the item is a "table", then will return the number of elements in said table
+/**
+ * int lt_count_at_index ( zTable *t, int index, int type )
+ *
+ * Counts indices in a table. If index is greater than 1 and the item is a 
+ * "table", then will return the number of elements in said table
+ *
+ */
 int lt_count_at_index ( zTable *t, int index, int type ) {
-	//Define
+
 	zhTable *tt = NULL;
 
-	//Return count of all elements
+	// Return count of all elements
 	if ( index == -1 )
 		return t->count;
 	else {
-		//Return one for elements that exist, but aren't tables
-		if ( lt_vta( t, index ) != ZTABLE_TBL )
+		// Return one for elements that exist, but aren't tables
+		int i = lt_value_type_at( t, index );
+	#if 0
+		if ( i != ZTABLE_TBL )
 			return 1;
 		else {
 			return ( tt = &lt_table_at( t, index ) ) ? (tt->count - type) : 0;
 		}
+	#else
+		if ( i == ZTABLE_TBL )
+			return ( tt = &lt_table_at( t, index ) ) ? (tt->count - type) : 0;
+		else if ( i == ZTABLE_TRM || i == ZTABLE_NOD )
+			return 0;
+	#ifdef ZTABLE_NULL
+		else if ( i == ZTABLE_NUL )
+			return 0;
+	#endif
+		else {
+			return 1;
+		}
+	#endif
 	}
 	return 0;
 }
 
 
+/**
+ * int lt_countall( zTable *t )
+ *
+ * Return count of *all* elements (including pseudo-elements) in a table.
+ *
+ */
 int lt_countall( zTable *t ) {
 	return t->count + 1;
 }
 
 
-//Create and initialize a table data structure
+/**
+ * zTable *lt_make ( int size )
+ *
+ * Create and initialize a table data structure.
+ *
+ */
 zTable *lt_make ( int size ) {
 	zTable *t = NULL;
 	
@@ -256,12 +308,17 @@ zTable *lt_make ( int size ) {
 }
 
 
-//Initiailizes a table data structure
+/**
+ * zTable *lt_init ( zTable *t, zKeyval *k, int size )
+ *
+ * Initiailizes a table data structure.
+ *
+ */
 zTable *lt_init ( zTable *t, zKeyval *k, int size ) {
-	//Define
+	// Define
 	int actual_size = size;
 
-	//Calculate optimal modulus for hashing
+	// Calculate optimal modulus for hashing
 	if ( size <= 32 )
 		t->modulo = 31; 
 	else if ( size <= 64 )
@@ -288,7 +345,7 @@ zTable *lt_init ( zTable *t, zKeyval *k, int size ) {
 
 	t->mallocd = (!k) ? 1 : 0;
 
-	//Allocate space for users that don't pass in their own structure 
+	// Allocate space for users that don't pass in their own structure
 	if ( !k ) {
 		actual_size = t->modulo;
 		if ( !( k = malloc( t->modulo * sizeof(zKeyval) ) ) ) {
@@ -302,14 +359,14 @@ zTable *lt_init ( zTable *t, zKeyval *k, int size ) {
 		return 0;
 	}
 
-	//Initialize all hash entries to -1
+	// Initialize all hash entries to -1
 	for ( int i=0; i < actual_size; i++ ) {
 		//.memset( k[i].hash, -1, sizeof(int) * lt_max_slots );
-		//memset( k[i].next, 0, sizeof( zKeyval * ) * lt_max_slots );
+		// memset( k[i].next, 0, sizeof( zKeyval * ) * lt_max_slots );
 		memset( k[i].index, -1, sizeof(int) * lt_max_slots );
 	}
 
-	//Set this
+	// Set this
 	t->current = NULL, t->src = NULL;
 	t->srcmallocd = 0;
 	t->error = 0;
@@ -324,8 +381,12 @@ zTable *lt_init ( zTable *t, zKeyval *k, int size ) {
 }
 
 
-
-//Adds a value to a table data structure
+/**
+ * zhType lt_add ( zTable *t, int side, zhType lt, int vi, float vf,
+ *
+ * Adds a value to a table data structure
+ *
+ */
 zhType lt_add ( zTable *t, int side, zhType lt, int vi, float vf,
 	char *vc, unsigned char *vb, unsigned int vblen, void *vn, zTable *vt, char *trim )
 {
@@ -340,12 +401,12 @@ zhType lt_add ( zTable *t, int side, zhType lt, int vi, float vf,
 	zhRecord *r = &v->v;
 	v->type = lt;
 
-	//Check for zero length blobs or text
+	// Check for zero length blobs or text
 	if ( ( lt == ZTABLE_BLB || lt == ZTABLE_TXT ) && !vblen ) {
 		return 0;
 	}
 
-	//Set each value to its matching type
+	// Set each value to its matching type
 	if ( lt == ZTABLE_INT )
 		r->vint = vi;
 	else if ( lt == ZTABLE_FLT )
@@ -356,7 +417,7 @@ zhType lt_add ( zTable *t, int side, zhType lt, int vi, float vf,
 		return ( t->error = ZTABLE_ERR_LT_INVALID_VALUE ) ? -1 : -1;
 	else if ( lt == ZTABLE_BLB )
 		r->vblob.blob = vb, r->vblob.size = vblen;
-#ifdef ZTABLE_NUL
+#ifdef ZTABLE_NULL
 	else if ( lt == ZTABLE_NUL )
 		r->vnull = NULL;
 #endif
@@ -376,8 +437,12 @@ zhType lt_add ( zTable *t, int side, zhType lt, int vi, float vf,
 }
 
 
-
-//Return types
+/**
+ * zhType lt_rettype( zTable *t, int side, int index )
+ *
+ * Returns the numeric type of a key or value in table.
+ *
+ */
 zhType lt_rettype( zTable *t, int side, int index ) {
 	if ( index < 0 || index > t->count ) {
 		return ( t->error = ZTABLE_ERR_LT_INVALID_INDEX ) ? 0 : 0;
@@ -386,8 +451,12 @@ zhType lt_rettype( zTable *t, int side, int index ) {
 }
 
 
-
-//Return typenames
+/**
+ * const char *lt_rettypename( zTable *t, int side, int index )
+ *
+ * Return the typename of a key or value at a specific index as a string.
+ *
+ */
 const char *lt_rettypename( zTable *t, int side, int index ) {
 	if ( index < 0 || index > t->count ) {
 		t->error = ZTABLE_ERR_LT_INVALID_INDEX; 
@@ -398,14 +467,25 @@ const char *lt_rettypename( zTable *t, int side, int index ) {
 }
 
 
+/**
+ * const char *lt_typename ( int type )
+ *
+ * Return a typename based on numeric description.
+ *
+ */
 const char *lt_typename ( int type ) {
 	return ( type > -1 && type <= ZTABLE_NOD ) ? lt_polymorph_type_names[ type ] : NULL;
 }
 
 
-//Move left or right within the hierarchy of tables
+/**
+ * int lt_move ( zTable *t, int dir )
+ *
+ * Move the internal pointer within hash table.
+ *
+ */
 int lt_move ( zTable *t, int dir ) {
-	//Out of space
+	// Out of space
 	if ( t->index > t->total ) {
 		t->error = ZTABLE_ERR_LT_OUT_OF_SPACE;
 		return -1;
@@ -414,9 +494,9 @@ int lt_move ( zTable *t, int dir ) {
 	zKeyval *curr = (t->head + t->index);
 	zhValue *value = &curr->value;
 
-	//Left or right?	
+	// Left or right?
 	if ( !dir ) {
-		//Set count of elements in this new table to actual count
+		// Set count of elements in this new table to actual count
 		zhTable *T = &value->v.vtable;
 		value->type = ZTABLE_TBL;
 		t->rCount = &T->count;
@@ -425,7 +505,7 @@ int lt_move ( zTable *t, int dir ) {
 		t->current = T;
 	}
 	else {
-		//Set references
+		// Set references
 		zhValue *key = &curr->key; 
 		key->type = ZTABLE_TRM;
 		value->type = ZTABLE_NUL;
@@ -449,31 +529,39 @@ int lt_move ( zTable *t, int dir ) {
 }
 
 
-
-//Finalize adding to both sides of a table data structure
+/**
+ * void lt_finalize ( zTable *t )
+ *
+ * Finalize adding to both sides of a table data structure.
+ *
+ */
 void lt_finalize ( zTable *t ) {
-	//if these are equal, don't increment both *t->rCount and t->count
+	// if these are equal, don't increment both *t->rCount and t->count
 	( t->rCount == &t->count ) ? 0 : ( *t->rCount )++ ; 
 	t->count ++, t->index ++;
 }
 
 
-
-//Hash each key
+/**
+ * int lt_lock ( zTable *t )
+ *
+ * "Lock down" the hash table by hashing each saved entry.
+ *
+ */
 int lt_lock ( zTable *t ) {
 	zKeyval *parent = NULL;
 
-	//Reset the indices to -1, b/c this affects things
+	// Reset the indices to -1, b/c this affects things
 	for ( int i = 0; i < t->index; i++ ) {
 		memset( ( t->head + i )->index, -1, sizeof(int) * lt_max_slots );
 	}
 
 	for ( int lim, pp, i=0; i <= t->index; i++ ) {
-		//Get reference and make a new buffer
+		// Get reference and make a new buffer
 		zKeyval *tt = t->head + i;
 		unsigned char buf[ LT_BUFLEN ] = {0};
 
-		//Check keys and values...
+		// Check keys and values...
 		if ( tt->value.type == ZTABLE_NUL ) {
 			if ( parent ) {
 				parent = parent->parent;
@@ -481,21 +569,21 @@ int lt_lock ( zTable *t ) {
 			continue;
 		}
 
-		//Set parent of an item.
+		// Set parent of an item.
 		if ( parent )	{
 			tt->parent = parent; 
 		}
 	
-		//Do parents here
+		// Do parents here
 		if ( tt->value.type == ZTABLE_TBL ) {
 			parent = tt;
 		}
 
-		//Build a string to hash, save the hash somewhere 
+		// Build a string to hash, save the hash somewhere
 		if ( ( pp = build_backwards( tt, buf, LT_BUFLEN ) ) > 0 ) {
 			int hash = lt_hashu( buf, pp, t->modulo ), *ii = ( t->head + hash )->index;
 		#ifdef DEBUG_H
-			//fprintf( stderr, "Finalizing value '%s'. Hash = %d.\n", buf, hash );
+			// fprintf( stderr, "Finalizing value '%s'. Hash = %d.\n", buf, hash );
 		#endif
 
 			for ( lim = 0; *ii > -1 && ( lim < lt_max_slots ); ii++, ++lim ) {
@@ -503,17 +591,17 @@ int lt_lock ( zTable *t ) {
 				;
 		#else
 				t->collisions++;
-				//fprintf( stderr, "Collision occurred when adding '%s'. Adding new index.\n", buf );
+				// fprintf( stderr, "Collision occurred when adding '%s'. Adding new index.\n", buf );
 		#endif
 			}
 
-			//If we hit the limit (b/c of too many collisions) just die
+			// If we hit the limit (b/c of too many collisions) just die
 			if ( lim == lt_max_slots ) {
 				t->error = ZTABLE_ERR_LT_MAX_COLLISIONS;
 				return 0;		
 			}
 		
-			//Set to the current slot
+			// Set to the current slot
 			*ii = i;	
 		}
 	}
@@ -521,9 +609,15 @@ int lt_lock ( zTable *t ) {
 }
 
 
-//Return index in table where key was found
+/**
+ * int lt_get_long_i ( zTable *t, unsigned char *find, int len )
+ *
+ * Return index in table where key was found.
+ *
+ */
 int lt_get_long_i ( zTable *t, unsigned char *find, int len ) {
-	int hash = 0, index = -1;
+	int hash = 0;
+	//int index = -1;
 	unsigned char *f = NULL, gb[ LT_BUFLEN ] = { 0 };
 	zKeyval *hv = NULL, *fv = NULL;
 
@@ -538,7 +632,7 @@ int lt_get_long_i ( zTable *t, unsigned char *find, int len ) {
 	if ( !t->start && !t->end ) 
 		hash = lt_hashu( f = find, len, t->modulo );
 	else {
-		//Ewww..
+		// Ewww..
 		int a = 0;
 		memcpy( &gb[0], t->buf, t->buflen );
 		if ( *find != '.' ) {
@@ -550,44 +644,60 @@ int lt_get_long_i ( zTable *t, unsigned char *find, int len ) {
 		f = gb;
 	}
 
-	//Find the slot first (if it doesn't exist, drop it)
-	//TODO: This is good b/c we can move to sparse allocation later
+	// Find the slot first (if it doesn't exist, drop it)
+	// TODO: This is good b/c we can move to sparse allocation later
 	if ( !( hv = t->head + hash ) ) {
 		return -1;
 	}
 
-	//Then search each filled slot in the bucket for a match
+	// Then search each filled slot in the bucket for a match
 	for ( int *iiset = hv->index; *iiset > -1; iiset++ ) {
 		unsigned char buf[ LT_BUFLEN ] = {0};
 		fv = t->head + (*iiset);
 
-		//Get the full string
+		// Get the full string
 		if ( build_backwards( fv, buf, LT_BUFLEN ) == -1 ) {
 			return -1;
 		}
 
-		//Compare against the full string buffer
+		// Compare against the full string buffer
 		if ( memcmp( f, buf, len ) == 0 ) {
 			return *iiset;
 		}
 	}
-	//If nothing was found, just die out
+	// If nothing was found, just die out
 	return -1;
 }
 
 
-//Return zKeyval at certain index
+/**
+ * zhValue *lt_retany ( zTable *t, int index )
+ *
+ * Returns the value at a specific index or NULL if nothing exists at that index.
+ *
+ */
 zhValue *lt_retany ( zTable *t, int index ) {
 	return ( index <= -1 || index > t->count ) ? NULL : &(t->head + index)->value; 
 }
 
 
+/**
+ * int lt_exists (zTable *t, int index)
+ *
+ * Detects if a value exists at a specific index.
+ *
+ */
 int lt_exists (zTable *t, int index) {
 	return ( index <= -1 || index > t->count );
 }
 
 
-//Return a zKeyval at a certain index
+/**
+ * zKeyval *lt_retkv ( zTable *t, int index )
+ *
+ * Return both the key and value at a specific index.
+ *
+ */
 zKeyval *lt_retkv ( zTable *t, int index ) {
 	if ( index <= -1 || index > t->count ) {
 		t->error = ZTABLE_ERR_LT_INVALID_INDEX;
@@ -598,7 +708,12 @@ zKeyval *lt_retkv ( zTable *t, int index ) {
 }
 
 
-//Return a zhRecord matching a certain type at a certain index
+/**
+ * zhRecord *lt_ret ( zTable *t, zhType type, int index )
+ *
+ * Return a zhRecord matching a certain type at a certain index
+ *
+ */
 zhRecord *lt_ret ( zTable *t, zhType type, int index ) {
 	if ( index <= -1 || index > t->count ) {
 		t->error = ZTABLE_ERR_LT_INVALID_INDEX;
@@ -613,23 +728,12 @@ zhRecord *lt_ret ( zTable *t, zhType type, int index ) {
 }
 
 
-//Set the index to another one (absolutely)
-int lt_absset( zTable *t, int index ) {
-	//Can't return less than 0
-	if ( index < 0 || index > t->count ) {
-		return 0;
-	}
-
-	//Rewind by the current index then increment by the new index	
-	t->current -= t->index;
-	t->index = index;
-	t->current += t->index ;	
-	t->cptr = (t->head + t->index)->value.v.vtable.ptr;
-	return 1;
-}
-
-
-//Set the current index to another one
+/**
+ * int lt_set ( zTable *t, int index )
+ *
+ * Set the current index to another one
+ *
+ */
 int lt_set ( zTable *t, int index ) {
 	int j = 0;	
 	if ( index < 0 )
@@ -647,13 +751,24 @@ int lt_set ( zTable *t, int index ) {
 }
 
 
-//Reset a table index
+/**
+ * void lt_reset ( zTable *t )
+ *
+ * Resets internal hash table pointer to 0.
+ *
+ */
 void lt_reset ( zTable *t ) {
 	t->start = 0, t->end = 0, t->index = 0;
 }
 
 
-//Iterate through the indices of a table
+/**
+ * zKeyval *lt_next ( zTable *t )
+ *
+ * Iterates through the indicies of a table.  Returns NULL once we move 
+ * through all entries.
+ *
+ */
 zKeyval *lt_next ( zTable *t ) {
 	zKeyval *curr = (t->index > t->count) ? NULL : t->head + t->index;
 	t->index++;
@@ -661,14 +776,25 @@ zKeyval *lt_next ( zTable *t ) {
 }
 
 
+/**
+ * zKeyval *lt_current ( zTable *t )
+ *
+ * Return the key and value at the current position in the hash table.
+ *
+ */
 zKeyval *lt_current ( zTable *t ) {
 	return ( t->index > t->count ) ? NULL : t->head + t->index;
 }
 
 
-//Loop from another point...
+/**
+ * zKeyval *lt_items_by_index ( zTable *t, int ind )
+ *
+ * Iterate through table entries starting at a specific index.
+ *
+ */
 zKeyval *lt_items_by_index ( zTable *t, int ind ) {
-	//Find a hash, and if it's a table... set some stuff
+	// Find a hash, and if it's a table... set some stuff
 	zKeyval *curr = NULL;
 
 	if ( t->cptr == -1 ) {
@@ -684,29 +810,35 @@ zKeyval *lt_items_by_index ( zTable *t, int ind ) {
 		return NULL;
 	}
 
-	//Set reference
+	// Set reference
 	curr = t->head + t->index;
 
-	//Check the key name and see if it matches t->cptr, return null if so
+	// Check the key name and see if it matches t->cptr, return null if so
 	if ( curr->key.type == ZTABLE_TRM && curr->key.v.vptr == t->cptr ) {
 		t->index = 0, t->cptr = -1;
 		return NULL;
 	}
 
-	//Increment and move on
+	// Increment and move on
 	t->index++;
 	return curr;
 }
 
 
 
-//Find a table by hash and return until it has no more keys.
+/**
+ * zKeyval *lt_items_i ( zTable *t, unsigned char *src, int len )
+ *
+ * Find a table by hash key (a string) and iterate through each entry
+ * until we reach the end.
+ *
+ */
 zKeyval *lt_items_i ( zTable *t, unsigned char *src, int len ) {
-	//Find a hash, and if it's a table... set some stuff
+	// Find a hash, and if it's a table... set some stuff
 	zKeyval *curr = NULL;
 	int in;
 
-	//Check for a hash table
+	// Check for a hash table
 	if ( t->cptr == -1 ) {
 		if ( (in = lt_get_long_i ( t, src, len )) == -1 ) {
 			return NULL;
@@ -724,44 +856,19 @@ zKeyval *lt_items_i ( zTable *t, unsigned char *src, int len ) {
 		return NULL;
 	}
 
-	//Set reference
+	// Set reference
 	curr = t->head + t->index;
 
-	//Check the key name and see if it matches t->cptr, return null if so
+	// Check the key name and see if it matches t->cptr, return null if so
 	if ( curr->key.type == ZTABLE_TRM && curr->key.v.vptr == t->cptr ) {
 		t->index = 0, t->cptr = -1;
 		return NULL;
 	}
 
-	//Increment and move on
+	// Increment and move on
 	t->index++;
 	return curr;
 } 
-
-
-
-//Set a data source
-void lt_setsrc ( zTable *t, void *src ) {
-	t->src = src;
-}
-
-
-//Will set boundaries on a new table
-zTable *lt_within_long( zTable *t, unsigned char *src, int len ) {
-	//Whenever we look for a string, we copy til the end
-	int a = 0;
-	t->buf = src;
-	t->buflen = len;
-
-	//Search for a table	
-	if ( (a = lt_get_long_i(t, src, len)) == -1 || lt_vta(t, a) != ZTABLE_TBL ) {
-		return NULL;
-	}
-
-	//Set start and end, then return the table
-	t->start = a, t->end = a + (&lt_table_at( t, a ))->count;
-	return t;
-}
 
 
 void lt_unset ( zTable *t ) {
@@ -773,13 +880,13 @@ void lt_unset ( zTable *t ) {
 
 
 
-//Get a key or value somewhere
+// Get a key or value somewhere
 void lt_free ( zTable *t ) {	
 	if ( !t ) {
 		return;
 	}
 
-	//Free any text keys
+	// Free any text keys
 	for ( int ii=0; ii < t->count; ii++ ) {
 		zKeyval *k = t->head + ii;
 		( k->key.type == ZTABLE_TXT ) ? free( k->key.v.vchar ), k->key.v.vchar = NULL : 0;
@@ -787,7 +894,7 @@ void lt_free ( zTable *t ) {
 	}
 
 	if ( t->mallocd ) {
-		//TODO: Why not just memset to zero?
+		// TODO: Why not just memset to zero?
 		free( t->head );
 		t->head = NULL, t->rCount = NULL;
 		t->error = 0, t->total = 0, t->count = 0, t->index = 0;
@@ -802,9 +909,9 @@ void lt_free ( zTable *t ) {
 
 
 
-//An iterator providing more control
+// An iterator providing more control
 int lt_exec_complex (zTable *t, int start, int end, void *p, int (*fp)( zKeyval *kv, int i, void *p ) ) {
-	//Bounds violations should stop.
+	// Bounds violations should stop.
 	if ( start < 0 || start > t->count || end < 0 || end > t->count ) {
 		return 0;
 	}
@@ -817,21 +924,21 @@ int lt_exec_complex (zTable *t, int start, int end, void *p, int (*fp)( zKeyval 
 
 
 
-//Copy iterator
+// Copy iterator
 static int copy_iterator( zKeyval *kv, int i, void *p ) {
 	struct zh_iterator *f = (struct zh_iterator *)p; 
 	zTable **t = (zTable **)f->userdata;
 
-	//decrease depth
+	// decrease depth
 	if ( kv->key.type == ZTABLE_TRM ) {
 		if ( --f->depth == 0 ) {
 			lt_ascend( *t );
-			//lt_finalize( *t );
+			// lt_finalize( *t );
 			return 0;
 		}
 	}
 
-	//increase depth
+	// increase depth
 	if ( kv->value.type == ZTABLE_TBL ) {
 		f->depth ++;
 	}
@@ -844,7 +951,7 @@ static int copy_iterator( zKeyval *kv, int i, void *p ) {
 		lt_addblobkey( *t, kv->key.v.vblob.blob, kv->key.v.vblob.size );
 	else if ( kv->key.type == ZTABLE_TRM ) {
 		lt_ascend( *t );
-		//lt_finalize( *t );
+		// lt_finalize( *t );
 		return 1;
 	}
 
@@ -871,7 +978,7 @@ static int copy_iterator( zKeyval *kv, int i, void *p ) {
 
 
 
-//Deep copy
+// Deep copy
 zTable *lt_deep_copy ( zTable *t, int start, int end ) {
 	zTable *nt = NULL;
 	struct zh_iterator zd = { 0 };
@@ -881,13 +988,13 @@ zTable *lt_deep_copy ( zTable *t, int start, int end ) {
 		return NULL;
 	}
 
-	//Finally, fp->depth should be zero when done, but starting at one may save time
+	// Finally, fp->depth should be zero when done, but starting at one may save time
 	if ( !( nt = malloc( sizeof ( zTable ) ) ) || !lt_init( nt, NULL, t->modulo ) ) {
 		t->error = 0; // MEMORY ALLOCATION ERROR
 		return NULL;
 	}
 
-	//Save data
+	// Save data
 	zd.len = end - start, zd.depth = 0;
 	zd.userdata = &nt, zd.source = t;	
 
@@ -903,19 +1010,19 @@ zTable *lt_deep_copy ( zTable *t, int start, int end ) {
 }
 
 
-//Clear error
+// Clear error
 void lt_clearerror ( zTable *t ) {
 	t->error = 0;
 }
 
-//Return errors as strings
+// Return errors as strings
 const char *lt_strerror ( zTable *t ) {
 	return ( t->error > -1 && t->error <= ZTABLE_ERR_LT_INDEX_MAX) ? lt_errors[ (int)t->error ] : NULL; 
 }
 
 
 #ifdef DEBUG_H 
-//Print out an initialized table
+// Print out an initialized table
 void lt_printt ( zTable *t ) {
 	fprintf( stderr, "t->total:      %d\n", t->total );
 	fprintf( stderr, "t->modulo:     %d\n", t->modulo );
@@ -927,35 +1034,32 @@ void lt_printt ( zTable *t ) {
 
 
 
-//Get a key or value somewhere
+// Get a key or value somewhere
 void lt_printall ( zTable *t ) {
-	//Header
+	// Header
 	fprintf( stderr, fmt, "Index", "KType", "VType", "Value", "CombinedValue", "HashOf", "Hashes" );
 
 	for ( int ii=0; ii < t->index; ii++ ) {
 		zKeyval *k = t->head + ii;
 		zhType kt;
 		int hash;	
-		const char *kk=NULL, *vv=NULL;
-		char bkbuf[1024] = {0};
-		char strbuf[512] = {0};
-		char inbuf[12] = {0};
+		const char *kk=NULL, *vv=NULL; char bkbuf[1024] = {0}; char strbuf[512] = {0}; char inbuf[12] = {0};
 		char habuf[12] = {0};
 		char nmbuf[125] = {0};
 
-		//Index
+		// Index
 		snprintf(inbuf, sizeof( inbuf ) - 1, "%d", ii);
 	
-		//Hashes
+		// Hashes
 		for ( int i=0, j=0; i < lt_max_slots ; i++ ) {
 			j += sprintf( &nmbuf[ j ], "%3d,",  k->index[ i ] );
 		}
 
-		//Key and value types
+		// Key and value types
 		kk = lt_rettypename( t, 0, ii );
 		vv = lt_rettypename( t, 1, ii );
 
-		//Finally, the key itself (the whole thing, I suppose)
+		// Finally, the key itself (the whole thing, I suppose)
 		if ((kt = lt_rettype( t, 0, ii )) == ZTABLE_INT )
 			sprintf( strbuf, "%d, ", ( t->head + ii )->key.v.vint );
 		else if ( kt == ZTABLE_TXT )
@@ -970,7 +1074,7 @@ void lt_printall ( zTable *t ) {
 			}
 		}
 	
-		//Build a string backwards
+		// Build a string backwards
 		build_backwards( t->head + ii, (unsigned char *)bkbuf, 1024 );
 		hash = lt_hashu( (unsigned char *)bkbuf, strlen(bkbuf), t->modulo );
 		sprintf( habuf, "%d", ( kt == ZTABLE_NON ) ? -1 : hash );
@@ -1010,7 +1114,7 @@ void print_value( zKeyval *kv ) {
 
 
 #if 0
-//Print a set of values at a particular index
+// Print a set of values at a particular index
 static void lt_printindex ( zKeyval *tt, int device, int showkey, int ind ) {
 	int w = 0;
 	int maxlen = ( showkey ) ? 24576 : lt_buflen;
@@ -1031,7 +1135,7 @@ static void lt_printindex ( zKeyval *tt, int device, int showkey, int ind ) {
 			/*ZTABLE_NODE is handled in printall*/
 			if ( t == ZTABLE_NON )
 				w += snprintf( &b[w], maxlen - w, "%s", "is uninitialized" );
-		#ifdef ZTABLE_NUL
+		#ifdef ZTABLE_NULL
 			else if ( t == ZTABLE_NUL )
 				w += snprintf( &b[w], maxlen - w, "is terminator" );
 		#endif
@@ -1048,15 +1152,15 @@ static void lt_printindex ( zKeyval *tt, int device, int showkey, int ind ) {
 			}
 		}
 
-		//TODO: This just got ugly.  Combine the different situations better...
+		// TODO: This just got ugly.  Combine the different situations better...
 		if ( !i && showkey ) { 
-			//I want to see the full key
+			// I want to see the full key
 			if ( t == ZTABLE_TRM )
 				w += snprintf( &b[w], maxlen - w, "%ld", r->vptr );
 			else if ( t == ZTABLE_NON || t == ZTABLE_NUL )
 				w += snprintf( &b[w], maxlen - w, "(null)" );
 			else {
-				//We want to see the length of the built string, and potentially its parent(s)
+				// We want to see the length of the built string, and potentially its parent(s)
 				char a[ maxlen ];
 				memset( a, 0, maxlen );
 				int sl = build_backwards( tt, (unsigned char *)a, maxlen );
@@ -1091,55 +1195,79 @@ static void lt_printindex ( zKeyval *tt, int device, int showkey, int ind ) {
 	write( device, "\n", 1 );
 }	
 
-//Dump a table (needs some flags for debugging) 
+// Dump a table (needs some flags for debugging) 
 int __lt_dump ( zKeyval *kv, int i, void *p ) {
 	zhType vt = kv->value.type;
-	zhInner *pp = (zhInner *)p; 
-//	if ( pp->indextype ) {
+	zhInner *pp = (zhInner *)p;
+	if ( pp->indextype ) {
 		char buf[ 128 ] = { 0 };
 		const char *space = &__lt_ws[ 100 - pp->level ];
-		int l = snprintf( buf, sizeof(buf), __lt_fmt, i, pp->level, space ); 
+		int l = snprintf( buf, sizeof(buf), __lt_fmt, i, pp->level, space );
 		write( pp->fd, buf, l );
-//	}
+	}
 	lt_printindex( kv, pp->fd, pp->dumptype, pp->level );
 	pp->level += (vt == ZTABLE_NUL) ? -1 : (vt == ZTABLE_TBL) ? 1 : 0;
 	return 1;
 }
 #else
+
+
+
+/**
+ * int __lt_dump ( zKeyval *kv, int ii, void *p )
+ *
+ * Dump tables.
+ *
+ * NOTE: This is VERY dangerous code.  It needs to be refactored a lot.
+ *
+ */
 int __lt_dump ( zKeyval *kv, int ii, void *p ) {	
-	//Define things
+#if 1
+	// Define things
+	char b[ LT_BUFLEN ] = {0};
+	char *space = NULL;
+	char *c = b;
+	unsigned int maxlen = LT_BUFLEN;
+	unsigned int w = 0;
 	zhInner *pp = (zhInner *)p;
-	int w = 0, maxlen = ( pp->dumptype == LT_DUMP_LONG ) ? 24576 : lt_buflen;
-	char *space = (char *)&__lt_ws[ 100 - pp->level ], b[ maxlen ], *c = b;
+
+	// Initialize and set this up for now
+	// TODO: Make this a real datatype...
 	struct { int t; zhRecord *r; } items[2] = {
 		{ kv->key.type  , &kv->key.v    },
-		{ kv->value.type, &kv->value.v  } 
+		{ kv->value.type, &kv->value.v  }
 	};
 
-	//Initialize our buffer for writing and write the index plus tabs
-	memset( b, 0, maxlen );
-	w = snprintf( b, maxlen - w, __lt_fmt, ii, pp->level, space ); 
+	// Initialize tabs
+	space = (char *)&__lt_ws[ 100 - pp->level ];
 
-	//Then loop through both sides of zKeyval and dump the values
+	// Initialize our buffer for writing and write the index plus tabs
+	w = snprintf( b, maxlen - w, __lt_fmt, ii, pp->level, space );
+
+	// Then loop through both sides of zKeyval and dump the values
 	for ( int i = 0; i < 2; i++ ) {
-		zhRecord *r = items[i].r; 
+		zhRecord *r = items[i].r;
 		int t = items[i].t;
 		if ( i ) {
 			w += snprintf( &b[w], maxlen - w, "%s", " -> " );
 			/*ZTABLE_NODE is handled in printall*/
-			if ( t == ZTABLE_NON )
+			if ( t == ZTABLE_NON ) {
 				w += snprintf( &b[w], maxlen - w, "%s", "is uninitialized" );
-		#ifdef ZTABLE_NUL
-			else if ( t == ZTABLE_NUL )
+			}
+		#ifdef ZTABLE_NULL
+			else if ( t == ZTABLE_NUL ) {
 				w += snprintf( &b[w], maxlen - w, "is terminator" );
+				pp->level--;
+			}
 		#endif
-			else if ( t == ZTABLE_USR )
+			else if ( t == ZTABLE_USR ) {
 				w += snprintf( &b[w], maxlen - w, "userdata [address: %p]", r->vusrdata );
+			}
 			else if ( t == ZTABLE_TBL ) {
-				pp->level ++;
+				pp->level++;
 				zhTable *rt = &r->vtable;
 				w += snprintf( &b[w], maxlen - w, 
-					"table [address: %p, ptr: %ld, elements: %d]", 
+					"table [address: %p, ptr: %ld, elements: %d]",
 					(void *)rt, rt->ptr, rt->count );
 			}
 			else {
@@ -1147,15 +1275,15 @@ int __lt_dump ( zKeyval *kv, int ii, void *p ) {
 			}
 		}
 
-		//TODO: This just got ugly.  Combine the different situations better...
-		if ( !i && ( pp->dumptype == LT_DUMP_LONG ) ) { 
-			//I want to see the full key
+		// TODO: This just got ugly.  Combine the different situations better...
+		if ( !i && ( pp->dumptype == LT_DUMP_LONG ) ) {
+			// I want to see the full key
 			if ( t == ZTABLE_TRM )
 				w += snprintf( &b[w], maxlen - w, "(trm) %ld", r->vptr ), pp->level--;
 			else if ( t == ZTABLE_NON || t == ZTABLE_NUL )
 				w += snprintf( &b[w], maxlen - w, "(null)" );
 			else {
-				//We want to see the length of the built string, and potentially its parent(s)
+				// We want to see the length of the built string, and potentially its parent(s)
 				char a[ maxlen ];
 				memset( a, 0, maxlen );
 				int sl = build_backwards( kv, (unsigned char *)a, maxlen );
@@ -1185,17 +1313,20 @@ int __lt_dump ( zKeyval *kv, int ii, void *p ) {
 			}
 		}
 	}
-	write( pp->fd, b, w );
+
+	// This is just too big
+	write( pp->fd, b, ( w > maxlen ) ? maxlen - 1 : w );
 	write( pp->fd, "\n", 1 );
+#endif
 	return 1;
 }
 #endif
 
-//Retrieve each of the (full) keys used to generate a table
-//This is mostly for testing, but could be useful in general...
+// Retrieve each of the (full) keys used to generate a table
+// This is mostly for testing, but could be useful in general...
 const char ** lt_get_keys ( zTable *t ) {
 	const char ** list = NULL;
-	//I MIGHT be able to do this w/o (but it takes so damn long)
+	// I MIGHT be able to do this w/o (but it takes so damn long)
 	for ( int i = 0, sz = 2; i < t->index -1; i++, sz++ ) {
 		zKeyval *k = t->head + i; 	
 		char *buf = malloc( LT_BUFLEN );
@@ -1207,7 +1338,7 @@ const char ** lt_get_keys ( zTable *t ) {
 			return NULL;
 		}
 			
-		//Reallocate
+		// Reallocate
 		if ( !( list = realloc( list, sizeof( char * ) * sz )) ) {
 			//t->error = ALLOCATION_FAILURE_YAH;
 			fprintf( stderr, "failed to allocate list\n" );
@@ -1228,6 +1359,46 @@ void lt_free_keys ( const char **list ) {
 	free( list );
 }
 
-
 #endif
 
+/**-- Experimental Tech --**/
+
+// Set a data source
+void lt_setsrc ( zTable *t, void *src ) {
+	t->src = src;
+}
+
+// Will set boundaries on a new table
+zTable *lt_within_long( zTable *t, unsigned char *src, int len ) {
+	// Whenever we look for a string, we copy til the end
+	int a = 0;
+	t->buf = src;
+	t->buflen = len;
+
+	// Search for a table
+	if ( (a = lt_get_long_i(t, src, len)) == -1 || lt_vta(t, a) != ZTABLE_TBL ) {
+		return NULL;
+	}
+
+	// Set start and end, then return the table
+	t->start = a, t->end = a + (&lt_table_at( t, a ))->count;
+	return t;
+}
+
+
+#if 0
+// Set the index to another one (absolutely)
+int lt_absset( zTable *t, int index ) {
+	// Can't return less than 0
+	if ( index < 0 || index > t->count ) {
+		return 0;
+	}
+
+	// Rewind by the current index then increment by the new index
+	t->current -= t->index;
+	t->index = index;
+	t->current += t->index ;
+	t->cptr = (t->head + t->index)->value.v.vtable.ptr;
+	return 1;
+}
+#endif

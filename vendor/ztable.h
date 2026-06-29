@@ -59,7 +59,9 @@
 
 #define ZTABLE_ERRV_LENGTH 127 
 
-#define LT_BUFLEN 2047 
+#define LT_BUFLEN 4096
+
+#define ZTABLE_NULL
 
 #ifndef LT_MAX_COLLISIONS
  #define LT_MAX_COLLISIONS 10
@@ -205,6 +207,12 @@
 #define lt_vta( t, i ) \
 	lt_rettype( t, 1, i )
 
+#define lt_key_type_at( t, i ) \
+	lt_rettype( t, 0, i )
+
+#define lt_value_type_at( t, i ) \
+	lt_rettype( t, 1, i )
+
 #define lt_ktna( t, i ) \
 	lt_rettypename( t, 0, i )
 
@@ -238,7 +246,7 @@
 #define lt_addfloatvalue(t, v) \
 	lt_add(t, 1, ZTABLE_FLT, 0, v, 0, 0, 0, 0, 0, NULL)
 
-#ifdef ZTABLE_NUL
+#ifdef ZTABLE_NULL
  #define lt_addnullvalue(t) \
 	lt_add(t, 1, ZTABLE_NUL, 0, 0, 0, 0, 0, 0, 0, NULL)
 #endif
@@ -267,7 +275,7 @@
 #define lt_addfv(t, v) \
 	lt_add(t, 1, ZTABLE_FLT, 0, v, 0, 0, 0, 0, 0, NULL)
 
-#ifdef ZTABLE_NUL
+#ifdef ZTABLE_NULL
  #define lt_addnv(t) \
 	lt_add(t, 1, ZTABLE_NUL, 0, 0, 0, 0, 0, 0, 0, NULL)
 #endif
@@ -404,7 +412,7 @@ union zhRecord {
   int vint;
   float vfloat;
   char *vchar;
-#ifdef ZTABLE_NUL
+#ifdef ZTABLE_NULL
   void *vnull;
 #endif
   void *vusrdata;
