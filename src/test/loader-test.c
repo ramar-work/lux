@@ -1,12 +1,12 @@
-/* ------------------------------------------- * 
- * loader-test.c 
+/* ------------------------------------------- *
+ * loader-test.c
  * --------------
  * Test out loader.c against a few different
  * styles of file.
  *
  * All of the tests are broken up into 4 distinct
- * parts (which can be seen in main.c). 
- * 
+ * parts (which can be seen in main.c).
+ *
  * #1 - Allocate space of $SIZE for the data set
  * we plan to use.
  *
@@ -24,26 +24,26 @@
  * LICENSE
  * -------
  * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy 
- * of this software and associated documentation files (the "Software"), to 
- * deal in the Software without restriction, including without limitation the 
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
- * sell copies of the Software, and to permit persons to whom the Software is 
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in 
+ *
+ * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  *
- * CHANGELOG 
+ * CHANGELOG
  * ---------
  * No entries yet.
  * ------------------------------------------- */
@@ -104,11 +104,11 @@ int set_meg_v( zTable *t, void *p ) {
 	//Try the loadset
 	if ( !loader_run( t, rules ) ) {
 		return 0;
-	} 
+	}
 
 	return 1;
 }
- 
+
 
 //Dump the rules that we created.
 void dump_meg_v( zTable *t, void *p ) {
@@ -141,8 +141,8 @@ void free_meg_v( zTable *t, void *p ) {
 
 
 //This is a simple structure.
-struct hostset { 
-	struct lconfig **hosts; 
+struct hostset {
+	struct lconfig **hosts;
 };
 
 
@@ -156,7 +156,7 @@ int test_hosts_handler ( zKeyval * kv, int i, void *p ) {
 	if ( kv->key.type == LITE_TXT && kv->value.type == LITE_TBL && f->depth == 2 ) {
 		struct lconfig *w = NULL;
 		int count = lt_counti( ( st = ((struct fp_iterator *)p)->source ), i );
-		FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count ); 
+		FPRINTF( "NAME: %s, COUNT OF ELEMENTS: %d\n", kv->key.v.vchar, count );
 		nt = loader_shallow_copy( st, i+1, i+count );
 		w = malloc( sizeof( struct lconfig ) );
 		memset( w, 0, sizeof( struct lconfig ) );
@@ -173,7 +173,7 @@ int test_hosts_handler ( zKeyval * kv, int i, void *p ) {
 
 		//Why would this fail?
 		w->name = kv->key.v.vchar;
-		loader_run( nt, rules ); 
+		loader_run( nt, rules );
 
 		//This is extra stupid, b/c all you really need to do is loop through the table entries	
 		add_item( hosts, w, struct lconfig *, &f->len );
@@ -193,7 +193,7 @@ int test_hosts_handler ( zKeyval * kv, int i, void *p ) {
 int set_hostset_v( zTable *t, void *p ) {
 	struct hostset *hostset = (struct hostset *)p;
 	const struct rule rules[] = {
-		{ "hosts", "t", .v.t = (void ***)&hostset->hosts, test_hosts_handler }, 
+		{ "hosts", "t", .v.t = (void ***)&hostset->hosts, test_hosts_handler },
 		{ NULL }
 	};
 
@@ -233,7 +233,7 @@ void free_hostset_v ( zTable *t, void *p ) {
 		( (*hosts)->ca_bundle ) ? free( (*hosts)->ca_bundle ) : 0;
 		( (*hosts)->certfile ) ? free( (*hosts)->certfile ) : 0;
 		( (*hosts)->keyfile ) ? free( (*hosts)->keyfile ) : 0;
-		free( (*hosts) ); 
+		free( (*hosts) );
 		hosts++;
 	}
 	free( hostset->hosts );
@@ -242,8 +242,8 @@ void free_hostset_v ( zTable *t, void *p ) {
 
 
 struct routelist {
-	struct routeh { 
-		char *name; 
+	struct routeh {
+		char *name;
 		//struct mvc *mvc;
 		struct mvc {
 			char **models;
@@ -267,7 +267,7 @@ int mvc_array_handler( zKeyval *kv, int i, void *p ) {
 	//If table count is one, then it better be a string.
 	if ( ( kt == LITE_INT || kt == LITE_TXT ) && kv->value.type == LITE_TXT ) {
 		char *p = strdup( kv->value.v.vchar );
-		add_item( pp, p, char *, &f->len ); 
+		add_item( pp, p, char *, &f->len );
 	}
 	return 1;
 }
@@ -325,7 +325,7 @@ int set_routelist_v( zTable *t, void *p ) {
 	struct routeh **routes = r->routes;
 	//mvc probably has to be allocated here
 	const struct rule rules[] = {
-		{ "routes", "t", .v.t = (void ***)&r->routes, test_routes_handler }, 
+		{ "routes", "t", .v.t = (void ***)&r->routes, test_routes_handler },
 		{ NULL }
 	};
 
@@ -347,17 +347,17 @@ void dump_routelist_v (zTable *t, void *p) {
 		static int i;
 		FPRINTF( "route %d: %s\n", i++, (*routes)->name );
 
-		//Notice more of the local referencing.  
+		//Notice more of the local referencing. 
 		//Using a pointer here will increment so that we lose track of the data.
 		struct mvc c = (*routes)->mvc;
 		FPRINTF( "\tmodel " );
 		while ( c.models && *c.models ) {
-			fprintf( stderr, "%s, ", *c.models ); 
+			fprintf( stderr, "%s, ", *c.models );
 			c.models++;
 		}
 
 		fprintf( stderr, "views: " );
-		while ( c.views && *c.views ) { 
+		while ( c.views && *c.views ) {
 			fprintf( stderr, "%s, ", *c.views ); c.views++;
 		}
 		fprintf( stderr, "\n" );
@@ -409,8 +409,8 @@ struct mvc {
 };
 
 
-struct routeh { 
-	char *name; 
+struct routeh {
+	char *name;
 	struct mvc *mvc;
 };
 
@@ -424,7 +424,7 @@ int mvc_array_handler( zKeyval *kv, int i, void *p ) {
 
 	//If table count is one, then it better be a string.
 	if ( ( kt == LITE_INT || kt == LITE_TXT ) && kv->value.type == LITE_TXT ) {
-		add_item( pp, kv->value.v.vchar, char *, &f->len ); 
+		add_item( pp, kv->value.v.vchar, char *, &f->len );
 	}
 	return 1;
 }
@@ -483,7 +483,7 @@ int test_routes_handler ( zKeyval * kv, int i, void *p ) {
 int set_host_rules( zTable *t ) {
 	struct lconfig **hosts = NULL;
 	const struct rule rules[] = {
-		{ "hosts", "t", .v.t = (void ***)&hosts, test_hosts_handler }, 
+		{ "hosts", "t", .v.t = (void ***)&hosts, test_hosts_handler },
 		{ NULL }
 	};
 
@@ -514,7 +514,7 @@ int set_host_rules( zTable *t ) {
 		free( (*hosts) );
 		hosts++;
 	}
-	return 1; 
+	return 1;
 }
 
 
@@ -522,7 +522,7 @@ int set_host_rules( zTable *t ) {
 int set_route_rules ( zTable *t ) {
 	struct routeh **routes = NULL;
 	const struct rule rules[] = {
-		{ "routes", "t", .v.t = (void ***)&routes, test_routes_handler }, 
+		{ "routes", "t", .v.t = (void ***)&routes, test_routes_handler },
 		{ NULL }
 	};
 
@@ -543,7 +543,7 @@ int set_route_rules ( zTable *t ) {
 		}
 
 		fprintf( stderr, "views: " );
-		while ( c->views && *c->views ) { 
+		while ( c->views && *c->views ) {
 			fprintf( stderr, "%s, ", *c->views ); c->views++;
 		}
 		fprintf( stderr, "\n" );
@@ -556,10 +556,10 @@ int set_route_rules ( zTable *t ) {
 //Tests more rules for pulling one unique key per value
 int set_lua_rules ( zTable *t ) {
 	const struct rule rules[] = {
-		{ "db", "s", .v.s = &host.db }, 
-		{ "title", "s", .v.s = &host.title },  
-		{ "fqdn", "s", .v.s = &host.fqdn }, 
-		//{ "routes", "t", build_routes }, 
+		{ "db", "s", .v.s = &host.db },
+		{ "title", "s", .v.s = &host.title }, 
+		{ "fqdn", "s", .v.s = &host.fqdn },
+		//{ "routes", "t", build_routes },
 		{ NULL }
 	};
 
@@ -569,7 +569,7 @@ int set_lua_rules ( zTable *t ) {
 	if ( !loader_run( t, rules ) ) {
 		return 0;
 	}
-	return 1; 
+	return 1;
  #endif
 }
 #endif
@@ -589,7 +589,7 @@ struct Test {
 	//A callback to set the rules
 	int (*set)( zTable *, void *p );	
 
-	//A callback to dump the filled struct 
+	//A callback to dump the filled struct
 	void (*dump)( zTable *, void *p );	
 
 	//A callback to free bytes allocated by following the ruleset
@@ -618,9 +618,9 @@ int main (int argc, char *argv[]) {
 	struct Test *t = tests;
 	while ( t->filename ) {
 
-		//Initialize Lua and allocate a single table. 
+		//Initialize Lua and allocate a single table.
 		lua_State *L = luaL_newstate();
-		zTable *tt = malloc( sizeof(zTable) ); 
+		zTable *tt = malloc( sizeof(zTable) );
 		char err[ 2048 ] = { 0 };
 		void *p = NULL;
 
@@ -651,7 +651,7 @@ int main (int argc, char *argv[]) {
 
 		memset( p, 0, t->sizep );
 
-		//Run the table through the set of rules and let's see what we find 
+		//Run the table through the set of rules and let's see what we find
 		if ( !t->set( tt, p ) ) {
 			FPRINTF( "Error setting userdata from Lua config file.\n" );
 			goto onext;

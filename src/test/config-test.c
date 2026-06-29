@@ -33,7 +33,7 @@ int main (int argc, char *argv[]) {
 	struct Test *test = tests;
 	while ( test->file ) {
 		char *f = (char *)test->file;
-		char err[2048] = {0}; 
+		char err[2048] = {0};
 		struct config *config = build_config( f, err, sizeof( err ) );
 
 		//Build configuration

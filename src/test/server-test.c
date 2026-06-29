@@ -4,7 +4,7 @@
 #include "../ctx-http.h"
 #include "../ctx-https.h"
 #define PORT 2020
-#define CTX 0 
+#define CTX 0
 #define TESTDIR "tests/server/"
 
 int filter_test( zhttp_t *rq, zhttp_t *rs, struct config *config, struct lconfig *host );
@@ -44,13 +44,13 @@ int filter_test( zhttp_t *rq, zhttp_t *rs, struct config *config, struct lconfig
 
 	http_set_status( rs, 200 );
 	http_set_ctype( rs, "text/html" );
-	http_set_content( rs, (uint8_t *)message, strlen( message ) ); 
+	http_set_content( rs, (uint8_t *)message, strlen( message ) );
 
 	if ( !http_finalize_response( rs, err, sizeof( err ) ) ) {
 		return http_set_error( rs, 500, err );
 	}
 
-	return 1; 
+	return 1;
 }
 
 

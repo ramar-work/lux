@@ -52,7 +52,7 @@ struct HTTPRecord *bodies[] = {
 struct Test {
 	const char *name;
 	zhttp_t request;
-}; 
+};
 
 
 struct Test static_cases[] = {
@@ -86,18 +86,18 @@ struct Test cases[] = {
 
 
 filter_t_test {
-	int (*filter)( 
-		zhttp_t *, 
-		zhttp_t *, 
-		struct config *, 
-		struct lconfig * 
-	); 
-	const char *name; 
+	int (*filter)(
+		zhttp_t *,
+		zhttp_t *,
+		struct config *,
+		struct lconfig *
+	);
+	const char *name;
 	const char *path;
 	const char *root;
 	uint8_t *expected;
 	int len;
-}; 
+};
 
 
 filter_t_test filter_tests[] = {
@@ -145,8 +145,8 @@ filter_t_test filter_tests[] = {
 
 //Write a formatted message to some kind of buffer
 void log_buf ( zhttp_t *res, char *log, int loglen ) {
-	const char logfmt[] = 
-		"%d, %d, "; 
+	const char logfmt[] =
+		"%d, %d, ";
 	memset( log, 0, loglen );
 	int len = snprintf( log, loglen, logfmt, res->status, res->mlen );
 	memcpy( &log[ len ], res->msg, res->mlen );

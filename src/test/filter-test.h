@@ -31,7 +31,7 @@ char HTTP_11[] = "HTTP/1.1";
 struct Test {
 	const char *name;
 	zhttp_t request;
-}; 
+};
 
 
 typedef int (*Filter)(zhttp_t *, zhttp_t *, struct config *, struct lconfig *);

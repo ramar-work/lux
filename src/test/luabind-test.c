@@ -41,7 +41,7 @@ int main ( int argc, char *argv[] ) {
 				status = 0;
 				break;
 			}	
-			file++; 
+			file++;
 		}
 #if 1	
 		if ( status && !lua_combine( L, err, sizeof(err) ) ) {

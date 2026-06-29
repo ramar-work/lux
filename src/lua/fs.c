@@ -3,6 +3,11 @@
  * ====
  *
  * Filesystem primitives for Lua
+ * 
+ * TODO
+ * ==== 
+ * - Explain shadowpath
+ * - Add a depth option to fs.list
  *
  */
 #include "fs.h"

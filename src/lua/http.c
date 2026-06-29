@@ -4,6 +4,13 @@
  *
  * Handle HTTP requests from Lua.
  *
+ * TODO
+ * ----
+ * - Only handles GET right now.  Needs other methods.
+ * - Consider merging with zhttp to enable packaging responses.
+ * - Allow alternate SSL backends. (at least OpenSSL)
+ * - Test with http://etc.com:2000 (port numbers)
+ *
  */
 #include "http.h"
 

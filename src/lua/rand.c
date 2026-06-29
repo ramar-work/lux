@@ -4,6 +4,10 @@
  *
  * Use this module to generate random characters, numbers, or blobs.
  *
+ * TODO
+ * ----
+ * - Add range limits for numbers and characters
+ * - Perhaps get rid of arbitrary lengths
  *
  */
 #include "rand.h"

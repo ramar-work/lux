@@ -106,7 +106,7 @@ exit(0);
 	free( boxlist );
 
 	//Add random datatypes
-	struct randomstruct { int a,b,c,d; }; 
+	struct randomstruct { int a,b,c,d; };
 	int structlistlen = 0;
 	struct randomstruct **structlist = NULL;
 	struct randomstruct *structset[] = {
@@ -128,7 +128,7 @@ exit(0);
 	//This is a tricky one, but it would probably work...
 	char ***charlistlist = NULL;
 	int charlistlen = 0;
-	char **charlistset[] = { 
+	char **charlistset[] = {
 		( char *[] ){ "that", "there", "cletus", NULL },
 		( char *[] ){ "this", "here", "jetus", NULL },
 		( char *[] ){ "there", "where", "HERE!", NULL },
@@ -158,10 +158,10 @@ exit(0);
 	char *d = mrand_nums( 20 );
 	fprintf( stderr, "random nums: %s\n", d );
 	free(d);
-	char *e = mrand_letters( 33 ); 
+	char *e = mrand_letters( 33 );
 	fprintf( stderr, "random letters: %s\n", e );
 	free(e);
-	char *f = mrand_chars( 42 ); 
+	char *f = mrand_chars( 42 );
 	fprintf( stderr, "random chars: %s\n", f );
 	free(f);
 
@@ -176,7 +176,7 @@ exit(0);
 			fprintf( stderr, "FAILED - append_to_uint8t on '%s'\n", *ww );
 			free( w );	
 			break;	
-		} 
+		}
 		ww++;
 	}
 
@@ -186,7 +186,7 @@ exit(0);
 		return 1;
 	}
 
-	fprintf( stderr, "SUCCESS - '%s'\n", (char *)w ); 
+	fprintf( stderr, "SUCCESS - '%s'\n", (char *)w );
 	free( w );
 	return 0;
 
