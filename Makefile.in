@@ -311,4 +311,7 @@ include mk/docs.mk
 # Include test recipes
 include mk/tests.mk
 
+# Include local build targets 
+-include mk/local.mk
+
 .PHONY: check clean dist distcheck docs install test tests bugs 
