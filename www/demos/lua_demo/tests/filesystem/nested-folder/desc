@@ -1,0 +1,45 @@
+bind
+sdesc: "DNS server"
+ldesc: "BIND is an implementation of the Domain Name System (DNS)
+protocols. The DNS protocols are part of the core Internet standards.
+They specify the process by which one computer can find another computer
+on the basis of its name. The BIND software distribution contains all of
+the software needed both to ask name service questions and to answer
+such questions."
+category: Net
+requires: bash bind-utils cygwin libGeoIP1 libbind9_161 libdb5.3 libdns1104 libdns1105 libdns1106 libiodbc2 libisc1100 libisccc161 libisccfg163 libjson-c2 liblmdb0 liblwres161 libmariadb3 libmaxminddb0 libmysqlclient18 libopenldap2_4_2 libpq5 libssl1.1 libxml2 python3 python36-isc python37 python37-isc zlib0
+version: 9.11.9-1
+install: x86_64/release/bind/bind-9.11.9-1.tar.xz 446764 81f4577770bc4d88483522d2e63e29ce1ec2582785213970e1b7dab93c14b770856ed991144c5d8be7227363ce1458b6c870ce49fec91a2820c6cb2429385865
+source: x86_64/release/bind/bind-9.11.9-1-src.tar.xz 8129160 7b5c82fb325d2b314575e473a6bba0855892013be01d579a085528ce076e76fea6b931a9501919ba3264f49c813811ae87ef6db44443c6869025115c0086e33d
+depends2: bash, bind-utils, cygwin, libbind9_161, libdb5.3, libdns1106, libiodbc2, libisc1100, libisccc161, libisccfg163, libjson-c2, liblmdb0, liblwres161, libmariadb3, libmaxminddb0, libopenldap2_4_2, libpq5, libssl1.1, libxml2, python37, python37-isc, zlib0
+[prev]
+version: 9.11.5-2.P4
+install: x86_64/release/bind/bind-9.11.5-2.P4.tar.xz 445192 446d1aa42f7b138855b8bdce3f89c50931e117491a22e5f3d103d5841c2eecc5c463a0338b6a7b0a390120ded15911c987b1e7f618bb21c003a052364eeab9e6
+source: x86_64/release/bind/bind-9.11.5-2.P4-src.tar.xz 8780652 60da38586d35626c0a0765da5cc167e7edb3e2840f15b09658900a01890f73b6bd2ba3dbb797d5e233f97e081a84c9ecc093d31cb11806d3e2b605fe37350b40
+depends2: bash, bind-utils, cygwin, libGeoIP1, libbind9_161, libdb5.3, libdns1104, libiodbc2, libisc1100, libisccc161, libisccfg163, libjson-c2, liblmdb0, liblwres161, libmysqlclient18, libopenldap2_4_2, libpq5, libssl1.1, libxml2, python3, python36-isc, zlib0
+[prev]
+version: 9.11.2-2.P1
+source: x86_64/release/bind/bind-9.11.2-2.P1-src.tar.xz 9525548 4eb579bf971e3b6e065736b5193fefed1a0276cb0829a5461ec52dad37ef5b195e37ae4374072e11e41c6b8f1d0e1112c3f40619488abc11fd327ea05c2dac06
+[prev]
+version: 9.11.2-1
+source: x86_64/release/bind/bind-9.11.2-1-src.tar.xz 9527440 ce6e8d8337c5968adab76752fdc05358874b6681c9aad26d1bb9240b923c9a70319dd46ba0543ab80418263d20194e918af288074f28d38cd2814b9e5bbf8198
+[prev]
+version: 9.11.0-3.P5
+source: x86_64/release/bind/bind-9.11.0-3.P5-src.tar.xz 9445492 eb3da4f9e886c2822f470637d740dfa6f8fa4c3bd394dc0e950aad7c207e5820199f2e9b50626061b451ed956f5d7c7422c2ccb7f0c080c89b790453ef967041
+[prev]
+version: 9.11.0-2.P3
+source: x86_64/release/bind/bind-9.11.0-2.P3-src.tar.xz 9437896 3b88f934503381dd43768dbba85ecf085a771bf8a4ef1216016353239d6392bcbd363403673dba7072e3d48a583e426fc107c3a6c6ba2c8b09f9b5dc98a02490
+[prev]
+version: 9.11.0-1.P2
+source: x86_64/release/bind/bind-9.11.0-1.P2-src.tar.xz 9420084 a633df7ddb9145d13edd5057a0f5dcf43e0da5a9cb87ffd794bdb2e938fdc12a5fd144c17fcb7950dd0dc6bae50e4ab006c20524fde646d3ac111544cf4e12ce
+[prev]
+version: 9.10.4-4.P4
+source: x86_64/release/bind/bind-9.10.4-4.P4-src.tar.xz 9033524 e3b05612843ed4cd8604125d3537ac98bd873026584a81eb28a8155734f4817be9aa240e249f1c3b65cfe4a0c78dbd8d00598bd2ce21a62cea1f353e29083658
+[prev]
+version: 9.10.4-3.P3
+source: x86_64/release/bind/bind-9.10.4-3.P3-src.tar.xz 9031356 90a6df5f584c19b4d714f55a5720d787d41de1416202e999cbf41c5685e0b70a43a773a9757449b0cedc470d8430f14741bb0ed9844fe93fe80e2b995f0b489d
+[prev]
+version: 9.11.6-1
+install: x86_64/release/bind/bind-9.11.6-1.tar.xz 446776 5f8a5c48acfd8bd0ec8ac50de57e740062111d77c4b57220ff68fdad9cb458903a5f9f18f952a280fca198459f1ed2f4e03ec2672ff6e3f99b8d2b58f616e503
+source: x86_64/release/bind/bind-9.11.6-1-src.tar.xz 8094904 7999d9114f81c60d60a6857c489ccc7e5156354f28140018ce4fbc4642e759f2e306718be3527acadc6a8fe51e3eac8c07ef2e5d0cde535bc3c01449acf63298
+depends2: bash, bind-utils, cygwin, libGeoIP1, libbind9_161, libdb5.3, libdns1105, libiodbc2, libisc1100, libisccc161, libisccfg163, libjson-c2, liblmdb0, liblwres161, libmysqlclient18, libopenldap2_4_2, libpq5, libssl1.1, libxml2, python3, python36-isc, zlib0
