@@ -87,7 +87,6 @@ SRC = \
 
 #	@srcdir@/src/xml.c
 #	@srcdir@/src/filters/filter-dirent.c 
-#	@srcdir@/src/filters/filter-redirect.c 
 
 OBJ = ${SRC:.c=.o}
 DEPS = @objdeps@
