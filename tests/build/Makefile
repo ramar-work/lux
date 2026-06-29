@@ -20,7 +20,7 @@ test-custom-configure:
 		--exec-prefix=$(dir)/ \
 		--localstatedir=$(dir)/var \
 		--datarootdir=$(dir)/share \
-		--sysconfidr=$(dir)/etc \
+		--sysconfdir=$(dir)/etc \
 		--enable-local-lua \
 		--enable-local-sqlite3 \
 		--enable-debugging \
@@ -131,6 +131,10 @@ test-instance:
 	test -d $(realdir)/test/www/wwwx/views
 	test -f $(realdir)/test/www/wwwx/views/hello.tpl
 
+# test-uninstall - Tests that uninstall works
+test-uninstall:
+	# Make
+	@cd $(realdir) && make uninstall
 
 # clean - Clean previous results in test up
 clean:
