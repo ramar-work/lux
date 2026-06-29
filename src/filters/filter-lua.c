@@ -1,21 +1,22 @@
-/* ------------------------------------------- * 
- * filter-lua.c 
+/**
+ * filter-lua.c
  * =============
- * 
+ *
  * Summary 
  * -------
- * - 
+ * The Lua filter and all the functions that comprise it.
  *
- * LICENSE
+ *
+ * More
+ * ----
+ * TBD
+ *
+ *
+ * License
  * -------
- * Copyright 2020-2021 Tubular Modular Inc. dba Collins Design
- *
  * See LICENSE in the top-level directory for more information.
  *
- * CHANGELOG 
- * ---------
- * -
- * ------------------------------------------- */
+ */
 #include "filter-lua.h"
 
 #define DYLIB ".so"
@@ -38,6 +39,7 @@ static const char extfmt[] = "%s;%s/?;%s/?.lua";
 
 static const char libcfmt[] = "%s;%s/lib/?" DYLIB;
 
+
 typedef enum {
 	CTYPE_TEXTHTML
 ,	CTYPE_PLAINTEXT
@@ -46,10 +48,12 @@ typedef enum {
 } ctypen_t;
 
 
-typedef struct ctype_t { 
-	const char *ctypename; 
-	ctypen_t ctype; 
+
+typedef struct ctype_t {
+	const char *ctypename;
+	ctypen_t ctype;
 } ctype_t;
+
 
 
 ctype_t ctypes_serializable[] = {
@@ -61,102 +65,55 @@ ctype_t ctypes_serializable[] = {
 , { NULL }
 };
 
+
+
 static const char *ctype_tags[] = {
 	"ctype"
 , "content-type"
-, "contenttype" 
+, "contenttype"
 , NULL
 };
 
 
-//HTTP error
-static int http_error( zhttp_t *res, int status, char *fmt, ... ) { 
-	va_list ap;
-	char err[ 2048 ];
-	memset( err, 0, sizeof( err ) );
-	va_start( ap, fmt );
-	vsnprintf( err, sizeof( err ), fmt, ap );
-	va_end( ap );
-	memset( res, 0, sizeof( zhttp_t ) );
-	res->clen = strlen( err );
-	http_set_status( res, status ); 
-	http_set_ctype( res, ctype_def );
-	http_copy_content( res, err , strlen( err ) );
-	zhttp_t *x = http_finalize_response( res, err, strlen( err ) ); 
-	return x ? 1 : 0;
-}
-
-
-#if 0
-//TODO: This is an incredibly difficult way to make things 
-//read-only...  Is there a better one?
-static const char read_only_block[] = " \
-	function make_read_only( t ) \
-		local tt = {} \
-		local mt = { \
-			__index = t	 \
-		,	__newindex = function (t,k,v) error( 'something went wrong', 1 ) end \
-		}	\
-		setmetatable( tt, mt ) \
-		return tt \
-	end \
-";
-#endif
-
-
-
 //TODO: Change me to accept a function pointer...
-static struct mvcmeta_t { 
-	const char *dir; 
+static struct mvcmeta_t {
+	const char *dir;
 	const char *ext;
-	const char *reserved; 
+	const char *reserved;
 	int (*fp)( int );
 } mvcmeta [] = {
 	{ "app", "lua", "model,models" }
 ,	{ "sql", "sql", "query,queries" }
-,	{ "views", "tpl", "view,views" } 
+,	{ "views", "tpl", "view,views" }
 ,	{ NULL, NULL, "content-type" }
 //,	{ NULL, "inherit", NULL }
 };
 
 
-
-//....
-int run_lua_buffer( lua_State *L, const char *buffer ) {
-	//Load a buffer	
-	luaL_loadbuffer( L, buffer, strlen( buffer ), "make-read-only-function" );
-	if ( lua_pcall( L, 0, LUA_MULTRET, 0 ) != LUA_OK ) {
-		fprintf( stdout, "lua string exec failed: %s", (char *)lua_tostring( L, -1 ) );
-		//This shouldn't fail, but if it does you should stop...
-		return 0;
-	}
-	return 1;
-}
-
-
-#if 0
-//In lieu of a C-only way to make members read only, use this
-static int make_read_only ( lua_State *L, const char *table ) {
-	//Certain tables (and their children) need to be read-only
-	int err = 0;
-	const char fmt[] = "%s = make_read_only( %s )";
-	char execbuf[ 256 ] = { 0 };
-	snprintf( execbuf, sizeof( execbuf ), fmt, table, table );
-
-	//Load a buffer	
-	luaL_loadbuffer( L, execbuf, strlen( execbuf ), "make-read-only" );
-	if ( ( err = lua_pcall( L, 0, LUA_MULTRET, 0 ) ) != LUA_OK ) {
-		fprintf( stdout, "lua string exec failed: %s", (char *)lua_tostring( L, -1 ) );
-		//This shouldn't fail, but if it does you should stop...
-		return 0;
-	}
-	return 1;
-}
-#endif
+static const confkey_t keys[] = {
+	{ "cache",    ZTABLE_TBL, 0, get_cache_header },
+	/* TODO: Support this: ZTABLE_TBL || ZTABLE_TXT */
+	{ "disallow", ZTABLE_TBL, 0, get_disallowed_paths }, 
+	{ "db", ZTABLE_TXT, 0, NULL },
+	{ "fqdn", ZTABLE_TXT, 0, NULL },
+	{ "static", ZTABLE_TBL, 0, NULL },
+	{ "title", ZTABLE_TBL, 0, NULL },
+	#if 0
+	{ "redirect", ZTABLE_TBL, 0, get_redirect },
+	{ "shadow", ZTABLE_TXT, 0, NULL }, // Use a different shadow directory
+	{ "map", ZTABLE_TBL, 0, NULL }, // Map directories to other places
+	{ "routes", ZTABLE_TBL, 0, get_redirect }, // Can't require this
+	#endif
+	{ NULL },
+};
 
 
-
-//Should return an error b/c there are some situations where this does not work.
+/**
+ * int lua_loadlibs( lua_State *L, struct lua_fset *set )
+ *
+ * Load the non-standard Lua libraries (i.e. everything in lux)
+ *
+ */
 int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
 	//Now load everything written elsewhere...
 	for ( ; set->namespace; set++ ) {
@@ -180,7 +137,12 @@ int lua_loadlibs( lua_State *L, struct lua_fset *set ) {
 
 
 
-//Check if there is a reserved keyword being requested
+/**
+ * static int is_reserved( const char *a )
+ *
+ * Check if there is a reserved keyword being requested.
+ *
+ */
 static int is_reserved( const char *a ) {
 	for ( int i = 0; i < sizeof( mvcmeta ) / sizeof( struct mvcmeta_t ); i ++ ) {
 #if 0
@@ -193,7 +155,7 @@ static int is_reserved( const char *a ) {
 	//int sl = strlen( (char *)mvcmeta[ i ].reserved );
 		//for ( ; memwalk( &w, (unsigned char *)mvcmeta[i].reserved, (unsigned char *)",", sl, 1 ); ) {
 #if 0
-fprintf( stderr, 
+fprintf( stderr,
 	"POS: %d Size: %d Len: %ld Next: %d\n",
 	w.pos, w.size, strlen(mvcmeta[i].reserved), w.next ); getchar();
 #endif
@@ -209,7 +171,12 @@ fprintf( stderr,
 
 
 
-//Make a route list
+/**
+ * static int make_route_list ( zKeyval *kv, int i, void *p )
+ *
+ * Make a route list.
+ *
+ */
 static int make_route_list ( zKeyval *kv, int i, void *p ) {
 	struct route_t *tt = (struct route_t *)p;
 	const int routes_wordlen = 6;
@@ -227,7 +194,12 @@ static int make_route_list ( zKeyval *kv, int i, void *p ) {
 
 
 
-//Create a list of resources (an alternate version of this will inherit everything) 
+/**
+ * static int make_mvc_list ( zKeyval *kv, int i, void *p )
+ *
+ * Create a list of resources (an alternate version of this will inherit everything)
+ *
+ */
 static int make_mvc_list ( zKeyval *kv, int i, void *p ) {
 	struct mvc_t *tt = (struct mvc_t *)p;
 	char *key = NULL;
@@ -261,11 +233,11 @@ static int make_mvc_list ( zKeyval *kv, int i, void *p ) {
 	if ( tt->mset && kv->value.type == ZTABLE_TXT && memchr( "mvq", *tt->mset->reserved, 3 ) ) {
 		struct imvc_t *imvc = malloc( sizeof( struct imvc_t ) );
 		memset( imvc, 0, sizeof( struct imvc_t ) );
-		snprintf( (char *)imvc->file, sizeof(imvc->file) - 1, "%s/%s.%s", 
+		snprintf( (char *)imvc->file, sizeof(imvc->file) - 1, "%s/%s.%s",
 			tt->mset->dir, kv->value.v.vchar, tt->mset->ext );
-		snprintf( (char *)imvc->base, sizeof(imvc->base) - 1, "%s.%s", 
+		snprintf( (char *)imvc->base, sizeof(imvc->base) - 1, "%s.%s",
 			kv->value.v.vchar, tt->mset->ext );
-		snprintf( (char *)imvc->ext, sizeof(imvc->ext) - 1, "%s", 
+		snprintf( (char *)imvc->ext, sizeof(imvc->ext) - 1, "%s",
 			tt->mset->ext );
 		add_item( &tt->imvc_tlist, imvc, struct imvc_t *, &tt->flen );
 	}
@@ -281,17 +253,27 @@ static int make_mvc_list ( zKeyval *kv, int i, void *p ) {
 
 
 
-//Free MVC list
+/**
+ * static void free_mvc_list ( void ***list )
+ *
+ * Free MVC list.
+ *
+ */
 static void free_mvc_list ( void ***list ) {
 	for ( void **l = *list; l && *l; l++ ) {
 		free( *l );
-	} 
+	}
 	free( *list ), *list = NULL;
 }
 
 
 
-//Free route list
+/**
+ * static void free_route_list ( struct iroute_t **list )
+ *
+ * Free the route list.
+ *
+ */
 static void free_route_list ( struct iroute_t **list ) {
 	for ( struct iroute_t **l = list; *l; l++ ) {
 		free( (*l)->route ), free( *l );
@@ -301,7 +283,12 @@ static void free_route_list ( struct iroute_t **list ) {
 
 
 
-//Return NULL if there are no files
+/**
+ * static struct dirent * dir_has_files ( DIR *dir )
+ *
+ * Check if a directory contains ANY files, returning NULL if there are none.
+ *
+ */
 static struct dirent * dir_has_files ( DIR *dir ) {
 	int fcount = 0;
 	struct dirent *d = NULL;
@@ -309,7 +296,7 @@ static struct dirent * dir_has_files ( DIR *dir ) {
 		if ( ( dlen = strlen( d->d_name ) > 4 ) && strstr( d->d_name, ".lua" ) ) {
 			//TODO: Will this need to happen b/c it's a different scope?
 			rewinddir( dir );
-			return d; 
+			return d;
 		}
 	}
 	return d;
@@ -317,7 +304,12 @@ static struct dirent * dir_has_files ( DIR *dir ) {
 
 
 
-//Load Lua configuration
+/**
+ * static int load_lua_config( struct luadata_t *l )
+ *
+ * Loads the instance's configuration file.
+ *
+ */
 static int load_lua_config( struct luadata_t *l ) {
 	char *db, *fqdn, cpath[ 2048 ] = { 0 };
 	DIR *dir = NULL;
@@ -329,9 +321,26 @@ static int load_lua_config( struct luadata_t *l ) {
 	//Create a full path to the config file
 	snprintf( cpath, sizeof(cpath) - 1, "%s/%s", l->root, confname );
 
-	//Open the configuration file
+	//Set shadow path
+	lua_pushstring( l->state, l->root );
+	lua_setglobal( l->state, CKEY_SHADOW );
+
+	//stat
+	if ( stat( cpath, &sb ) == -1 ) {
+		char terr[ 1024 ] = {0};
+		strerror_r( errno, terr, sizeof( terr ) );
+		snprintf( l->err, LD_ERRBUF_LEN, "Failed to stat() file: %s: %s", cpath, terr );
+		return 0;
+	}
+
+	//zero-length isn't allowed here...
+	if ( !sb.st_size ) {
+		snprintf( l->err, LD_ERRBUF_LEN, "Configuration file for instance at path %s is zero-length.", l->root );
+		return 0;
+	}
+
+	//open and execute, catching and reporting back any errors
 	if ( !lua_exec_file( l->state, cpath, l->err, LD_ERRBUF_LEN ) ) {
-		//snprintf( l->err, LD_ERRBUF_LEN, "Execution of %s/%s failed.", l->root, "config.lua" );
 		return 0;
 	}
 
@@ -340,10 +349,6 @@ static int load_lua_config( struct luadata_t *l ) {
 		snprintf( l->err, LD_ERRBUF_LEN, "Configuration is not a Lua table." );
 		return 0;
 	}
-
-	//Set shadow path
-	lua_pushstring( l->state, l->root );
-	lua_setglobal( l->state, "shadow" );
 
 	//Check if there are any route files
 	snprintf( cpath, sizeof(cpath) - 1, "%s/%s", l->root, rkey );
@@ -354,8 +359,7 @@ static int load_lua_config( struct luadata_t *l ) {
 	}
 	else {
 		//Find the routes table and put that on the stack
-		lua_pushnil( l->state );
-		for ( ; lua_next( l->state, 1 ); ) {
+		for ( lua_pushnil( l->state ); lua_next( l->state, 1 ); ) {
 			if ( lua_type( l->state, -2 ) == LUA_TSTRING && !strcmp( lua_tostring( l->state, -2 ), "routes" ) ) {
 				lua_remove( l->state, -2 );
 				break;
@@ -364,50 +368,56 @@ static int load_lua_config( struct luadata_t *l ) {
 		}
 
 		//Load each route file and combine it with the route table
-		for ( int dlen, ii; ( d = readdir( dir ) ) ; ) {
-			//Only deal with regular Lua files (eventually can support symbolic links)
-			FPRINTF( "Checking for valid route file at: %s/%s\n", cpath, d->d_name );
-			if ( ( dlen = strlen( d->d_name ) > 4 ) && strstr( d->d_name, ".lua" ) && d->d_type == DT_REG ) { 
-				snprintf( cpath, sizeof(cpath) - 1, "%s/%s/%s", l->root, "routes", d->d_name );
+		for ( int dlen; ( d = readdir( dir ) ) ; ) {
+			//Initialize structures
+			memset( cpath, 0, sizeof( cpath ) );
+			memset( &sb, 0, sizeof( struct stat ) );
 
-				//Open each file in the directory?
+			//Use some of these for slightly easier way to program this
+			char *fn = d->d_name;
+
+			//Only deal with regular Lua files (eventually can support symbolic links)
+			if ( ( dlen = strlen( fn ) > 4 ) && strstr( fn, ".lua" ) && d->d_type == DT_REG ) {
+				//Copy the canonical path
+				snprintf( cpath, sizeof(cpath) - 1, "%s/%s/%s", l->root, "routes", fn );
+				FPRINTF( "Checking for valid route file at: %s\n", cpath );
+
+				//stat
+				if ( stat( cpath, &sb ) == -1 ) {
+					char terr[ 1024 ] = {0};
+					strerror_r( errno, terr, sizeof( terr ) );
+					snprintf( l->err, LD_ERRBUF_LEN, "Failed to stat() file: %s: %s", cpath, terr );
+					return 0;
+				}
+
+				//zero-length files make no sense here, but it's not a big deal so skip it
+				//TODO: Log this
+				if ( !sb.st_size ) {
+					continue;
+				}
+
+				//open and execute, catching and reporting back any errors
 				if ( !lua_exec_file( l->state, cpath, l->err, LD_ERRBUF_LEN ) ) {
-					//snprintf( stderr, "Lua error: %s\n", l->err );
-					//snprintf( l->err, LD_ERRBUF_LEN, "Failed to run file at %s did not return a table.", cpath );
 					return 0;
 				}
 
 				//The resultant value should ALWAYS be a table
-				if ( !lua_istable( l->state, ( ii = lua_gettop( l->state ) ) ) ) {
+				if ( !lua_istable( l->state, lua_gettop( l->state ) ) ) {
 					snprintf( l->err, LD_ERRBUF_LEN, "File at %s did not return a table.", cpath );
 					return 0;
 				}
 
-				//Loop through all the top-level keys
-				lua_pushnil( l->state );
-				for ( const char *vv; lua_next( l->state, ii ); ) {
-					if ( lua_type( l->state, -2 ) != LUA_TSTRING ) {
-						snprintf( l->err, LD_ERRBUF_LEN, "Key in table at %s was not a string.", cpath );
-						return 0;
-					}
-
-					if ( lua_type( l->state, -1 ) != LUA_TTABLE ) {
-						snprintf( l->err, LD_ERRBUF_LEN, "Value at %s in table at %s was not a string.", cpath, lua_tostring( l->state, -2 ) );
-						return 0;
-					}
-
-					//Push the key back for iteration's sake
-					vv = lua_tostring( l->state, -2 );
-					lua_settable( l->state, 2 );
-					lua_pushstring( l->state, vv );
+				//Merge
+				if ( !lua_rmerge( l->state, 2, lua_gettop( l->state ), l->err, LD_ERRBUF_LEN ) ) {
+					return 0;
 				}
+
+				//Pop the added table
+				lua_pop( l->state, 1 ) /*, lua_rdumpstack( l->state ) */;
 			}
 		}
 
-		//Clean up the stack and free the original set of routes
-		lua_pop( l->state, 1 );
-
-		//Add key and set table
+		//Add the right key name and set this table
 		lua_pushstring( l->state, "routes" );
 		lua_insert( l->state, 2 );
 		lua_settable( l->state, 1 );
@@ -436,11 +446,11 @@ static int load_lua_config( struct luadata_t *l ) {
 
 	//TODO: use pointers instead.  There is no reason to copy all of this...
 	if ( ( db = lt_text( t, "db" ) ) ) {
-		memcpy( (void *)l->db, db, strlen( db ) ); 
+		memcpy( (void *)l->db, db, strlen( db ) );
 	}
 
 	if ( ( fqdn = lt_text( t, "fqdn" ) ) ) {
-		memcpy( (void *)l->fqdn, fqdn, strlen( fqdn ) ); 
+		memcpy( (void *)l->fqdn, fqdn, strlen( fqdn ) );
 	}
 
 	lua_pop( l->state, 1 );
@@ -450,7 +460,12 @@ static int load_lua_config( struct luadata_t *l ) {
 
 
 
-//Checking for static paths is important, also need to check for disallowed paths
+/**
+ * static int path_is_static ( struct luadata_t *l )
+ *
+ * Check for static paths.
+ *
+ */
 static int path_is_static ( struct luadata_t *l ) {
 	int i, size, ulen = strlen( l->req->path );
 	if ( ( i = lt_geti( l->zconfig, "static" ) ) == -1 ) {
@@ -473,113 +488,12 @@ static int path_is_static ( struct luadata_t *l ) {
 }
 
 
-
-//Send a static file
-static const int send_static ( zhttp_t *res, const char *dir, const char *uri ) {
-	//Read_file and return that...
-	struct stat sb;
-	int fd = 0;
-	char err[ 2048 ] = { 0 }, spath[ 2048 ] = { 0 };
-	unsigned char *data;
-	const struct mime_t *mime;
-	memset( spath, 0, sizeof( spath ) );
-	snprintf( spath, sizeof( spath ) - 1, "%s/%s", dir, ++uri );
-
-	//Check if the path is there at all (read-file can't do this)
-	if ( stat( spath, &sb ) == -1 ) {
-		return http_error( res, 404, "File '%s' not found", spath );
-	}
-
-	//Get its mimetype
-	if ( !( mime = zmime_get_by_filename( spath ) ) ) {
-		mime = zmime_get_default();
-	}
-#if 0
-	//write max should be checked.
-	//...
-	int dlen = 0;
-
-	//read_file and send back
-	if ( !( data = read_file( spath, &dlen, err, sizeof( err ) ) ) ) {
-		return http_error( res, 500, "static read failed: %s", err );
-	}
-
-	//Gotta get the mimetype too	
-	if ( !( mime = zmime_get_by_filename( spath ) ) ) {
-		mime = zmime_get_default();
-	}
-
-	//Send the message out
-	res->clen = dlen;
-	http_set_status( res, 200 ); 
-	http_set_ctype( res, mime->mimetype );
-	http_set_content( res, data, dlen );
-	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
-		return http_error( res, 500, err );
-	}
-
-	free( data );
-#else
-	//Open the file
-	if ( ( fd = open( spath, O_RDONLY ) ) == -1 ) {
-		return http_error( res, 404, strerror( errno ) );
-	}
-
-	//Prepare the message
-	#if 1
-	//TODO: Enable non sendfile capable systems to be able to send a file the old crappy way.
-	res->atype = ZHTTP_MESSAGE_SENDFILE;
-	res->clen = sb.st_size;
-	res->fd = fd;
-	res->status = 200;
-	res->ctype = (char *)mime->mimetype;
-	#else
-	http_set_fd( res, fd );
-	http_set_content_length( res, sb.st_size );
-	http_set_message_type( res, ZHTTP_MESSAGE_SENDFILE );
-	http_set_status( res, 200 );
-	http_set_ctype( res, mime->mimetype );
-	#endif
-
-	if ( !http_finalize_response( res, err, sizeof(err) ) ) {
-		return http_error( res, 500, err );
-	}
-#endif
-	return 1;
-}
-
-
-//...
-static void dump_records( struct HTTPRecord **r ) {
-	int b = 0;
-	for ( struct HTTPRecord **a = r; a && *a; a++ ) {
-		fprintf( stderr, "%p: %s -> ", *a, (*a)->field ); 
-		b = write( 2, (*a)->value, (*a)->size );
-		b = write( 2, "\n", 1 );
-	}
-}
-
-
-static char * getpath( char *rp, char *ap, int destlen ) {
-	int pos = 0, len = strlen( rp );
-
-	if ( ( pos = memchrat( rp , '?', len ) ) > -1 ) {
-		len = pos;
-	}
-
-	if ( destlen <= pos ) {
-		return NULL;
-	}
-	
-	for ( char *p = ap, *path = rp; *path && *path != '?'; ) {
-		*(p++) = *(path++);
-	}
-
-	return ap;
-}
-
-
-//Initialize routes in Lua
+/**
+ * static int init_lua_routes ( struct luadata_t *l )
+ *
+ * Initialize the routes list
+ *
+ */
 static int init_lua_routes ( struct luadata_t *l ) {
 	zWalker w = {0}, w2 = {0};
 	const char *active = NULL, *path = l->apath + 1, *resolved = l->rroute + 1;
@@ -591,17 +505,17 @@ static int init_lua_routes ( struct luadata_t *l ) {
 
 	//Handle root requests
 	if ( !*path ) {
-		lua_pushinteger( l->state, 1 ); 
-		lua_pushstring( l->state, def ); 
+		lua_pushinteger( l->state, 1 );
+		lua_pushstring( l->state, def );
 		lua_settable( l->state, pos );
 
-		lua_pushstring( l->state, "active" ); 
-		lua_pushstring( l->state, def ); 
+		lua_pushstring( l->state, "active" );
+		lua_pushstring( l->state, def );
 		lua_settable( l->state, pos );
 
 		memcpy( (void *)l->aroute, def, strlen (def) );
 		return 1;
-	} 
+	}
 	
 	// Loop twice to set up the map
 	for ( ; strwalk( &w, path, "/" ); ) {
@@ -652,8 +566,12 @@ static int init_lua_routes ( struct luadata_t *l ) {
 }
 
 
-
-//Initialize HTTP in Lua
+/**
+ * int init_lua_request ( struct luadata_t *l )
+ *
+ * Creates the global "request" key and associated table data.
+ *
+ */
 static int init_lua_request ( struct luadata_t *l ) {
 	//Loop through all things
 	const char *str[] = { "headers", "url" };
@@ -667,9 +585,10 @@ static int init_lua_request ( struct luadata_t *l ) {
 	lua_setstrstr( l->state, "method", l->req->method, 1 );
 	lua_setstrstr( l->state, "protocol", l->req->protocol, 1 );
 	lua_setstrstr( l->state, "host", l->req->host, 1 );
+	lua_setstrstr( l->state, "ipv4", l->ipv4, 1 );
 
 	//In some cases browsers omit the content-type
-	if ( !strcmp( l->req->method, "GET" ) && !strcmp( l->req->ctype, "application/octet-stream" ) ) 
+	if ( !strcmp( l->req->method, "GET" ) && !strcmp( l->req->ctype, "application/octet-stream" ) )
 		lua_setstrstr( l->state, "ctype", "text/html", 1 );
 	else {
 		lua_setstrstr( l->state, "ctype", l->req->ctype, 1 );
@@ -689,12 +608,12 @@ static int init_lua_request ( struct luadata_t *l ) {
 				if ( strcmp( "Cookie", (*r)->field ) != 0 )
 					lua_pushstring( l->state, (*r)->field );
 				else {	
-					char *f = (char *)(*r)->field; 
+					char *f = (char *)(*r)->field;
 					*f = ( *f > 63 && *f < 91 ) ? *f + 32 : *f;
 					lua_pushstring( l->state, f );
 				}
 			#else
-				char *f = (char *)(*r)->field; 
+				char *f = (char *)(*r)->field;
 				*f = ( *f > 63 && *f < 91 ) ? *f + 32 : *f;
 				lua_pushstring( l->state, f );
 			#endif
@@ -704,7 +623,7 @@ static int init_lua_request ( struct luadata_t *l ) {
 				lua_setstrbin( l->state, "value", ( char * )(*r)->value, (*r)->size, pos + 2 );
 				lua_setstrint( l->state, "size", (*r)->size, pos + 2 );
 
-			#if 0 
+			#if 0
 				//For now, we only need to worry with authentication and cookies
 				if ( strcmp( "cookie", (*r)->field ) == 0 ) {
 
@@ -716,7 +635,7 @@ static int init_lua_request ( struct luadata_t *l ) {
 						unsigned char *b, buf[ 256 ] = {0};
 						int si = 0, size = memchr( "=;", w->chr, 2 ) ? w->size - 1 : w->size;
 
-						//Die on sizes that are too large 
+						//Die on sizes that are too large
 						if ( size >= 256 ) {
 							snprintf( l->err, LD_ERRBUF_LEN, "Header %s too large.", i ? "value" : "key" );
 							return 0;
@@ -748,7 +667,7 @@ static int init_lua_request ( struct luadata_t *l ) {
 	}
 
 	//We gotta do the body now	
-	struct HTTPRecord **b; 
+	struct HTTPRecord **b;
 	if ( ( b = l->req->body ) ) {
 		lua_pushstring( l->state, "body" ), lua_newtable( l->state );
 		if ( l->req->formtype == ZHTTP_OTHER ) {
@@ -767,7 +686,7 @@ static int init_lua_request ( struct luadata_t *l ) {
 				//Any other fields?
 			#endif
 				lua_settable( l->state, 3 );
-			} 
+			}
 		}
 		lua_settable( l->state, 1 );			
 	}	
@@ -784,10 +703,32 @@ static int init_lua_shadowpath ( struct luadata_t *l ) {
 
 
 static int init_lua_config ( struct luadata_t *l ) {
-	return ztable_to_lua( l->state, l->zconfig ); 
+	return ztable_to_lua( l->state, l->zconfig );
 }
 
 
+/**
+ * TODO:
+ * struct lua_readonly_t
+ *
+ * Initializes global elements that should show up in MOST requests made through the Lua handler.
+ *
+ * This is not quite functional yet, but the idea is going the right way.
+ * Calling (*exec)(...) should fill in any tables that are expected to be
+ * used in the global scope.
+ *
+ * Right now, this list is:
+ * config - A Lua table representation of everything in the instance config file (config.lua).
+ * request - The headers, IP address and body of the request received
+ * route - The completed part, and route parts of the current request.
+ *
+ * This should also include:
+ * shadow - The "shadow" path, or the root file path accessible to this instance of Lua.
+ * date - Access to the os.date primitives from anywhere within the context of the current request
+ * session - Access to a local or network datastore with the intention of persisting data
+ * cache - A list of objects that should be cached, also possibly handled via local or network datastore.
+ *
+ */
 //Data to initialize global elements
 static struct lua_readonly_t {
 	const char *name;
@@ -805,6 +746,13 @@ static struct lua_readonly_t {
 };
 
 
+
+/**
+ * static int free_ld ( struct luadata_t *l )
+ *
+ * Destroy the Lua data structure.
+ *
+ */
 static int free_ld ( struct luadata_t *l ) {
 	lua_close( l->state );
 	lt_free( l->zconfig ), free( l->zconfig );
@@ -815,15 +763,29 @@ static int free_ld ( struct luadata_t *l ) {
 }
 
 
-char * text_encode ( ztable_t *t ) {
+
+/**
+ * static char * text_encode ( ztable_t *t )
+ *
+ * TODO: Come up with a better way to handle this.
+ *
+ */
+static char * text_encode ( ztable_t *t ) {
 	char *c = malloc( 1 );
 	*c = '\0';
 	return c;
 }
 
 
+
+/**
+ * static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t )
+ *
+ * Return content as a serializable type.
+ *
+ */
 static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
-	char * content = NULL; 
+	char * content = NULL;
 	const char *ctype = NULL;
 	int clen = 0;
 	zhttp_t *p = NULL;
@@ -854,16 +816,16 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 		ctype = t->ctypename;
 	}
 	else {
-		//TODO: This should handle the other types... 
+		//TODO: This should handle the other types...
 		content = text_encode( l->zmodel );
 		clen = strlen( content );
 		ctype = "text/plain";
 	}
 
 	l->res->clen = clen;
-	http_set_status( l->res, 200 ); 
+	http_set_status( l->res, 200 );
 	http_set_ctype( l->res, t->ctypename );
-	http_set_content( l->res, (unsigned char *)content, l->res->clen ); 
+	http_set_content( l->res, (unsigned char *)content, l->res->clen );
 
 	//Return the finished message if we got this far
 	p = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN );
@@ -874,15 +836,12 @@ static zhttp_t * return_as_serializable ( struct luadata_t *l, ctype_t *t ) {
 
 
 
-
-//Check if the user asked to delay the response...
-static int delay_response ( struct luadata_t *l ) {
-	return 1;
-}
-
-
-
-//...
+/**
+ * static int return_as_response ( struct luadata_t *l )
+ *
+ * Return the completed operations as a response versus an HTML (or other visual markup) page.
+ *
+ */
 static int return_as_response ( struct luadata_t *l ) {
 
 	ztable_t *rt = NULL;
@@ -940,12 +899,12 @@ static int return_as_response ( struct luadata_t *l ) {
 	
 	//Get the content-type (if there is one)
 	if ( ( ctype_i = lt_geti( rt, "ctype" ) ) > -1 ) {
-		snprintf( ctype, sizeof( ctype ) - 1, "%s", lt_text_at( rt, ctype_i ) ); 
+		snprintf( ctype, sizeof( ctype ) - 1, "%s", lt_text_at( rt, ctype_i ) );
 	}
 
 	//Get the content-length (if there is one)
 	if ( ( clen_i = lt_geti( rt, "clen" ) ) > -1 ) {
-		clen = lt_int_at( rt, clen_i ); 
+		clen = lt_int_at( rt, clen_i );
 	}
 
 	//Get the content
@@ -1004,11 +963,11 @@ static int return_as_response ( struct luadata_t *l ) {
 		for ( zKeyval *kv = lt_items( rt, "headers" ); ( kv = lt_items( rt, "headers" ) ); ) {
 			if ( kv->key.type == ZTABLE_TRM )
 				break;
-			if ( kv->key.type	!= ZTABLE_TXT && (  kv->value.type	!= ZTABLE_TXT && kv->value.type != ZTABLE_INT ) ) { 
+			if ( kv->key.type	!= ZTABLE_TXT && (  kv->value.type	!= ZTABLE_TXT && kv->value.type != ZTABLE_INT ) ) {
 				snprintf( l->err, LD_ERRBUF_LEN, "Got invalid header value." );
 				return 0; // die
 			}
- 
+
 			if ( kv->value.type == ZTABLE_TXT )
 				http_set_header( l->res, kv->key.v.vchar, kv->value.v.vchar );
 			else if ( kv->value.type == ZTABLE_INT ) {
@@ -1022,12 +981,12 @@ static int return_as_response ( struct luadata_t *l ) {
 	if ( !delayed ) {
 		//Set structures
 		l->res->clen = clen;
-		http_set_status( l->res, status ); 
+		http_set_status( l->res, status );
 		http_set_ctype( l->res, ctype );
-		http_set_content( l->res, content, clen ); 
+		http_set_content( l->res, content, clen );
 
 		//Return finalized content
-		zhttp_t *rr = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN ); 
+		zhttp_t *rr = http_finalize_response( l->res, l->err, LD_ERRBUF_LEN );
 		lt_free( rt ), free( rt );
 		if ( file_i > -1 || prepped_own_content ) {
 			free( content );
@@ -1043,7 +1002,7 @@ int find_matching_route ( struct luadata_t *l ) {
 	ztable_t *t = NULL;
 	struct route_t p =  { 0 };
 
-	if ( lt_geti( l->zconfig, "routes" ) > -1 ) { 
+	if ( lt_geti( l->zconfig, "routes" ) > -1 ) {
 		//Create a mini table
 		p.src = t = lt_copy_by_key( l->zconfig, "routes" );
 
@@ -1082,74 +1041,279 @@ int has_views( struct imvc_t **list ) {
 }
 
 
-//The entry point for a Lua application
+
+/**
+ * char *pdirname ( char *path )
+ *
+ * Returns the directory name of a path in [dirpath].
+ *
+ */
+static char *pdirname ( const char *path, char *dirpath, int dplen ) {
+	int len = strlen( path );
+	char *p = NULL;
+
+	// If too big, stop
+	if ( len > dplen ) {
+		return NULL;
+	}
+
+	// Still count from the back
+	p = (char *)path + len;
+	for ( ; len > 0 && *p != '/'; p--, --len );
+
+	// If *p == '/', copy to dirpath, otherwise return p
+	if ( *p == '/' ) {
+		memcpy( dirpath, path, len );
+		return dirpath;
+	}
+
+	return p;
+}
+
+
+/**
+ * static char *prnodes( const char *path, char *dirpath, int dplen )
+ *
+ * Returns the part of a node (or string) that succeeds a specific character.
+ *
+ */
+static char *prnodes( const char *src, char *dest, int dplen, char c, int count, int keep ) {
+
+	int len = strlen( src );
+	int clen = 0;
+	int nodescount = 0;
+	char *p = (char *)src;
+	char *d = dest;
+
+	// If either is blank, stop
+	if ( !src || !dest ) {
+		return NULL;
+	}
+
+	// If too big, stop
+	if ( len > dplen ) {
+		return NULL;
+	}
+
+	// If count is not positive stop
+	if ( count < 1 ) {
+		return NULL;
+	}
+
+#if 0
+	// Move through the src and trim to only return what we asked for.
+	for ( ; len > 0 && *p; p++, len-- ) {
+		if ( *p == c ) {
+			if ( ++nodescount == count ) break;
+		}
+		*(d++) = *p;
+	}
+#endif
+
+	// Still count from the back
+	p = (char *)src + len;
+	for ( ; len > 0; --p, --len, ++clen ) {
+		if ( *p == c ) {
+			if ( ++nodescount == count ) break;
+		}
+	}
+
+	// If len == 0, return src
+	if ( len == 0 ) {
+		return (char *)src;
+	}
+
+	// If !keep, modify
+	if ( !keep ) {
+		p++, clen--;
+	}
+
+	// If *p == '/', copy to dirpath, otherwise return p
+	memcpy( dest, p, clen );
+	return dest;
+}
+
+
+
+
+/**
+ * static char *pnodes( const char *path, char *dirpath, int dplen )
+ *
+ * Returns the part of a node (or string) that precedes a specific character.
+ *
+ */
+static char *pnodes( const char *src, char *dest, int dplen, char c, int count, int lead ) {
+
+	int len = strlen( src );
+	int nodescount = 0;
+	char *p = (char *)src;
+	char *d = dest;
+
+	// If either is blank, stop
+	if ( !src || !dest ) {
+		return NULL;
+	}
+
+	// If too big, stop
+	if ( len > dplen ) {
+		return NULL;
+	}
+
+	// If count is not positive stop
+	if ( count < 1 ) {
+		return NULL;
+	}
+
+	// Move through the src and trim to only return what we asked for.
+	for ( ; len > 0 && *p; p++, len-- ) {
+		*(d++) = *p;
+		if ( *p == c ) {
+			if ( ++nodescount == count ) break;
+		}
+	}
+
+	if ( !lead ) {
+		*(--d) = '\0';
+	}
+
+	return dest;
+}
+
+
+
+/**
+ * char *peval( struct luadata_t *ld, struct imvc_t *m )
+ *
+ * Evaluates special characters in route listings.
+ *
+ */
+char *peval( char *dest, int dlen, struct luadata_t *ld, struct imvc_t *m ) {
+	// This should all be split out now...
+	char fname[ PATH_MAX ];
+	memset( fname, 0, PATH_MAX );
+	int fnlen = 0;
+
+	// Copy each over
+	for ( char *f = fname, *mm = (char *)m->file; fnlen < sizeof( fname ) && *mm; ) {
+		*f = *mm;
+		int len = 0;
+
+		// Do a simple replacement with the active route name
+		if ( *f == '@' ) {
+			len = strlen( ld->aroute );
+			memcpy( f, ld->aroute, len );
+			f += len, mm++, fnlen += len;
+			continue;
+		}
+
+		// Do a simple replacement with the root node of "dirname"
+		else if ( *f == '^' ) {
+			//multiple $'s define how far up to look at the chain for the replacement
+			char *dp = NULL, dirname[ PATH_MAX ];
+			memset( dirname, 0, PATH_MAX );
+			if ( !( dp = pnodes( ld->rroute, dirname, PATH_MAX, '/', 2, 0 ) ) ) {
+			// sET ERROR STRING
+				return NULL;
+			}
+			dp++;
+			len = strlen( dp );
+			memcpy( f, dp, len );
+			f += len, mm++, fnlen += len;
+			continue;
+		}
+
+		// Do a simple replacement with the "dirname" of the current route path
+		else if ( *f == '#' ) {
+			int count = 0;
+			char *dp = NULL, dirname[ PATH_MAX ];
+			memset( dirname, 0, PATH_MAX );
+	#if 0
+			if ( memcmp( f, "###", 3 )	)
+				count = 3;
+			else if ( memcmp( f, "##", 2 )	)
+				count = 2;
+			else {
+				count = 1;
+			}
+	#endif
+
+			if ( !( dp = pdirname( ld->rroute, dirname, PATH_MAX ) ) ) {
+			// sET ERROR STRING
+				return NULL;
+			}
+			dp++;
+			len = strlen( dp );
+			memcpy( f, dp, len );
+			f += len, mm++, fnlen += len;
+			continue;
+		}
+
+		f++, mm++, fnlen++;
+	}
+
+	snprintf( dest, dlen, "%s/%s", ld->root, fname );
+	return dest;
+}
+
+
+
+
+/**
+ * const int filter_lua( const server_t *serv, conn_t *conn )
+ *
+ * The entry point for a Lua application.
+ *
+ */
 const int filter_lua( const server_t *serv, conn_t *conn ) {
 
-	//Define variables and error positions...
-	ztable_t zc = {0}, zm = {0};
+	// Define variables and error positions...
+	int ccount = 0;
+	int clen = 0;
+	int model = 0;
+	int tcount = 0;
+	int view = 0;
 	struct luadata_t ld = {0};
-	int clen = 0, ccount = 0, tcount = 0, model = 0, view = 0;
+	struct lconfig *host = conn->config;
+	ztable_t zc = {0};
+	ztable_t zm = {0};
 	unsigned char *content = NULL;
 
-	//Prepare the response
+	// Initialize the request address buffer
+	snprintf( ld.ipv4, LD_IPV4_LEN, "%s", conn->ipv4 );
+
+	// Prepare the response
 	memset( conn->res, 0, sizeof( zhttp_t ) );
 
-	//Initialize Lua data structure
-	ld.req = conn->req; 
+	// Initialize Lua data structure
+	ld.req = conn->req;
 	ld.res = conn->res;
 	ld.res->atype = ZHTTP_MESSAGE_MALLOC;
-	memcpy( (void *)ld.root, conn->config->dir, strlen( conn->config->dir ) );
 
-	//Then initialize the Lua state
+	// Check that the directory was specified
+	if ( !host->dir ) {
+		return http_error( conn->res, 500, "%s", "No directory path specified for this site." );
+	}
+
+	// Then copy it over
+	memcpy( (void *)ld.root, host->dir, strlen( host->dir ) );
+
+	// Then initialize the Lua state
 	if ( !( ld.state = luaL_newstate() ) ) {
 		return http_error( conn->res, 500, "%s", "Failed to initialize Lua environment." );
 	}
 
-	//Load the standard libraries first
+	// Load the standard libraries first
 	luaL_openlibs( ld.state );
 
-	//Then load the Hypno extensions 
+	// Then load the extensions
 	if ( !lua_loadlibs( ld.state, functions ) ) {
 		free_ld( &ld );
-		return http_error( conn->res, 500, "Failed to initialize Lua standard libs." ); 
+		return http_error( conn->res, 500, "Failed to initialize Lua standard libs." );
 	}
 
-	//Then start loading our configuration
-	if ( !load_lua_config( &ld ) ) {
-		free_ld( &ld );
-		return http_error( conn->res, 500, "%s\n", ld.err );
-	}
-
-	//Need to delegate to static handler when request points to one of the static paths
-	if ( path_is_static( &ld ) ) {
-		free_ld( &ld );
-		return send_static( conn->res, ld.root, conn->req->path );
-	}
-
-	//req->path needs to be modified to return just the path without the ?
-	if ( !getpath( conn->req->path, (char *)ld.apath, LD_LEN ) ) {
-		free_ld( &ld );
-		return http_error( conn->res, 500, "%s", "Failed to extract path info into Lua userspace - Path too long, try increasing LD_LEN to fix this." );
-	}
-
-	if ( !find_matching_route( &ld ) ) {
-		free_ld( &ld );
-		return http_error( conn->res, 404, "Couldn't find path at %s\n", ld.apath );
-	}
-
-	//Loop through the structure and add read-only structures to Lua, 
-	//you could also add the libraries, but that is a different method
-	for ( struct lua_readonly_t *t = lua_readonly; t->name; t++ ) {
-		if ( !t->exec( &ld ) ) {
-			free_ld( &ld );
-			return http_error( conn->req, ld.status, ld.err );
-		}
-		lua_setglobal( ld.state, t->name );
-	}
-
-	//Set package path
+	// Set custom package path (in addition to Lua's regular include path)
 	if ( lua_retglobal( ld.state, "package", LUA_TTABLE ) ) {
-		//Get the path of whatever we're talking about
+		// Get the path of whatever we're talking about
 		char ppath[ PATH_MAX / 2 ] = { 0 }, cpath[ PATH_MAX / 2 ] = {0};
 		const char *lpath = lua_getv( ld.state, "path", 1 );
 		snprintf( ppath, sizeof( ppath ) - 1, extfmt, lpath, ld.root, ld.root );
@@ -1159,7 +1323,7 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 		snprintf( cpath, sizeof( cpath ) - 1, libcfmt, lcpath, ld.root );
 		lua_pop( ld.state, lua_gettop( ld.state ) - 1 );
 
-		//Re-add to the table
+		// Re-add to the table
 		#if 1
 		lua_setstrstr( ld.state, "path", ppath, 1 );
 		lua_setstrstr( ld.state, "cpath", cpath, 1 );
@@ -1174,48 +1338,233 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 		lua_setglobal( ld.state, "package" );
 	}
 
+	//Then start loading our configuration
+#if 1
+	if ( !load_lua_config( &ld ) ) {
+		free_ld( &ld );
+		return http_error( conn->res, 500, "%s\n", ld.err );
+	}
+#else
+	// This just got a hell of a lot longer...
+#endif
+
+	//Need to delegate to static handler when request points to one of the static paths
+	if ( path_is_static( &ld ) ) {
+
+		// TODO: All of this will be moving to the top when time permits
+		char err[ 2048 ] = {0};
+		char fpath[ 2048 ] = {0};
+		char *cache_header = NULL;
+		int status = 0;
+		struct stat sb = {0};
+		const char *xuri = conn->req->path;
+		int da = 0, *disallowed = &da;
+		const confkey_t skeys[] = {
+			{ "cache",    ZTABLE_TBL, 0, get_cache_header },
+			/* TODO: Support this: ZTABLE_TBL || ZTABLE_TXT */
+			{ "disallow", ZTABLE_TBL, 0, get_disallowed_paths },
+			#if 0
+			{ "redirect", ZTABLE_TBL, 0, get_redirect },
+			#endif
+			{ NULL },
+		};
+
+	#if 1
+		FPRINTF( "*** config dir is '%s'***\n", conn->config->dir );
+		FPRINTF( "*** path should be '%s'***\n", conn->req->path );
+
+	#endif
+
+		// Concat
+		if ( !concat( fpath, sizeof( fpath ) - 1, "%s/%s", host->dir, xuri + 1 ) ) {
+			const char fmt[] = "Failed to generate full path to requested page";
+			return http_error( conn->res, 500, "%s", fmt );
+		}
+
+		// Check for the existence of file on server
+		if ( stat( fpath, &sb ) == -1 ) {
+			snprintf( err, sizeof( err ) - 1, "%s: %s.", strerror( errno ), fpath );
+			// TEST: Disallow access most anywhere in the requested path
+			if ( errno == EACCES ) {
+				// log it, and do any custom handling
+				return http_error( conn->res, 401, "%s", "Unauthorized" );
+			}
+			// TEST: Request a file that's not there
+			else if ( errno == ENOENT ) {
+				// log it, and do any custom handling
+				return http_error( conn->res, 404, "%s", "Not found" );
+			}
+			// TEST: too many symbolic links is somewhat easy to simulate
+			else {
+				return http_error( conn->res, 500, "%s", "Server error occurred" );
+			}
+		}
+
+		// Then check that it's a real file (if not, it's a 400)
+		if ( !S_ISREG( sb.st_mode ) && !S_ISLNK( sb.st_mode ) ) {
+			return http_error( conn->res, 400, "%s", "Bad Request" );
+		}
+
+		// Finally, check that the current user has read access to the file
+		if ( access( fpath, R_OK ) == -1 ) {
+			return http_error( conn->res, 401, "%s", "Unauthorized" );
+		}
+
+		#if 0
+		// TODO: This check should NEVER be needed here, b/c only explicitly
+		// defined static paths are allowed in the first place
+		for ( const char **dname = def_disallowed_paths; dname && *dname; dname++ ) {
+			if ( memstrat( fname, *dname, strlen(fname) ) == 0 ) {
+				FPRINTF( "--- Caught disallowed path '%s' ~= %s ---\n", *dname, fname );
+				// TODO: Log the attempt
+				return http_error( conn->res, 401, "Unauthorized" );
+			}
+		}
+		#endif
+
+		#if 1
+		// Search for disallow
+		if ( extr_key( ld.zconfig, "disallow", keys, xuri, &disallowed, err, sizeof( err ) ) && *disallowed ) {
+			FPRINTF( "--- disallow = %s ***\n", err );
+			return http_error( conn->res, 401, "%s", "Unauthorized" );
+		}
+
+		#if 0
+		// Search for redirect
+		if ( extr_key( conf, "redirect", keys, xuri, &redir_header, err, sizeof( err ) ) && redir_header ) {
+			// May have to make the entire message
+			FPRINTF( "--- redirect = %s ***\n", redir_header );
+			//return http_error( conn->res, 401, "%s", "Allocation failure." );
+		}
+		#endif
+
+		// Search for cache
+		if ( extr_key( ld.zconfig, "cache", keys, xuri, &cache_header, err, sizeof( err ) ) && cache_header ) {
+			//http_set_header( conn->res, "Cache-control", cache_header );
+			http_copy_header( conn->res, "Cache-control", cache_header );
+			free( cache_header );
+		}
+		#endif
+
+		// Send it on
+		if ( !send_static( conn->res, fpath, err, sizeof( err ) ) ) {
+			return http_error( conn->res, 500, "%s", err );
+		}
+
+		// Free any resources
+		free_ld( &ld );
+		return 1;
+	}
+
+	//req->path needs to be modified to return just the path without the ?
+	if ( !getpath( conn->req->path, (char *)ld.apath, LD_LEN ) ) {
+		free_ld( &ld );
+		return http_error( conn->res, 500, "%s", "Failed to extract path info into Lua userspace - Path too long, try increasing LD_LEN to fix this." );
+	}
+
+	//TODO: this needs some work.  Mostly just precedence.
+	if ( !find_matching_route( &ld ) ) {
+		free_ld( &ld );
+		return http_error( conn->res, 404, "Couldn't find path at %s\n", ld.apath );
+	}
+
+	//Loop through the structure and add read-only structures to Lua,
+	//you could also add the libraries, but that is a different method
+	for ( struct lua_readonly_t *t = lua_readonly; t->name; t++ ) {
+		if ( !t->exec( &ld ) ) {
+			free_ld( &ld );
+			return http_error( conn->req, ld.status, ld.err );
+		}
+		lua_setglobal( ld.state, t->name );
+	}
+
+#if 0
+	//NOTE: 'Set package path' from above was done here previously, check first for issues
+#endif
+
 	//Execute each model
 	for ( struct imvc_t **m = ld.pp.imvc_tlist; m && *m; m++ ) {
 		//Define
-		char err[2048] = {0}, msymname[1024] = {0}, mpath[ 2192 ] = {0};
+		char err[2048] = {0};
+		char msymname[1024] = {0};
+		char mpath[ 2192 ] = {0};
 
 		//Check for a file
 		if ( *(*m)->file == 'a' ) {
-			//Open the file that will execute the model
-			if ( *(*m)->base != '@' )
+			//TODO: Consider using single matches
+			//No special characters found, execute the model.
+			if ( !strchr( (*m)->base, '@' ) && !strchr( (*m)->base, '#' ) && !strchr( (*m)->base, '^' ) ) {
 				snprintf( mpath, sizeof( mpath ), "%s/%s", ld.root, (*m)->file );
-			else {
-				snprintf( mpath, sizeof( mpath ), "%s/%s/%s.%s", ld.root, "app", ld.aroute, (*m)->ext );
+			}
+			else if ( !peval( mpath, sizeof( mpath ), &ld, (*m) ) ) {
+				return http_error( conn->res, 500, "An error occurred processing route: %s", ld.rroute );
 			}
 
-			//...
+			//Actually load and execute said file...
 			FPRINTF( "Executing model %s\n", mpath );
 			if ( !lua_exec_file( ld.state, mpath, ld.err, sizeof( ld.err ) ) ) {
 				free_ld( &ld );
 				return http_error( conn->res, 500, "Error occurred: %s", ld.err );
 			}
 
-			//Get name of model file in question 
+			//Get name of model file in question
 			memcpy( msymname, &(*m)->file[4], strlen( (*m)->file ) - 8 );
 
 			//Get a count of the values which came from the model
 			tcount += ccount = lua_gettop( ld.state );
 
+			//Check the stack here and make sure that a TABLE was returned...
+			FPRINTF( "Checking the stack here after execution of '%s'...\n", mpath );
+			FPRINTF( "(%d values on stack)\n", ccount );
+
+			// After exec of anything w/ nil, we still fail...
+			// If any values are NOT a table, fail
+			for ( int i = 1; i <= ccount; i++ ) {
+				if ( lua_isnone( ld.state, i ) )
+					FPRINTF( "Only exec, no values.  This is fine.\n" );
+				else if ( lua_istable( ld.state, i ) )
+					FPRINTF( "Got table.  This is fine.\n" );
+				else {
+					// For what we're doing, it makes little sense to return anything else...
+					const char fmt[] =
+						"Executing file %s results in a primitive value.  "
+						"(Please try refactoring the code in this file to return values in a key-value table.)"
+					;
+					free_ld( &ld );
+					snprintf( ld.err, sizeof( ld.err ), fmt, mpath );
+					return http_error( conn->res, 500, "Error occurred: %s", ld.err );
+				}
+			}
+
 			//Merge previous models
 			if ( tcount > 1 ) {
 				lua_getglobal( ld.state, modelkey );
-				( lua_isnil( ld.state, -1 ) ) ? lua_pop( ld.state, 1 ) : 0;
-				lua_merge( ld.state );	
+
+				// No model? Get rid of whatever was added and keep going
+				if ( lua_isnil( ld.state, -1 ) ) {
+					lua_pop( ld.state, 1 );
+				}
+
+				// Previous model exists?, go ahead and merge
+				else {
+					//When/if a merge fails, error out and don't try again
+					if ( !lua_rmerge( ld.state, 1, 2, ld.err, sizeof( ld.err ) ) ) {
+						free_ld( &ld );
+						snprintf( ld.err, sizeof( ld.err ), "Executing file %s results", mpath );
+						return http_error( conn->res, 500, "Error occurred: %s", ld.err );
+					}
+					lua_remove( ld.state, 2 ); // lua_pop( L, 1 ) should also work
+				}
 				lua_setglobal( ld.state, modelkey );
-			} 
+			}
 			else if ( ccount ) {
 				lua_setglobal( ld.state, modelkey );
 			}
 			model = 1;
 		}
 
-		//Stop if the user specifies a 'response' table that's not empty...
-		if ( lua_retglobal( ld.state, "response", LUA_TTABLE ) ) {
+		// Stop if the user specifies a 'response' table that's not empty...
+		if ( lua_retglobal( ld.state, CKEY_RESPONSE, LUA_TTABLE ) ) {
 			FPRINTF( "Evaluating response table.\n" );
 			int eres = return_as_response( &ld );
 
@@ -1236,34 +1585,46 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 		}
 	}
 
-	//Can we simply check if config exists in _G?
+	// Can we simply check if config exists in _G?
 	if ( has_views( ld.pp.imvc_tlist ) && lua_retglobal( ld.state, configkey, LUA_TTABLE ) ) {
-		FPRINTF( "Adding config...\n" );
+		FPRINTF( "Adding config table to model...\n" );
 		
-		//Make a config key and do some stuff...
+		// Make a config key and do some stuff...
 		lua_newtable( ld.state );
 		lua_pushstring( ld.state, configkey );
 		lua_pushnil( ld.state );
 		lua_copy( ld.state, 1, 4 );
-		lua_remove( ld.state, 1 ); 
+		lua_remove( ld.state, 1 );
 		lua_settable( ld.state, 1 );
 
-		//...
+		// Reference the model from Lua
 		lua_getglobal( ld.state, modelkey );
-	#if 0
-		lua_isnil( ld.state, -1 ) ? lua_pop( ld.state, 1 ) : 0;
-	#else
-		lua_isnil( ld.state, -1 ) ? lua_pop( ld.state, 1 ) : lua_merge( ld.state );
-	#endif
+
+		// There was no model executed here
+		if ( lua_isnil( ld.state, -1 ) ) {
+			lua_pop( ld.state, 1 );
+		}
+		// This should be a table, but I think it will be...
+		//else if ( !lua_rmerge( ld.state, 0, ld.err, sizeof( ld.err ) ) ) {
+		else {
+			if ( !lua_rmerge( ld.state, 1, 2, ld.err, sizeof( ld.err ) ) ) {
+				free_ld( &ld );
+				return http_error( conn->res, 500, "Error when merging config and model: %s", ld.err );
+			}
+			lua_remove( ld.state, 2 ); // lua_pop( L, 1 ) should also work
+		}
 
 		//Add it back to the model after successful merge
 		lua_setglobal( ld.state, modelkey );
-		FPRINTF( "Config done.\n" );
+		FPRINTF( "Adding config done...\n" );
 	}
+
+	//TODO: Optionally can add other modules here (like date, etc)
+	//...
 
 	//Could be either a table or string... so account for this
 	if ( lua_retglobal( ld.state, modelkey, LUA_TTABLE ) ) {
-		FPRINTF( "Adding model...\n" );
+		FPRINTF( "Converting model to ztable...\n" );
 		const char **c = ctype_tags;
 		char tkey[ 1024 ] = { 0 }, *key = lt_retkv( ld.zroute, 0 )->key.v.vchar;
 		int count = lua_count( ld.state, 1 ), ksize = sizeof( tkey );
@@ -1302,7 +1663,7 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 			}
 		}
 
-		//Finally, check if there is a view specified 
+		//Finally, check if there is a view specified
 		memset( tkey, 0, ksize ), snprintf( tkey, ksize - 1, "%s.%s", key, "view" );
 		if ( lt_geti( ld.zroute, tkey ) == -1 ) {
 			if ( !return_as_serializable( &ld, &ctypes_serializable[ CTYPE_JSON ] ) ) {
@@ -1349,7 +1710,7 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 				return http_error( conn->res, 500, "%s", errbuf );
 			}
 
-			zhttp_append_to_uint8t( &content, &clen, render, renlen ); 
+			zhttp_append_to_uint8t( &content, &clen, render, renlen );
 			zrender_free( rz ), free( render ), free( src );
 			view = 1;
 		}
@@ -1372,11 +1733,11 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 	char *ctype = zhttp_dupstr( ctype_def );
 	conn->res->ctype = ctype;
 	#endif
-	http_set_content( conn->res, content, clen ); 
+	http_set_content( conn->res, content, clen );
 
 	//Return the finished message if we got this far
 	if ( !http_finalize_response( conn->res, ld.err, LD_ERRBUF_LEN ) ) {
-		snprintf( conn->err, sizeof( conn->err ), 
+		snprintf( conn->err, sizeof( conn->err ),
 			"Failed to finalize HTTP response: %s", ld.err );
 		FPRINTF( "Failed to finalize HTTP response: %s", ld.err );
 		free_ld( &ld );
@@ -1389,41 +1750,3 @@ const int filter_lua( const server_t *serv, conn_t *conn ) {
 	free( content );
 	return 1;
 }
-
-
-
-#ifdef RUN_MAIN
-int main ( int argc, char *argv[] ) {
-	zhttp_t req = {0}, res = {0};
-	char err[ 2048 ] = { 0 };
-
-	//Populate the request structure.  Normally, one will never populate this from scratch
-	req.path = zhttp_dupstr( "/books" );
-	req.ctype = zhttp_dupstr( "text/html" );
-	req.host = zhttp_dupstr( "example.com" );
-	req.method = zhttp_dupstr( "GET" );
-	req.protocol = zhttp_dupstr( "HTTP/1.1" );
-
-	//Assemble a message from here...
-	if ( !http_finalize_request( &req, err, sizeof( err ) ) ) {
-		fprintf( stderr, "%s\n", err );
-		return 1; 
-	}
-
-	//run the handler
-	if ( !lua_handler( &req, &res ) ) {
-		fprintf( stderr, "lmain: HTTP funct failed to execute\n" );
-		write( 2, res.msg, res.mlen );
-		http_free_request( &req );
-		http_free_response( &res );
-		return 1;
-	}
-
-	//Destroy res, req and anything else allocated
-	http_free_request( &req );
-	http_free_response( &res );
-
-	//After we're done, look at the response
-	return 0;
-}
-#endif
