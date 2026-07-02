@@ -5,6 +5,9 @@
 # archives/ should never be tracked
 archives/
 
+# .build should never be tracked
+.build/
+
 # include/ should never be tracked
 include/
 
