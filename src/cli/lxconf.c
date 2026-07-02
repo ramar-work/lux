@@ -19,6 +19,7 @@
  * TODO
  * ----
  * - Come up with a clean way to update hosts when adding new sites.
+ * - -H name=x,dir=y,filter=z
  *
  */
 
@@ -32,20 +33,22 @@
 	"-V, --version            Show version information and quit.\n" \
 	"-v, --verbose            Tell me everything.\n" \
 	"-h, --help               Show the help menu.\n" \
+	"-t, --type <arg>         Generate a configuration file for either a server or instance.\n" \
+	"    --server             Alias for server configuration file generation.\n" \
+	"    --instance           Alias for instance configuration file generation.\n" \
 	"\n" \
   "Server specific:\n" \
 	"\n" \
-	"-w, --wwwroot <arg>      Define a database connection to use with this instance.\n" \
+	"-w, --wwwroot <arg>      Define a wwwroot to use.\n" \
 	"-f, --filter <arg>       Define a DEFAULT filter to use with all instances\n" \
 	"                         associated with this configuration.\n" \
 	"-H, --host <arg>         Define a host to use with this instance.\n" \
 	"\n" \
   "Instance specific:\n" \
 	"-b, --database <arg>     Define a database connection to use with this instance.\n" \
-	"-t, --type <arg>         Generate a configuration file for either a server or instance.\n" \
 	"-n, --fqdn <arg>         Define a fully qualified domain name for this instance.\n" \
 	"-t, --title <arg>        Define an HTML title for this instance.\n" \
-	"-s, --static <arg>       Define static paths that the instance should serve. (Use \n"
+	"-S, --static <arg>       Define static paths that the instance should serve. (Use \n"
 
 
 const dir_t file_def[] = {
@@ -110,16 +113,25 @@ void print_config ( config_t *ua ) {
 	fprintf( stderr, "Create:      %d\n", ua->create );
 	fprintf( stderr, "Type:        %c\n", ua->type );
 	fprintf( stderr, "Path:        %s\n", ua->path );
-#if 0
-	fprintf( stderr, "Domain Name: %s\n", ua->domain  );
-	fprintf( stderr, "Title:       %s\n", ua->title );
-	fprintf( stderr, "Database:    %s\n", ua->database );
-	fprintf( stderr, "Static paths:\n" );
-	for ( const char **sp = ua->statics.strings; sp && *sp; sp++ ) {
-		fprintf( stderr, "%s\n", *sp );
+	if ( ua->type == 's' ) {
+		fprintf( stderr, "WWW Root:    %s\n", ua->wwwroot );
+		//fprintf( stderr, "Default Filter:    %s\n", ua->database );
+		//fprintf( stderr, "Default Port:    %s\n", ua->database );
+		fprintf( stderr, "Hosts:\n" );
+		for ( const char **sp = ua->statics.strings; sp && *sp; sp++ ) {
+			fprintf( stderr, "%s\n", *sp );
+		}
 	}
-	fprintf( stderr, "Package:     %s\n", ua->package );
-#endif
+	else {
+		fprintf( stderr, "Domain Name: %s\n", ua->domain  );
+		fprintf( stderr, "Title:       %s\n", ua->title );
+		fprintf( stderr, "Database:    %s\n", ua->database );
+		fprintf( stderr, "Static paths:\n" );
+		for ( const char **sp = ua->statics.strings; sp && *sp; sp++ ) {
+			fprintf( stderr, "%s\n", *sp );
+		}
+	}
+
 	return;
 }
 
@@ -165,6 +177,10 @@ int main ( int argc, char *argv[] ) {
 			ua.create = 1;
 		else if ( EVALARG( *argv, "-v", "--verbose" ) )
 			ua.verbose = 1;
+		else if ( EVALARG( *argv, "-s", "--server" ) )
+			ua.type = 's';	
+		else if ( EVALARG( *argv, "-i", "--instance" ) )
+			ua.type = 'i';	
 		else if ( EVALARG( *argv, "-o", "--output" ) && !SAVEARG( argv, ua.path ) )
 			return EXITPRINTF( 1, "%s\n", "Argument required for --output." );	
 		else if ( EVALARG( *argv, "-w", "--wwwroot" ) && !SAVEARG( argv, ua.wwwroot ) )
@@ -175,9 +191,9 @@ int main ( int argc, char *argv[] ) {
 			return EXITPRINTF( 1, "%s\n", "Argument required for --database." );	
 		else if ( EVALARG( *argv, "-n", "--fqdn" ) && !SAVEARG( argv, ua.domain ) )
 			return EXITPRINTF( 1, "%s\n", "Argument required for --fqdn." );	
-		else if ( EVALARG( *argv, "-t", "--title" ) && !SAVEARG( argv, ua.title ) )
+		else if ( EVALARG( *argv, "-T", "--title" ) && !SAVEARG( argv, ua.title ) )
 			return EXITPRINTF( 1, "%s\n", "Argument required for --title." );	
-		else if ( EVALARG( *argv, "-s", "--static" ) ) {
+		else if ( EVALARG( *argv, "-S", "--static" ) ) {
 			if ( !*( ++argv ) ) {
 				return EXITPRINTF( 1, "Expected argument for --static!" );
 			}
@@ -231,18 +247,17 @@ print_config( &ua );
 
 		// Create an instance config file
 		if  ( ua.type == 's' ) {
+			path = SHAREDIR "config.server.lua.in";
+
 			// wwwroot cannot be blank in this case
 			if ( !ua.wwwroot ) {
-				fprintf( stdout, NAME ": Must define a default wwwroot when creating a server configuration\n" );
-				return 0;
+				ua.wwwroot = ".";
 			}
 
-			path = SHAREDIR "config.server.lua";
-
 			// Define finds and replacements with this weird little structure
-			kset[ 0 ].key = "root"; //, &ua.database, 2 };
+			kset[ 0 ].key = "wwwroot"; //, &ua.database, 2 };
 			kset[ 0 ].ptr = &ua.wwwroot;
-			kset[ 0 ].len = 4;
+			kset[ 0 ].len = 7;
 
 			// Define finds and replacements with this weird little structure
 			kset[ 1 ].key = "default_filter"; //, &ua.database, 2 };
@@ -252,7 +267,7 @@ print_config( &ua );
 
 		// Create an instance config file
 		else if ( ua.type == 'i' ) {
-			path = SHAREDIR "config.instance.lua";
+			path = SHAREDIR "config.instance.lua.in";
 
 			// Define finds and replacements with this weird little structure
 			kset[ 0 ].key = "db"; //, &ua.database, 2 };
@@ -271,7 +286,7 @@ print_config( &ua );
 
 		// Open and read contents to memory
 		if ( !( file = read_file( path, &filelen, err, sizeof( err ) ) ) ) {
-			fprintf( stdout, NAME ": File read error: %s\n", err );
+			fprintf( stderr, NAME ": File read error: %s\n", err );
 			return 0;
 		}
 
@@ -280,7 +295,7 @@ print_config( &ua );
 			fd = 1;
 		// Blow the original away if you specified a path
 		else if ( ( fd = open( ua.path, O_CREAT | O_RDWR | O_TRUNC, 0644 ) ) == -1 ) {
-			fprintf( stdout, NAME ": File open error: %s\n", strerror( errno ) );
+			fprintf( stderr, NAME ": File open error: %s\n", strerror( errno ) );
 			return 0;
 		}
 
