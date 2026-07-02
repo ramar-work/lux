@@ -6,7 +6,7 @@
  *
  * Usage
  * -----
- * -
+ * 
  *
  * LICENSE
  * -------
@@ -21,9 +21,9 @@
  *
  * TODO
  * ----
- * - Compress a package (by selectively pulling things?)
  * - Create a new package (by creating a new template)
- * - De-cmopress a pcakage (to a specific location)
+ * - Compress a package (by selectively pulling things?)
+ * - Decompress a pcakage (to a specific location)
  *
  * ------------------------------------------- */
 #include "lxcommon.h"
@@ -50,6 +50,17 @@ struct gnutls_abstr {
 #define PORT 22
 
 #define HOST "192.168.56.12"
+
+#define PKGNAME_LENGTH_LIMIT 255
+
+
+/* List of illegal ASCII characters for *nix and Windows */
+#if 1
+//#define PKGNAME_ILLEGAL_CHARS
+const uint8_t PKGNAME_ILLEGAL_CHARS[] = "/?*[]$!&<>|'\":\t\n\\\0";
+#else
+const uint8_t _IC[] = { '/', '?', '*', '[', ']', '$', '!', '&', '<', '>', '|', '"', '\'', ':', '\t', '\n', '\\', '\0' };
+#endif
 
 #define HELP \
 	"-c, --create             Create a new package.\n" \
@@ -82,12 +93,9 @@ struct repository {
 };
 
 
-
-
 // Default for packages for new instances
 const dir_t pkg_def[] = {
 	{ "/README.md", H_FILE, SHAREDIR "package.README.md" },
-	{ "/Makefile", H_FILE, SHAREDIR "package.Makefile" },
 	{ "/app/", H_DIR, NULL },
 	{ "/app/stub.lua", H_FILE, SHAREDIR "app.stub.lua" },
 	{ "/assets/", H_DIR, NULL },
@@ -99,10 +107,12 @@ const dir_t pkg_def[] = {
 	{ "/tests/", H_DIR, NULL },
 	{ "/sql/", H_DIR, NULL },
 	{ "/src/", H_DIR, NULL },
+	{ "/src/Makefile", H_FILE, SHAREDIR "package.Makefile" },
 	{ "/views/", H_DIR, NULL },
 	{ "/views/stub.tpl", H_FILE, SHAREDIR "views.stub.tpl" },
 	{ NULL }
 };
+
 
 const char *skip_files[] = {
 	".git/", 
@@ -1074,6 +1084,7 @@ int is_tar_gz ( const char *pkgname, char *err, int errlen ) {
  *
  */
 int copy_to_instance( const char *instdir, const char *pkgname, char *err, int errlen ) {
+
 	// Define
 	unsigned char *pkg = NULL;
 	int pkglen = 0;
@@ -1127,6 +1138,9 @@ typedef struct config_t {
 	/* The source directory of the new package */
 	char *srcdir;
 
+	/* The name of the package */
+	char *pkgname;
+
 	/* Where to place the compressed files that comprise a package directory */
 	char *comppath;
 
@@ -1146,7 +1160,8 @@ typedef struct config_t {
 void print_config ( config_t *ua ) {
 	fprintf( stderr, "Create:      %d\n", ua->create );
 	fprintf( stderr, "Install:     %d\n", ua->install );
-	fprintf( stderr, "Package:     %s\n", ua->package );
+	fprintf( stderr, "Name:        '%s'\n", ua->pkgname );
+	//fprintf( stderr, "Package:     %s\n", ua->package );
 	fprintf( stderr, "Instance:    %s\n", ua->instance );
 	fprintf( stderr, "Repository:  %s\n", ua->repository );
 	fprintf( stderr, "Source Dir:  %s\n", ua->srcdir );
@@ -1158,25 +1173,14 @@ void print_config ( config_t *ua ) {
 
 int main ( int argc, char *argv[] ) {
 
-	// Define some basics
+	// Define
 	char err[ 1024 ] = { 0 };
+	config_t ua = { 0 };
 
 	if ( argc < 2 ) {
 		fprintf( stderr, NAME ":\n%s\n", HELP );
 		return 1;
 	}
-
-	// Set up some sensible defaults
-	// TODO: Make me global
-	config_t ua = {
-		.create = 0,
-		.install = 0,
-		.package = NULL,
-		.instance = NULL,
-		.repository = NULL,
-		.verbose = 0,
-		.srcdir = NULL,
-	};
 
 	// Skip the first argument...
 	for ( argv++; *argv; ) {
@@ -1202,62 +1206,103 @@ int main ( int argc, char *argv[] ) {
 			return EXITPRINTF( 1, "%s\n", "Argument required for --compress." );	
 		}
 		else if ( EVALARG( *argv, "-i", "--install" ) ) {
-			if ( !SAVEARG( argv, ua.package ) ) {
+			if ( !SAVEARG( argv, ua.pkgname ) ) {
 				return EXITPRINTF( 1, "%s\n", "Argument required for --install." );	
 			}
 			ua.install = 1;
 		}
-#if 0
 		// An alternate way of defining a package 
-		else if ( EVALARG( *argv, "-p", "--package" ) && !SAVEARG( argv, ua.package ) )
+		else if ( EVALARG( *argv, "-p", "--package" ) && !SAVEARG( argv, ua.pkgname ) )
 			return EXITPRINTF( 1, "%s\n", "Argument required for --package." );	
+		else if ( EVALARG( *argv, "-n", "--name" ) && !SAVEARG( argv, ua.pkgname ) ) {
+			return EXITPRINTF( 1, "%s\n", "Argument required for --name." );	
+		}
+	#if 0
 		// Attempt to extract a package from a running instance
 		else if ( EVALARG( *argv, "-E", "--extract" ) && !SAVEARG( argv, ua.extract ) )
 			return EXITPRINTF( 1, "%s\n", "Argument required for --extract." );	
-#endif
+	#endif
 		else if ( EVALARG( *argv, "-V", "--version" ) ) {
 			fprintf( stdout, "%s\n", PACKAGE_VERSION );
 			return 0;
 		}
-#if 1
+	#if 1
 		else if ( !memcmp( *argv, "-", 1  ) ) {
 			return EXITPRINTF( 1, NAME ": Got unknown argument %s!\n", *argv );
 		}
-#endif
+	#endif
 		argv++;
 	}
 
-	// 
+	#if 1
+	// TODO: Debugging only, so get rid of this once we're more stable 
 	print_config( &ua );
+	#endif
 
-	// 
+	// Stop if no actions are specified 
 	if ( !ua.create && !ua.install ) {
 		fprintf( stderr, NAME ": No actions specified.\n" );
 		return 1;
 	}
 
-	// If the user specifies a directory, use the basename as package name
-	if ( ua.srcdir && !ua.package ) {
-		ua.package = pbasename( ua.srcdir );
-	}
-
-	// Create stuff
+	// Create scaffolding for a new package 
 	if ( ua.create ) {
 
-		// Check for the instance or the package?
-		if ( !ua.package ) {
-			fprintf( stderr, NAME ": No package specified\n" );
+		// Use the directory basename as package name if no name was specified
+		if ( ua.srcdir && !ua.pkgname ) {
+			ua.pkgname = pbasename( ua.srcdir );
+		}
+
+		// Check for a package name otherwise.
+		if ( !ua.pkgname ) {
+			fprintf( stderr, NAME ": --create was specified with no package name.  Stopping...\n" );
 			return 1;
+		}
+
+		// Package names are going to be arbitrarily less than 256 characters
+		if ( strlen( ua.pkgname ) > PKGNAME_LENGTH_LIMIT ) {
+			fprintf( stderr, NAME ": Package names must be less than 256 characters.  Stopping...\n" );
+			return 1;
+		}
+
+		// The first character should only be a-z.
+		if ( !strchr( "abcdefghijklmnopqrstuvwxyz", *ua.pkgname ) ) {
+			fprintf( stderr, NAME ": Package names can only start with characters [a-z].  Stopping...\n" );
+			return 1;
+		}
+
+		// Also check the pkgname for illegal or nonsensical characters.
+		for ( uint8_t *x = NULL, len = 0, *px = (uint8_t *)ua.pkgname; *px; px++, len++ ) {
+
+			// Block illegal characters
+			if ( ( x = memchr( PKGNAME_ILLEGAL_CHARS, *px, sizeof( PKGNAME_ILLEGAL_CHARS ) ) ) ) {
+				fprintf( stderr, NAME ": Got invalid character '%c' in package name.  Stopping...\n", *x );
+				return 1;
+			}
+
+			// Block silly or unreadable sequences (TODO: There must be some other way to express this.)
+			if ( len && ( !memcmp( (px - 1), "-_", 2 ) || !memcmp( (px - 1), "_-", 2 ) || !memcmp( (px - 1), "--", 2 ) || !memcmp( (px - 1), "__", 2 ) ) ) {
+				char tmp[ 3 ] = {0};
+				memcpy( tmp, px - 1, 2 ); 
+				fprintf( stderr, NAME ": Got invalid character sequence '%s' in package name.  Stopping...\n", tmp );
+				return 1;
+			}
+		}	
+
+		// If a source directory wasn't specified, assume that the user
+		// wants to place it in the current directory.
+		if ( !ua.srcdir ) {
+			ua.srcdir = ua.pkgname;
 		}
 
 		// Replacements
 		kset_t reps[] = {
-			{ "pkgname", &ua.package, 2 },
+			{ "pkgname", &ua.pkgname, 2 },
 			{ NULL }
 		};
 
 		if ( !create_dirs( ua.srcdir, (dir_t *)pkg_def, reps, err, sizeof( err ) ) ) {
-			fprintf( stderr, NAME ": Creating package '%s' failed: %s\n", ua.package, err );
+			fprintf( stderr, NAME ": Creating package '%s' failed: %s\n", ua.pkgname, err );
 			return 1;
 		}
 
@@ -1274,21 +1319,21 @@ int main ( int argc, char *argv[] ) {
 		unsigned char *pkg = NULL;
 
 		// Check for the instance or the package?
-		if ( !ua.package ) {
+		if ( !ua.pkgname ) {
 			fprintf( stderr, NAME ": No package specified\n" );
 			return 1;
 		}
 
 		// Some quick debugging info
 		if ( 1 ) {
-			FPRINTF( "basename %s\n", pbasename( ua.package ) );
-			FPRINTF( "package %s\n", ua.package );
+			FPRINTF( "basename %s\n", pbasename( ua.pkgname ) );
+			FPRINTF( "package %s\n", ua.pkgname );
 			FPRINTF( "instance %s\n", ua.instance );
 		}
 
 	#if 1
 		// Copy it to instance	
-		if ( !copy_to_instance( ua.instance, ua.package, err, sizeof( err ) ) ) {
+		if ( !copy_to_instance( ua.instance, ua.pkgname, err, sizeof( err ) ) ) {
 			fprintf( stderr, NAME ": Installing package <pkg-name> to <dir> failed: %s\n", err );
 			return 1;
 		}
