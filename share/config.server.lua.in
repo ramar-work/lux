@@ -16,6 +16,10 @@
 return {
 	wwwroot = "@wwwroot@",
 	-- filter = "@default_filter@",
+	-- port = "@default_port@",
+	-- protocol = "@default_protocol@",
+	-- ipv4addr = "@ipv4_addr@",
+	-- ipv6addr = "@ipv6_addr@",
 	hosts = {
 		-- Default host in case no domain is specified
 		["localhost"] = { 
