@@ -118,8 +118,8 @@ server: $(DEPS) $(OBJ)
 
 # package - Builds lxpkg only
 package: $(DEPS) $(OBJ)
-	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
-	$(CC) $(CFLAGS) $(srcdir)/src/cli/lxpkg.c -o $(srcdir)/bin/lxpkg $(OBJ) $(DEPS) $(LDFLAGS) -larchive
+	#	-@test -d $(srcdir)/bin/ || mkdir $(srcdir)/bin/
+	#	$(CC) $(CFLAGS) $(srcdir)/src/cli/lxpkg.c -o $(srcdir)/bin/lxpkg $(OBJ) $(DEPS) $(LDFLAGS) -larchive
 
 # cli - Builds admin tool only
 # FIXME: $(DEPS) will result in wasted space here.  TLS, for example, is not used
