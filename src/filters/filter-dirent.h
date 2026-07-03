@@ -9,7 +9,7 @@
  *
  * Usage
  * -----
- * filter-dirent.c allows hypno to act as a directory server, in which the
+ * filter-dirent.c allows lux to act as a directory server, in which the
  * server simply presents the user with a list of files for view or download. 
  *
  * LICENSE

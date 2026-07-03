@@ -9,7 +9,7 @@
  *
  * Usage
  * -----
- * filter-static.c enables Hypno to act as a static file server.
+ * filter-static.c enables lux to act as a static file server.
  *
  * LICENSE
  * -------

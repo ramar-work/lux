@@ -1,14 +1,36 @@
-# hypno
+# Lux 
 
-A low maintenance library and tools for web development.
+Web application development with Lua.
 
 
-## Building from Source
+## Summary
 
-hypno depends on the following:
+- Why would I use this?
+
+- What advantages do I have compared to other engines?
+
+- What can I do with this?
+
+
+## Setup 
+
+### Building from Source
+
+At the very least, Lux depends on the following:
 
 - Lua v5.4 or greater
+- SQLite3
+
+<!--
+Optionally, for TLS & package management support
+-->
+Optionally, for TLS support
+
 - GnuTLS 2.0 or greater
+
+<!--
+- libarchive  
+-->
 
 If cloning from Git, use the following command to create a configure script and Makefile:
 ```
@@ -16,13 +38,14 @@ autoupdate && autoreconf --install
 ```
 
 
+#### General Instructions for Linux
 
+Lux can be built from source like other common Linux software via the following steps.
 
-### Linux
-
-Hypno can be built from source like other common Linux software via the following steps.
 <pre>
-./configure && make && sudo make install
+$ ./configure 
+$ make 
+$ sudo make install
 </pre>
 
 Running `./configure --help` will display all of the different ways that the build can be customized for your system.   Your most important options are most likely going to be:
@@ -31,7 +54,7 @@ Running `./configure --help` will display all of the different ways that the bui
 - `--with-server-group` - To define the group that owns the server process
 
 
-#### Debian 
+##### Debian 
 
 Instructions for Debian will also be sufficient for other apt-based distributions.
 
@@ -39,18 +62,18 @@ Instructions for Debian will also be sufficient for other apt-based distribution
 # Install the following dependencies
 $ apt install liblua5.4-dev gnutls-dev make
 
-# Get hypno via Git
-$ git clone https://github.com/ramar-work/hypno.git
+# Get Lux via Git
+$ git clone https://github.com/ramar-work/Lux.git
 
 # Make and install (remember to use `sudo` when installing)
-$ cd hypno && make && make install
+$ cd Lux && make && make install
 
 # Run the examples at port 2222
 $ make examples
 </pre>
 
 
-#### Fedora
+##### Fedora
 
 Instructions for Debian ought to translate to other yum-based distributions.
 
@@ -58,30 +81,30 @@ Instructions for Debian ought to translate to other yum-based distributions.
 # Install dependencies
 $ yum install lua-devel gnutls-devel make
 
-# Get hypno via Git
-$ git clone https://github.com/ramar-work/hypno.git
+# Get Lux via Git
+$ git clone https://github.com/ramar-work/Lux.git
 
 # Make and install (remember to use `sudo` when installing)
-$ cd hypno && make && make install
+$ cd Lux && make && make install
 
 # Run the examples to see the code in action.
 $ make examples
 </pre>
 
 
-#### Arch & others
+##### Arch & others
 
-Arch happens to be the distribution that hypno is developed on and
+Arch happens to be the distribution that Lux is developed on and
 it is a fairly straightforward process to build there.  
 <pre>
 # Install dependencies
 $ pacman -Sy lua gnutls
 
-# Get hypno via Git
-$ git clone https://github.com/ramar-work/hypno.git
+# Get Lux via Git
+$ git clone https://github.com/ramar-work/Lux.git
 
 # Make and install
-$ cd hypno && make && make install
+$ cd Lux && make && make install
 
 # Run the examples to see the code in action.
 $ make examples
@@ -89,7 +112,7 @@ $ make examples
 
 
 
-### Windows (via Cygwin)
+#### Windows (via Cygwin)
 
 The Cygwin build is pretty close to what it would be on a typical
 Linux system.  Dependencies can be grabbed either through the command-line
@@ -114,32 +137,28 @@ The rest of the build steps are follow what would be done a regular Linux
 system.
 
 <pre>
-# Get hypno via Git
-$ git clone https://github.com/ramar-work/hypno.git
+# Get Lux via Git
+$ git clone https://github.com/ramar-work/Lux.git
 
 # Make and install
-$ cd hypno && make && make install
+$ cd Lux && make && make install
 
 # Run the examples at port 2222
 $ make examples
 </pre>
 
-NOTE: In my opinion, running Hypno on Cygwin is really just
-useful for quick tests.  The emulation and utilities used to get that
-Linux feel just aren't fast enough for production-level performance.
 
+#### Mac OS 
 
-### OSX
-
-The OSX build needs a bit of work.   Building Lua manually and linking against
+The Mac OS build needs a bit of work.   Building Lua manually and linking against
 that seems to be the best solution for now. 
 
-The OSX build also requires brew, which requires XCode and XCode's command line 
+The Mac OS build also requires brew, which requires XCode and XCode's command line 
 tools.
 
-#### Getting Dependencies via Brew
+##### Getting Dependencies via Brew
 
-The GnuTLS dependency can be grabbed via Brew.  Hypno will also require `pkg-config`
+The GnuTLS dependency can be grabbed via Brew.  Lux will also require `pkg-config`
 to find all of the libraries after installation.
 
 <pre>
@@ -149,7 +168,7 @@ $ brew install gnutls pkg-config
 Unfortunately, the Lua package downloaded with Homebrew does not ship with 
 it's headers or a library.  So we'll need to create one ourselves.
 
-#### Getting and Building Lua
+##### Getting and Building Lua
 
 There are three steps to building Lua manually.
 
@@ -165,16 +184,16 @@ $ make macosx && make install
 </pre>
 
 
-#### Building Hypno
+##### Building Lux
 
-Building Hypno now will be simliar to other Linux based builds.
+Building Lux now will be simliar to other Linux based builds.
 
 <pre>
-# Get hypno via Git
-$ git clone https://github.com/ramar-work/hypno.git
+# Get Lux via Git
+$ git clone https://github.com/ramar-work/Lux.git
 
 # Make and install
-$ cd hypno && make && make install
+$ cd Lux && make && make install
 
 # Run the examples at port 2222
 $ make examples
@@ -183,7 +202,7 @@ $ make examples
 
 <!-- ## Using the CLI -->
 <!--  -->
-<!-- Hypno can create its own application directories like other big frameworks.  It's usage is something like this: -->
+<!-- Lux can create its own application directories like other big frameworks.  It's usage is something like this: -->
 <!--  -->
 <!-- Flags                 | Function -->
 <!-- -----                 | -------- -->
@@ -204,14 +223,14 @@ $ make examples
 
 ### App Development
 
-Hypno's greatest use is as a general purpose web application server.  It can be extended to serve applications in a variety of languages, but first and foremost relies on Lua for the generation of what we'll call models.  For those familiar with the concept of MVC, a model is nothing more than a set of business logic.   Views by default are handled with a Mustache-esque (<a href="https://mustache.github.io">Mustache</a>) templating language.  
+Lux's greatest use is as a general purpose web application server.  It can be extended to serve applications in a variety of languages, but first and foremost relies on Lua for the generation of what we'll call models.  For those familiar with the concept of MVC, a model is nothing more than a set of business logic.   Views by default are handled with a Mustache-esque (<a href="https://mustache.github.io">Mustache</a>) templating language.  
 
-Hypno relies on three tools to work together in tandem: a server (hypno-server), a cli tool for administration (hypno-cli), and a testing engine (hypno-harness).   More information can be found #here, #here and #here. 
+Lux relies on three tools to work together in tandem: a server (Lux-server), a cli tool for administration (Lux-cli), and a testing engine (Lux-harness).   More information can be found #here, #here and #here. 
 
 The folllowing command will create a new instance for your web application.
 
 <pre>
-$ hypno-cli -d /path/to/your/directory
+$ Lux-cli -d /path/to/your/directory
 </pre>
 
 There are some additional options that will allow you to customize the domain name used, any static paths, and more.
@@ -276,7 +295,7 @@ return {
 
 As you can see, our config file also specifies some default static paths that are needed for a majority of front-facing web applications.  These are `favicon.ico`, `ROBOTS.TXT` and anything under the `assets/` directory.  Editing the `/assets` path will, of course, modify which resources are accessible.
 
-Notice the `db` key and value.   Hypno comes with both SQLite and MySQL drivers out of the box, and we can choose either by specifying the type of driver via URI and either a file or connection string depending on the desired backend.
+Notice the `db` key and value.   Lux comes with both SQLite and MySQL drivers out of the box, and we can choose either by specifying the type of driver via URI and either a file or connection string depending on the desired backend.
 
 Lastly, the config file expects a few keys by default, but we are free to add much more as needed.  For example, if we would like to keep track of a Google site verification ID, it can be done via something like the following:
 
@@ -318,7 +337,7 @@ return {
 
 ...will define two routes for this website.  One for root (/) and one for /namaste.   
 
-hypno generates messages by executing the code in the files defined by the model key, and either returning that in a serialized format, or loading a view and sending the model output through that.  This means for our "/namaste" endpoint above, that hypno expects to find a file titled `$DIR/app/peace.lua` when looking for a model.  If hypno does not find it, it will return a 500 error, since the engine cannot find a required file.  Since we've also defined a view, hypno will expect to find a file titled `$DIR/views/peace.tpl`.   Errors in the template will return a 500, explaining what went wrong.  Likewise, a 500 will also be returned if the view file is not found.
+Lux generates messages by executing the code in the files defined by the model key, and either returning that in a serialized format, or loading a view and sending the model output through that.  This means for our "/namaste" endpoint above, that Lux expects to find a file titled `$DIR/app/peace.lua` when looking for a model.  If Lux does not find it, it will return a 500 error, since the engine cannot find a required file.  Since we've also defined a view, Lux will expect to find a file titled `$DIR/views/peace.tpl`.   Errors in the template will return a 500, explaining what went wrong.  Likewise, a 500 will also be returned if the view file is not found.
 
 The routes table also comes with some helpful conventions to make it easier to design large sites.  One convention is using a comma seperated list to let multiple routes point to the same set of files.  The following example will allow our site to serve requests for `/`, `/nirvana`, `/namaste`, `/enlightenment`.
 
@@ -356,7 +375,7 @@ return {
 }
 </pre> 
 
-Whenever the `@` symbol is specified in a model or view, hypno will search for a file matching the <i>active route</i>.  Using the the code above, if we get a request for `/namaste`, hypno now will expect a file named `$DIR/app/namaste.lua` to exist.  <i>One caveat to the `@` symbol evaluation, is that it does not work well with the home page requests.   This will change in a future version of hypno, but for right now, <b>just don't do it</b>.</i>
+Whenever the `@` symbol is specified in a model or view, Lux will search for a file matching the <i>active route</i>.  Using the the code above, if we get a request for `/namaste`, Lux now will expect a file named `$DIR/app/namaste.lua` to exist.  <i>One caveat to the `@` symbol evaluation, is that it does not work well with the home page requests.   This will change in a future version of Lux, but for right now, <b>just don't do it</b>.</i>
 
 Lastly, the `model` and `view` do not always have to point to a string.   We can use both strings and tables and come up with some interesting combinations.  Let's say, for example, that we have a specific header that we want to load when serving requests for the home page.
 
@@ -397,7 +416,7 @@ return {
 
 ### Models
 
-Most any Lua code can be used when writing business logic, and packages can be installed via LuaRocks for extended functionality.  Additionally, Hypno comes with a large set of extensions that allow for a more cohesive experience when doing certain operations.  For example, the db module allows for fairly seamless (though simplistic one-time) connections to a few different dbms systems.   Sessions and common encoding/decoding routines also ship with Hypno, so unless there is a need for an encoding that does not exist, the engine will be able to serve most needs.
+Most any Lua code can be used when writing business logic, and packages can be installed via LuaRocks for extended functionality.  Additionally, Lux comes with a large set of extensions that allow for a more cohesive experience when doing certain operations.  For example, the db module allows for fairly seamless (though simplistic one-time) connections to a few different dbms systems.   Sessions and common encoding/decoding routines also ship with Lux, so unless there is a need for an encoding that does not exist, the engine will be able to serve most needs.
 
 There are no real restrictions on models returned, but at the very least we'll need something like the following for a model to work:
 <pre>
@@ -464,80 +483,78 @@ will render something like this:
 
 ## Tools 
 
-Hypno comes with 3 different command line tools to help serve applications, which are discussed below.
+Lux comes with different command line tools to aid development and serve applications, which are discussed below:
 
 
-### hypno-server
+### lxsrv 
 
-`hypno-server` handles: 
-
-- Serving static web pages.
-- Serving web applications via a shared object.
-- Serving a list of files in a directory.
-- Handling redirects.
-- Serving TLS encrypted traffic.
+`lxsrv` manages the Lux web server and supports static & Lua-driven sites by default.  In most cases, you won't interact directly with this tool; it will be managed by systemd or some other init system for a production site.
 
 The commands are listed below: 
 <pre>
--s, --start                  Start the server              
--c, --config <arg>           Use this Lua file for configuration
--p, --port <arg>             Start using a different port  
--u, --user <arg>             Choose an alternate user to start as
--d, --dump                   Dump configuration            
-    --no-fork                Do not fork                   
-    --use-ssl                Use SSL                       
-    --debug                  set debug rules               
--h, --help                   Show the help menu.  
+-s, --start                 Start the server
+-k, --kill                  Kill a running server
+-c, --configuration <arg>   Use this Lua file for configuration
+-p, --port <arg>            Start using a different port 
+    --pidfile <arg>         Define a PID file
+-u, --user <arg>            Choose an alternate user to run as
+-g, --group <arg>           Choose an alternate group to run as
+-x, --dump                  Dump configuration at startup
+-L, --logfile <arg>         Define an alternate log file location
+-V, --version               Show version information and quit.
+-W, --wbuffer <arg>         Set a write buffer.
+-M, --max-connections <arg> Set maximum connections (per context).
+-T, --max-threads <arg>     Set maximum threads (per context).
+-B, --backlog <arg>         Set the socket backlog.
+-r, --wwwroot <arg>         Define where to create a new application.
+-F, --default-filter <arg>  Use filter <arg> as the default.
+-t, --hostname <arg>        Respond to requests with this hostname.
+-I, --ip-address <arg>      Respond to requests received at this IP address.
+-h, --help                  Show the help menu.
 </pre>
 
 
-### hypno-harness
+### lxcli
 
-`hypno-harness` handles: 
-
-- Testing of different routes from the command line (without a running server)
+`lxcli` is the tool for managing instances (or applications).  With this, you can build scaffolding for a static website, a Lua-driven site or some other custom message delivery endpoint.
 
 <pre>
-hypno-harness:
--f, --filter <arg>       Specify a filter for testing (required).
--l, --library <arg>      Specify path to library.
--d, --directory <arg>    Specify path to web app directory (required).
--u, --uri <arg>          Specify a URI (required).
--c, --content-type <arg> Specify a content-type for testing.
--n, --host <arg>         Specify a hostname for use w/ the request.
--a, --alias <arg>        Specify an alternate hostname for use w/ the request.
--m, --method <arg>       Specify an HTTP method to be used when making
-                         a request. (GET is default)
--p, --protocol <arg>     Specify alternate protocols (HTTP/1.0, 2.0, etc)
--F, --form <arg>         Specify a body to use when making requests.
--b, --binary <arg>       Specify a body to use when making requests. (assumes multipart)
-                         (Use multiple invocations for additional arguments)
--e, --header <arg>       Specify a header to use when making requests.
-                         (Use multiple invocations for additional arguments)
--M, --multipart          Use a multipart request when using POST or PUT
--S, --msg-only           Show only the message, no header info
--B, --body-to <arg>      Output body to file at <arg>
--H, --headers-to <arg>   Output headers to file at <arg>
--v, --verbose            Be wordy.
--h, --help               Show help and quit.
+-c, --create             Create a new instance.
+-d, --directory <arg>    Define where to create the new instance.
+-n, --fqdn <arg>         Define a fully qualified domain name for this instance.
+-t, --title <arg>        Define an HTML title for this instance.
+-s, --static <arg>       Define static paths that the instance should serve. (Use 
+                         multiple --static flags to specify multiple paths).
+-b, --database <arg>     Define a database connection to use with this instance.
+-V, --version            Show version information and quit.
+-v, --verbose            Tell me everything.
+-h, --help               Show the help menu.
 </pre>
 
 
-### hypno-cli
+### lxconf
 
-`hypno-cli` handles: 
-
-- Creating & modifying instances / applications
+`lxconf` handles creating configuration files.
 
 <pre>
-No options received:
--d, --dir &lt;arg&gt;          Define where to create a new application.
--n, --domain-name &lt;arg&gt;  Define a specific domain for the app.
-    --title &lt;arg&gt;        Define a &lt;title&gt; for the app.
--s, --static &lt;arg&gt;       Define a static path. (Use multiple -s's to
-                         specify multiple paths).
--b, --database &lt;arg&gt;     Define a specific database connection.
--x, --dump-args          Dump passed arguments.
-</pre>
+-c, --create             Create a new instance.
+-o, --output <path>      Put the generated file here.
+-V, --version            Show version information and quit.
+-v, --verbose            Tell me everything.
+-h, --help               Show the help menu.
 
+Server specific:
+
+-w, --wwwroot <arg>      Define a database connection to use with this instance.
+-f, --filter <arg>       Define a DEFAULT filter to use with all instances
+                         associated with this configuration.
+-H, --host <arg>         Define a host to use with this instance.
+
+Instance specific:
+-b, --database <arg>     Define a database connection to use with this instance.
+-t, --type <arg>         Generate a configuration file for either a server or instance.
+-n, --fqdn <arg>         Define a fully qualified domain name for this instance.
+-t, --title <arg>        Define an HTML title for this instance.
+-s, --static <arg>       Define static paths that the instance should serve. (Use 
+</pre>
 <link rel="stylesheet" href="main.css">
