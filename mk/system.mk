@@ -1,5 +1,5 @@
 # system.mk - Builds & installs a new version of Lux system wide
-.system: .system-configure .system-make .system-install .system-env
+.system: veryclean .system-configure .system-make
 	echo "Installed Lux to /usr/local."	
 
 # .system-configure - Configure for a regular system build
@@ -17,11 +17,6 @@
 # .system-make - Run build 
 .system-make:
 	make clangdebug
-
-# .system-install - Install binaries, libraries and a new systemd initialization file
-.system-install:
-	make install
-	systemctl daemon-reload
 
 # .system-uninstall- Uninstall the system build 
 .system-uninstall:
