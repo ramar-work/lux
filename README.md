@@ -3,6 +3,8 @@
 Web application development with Lua.
 
 
+<!--
+
 ## Summary
 
 - Why would I use this?
@@ -11,6 +13,7 @@ Web application development with Lua.
 
 - What can I do with this?
 
+-->
 
 ## Setup 
 
