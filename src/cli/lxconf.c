@@ -47,7 +47,7 @@
   "Instance specific:\n" \
 	"-b, --database <arg>     Define a database connection to use with this instance.\n" \
 	"-n, --fqdn <arg>         Define a fully qualified domain name for this instance.\n" \
-	"-t, --title <arg>        Define an HTML title for this instance.\n" \
+	"-T, --title <arg>        Define an HTML title for this instance.\n" \
 	"-S, --static <arg>       Define static paths that the instance should serve. (Use \n"
 
 
@@ -267,7 +267,7 @@ print_config( &ua );
 
 		// Create an instance config file
 		else if ( ua.type == 'i' ) {
-			path = SHAREDIR "config.instance.lua.in";
+			path = SHAREDIR "config.instance.lua";
 
 			// Define finds and replacements with this weird little structure
 			kset[ 0 ].key = "db"; //, &ua.database, 2 };
