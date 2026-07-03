@@ -14,6 +14,9 @@ include/
 # lib/ should never be tracked
 lib/
 
+# packages / extensions are under development and won't be tracked here
+packages/
+
 # Track nothing in test b/c this is for testing only.
 # TODO: This should probably be installed somewhere else.
 test/**

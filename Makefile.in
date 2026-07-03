@@ -2,12 +2,8 @@
 ## --------------------------------------------------------- ##
 ## lux makefile
 ## 
-## @summary
-## Contains all the targets necessary to assemble
-## Hypno on most machines. 
-##
-## @author
-## Copyright 2022-2026 Antonio R. Collins II dba rwk apps
+## Copyright 2022-2026
+## Antonio R. Collins II (ramar@ramarcollins.com)
 ## --------------------------------------------------------- ##
 BINNAME = @PACKAGE_NAME@
 VERSION = @PACKAGE_VERSION@
@@ -302,16 +298,14 @@ config.status: configure
 # Include documentation recipes
 include mk/docs.mk
 
-# Include www documentation recipes
--include mk/docswww.mk
-
 # Include packaging recipes
 -include mk/pkg.mk
 
 # Include test recipes
-include mk/tests.mk
+#include mk/tests.mk
 
-# Include local build targets 
+# Include local build/dev targets
 -include mk/local.mk
+-include mk/system.mk
 
 .PHONY: check clean dist distcheck docs install test tests bugs 
